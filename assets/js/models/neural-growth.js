@@ -27,7 +27,7 @@ export class NeuralGrowthModel {
     this.description =
       "Learned local update rules grow original organic textures or a published reference across a persistent cellular grid. Choose a pattern and disturb the field to observe regeneration.";
     this.available = true;
-    this.supportsModulation = false;
+    this.supportsModulation = true;
     this.supportsRandomize = false;
     this.statefulSimulation = true;
     this.captureCapabilities = {
@@ -51,6 +51,7 @@ export class NeuralGrowthModel {
     this._clockRunning = false;
     this._lastTick = null;
     this._accumulator = 0;
+    this._queuedDisturbances = [];
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
@@ -87,7 +88,6 @@ export class NeuralGrowthModel {
         max: 120,
         step: 1,
         default: 30,
-        modulation: false,
         help: "Requested updates per second, limited to two per frame. Zero freezes growth; CLOCK pauses without resetting.",
       },
       {
@@ -100,6 +100,62 @@ export class NeuralGrowthModel {
           { value: 256, label: "256 × 256 · more detail" },
         ],
         help: "Changing grid size restarts the simulation. Viewport resolution does not change the grid.",
+      },
+      {
+        key: "rotation",
+        label: "ROTATION",
+        type: "range",
+        min: 0,
+        max: 360,
+        step: 1,
+        default: 0,
+        wrap: true,
+        help: "Rotates directional perception filters in real time without resetting or losing field state.",
+      },
+      {
+        key: "brushRadius",
+        label: "BRUSH RADIUS",
+        type: "range",
+        min: 4,
+        max: 32,
+        step: 1,
+        default: 8,
+        modulation: false,
+        help: "Pointer disturbance brush radius in grid cells.",
+      },
+      {
+        key: "disturbanceMode",
+        label: "DISTURBANCE MODE",
+        type: "select",
+        default: "erase",
+        options: [
+          { value: "erase", label: "Erase · Neutral (0)" },
+          { value: "noise", label: "Noise · Scramble" },
+        ],
+        help: "Interactive disturbance mode: zero channels to neutral or inject high-frequency noise.",
+      },
+      {
+        key: "topology",
+        label: "GRID TOPOLOGY",
+        type: "select",
+        default: "square",
+        options: [
+          { value: "square", label: "Square · 8 Neighbors" },
+          { value: "hexagonal", label: "Hexagonal · 6 Neighbors" },
+        ],
+        help: "Switches cell neighborhood geometry. Hexagonal topology introduces 6-fold radial symmetry.",
+      },
+      {
+        key: "zoom",
+        label: "ZOOM",
+        type: "select",
+        default: 1,
+        options: [
+          { value: 1, label: "1× · Full Field" },
+          { value: 2, label: "2× · Cell Detail" },
+          { value: 4, label: "4× · Pixel Grid" },
+        ],
+        help: "Inspects discrete cell states with nearest-neighbor magnification without altering simulation.",
       },
       {
         key: "palette",
@@ -130,6 +186,9 @@ export class NeuralGrowthModel {
   get activePattern() {
     return this._activePattern;
   }
+  get parameters() {
+    return this._parameters;
+  }
   get technicalInfo() {
     return getPattern(this._activePattern || DEFAULT_PATTERN).technicalInfo;
   }
@@ -149,6 +208,10 @@ export class NeuralGrowthModel {
     );
   }
 
+  get isClockRunning() {
+    return this._clockRunning;
+  }
+
   setClockRunning(running) {
     if (this._clockRunning !== Boolean(running)) {
       this._lastTick = null;
@@ -162,6 +225,7 @@ export class NeuralGrowthModel {
     this._abort?.abort();
     this._abort = null;
     this._loadingPattern = false;
+    this._queuedDisturbances = [];
     this.setClockRunning(false);
   }
 
@@ -225,6 +289,10 @@ export class NeuralGrowthModel {
           if (checkpoint.id !== pattern.id)
             throw new Error("Checkpoint does not match the selected pattern.");
           this._checkpoints.set(pattern.id, checkpoint);
+          if (this._checkpoints.size > 16) {
+            const oldestKey = this._checkpoints.keys().next().value;
+            this._checkpoints.delete(oldestKey);
+          }
         } finally {
           if (this._abort === abort) {
             this._abort = null;
@@ -274,6 +342,7 @@ export class NeuralGrowthModel {
       this.lastError = null;
       this._failedConfiguration = null;
       runtimeOperation = true;
+      this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
         if (this._lastTick !== null) {
           const delta = Math.max(
@@ -285,12 +354,19 @@ export class NeuralGrowthModel {
             this._accumulator + delta * parameters.growthSpeed,
           );
           const count = Math.floor(this._accumulator + 1e-9);
-          if (count) this._runtime.step(count);
+          if (count) {
+            const angleRad =
+              (Number(parameters.rotation || 0) * Math.PI) / 180;
+            this._runtime.step(count, {
+              rotation: angleRad,
+              topology: parameters.topology,
+            });
+          }
           this._accumulator -= count;
         }
         this._lastTick = timeSeconds;
       }
-      this._runtime.draw(canvas, parameters.palette);
+      this._runtime.draw(canvas, parameters.palette, parameters.zoom);
       return this._result();
     } catch (error) {
       candidate?.dispose();
@@ -338,7 +414,13 @@ export class NeuralGrowthModel {
 
   step() {
     if (!this.ready) return;
-    this._runRuntime(() => this._runtime.step(1));
+    const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
+    this._runRuntime(() =>
+      this._runtime.step(1, {
+        rotation: angleRad,
+        topology: this._parameters.topology,
+      }),
+    );
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -351,12 +433,83 @@ export class NeuralGrowthModel {
     } else {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
+    this._queuedDisturbances = [];
     this._lastTick = null;
     this._accumulator = 0;
   }
 
+  queueDisturbance(
+    x,
+    y,
+    radius = Number(this._parameters.brushRadius) ||
+      Math.max(2, Math.round(this.simulationSize * 0.06)),
+    mode = this._parameters.disturbanceMode || "erase",
+  ) {
+    if (!this.ready) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const size = this.simulationSize;
+    const clampedX = Math.max(0, Math.min(size - 1, Math.round(x)));
+    const clampedY = Math.max(0, Math.min(size - 1, Math.round(y)));
+    const clampedRadius = Math.max(
+      1,
+      Math.min(Math.floor(size / 2), Math.round(radius)),
+    );
+    if (this._queuedDisturbances.length >= 64) {
+      this._queuedDisturbances.shift();
+    }
+    this._queuedDisturbances.push({
+      x: clampedX,
+      y: clampedY,
+      radius: clampedRadius,
+      mode,
+    });
+  }
+
+  queueDisturbanceStroke(
+    x0,
+    y0,
+    x1,
+    y1,
+    radius = Number(this._parameters.brushRadius) ||
+      Math.max(2, Math.round(this.simulationSize * 0.06)),
+    mode = this._parameters.disturbanceMode || "erase",
+  ) {
+    if (!this.ready) return;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.hypot(dx, dy);
+    const step = Math.max(1, radius * 0.5);
+    const count = Math.min(32, Math.max(1, Math.ceil(dist / step)));
+    for (let i = 0; i <= count; i += 1) {
+      const t = count === 0 ? 0 : i / count;
+      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode);
+    }
+  }
+
+  _drainDisturbances() {
+    if (!this._runtime || this._queuedDisturbances.length === 0) return false;
+    let applied = false;
+    while (this._queuedDisturbances.length > 0) {
+      const { x, y, radius, mode } = this._queuedDisturbances.shift();
+      try {
+        if (mode && mode !== "erase") {
+          this._runtime.disturb(x, y, radius, mode);
+        } else {
+          this._runtime.disturb(x, y, radius);
+        }
+        applied = true;
+      } catch (_) {
+        // Silently drop invalid coordinates
+      }
+    }
+    return applied;
+  }
+
   disturb(x, y, radius = Math.max(2, Math.round(this.simulationSize * 0.06))) {
-    if (this.ready) this._runRuntime(() => this._runtime.disturb(x, y, radius));
+    if (this.ready) {
+      this.queueDisturbance(x, y, radius);
+      this._drainDisturbances();
+    }
   }
 
   renderSnapshot(canvas) {
@@ -365,7 +518,7 @@ export class NeuralGrowthModel {
         this.lastError || "Wait for Neural Growth to initialize.",
       );
     this._runRuntime(() =>
-      this._runtime.draw(canvas, this._parameters.palette),
+      this._runtime.draw(canvas, this._parameters.palette, 1),
     );
   }
 

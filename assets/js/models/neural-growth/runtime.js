@@ -35,9 +35,14 @@ const PERCEPTION = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_shuffle;
 uniform ivec2 u_offset;
+uniform float u_angle;
+uniform int u_topology;
 const int SX[9] = int[9](-1, 0, 1, -2, 0, 2, -1, 0, 1);
 const int SY[9] = int[9](-1, -2, -1, 0, 0, 0, 1, 2, 1);
 const int LP[9] = int[9](1, 2, 1, 2, -12, 2, 1, 2, 1);
+const float HEX_SX[6] = float[6](2.0, -2.0, 1.0, -1.0, 1.0, -1.0);
+const float HEX_SY[6] = float[6](0.0, 0.0, 1.7320508, 1.7320508, -1.7320508, -1.7320508);
+const float HEX_LP[6] = float[6](2.0, 2.0, 2.0, 2.0, 2.0, 2.0);
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int group = p.x / u_size;
@@ -49,21 +54,56 @@ void main() {
     out_color = texelFetch(u_state, ivec2(xy.x + inputGroup * u_size, xy.y), 0);
     return;
   }
-  ivec4 result = ivec4(0);
-  for (int y = 0; y < 3; y++) {
-    for (int x = 0; x < 3; x++) {
-      ivec2 cell = wrapCell(xy + ivec2(x - 1, y - 1));
-      ivec4 value = ivec4(round(texelFetch(u_state, ivec2(cell.x + inputGroup * u_size, cell.y), 0) * 255.0)) - ivec4(127);
-      int k = y * 3 + x;
-      int coefficient = band == 1 ? SX[k] : (band == 2 ? SY[k] : LP[k]);
+  float cosA = cos(u_angle);
+  float sinA = sin(u_angle);
+  vec4 result = vec4(0.0);
+  if (u_topology == 0) {
+    for (int y = 0; y < 3; y++) {
+      for (int x = 0; x < 3; x++) {
+        ivec2 cell = wrapCell(xy + ivec2(x - 1, y - 1));
+        vec4 value = vec4(round(texelFetch(u_state, ivec2(cell.x + inputGroup * u_size, cell.y), 0) * 255.0)) - 127.0;
+        int k = y * 3 + x;
+        float coefficient = band == 1
+          ? (float(SX[k]) * cosA + float(SY[k]) * sinA)
+          : (band == 2
+            ? (-float(SX[k]) * sinA + float(SY[k]) * cosA)
+            : float(LP[k]));
+        result += value * coefficient;
+      }
+    }
+  } else {
+    int parity = xy.y % 2;
+    ivec2 hexOffsets[6];
+    hexOffsets[0] = ivec2(1, 0);
+    hexOffsets[1] = ivec2(-1, 0);
+    if (parity == 0) {
+      hexOffsets[2] = ivec2(0, 1);
+      hexOffsets[3] = ivec2(-1, 1);
+      hexOffsets[4] = ivec2(0, -1);
+      hexOffsets[5] = ivec2(-1, -1);
+    } else {
+      hexOffsets[2] = ivec2(1, 1);
+      hexOffsets[3] = ivec2(0, 1);
+      hexOffsets[4] = ivec2(1, -1);
+      hexOffsets[5] = ivec2(0, -1);
+    }
+    for (int i = 0; i < 6; i++) {
+      ivec2 cell = wrapCell(xy + hexOffsets[i]);
+      vec4 value = vec4(round(texelFetch(u_state, ivec2(cell.x + inputGroup * u_size, cell.y), 0) * 255.0)) - 127.0;
+      float coefficient = band == 1
+        ? (HEX_SX[i] * cosA + HEX_SY[i] * sinA)
+        : (band == 2
+          ? (-HEX_SX[i] * sinA + HEX_SY[i] * cosA)
+          : HEX_LP[i]);
       result += value * coefficient;
     }
+    if (band == 3) {
+      vec4 centerVal = vec4(round(texelFetch(u_state, ivec2(xy.x + inputGroup * u_size, xy.y), 0) * 255.0)) - 127.0;
+      result -= centerVal * 12.0;
+    }
   }
-  // The kernels have integer coefficients divided by eight. Accumulating in
-  // byte space and choosing nearest/half-up explicitly removes renderer-specific
-  // UNORM half-tie behavior without changing the kernels or learned weights.
-  ivec4 encoded = clamp((result + ivec4(127 * 8 + 4)) / 8, ivec4(0), ivec4(255));
-  out_color = vec4(encoded) / 255.0;
+  vec4 encoded = clamp(floor((result + 1020.0) / 8.0), 0.0, 255.0);
+  out_color = encoded / 255.0;
 }`;
 
 function denseShader(inputs, hiddenInput, hiddenOutput) {
@@ -112,11 +152,25 @@ const DISTURB = `${PREFIX}
 uniform sampler2D u_state;
 uniform ivec2 u_center;
 uniform float u_radius;
+uniform int u_mode;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec2 distance = vec2(abs(ivec2(p.x % u_size, p.y) - u_center));
   distance = min(distance, vec2(float(u_size)) - distance);
-  out_color = length(distance) <= u_radius ? vec4(127.0 / 255.0) : texelFetch(u_state, p, 0);
+  if (length(distance) <= u_radius) {
+    if (u_mode == 1) {
+      vec2 coord = vec2(p);
+      float n1 = fract(sin(dot(coord, vec2(12.9898, 78.233))) * 43758.5453);
+      float n2 = fract(sin(dot(coord + vec2(17.1, 41.3), vec2(39.346, 11.135))) * 23421.631);
+      float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
+      float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
+      out_color = vec4(n1, n2, n3, n4);
+    } else {
+      out_color = vec4(127.0 / 255.0);
+    }
+  } else {
+    out_color = texelFetch(u_state, p, 0);
+  }
 }`;
 
 const VISUALIZE = `${PREFIX}
@@ -247,6 +301,8 @@ export class TextureNcaRuntime {
       this.weights = model.layers.map((layer) =>
         this.allocate(layer.shape[1] / 4, layer.shape[0], false, layer.weights),
       );
+      this.rotation = 0;
+      this.topology = "square";
       this.restart(seed);
       if (gl.getError() !== gl.NO_ERROR)
         throw new Error("WebGL initialization failed.");
@@ -333,7 +389,8 @@ export class TextureNcaRuntime {
     }
     for (const [key, value] of Object.entries(uniforms)) {
       if (Array.isArray(value)) gl.uniform2i(location(key), value[0], value[1]);
-      else if (key === "u_palette") gl.uniform1i(location(key), value);
+      else if (key === "u_palette" || key === "u_topology")
+        gl.uniform1i(location(key), value);
       else gl.uniform1f(location(key), value);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -370,8 +427,10 @@ export class TextureNcaRuntime {
     this.steps = 0;
   }
 
-  step(count = 1) {
+  step(count = 1, { rotation = this.rotation, topology = this.topology } = {}) {
     this.assertActive();
+    this.rotation = Number(rotation) || 0;
+    this.topology = topology === "hexagonal" ? "hexagonal" : "square";
     if (!Number.isInteger(count) || count < 0 || count > 128)
       throw new RangeError("Step count must be between zero and 128.");
     for (let index = 0; index < count; index += 1) {
@@ -383,7 +442,11 @@ export class TextureNcaRuntime {
         "perception",
         this.perception,
         { u_state: this.state, u_shuffle: this.shuffleTexture },
-        { u_offset: this.lastOffset },
+        {
+          u_offset: this.lastOffset,
+          u_angle: this.rotation,
+          u_topology: this.topology === "hexagonal" ? 1 : 0,
+        },
       );
       this.run(
         "hidden",
@@ -412,7 +475,7 @@ export class TextureNcaRuntime {
     }
   }
 
-  disturb(x, y, radius) {
+  disturb(x, y, radius = 8, mode = "erase") {
     this.assertActive();
     if (
       ![x, y, radius].every(Number.isFinite) ||
@@ -431,12 +494,12 @@ export class TextureNcaRuntime {
       "disturb",
       this.nextState,
       { u_state: this.state },
-      { u_center: [x, y], u_radius: radius },
+      { u_center: [x, y], u_radius: radius, u_mode: mode === "noise" ? 1 : 0 },
     );
     [this.state, this.nextState] = [this.nextState, this.state];
   }
 
-  draw(targetCanvas, palette = "native") {
+  draw(targetCanvas, palette = "native", zoom = 1) {
     this.assertActive();
     if (!["native", "spectral"].includes(palette))
       throw new Error("Unknown display palette.");
@@ -451,9 +514,16 @@ export class TextureNcaRuntime {
     const extent = Math.min(targetCanvas.width, targetCanvas.height);
     context.fillStyle = "#101218";
     context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-    context.imageSmoothingEnabled = true;
+    const z = Math.max(1, Math.min(8, Number(zoom) || 1));
+    context.imageSmoothingEnabled = z === 1;
+    const srcExtent = this.size / z;
+    const srcOffset = (this.size - srcExtent) / 2;
     context.drawImage(
       this.canvas,
+      srcOffset,
+      srcOffset,
+      srcExtent,
+      srcExtent,
       (targetCanvas.width - extent) / 2,
       (targetCanvas.height - extent) / 2,
       extent,

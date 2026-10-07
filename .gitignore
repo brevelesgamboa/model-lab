@@ -6,6 +6,8 @@ node_modules/
 /models/neural-growth/*
 !/models/neural-growth/checkpoint.json
 !/models/neural-growth/NOTICE.md
+!/models/neural-growth/reference/
+!/models/neural-growth/previews/
 !/models/neural-growth/organic-structures/
 /models/neural-growth/organic-structures/*
 !/models/neural-growth/organic-structures/membrane-field.json

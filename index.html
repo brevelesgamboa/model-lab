@@ -110,6 +110,7 @@
 
                 <section id="growth-tools" class="growth-tools" aria-label="Neural Growth actions" hidden>
                   <div class="growth-tools__actions">
+                    <button id="open-growth-gallery" class="mini-button mini-button--highlight" type="button">PATTERN GALLERY</button>
                     <button id="step-growth" class="mini-button" type="button">SINGLE STEP</button>
                     <button id="restart-growth" class="mini-button" type="button">RESTART</button>
                     <button id="disturb-growth" class="mini-button" type="button">DISTURB CENTER</button>
@@ -1169,6 +1170,41 @@
               <button id="export-modal-cancel" class="action-button action-button--secondary" type="button">CANCEL</button>
               <button id="export-modal-confirm" class="action-button" type="button">EXPORT PNG</button>
             </div>
+          </div>
+        </dialog>
+
+        <dialog id="growth-gallery-dialog" class="growth-gallery-dialog" aria-labelledby="growth-gallery-title">
+          <div class="growth-gallery">
+            <header class="growth-gallery__header">
+              <div class="growth-gallery__title-group">
+                <h2 id="growth-gallery-title" class="growth-gallery__title">PATTERN GALLERY</h2>
+                <span id="growth-gallery-count" class="growth-gallery__count">69 patterns</span>
+              </div>
+              <button id="close-growth-gallery" class="growth-gallery__close-button" type="button" aria-label="Close pattern gallery">✕</button>
+            </header>
+            <div class="growth-gallery__toolbar">
+              <div class="growth-gallery__search-wrapper">
+                <input
+                  id="growth-gallery-search"
+                  class="growth-gallery__search"
+                  type="search"
+                  placeholder="Search 69 patterns (e.g. bubbly, mixed4c, honeycombed)..."
+                  autocomplete="off"
+                />
+              </div>
+              <div id="growth-gallery-tabs" class="growth-gallery__tabs" role="tablist">
+                <button class="growth-gallery__tab is-active" type="button" role="tab" data-filter="all">All (69)</button>
+                <button class="growth-gallery__tab" type="button" role="tab" data-filter="texture">Textures (39)</button>
+                <button class="growth-gallery__tab" type="button" role="tab" data-filter="inception">Inception (27)</button>
+                <button class="growth-gallery__tab" type="button" role="tab" data-filter="organic">Originals (3)</button>
+                <button class="growth-gallery__tab" type="button" role="tab" data-filter="favorites">Favorites (<span id="growth-favorites-count">0</span>)</button>
+              </div>
+            </div>
+            <div id="growth-recent-strip" class="growth-gallery__recent" hidden>
+              <span class="growth-gallery__recent-label">RECENT:</span>
+              <div id="growth-recent-items" class="growth-gallery__recent-items"></div>
+            </div>
+            <div id="growth-gallery-grid" class="growth-gallery__grid" role="listbox"></div>
           </div>
         </dialog>
       </main>

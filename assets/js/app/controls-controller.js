@@ -30,11 +30,21 @@ export function precisionFromStep(step) {
 }
 
 export function coerceRangeValue(definition, value) {
-  const numeric = clamp(
-    Number(value),
-    Number(definition.min),
-    Number(definition.max),
-  );
+  let numeric = Number(value);
+  if (definition.wrap) {
+    const span = Number(definition.max) - Number(definition.min);
+    if (span > 0) {
+      numeric =
+        ((((numeric - Number(definition.min)) % span) + span) % span) +
+        Number(definition.min);
+    }
+  } else {
+    numeric = clamp(
+      numeric,
+      Number(definition.min),
+      Number(definition.max),
+    );
+  }
   if (definition.format === "integer" || Number(definition.step) >= 1)
     return Math.round(numeric);
   return Number(
@@ -307,6 +317,11 @@ export function createControlsController({
         const modulationToggle = document.createElement("button");
         modulationToggle.type = "button";
         modulationToggle.className = "modulation-toggle";
+        modulationToggle.dataset.key = definition.key;
+        modulationToggle.setAttribute(
+          "aria-label",
+          `Toggle modulation for ${definition.label}`,
+        );
         modulationToggle.textContent = "MOD";
         const config = currentLfoState[definition.key] || defaultLfoConfig();
         currentLfoState[definition.key] = config;

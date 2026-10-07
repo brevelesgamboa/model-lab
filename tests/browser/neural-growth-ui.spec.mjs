@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(0);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(2);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeDisabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -130,6 +130,11 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
     .getByLabel("DISPLAY PALETTE", { exact: true })
     .selectOption("spectral");
   await page.getByLabel("GROWTH SPEED exact value", { exact: true }).fill("60");
+  await page.getByLabel("ROTATION exact value", { exact: true }).fill("90");
+  await page
+    .getByLabel("GRID TOPOLOGY", { exact: true })
+    .selectOption("hexagonal");
+  await page.getByLabel("ZOOM", { exact: true }).selectOption("2");
   await page.getByLabel("SEED", { exact: true }).fill("");
   await page.locator("#quality-select").selectOption("economy");
   await page.setViewportSize({ width: 1000, height: 800 });
@@ -260,6 +265,73 @@ test("pointer disturbance uses the displayed field's bottom-up coordinates", asy
     .poll(() => page.evaluate(() => window.__lastDisturbance))
     .toEqual([64, 95, 8]);
   expect((await state(page)).steps).toBe(2);
+});
+
+test("continuous pointer dragging during live growth does not interrupt or reset steps", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.locator("#toggle-animation").click();
+  await expect.poll(async () => (await state(page)).steps).toBeGreaterThan(2);
+
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const rect = await canvas.boundingBox();
+  const side = Math.min(rect.width, rect.height);
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
+  const startX = centerX - side * 0.25;
+  const startY = centerY - side * 0.25;
+  const endX = centerX + side * 0.25;
+  const endY = centerY + side * 0.25;
+
+  const stepsBefore = (await state(page)).steps;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) {
+    await page.mouse.move(
+      startX + (endX - startX) * (i / 5),
+      startY + (endY - startY) * (i / 5),
+    );
+    await page.waitForTimeout(50);
+  }
+  await page.mouse.up();
+
+  const stepsAfter = (await state(page)).steps;
+  expect(stepsAfter).toBeGreaterThan(stepsBefore);
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
+});
+
+test("drawing while paused modifies the field without advancing simulation steps or starting clock", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "1",
+  );
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: OFF");
+  const before = await state(page);
+
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const rect = await canvas.boundingBox();
+  const side = Math.min(rect.width, rect.height);
+  const centerX = rect.x + rect.width / 2;
+  const centerY = rect.y + rect.height / 2;
+  await page.mouse.move(centerX - side * 0.2, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + side * 0.2, centerY);
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => (await state(page)).hash)
+    .not.toBe(before.hash);
+
+  const after = await state(page);
+  expect(after.steps).toBe(before.steps);
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: OFF");
 });
 
 test("failed checkpoint loading latches once and Restart retries cleanly", async ({
@@ -456,3 +528,73 @@ test("all original checkpoints grow in the app, fit narrow layouts, and snapshot
   await download;
   expect(await state(page)).toEqual(before);
 });
+
+test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and switches models", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const galleryBtn = page.locator("#open-growth-gallery");
+  await expect(galleryBtn).toBeVisible();
+  await galleryBtn.click();
+
+  const dialog = page.locator("#growth-gallery-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#growth-gallery-count")).toContainText("69");
+
+  // Filter tab: Textures (39)
+  await page.locator(".growth-gallery__tab[data-filter='texture']").click();
+  await expect(page.locator("#growth-gallery-count")).toContainText("39");
+
+  // Search filter
+  const searchInput = page.locator("#growth-gallery-search");
+  await searchInput.fill("bubbly");
+  await expect(page.locator("#growth-gallery-count")).toContainText("2");
+
+  // Favorite bookmarking
+  const favBtn = page.locator(".growth-gallery__fav-btn").first();
+  await favBtn.click();
+  await expect(favBtn).toHaveClass(/is-fav/);
+  await expect(page.locator("#growth-favorites-count")).toHaveText("1");
+
+  // Filter tab: Favorites (1)
+  await searchInput.fill("");
+  await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
+  await expect(page.locator("#growth-gallery-count")).toContainText("1");
+
+  // Select pattern from gallery
+  const card = page.locator(".growth-gallery__card").first();
+  await card.click();
+  await expect(dialog).not.toBeVisible();
+
+  // Selected pattern should now be loaded
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+    .toBe("bubbly-0101");
+});
+
+test("continuous rotation and growth speed expose modulation controls with circular wrapping", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  // Ensure rotation has MOD button and circular wrap works
+  const rotationMod = page.locator('button.modulation-toggle[data-key="rotation"]');
+  await expect(rotationMod).toBeVisible();
+
+  const speedMod = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
+  await expect(speedMod).toBeVisible();
+
+  // Test circular wrap on rotation
+  const wrapped = await page.evaluate(async () => {
+    const { coerceRangeValue } = await import(
+      "/assets/js/app/controls-controller.js"
+    );
+    const def = { min: 0, max: 360, step: 1, wrap: true };
+    return [
+      coerceRangeValue(def, 375),
+      coerceRangeValue(def, -15),
+      coerceRangeValue(def, 720),
+    ];
+  });
+  expect(wrapped).toEqual([15, 345, 0]);
+});
+

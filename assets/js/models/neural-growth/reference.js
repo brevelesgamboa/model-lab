@@ -39,7 +39,7 @@ export function validateSeed(seed) {
 export function validateCheckpoint(input) {
   if (!input || input.format !== PROFILE)
     throw new Error("Unsupported Texture NCA profile.");
-  if (typeof input.id !== "string" || !/^[a-z0-9-]{1,64}$/.test(input.id)) {
+  if (typeof input.id !== "string" || !/^[a-z0-9_-]{1,64}$/.test(input.id)) {
     throw new Error("Invalid checkpoint identifier.");
   }
   if (

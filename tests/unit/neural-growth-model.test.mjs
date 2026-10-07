@@ -79,7 +79,7 @@ function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
 test("Growth declares explicit capture and modulation capabilities", () => {
   const model = new NeuralGrowthModel();
   validateModelDefinition(model);
-  assert.equal(model.supportsModulation, false);
+  assert.equal(model.supportsModulation, true);
   assert.deepEqual(captureCapabilities(model), {
     png: true,
     gif: false,
@@ -110,7 +110,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
   );
 });
 
-test("redraws, palette, speed, viewport and snapshots do not reset or advance state", async (context) => {
+test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
   model.step();
@@ -118,7 +118,14 @@ test("redraws, palette, speed, viewport and snapshots do not reset or advance st
   model.setClockRunning(true);
   await model.render(
     canvas,
-    { ...params, palette: "spectral", growthSpeed: 60 },
+    {
+      ...params,
+      palette: "spectral",
+      growthSpeed: 60,
+      rotation: 180,
+      topology: "hexagonal",
+      zoom: 2,
+    },
     100,
   );
   canvas.width = 512;
@@ -128,6 +135,37 @@ test("redraws, palette, speed, viewport and snapshots do not reset or advance st
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].restarts, 0);
   assert.deepEqual(runtimes[0].disturbances, [[12, 34, 8]]);
+});
+
+test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+
+  model.queueDisturbance(10, 20, 6);
+  assert.equal(runtimes[0].disturbances.length, 0);
+
+  await model.render(canvas, params, 1);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.deepEqual(runtimes[0].disturbances[0], [10, 20, 6]);
+
+  runtimes[0].disturbances.length = 0;
+  model.queueDisturbanceStroke(10, 10, 10, 30, 4);
+  assert.equal(runtimes[0].disturbances.length, 0);
+  await model.render(canvas, params, 2);
+  assert.ok(runtimes[0].disturbances.length >= 5);
+  assert.deepEqual(runtimes[0].disturbances[0], [10, 10, 4]);
+  assert.deepEqual(
+    runtimes[0].disturbances[runtimes[0].disturbances.length - 1],
+    [10, 30, 4],
+  );
+
+  runtimes[0].disturbances.length = 0;
+  for (let i = 0; i < 100; i += 1) {
+    model.queueDisturbance(i, i, 4);
+  }
+  await model.render(canvas, params, 3);
+  assert.equal(runtimes[0].disturbances.length, 64);
+  assert.deepEqual(runtimes[0].disturbances[63], [99, 99, 4]);
 });
 
 test("seed resets once, grid replacement disposes once, and model switching retains state", async (context) => {
