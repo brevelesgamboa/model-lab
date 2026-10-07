@@ -1,0 +1,23 @@
+# Dependencies & Build Artifacts
+node_modules/
+dist/
+package-lock.json
+
+# Model Binaries & Weight Files (Very token-heavy)
+models/
+*.onnx
+*.pt
+*.bin
+*.weights
+
+# Git & Logs
+.git/
+*.log
+
+# Static assets & media
+assets/models/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg

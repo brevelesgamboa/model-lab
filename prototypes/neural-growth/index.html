@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neural Growth — Development Prototype</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <p class="eyebrow">Latent Field / Development Prototype</p>
+        <h1>Neural Growth</h1>
+        <p class="introduction">
+          A learned local update rule evolves a persistent cellular state. This
+          is a texture model, not a simulation of biological tissue.
+        </p>
+      </header>
+
+      <section class="workspace" aria-label="Neural cellular automaton">
+        <div class="viewport-panel">
+          <div class="viewport-header">
+            <span id="run-state" role="status">Loading checkpoint</span>
+            <span id="grid-status">128 × 128 cells</span>
+          </div>
+          <div class="canvas-container">
+            <canvas
+              id="growth-canvas"
+              width="768"
+              height="768"
+              aria-label="Evolving neural texture. Click or drag to disturb cells."
+            ></canvas>
+          </div>
+          <div class="viewport-footer">
+            <span id="step-status">0 updates</span>
+            <span>Click or drag to disturb</span>
+          </div>
+        </div>
+
+        <aside class="controls-panel" aria-label="Simulation controls">
+          <div class="pattern-information">
+            <span class="control-label">Pattern</span>
+            <h2>Vesicle Study</h2>
+            <p>Reference checkpoint: <code>mixed4c_439</code></p>
+          </div>
+
+          <div class="playback-actions">
+            <button id="play-toggle" type="button" disabled>Play</button>
+            <button id="single-step" type="button" disabled>Single step</button>
+          </div>
+          <div class="secondary-actions">
+            <button id="restart" type="button" disabled>Restart</button>
+            <button id="disturb" type="button" disabled>Disturb center</button>
+          </div>
+
+          <fieldset id="settings" disabled>
+            <legend>Simulation settings</legend>
+            <label for="seed">Initialization seed</label>
+            <input
+              id="seed"
+              type="number"
+              min="0"
+              max="4294967295"
+              step="1"
+              value="1"
+            />
+
+            <label for="grid-size">Simulation grid</label>
+            <select id="grid-size">
+              <option value="128">128 × 128</option>
+              <option value="256">256 × 256</option>
+            </select>
+
+            <label class="range-label" for="growth-speed">
+              <span>Growth speed</span>
+              <output id="speed-value" for="growth-speed">30 updates/s</output>
+            </label>
+            <input
+              id="growth-speed"
+              type="range"
+              min="0"
+              max="120"
+              step="1"
+              value="30"
+            />
+
+            <label for="palette">Display palette</label>
+            <select id="palette">
+              <option value="native">Native</option>
+              <option value="spectral">Spectral</option>
+            </select>
+          </fieldset>
+
+          <p class="setting-note">
+            Seed and grid changes restart the state. Speed and palette changes
+            preserve it. Hidden tabs pause automatically.
+          </p>
+          <button id="snapshot" class="snapshot-action" type="button" disabled>
+            Save PNG snapshot
+          </button>
+          <p id="load-error" class="error-message" role="alert" hidden></p>
+        </aside>
+      </section>
+
+      <footer class="page-footer">
+        <p id="backend-status">WebGL2 availability will be checked on load.</p>
+        <p>
+          Based on the
+          <a
+            href="https://github.com/google-research/self-organising-systems/tree/master/self_organising_systems/texture_ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Google research Texture NCA implementation</a
+          >. <a href="./PROVENANCE.md">Checkpoint provenance</a> ·
+          <a href="./licenses/Apache-2.0.txt">Upstream license</a>
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="./controller.js"></script>
+  </body>
+</html>

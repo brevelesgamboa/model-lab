@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Latent Field — ONNX runtime check</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        color: #ddd;
+        background: #08080a;
+        font:
+          14px/1.6 ui-monospace,
+          monospace;
+      }
+      main {
+        max-width: 900px;
+        margin: 24px auto;
+      }
+      button {
+        font: inherit;
+        padding: 10px 16px;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>ONNX runtime check</h1>
+      <p>
+        Loads the bundled DigiFace decoder and validates an inference. This does
+        not load Inception or measure interactive performance.
+      </p>
+      <button id="run-check" type="button">Run check</button>
+      <pre id="log" aria-live="polite">Ready.</pre>
+      <p><a href="./">Return to Latent Field</a></p>
+    </main>
+    <script
+      type="module"
+      src="./assets/js/diagnostics/runtime-check.js"
+    ></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+node_modules/
+.aider*
+# Keep local experiments out of Git; existing verified release weights remain tracked.
+/models/*
+!/models/neural-growth/
+/models/neural-growth/*
+!/models/neural-growth/checkpoint.json
+!/models/neural-growth/NOTICE.md
+*.bin
+*.onnx
+*.tar.gz
+/dist/
+/assets/vendor/
+/runtime/
+/test-results/
+/playwright-report/

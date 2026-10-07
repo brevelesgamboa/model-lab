@@ -1,0 +1,1216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="LATENT FIELD is a local-first browser laboratory for generative models, mathematical fields, local datasets, and saved visual experiments."
+    />
+    <title>latent field</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 fill=%22%23000%22/%3E%3Cpath d=%22M12 32h40M32 12v40%22 stroke=%22%237254f4%22 stroke-width=%226%22/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gajraj+One&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <script type="module" src="assets/js/bootstrap.js"></script>
+  </head>
+  <body>
+    <noscript>
+      <div class="noscript">JavaScript is required to run LATENT FIELD.</div>
+    </noscript>
+
+    <div id="site" class="site is-visible" aria-hidden="false">
+      <section class="app-window" aria-label="LATENT FIELD application">
+        <header class="masthead">
+          <div class="brand-lockup">
+            <button
+              id="brand-home"
+              class="brand-home"
+              type="button"
+              aria-label="Open lab"
+            >
+              LATENT FIELD
+            </button>
+            <span class="brand-subtitle">LOCAL GENERATIVE MODEL LAB</span>
+          </div>
+
+          <div class="masthead__tools" aria-label="Lab layout controls">
+            <label class="quality-control">
+              <span>QUALITY</span>
+              <select id="quality-select" aria-label="Output quality"></select>
+            </label>
+            <button
+              id="toggle-input"
+              class="utility-button is-active"
+              type="button"
+              aria-pressed="true"
+            >
+              INPUT
+            </button>
+            <button
+              id="toggle-terminal"
+              class="utility-button"
+              type="button"
+              aria-pressed="false"
+            >
+              LOG
+            </button>
+          </div>
+
+          <nav class="nav" aria-label="Primary navigation">
+            <button class="nav__item is-active" type="button" data-view="lab">
+              LAB
+            </button>
+            <button class="nav__item" type="button" data-view="archive">
+              SAVED RUNS
+            </button>
+            <button class="nav__item" type="button" data-view="experiments">
+              EXPERIMENTS
+            </button>
+            <button class="nav__item" type="button" data-view="about">
+              ABOUT
+            </button>
+          </nav>
+        </header>
+
+        <main class="app-main">
+          <section id="view-lab" class="view is-active" data-view-panel="lab">
+            <div id="lab-grid" class="lab-grid">
+              <aside class="panel input-panel">
+                <div class="panel-heading">
+                  <h1 class="panel__title">Parameters</h1>
+                  <span class="panel-code">INPUT</span>
+                </div>
+
+                <label class="field field--model">
+                  <span>MODEL ROUTE</span>
+                  <select id="model-select" aria-label="Model route"></select>
+                </label>
+
+                <div class="model-readout">
+                  <span id="model-family">MODEL FAMILY: —</span>
+                  <span id="model-backend">BACKEND: —</span>
+                  <p id="model-description">Select a model route.</p>
+
+                  <details id="model-info" class="model-info" hidden>
+                    <summary>MODEL INFO</summary>
+                    <div
+                      id="model-info-content"
+                      class="model-info__content"
+                    ></div>
+                  </details>
+                </div>
+
+                <section id="growth-tools" class="growth-tools" aria-label="Neural Growth actions" hidden>
+                  <div class="growth-tools__actions">
+                    <button id="step-growth" class="mini-button" type="button">SINGLE STEP</button>
+                    <button id="restart-growth" class="mini-button" type="button">RESTART</button>
+                    <button id="disturb-growth" class="mini-button" type="button">DISTURB CENTER</button>
+                  </div>
+                  <p id="growth-status" class="field__help" role="status" aria-live="off"></p>
+                </section>
+
+                <details id="advanced-controls" class="advanced-controls" open>
+                  <summary>MODEL CONTROLS</summary>
+                  <div id="parameter-controls" class="parameter-controls"></div>
+                </details>
+
+                <div id="input-actions" class="input-actions">
+                  <button
+                    id="run-experiment"
+                    class="action-button"
+                    type="button"
+                  >
+                    SAVE RUN
+                  </button>
+                  <button
+                    id="randomize-all"
+                    class="action-button action-button--secondary"
+                    type="button"
+                  >
+                    RANDOMIZE
+                  </button>
+                </div>
+              </aside>
+
+              <section id="output-panel" class="panel output-panel">
+                <div class="panel-heading panel-heading--output">
+                  <h1 class="panel__title">Output</h1>
+                  <span id="output-resolution" class="panel-code"
+                    >512 × 512</span
+                  >
+                </div>
+
+                <div id="fractal-tools" class="fractal-tools" hidden>
+                  <div class="fractal-explore-actions">
+                    <span id="explore-hint" class="explore-hint"
+                      >DRAG TO EXPLORE</span
+                    >
+                    <label id="fractal-examples-tool" class="fractal-examples-tool"
+                      ><span>CLASSIC EXAMPLES</span
+                      ><select
+                        id="classic-fractal-view"
+                        aria-label="Classic fractal examples"
+                      ></select
+                    ></label>
+                  </div>
+                </div>
+
+                <div id="neural-dream-tools" class="neural-dream-tools" hidden>
+                  <div class="neural-dream-tools__source">
+                    <label
+                      class="mini-button mini-button--active"
+                      for="neural-dream-image"
+                      >CHOOSE IMAGE</label
+                    >
+                    <input
+                      id="neural-dream-image"
+                      class="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                    />
+                    <button
+                      id="load-neural-dream"
+                      class="mini-button"
+                      type="button"
+                    >
+                      LOAD GPU MODEL
+                    </button>
+                    <span id="neural-dream-status">ADD A LOCAL IMAGE</span>
+                  </div>
+                  <div
+                    class="neural-dream-tools__modes"
+                    role="group"
+                    aria-label="InceptionV3 source and feature ascent"
+                  >
+                    <button
+                      class="mini-button mini-button--active"
+                      type="button"
+                      data-dream-mode="original"
+                      aria-pressed="true"
+                    >
+                      SOURCE
+                    </button>
+                    <button
+                      id="neural-dream-run-btn"
+                      class="mini-button"
+                      type="button"
+                      data-dream-mode="dream"
+                      aria-pressed="false"
+                      disabled
+                    >
+                      RUN
+                    </button>
+                    <button
+                      id="pause-neural-dream"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      PAUSE
+                    </button>
+                    <button
+                      id="more-neural-dream"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      +15 STEPS
+                    </button>
+                    <button
+                      id="reset-neural-dream"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      RESET TO SOURCE
+                    </button>
+                  </div>
+                  <div
+                    class="neural-dream-tools__spatial"
+                    id="neural-dream-spatial-tools"
+                    role="toolbar"
+                    aria-label="Spatial focus and interactive mask tools"
+                  >
+                    <span class="spatial-tools-label">SPATIAL MASK:</span>
+                    <button
+                      id="spatial-tool-brush"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Brush Mask: Paint or erase mask directly on canvas (wheel to resize)"
+                      disabled
+                    >
+                      BRUSH
+                    </button>
+                    <button
+                      id="spatial-tool-spotlight"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Spotlight: Click/drag on canvas to position radial focus beam"
+                      disabled
+                    >
+                      SPOTLIGHT
+                    </button>
+                    <button
+                      id="spatial-tool-edges"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Detect Edges: Auto-extract Sobel contour mask from image"
+                      disabled
+                    >
+                      EDGES
+                    </button>
+                    <button
+                      id="spatial-tool-attention"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Select Subject: 1-click InceptionV3 semantic segmentation (can refine with BRUSH)"
+                      disabled
+                    >
+                      SELECT SUBJECT
+                    </button>
+                    <button
+                      id="spatial-tool-preview"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Toggle mask preview overlay on canvas"
+                      disabled
+                    >
+                      PREVIEW
+                    </button>
+                    <button
+                      id="spatial-tool-invert"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Invert current mask"
+                      disabled
+                    >
+                      INVERT
+                    </button>
+                    <button
+                      id="spatial-tool-clear"
+                      class="mini-button spatial-tool-btn"
+                      type="button"
+                      title="Clear custom mask (revert to full frame)"
+                      disabled
+                    >
+                      CLEAR
+                    </button>
+                  </div>
+                  <div
+                    class="spatial-tool-options"
+                    id="spatial-tool-options"
+                    hidden
+                  ></div>
+                </div>
+
+                <div class="output-stage">
+                  <div class="output-frame">
+                    <canvas
+                      id="output-canvas"
+                      width="512"
+                      height="512"
+                      aria-label="Model output"
+                    ></canvas>
+                    <canvas
+                      id="mask-overlay-canvas"
+                      class="mask-overlay-canvas"
+                      width="512"
+                      height="512"
+                      hidden
+                      aria-hidden="true"
+                    ></canvas>
+                    <div
+                      class="output-frame__scan"
+                      hidden
+                      aria-hidden="true"
+                    ></div>
+                    <div id="render-state" class="render-state">READY</div>
+                    <div id="gif-progress" class="gif-progress" hidden>
+                      <span>ENCODING GIF</span>
+                      <progress
+                        id="gif-progress-bar"
+                        max="100"
+                        value="0"
+                      ></progress>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="output-meta">
+                  <span id="active-route" class="output-live-info"
+                    >ROUTE —</span
+                  >
+                  <span id="live-fps" class="output-live-info">LIVE —</span>
+                  <span id="run-id" hidden>UNSAVED</span>
+                  <span id="frame-index" hidden>0000</span>
+                  <span id="lfo-count" hidden>0</span>
+                  <span id="capture-status" hidden></span>
+                  <input id="capture-note" type="hidden" />
+                  <div class="output-actions">
+                    <button
+                      id="toggle-fullscreen"
+                      class="text-button"
+                      type="button"
+                      aria-pressed="false"
+                    >
+                      FULLSCREEN
+                    </button>
+                    <button
+                      id="toggle-animation"
+                      class="text-button"
+                      type="button"
+                    >
+                      CLOCK: OFF
+                    </button>
+                    <button id="save-image" class="text-button" type="button">
+                      SAVE PNG
+                    </button>
+                    <button id="save-gif" class="text-button" type="button">
+                      EXPORT GIF
+                    </button>
+                  </div>
+                </div>
+
+                <section id="hq-renders" class="hq-renders" hidden>
+                  <div class="hq-renders__head">
+                    <strong>HQ VERSIONS</strong
+                    ><span id="hq-status">READY</span>
+                  </div>
+                  <div id="hq-render-list" class="hq-render-list"></div>
+                </section>
+
+                <div id="hq-viewer" class="hq-viewer" hidden>
+                  <img id="hq-viewer-image" alt="High quality fractal render" />
+                  <div class="hq-viewer__bar">
+                    <span id="hq-viewer-label">HQ FRACTAL</span>
+                    <div>
+                      <button
+                        id="hq-viewer-download"
+                        class="text-button"
+                        type="button"
+                      >
+                        DOWNLOAD</button
+                      ><button
+                        id="hq-viewer-close"
+                        class="text-button"
+                        type="button"
+                      >
+                        CLOSE
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel terminal-panel">
+                <div class="panel-heading panel-heading--terminal">
+                  <h1 class="panel__title">Session Log</h1>
+                  <span class="panel-code">LOCAL SESSION</span>
+                </div>
+                <div
+                  id="terminal-output"
+                  class="terminal-output"
+                  aria-live="polite"
+                ></div>
+              </section>
+            </div>
+          </section>
+
+          <section
+            id="view-experiments"
+            class="view"
+            data-view-panel="experiments"
+            hidden
+          >
+            <div class="simple-page studio-page">
+              <div class="page-heading">
+                <div>
+                  <p class="eyebrow">OPTIONAL LOCAL TRAINING</p>
+                  <h1 class="page-title">Experiments</h1>
+                  <p>
+                    Build an image basis with Quick PCA, or train a small
+                    autoencoder on compatible hardware. These experiments use
+                    images you select and run on this device.
+                  </p>
+                </div>
+                <div class="page-actions">
+                  <button
+                    id="open-datasets-from-studio"
+                    class="action-button action-button--secondary"
+                    type="button"
+                  >
+                    FIND OPEN IMAGES
+                  </button>
+                  <button
+                    id="launch-custom"
+                    class="action-button action-button--secondary"
+                    type="button"
+                    disabled
+                  >
+                    OPEN PCA IN LAB
+                  </button>
+                  <button
+                    id="launch-neural"
+                    class="action-button"
+                    type="button"
+                    disabled
+                  >
+                    OPEN NEURAL IN LAB
+                  </button>
+                </div>
+              </div>
+
+              <div class="studio-grid studio-grid--neural">
+                <section class="panel studio-panel studio-panel--dataset">
+                  <div class="panel-heading">
+                    <h2 class="panel__title">01 / Dataset</h2>
+                    <span class="panel-code">128PX RGB</span>
+                  </div>
+                  <label class="upload-zone" for="image-upload">
+                    <strong>ADD IMAGE FILES</strong>
+                    <span
+                      >PNG / JPG / WEBP · 3 TO 64 FILES · NORMALIZED
+                      LOCALLY</span
+                    >
+                  </label>
+                  <input
+                    id="image-upload"
+                    class="visually-hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                  />
+                  <button
+                    id="add-synthetic-set"
+                    class="mini-button synthetic-set-button"
+                    type="button"
+                  >
+                    GENERATE 32 DIGIFACE MODEL SAMPLES
+                  </button>
+
+                  <div class="draw-lab">
+                    <div class="draw-lab__header">
+                      <span>DRAW A TRAINING SAMPLE</span>
+                      <label
+                        >COLOR
+                        <input id="draw-color" type="color" value="#ffffff"
+                      /></label>
+                      <label
+                        >BRUSH
+                        <input
+                          id="brush-size"
+                          type="range"
+                          min="2"
+                          max="30"
+                          value="12"
+                      /></label>
+                    </div>
+                    <canvas
+                      id="draw-canvas"
+                      width="256"
+                      height="256"
+                      aria-label="Drawing pad"
+                    ></canvas>
+                    <div class="draw-lab__actions">
+                      <button
+                        id="clear-drawing"
+                        class="mini-button"
+                        type="button"
+                      >
+                        CLEAR PAD
+                      </button>
+                      <button
+                        id="add-drawing"
+                        class="mini-button mini-button--active"
+                        type="button"
+                      >
+                        ADD DRAWING
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="dataset-count">
+                    SAMPLES <strong id="sample-count">0 / 64</strong>
+                  </div>
+                  <div
+                    id="sample-grid"
+                    class="sample-grid"
+                    aria-live="polite"
+                  ></div>
+                  <button
+                    id="clear-dataset"
+                    class="text-button text-button--danger"
+                    type="button"
+                  >
+                    CLEAR DATASET
+                  </button>
+                </section>
+
+                <section
+                  class="panel studio-panel studio-panel--training studio-panel--training-main"
+                >
+                  <div class="panel-heading">
+                    <h2 class="panel__title">02 / Training</h2>
+                    <span class="panel-code">PCA + TF.JS</span>
+                  </div>
+
+                  <label class="field">
+                    <span>MODEL NAME</span>
+                    <input
+                      id="custom-model-name"
+                      type="text"
+                      maxlength="32"
+                      value="My Local Model"
+                      spellcheck="false"
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>TRAINING ENGINE</span>
+                    <select id="training-engine">
+                      <option value="pca" selected>
+                        QUICK PCA / WEB WORKER
+                      </option>
+                      <option value="neural">
+                        EXPERIMENTAL NEURAL / REQUIRES GPU CHECK
+                      </option>
+                    </select>
+                  </label>
+
+                  <div
+                    id="neural-training-controls"
+                    class="neural-training-controls"
+                  >
+                    <dl class="training-configuration">
+                      <div>
+                        <dt>Architecture</dt>
+                        <dd>Convolutional autoencoder</dd>
+                      </div>
+                      <div>
+                        <dt>Input</dt>
+                        <dd>128 × 128 RGB</dd>
+                      </div>
+                      <div>
+                        <dt>Latent dimensions</dt>
+                        <dd>64</dd>
+                      </div>
+                      <div>
+                        <dt>Training limit</dt>
+                        <dd>Up to 5 minutes</dd>
+                      </div>
+                      <div>
+                        <dt>Output treatment</dt>
+                        <dd>Square-pixel displacement</dd>
+                      </div>
+                    </dl>
+
+                    <div class="hardware-benchmark-card">
+                      <div>
+                        <span>TRAINING BACKEND</span>
+                        <strong id="training-backend">NOT BENCHMARKED</strong>
+                      </div>
+                      <div>
+                        <span>SPEED CLASS</span>
+                        <strong id="training-speed">—</strong>
+                      </div>
+                      <div>
+                        <span>RECOMMENDED</span>
+                        <strong id="training-recommended">—</strong>
+                      </div>
+                      <button
+                        id="benchmark-training"
+                        class="mini-button"
+                        type="button"
+                      >
+                        CHECK NEURAL TRAINING ACCESS
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    id="pca-training-controls"
+                    class="pca-training-controls"
+                    hidden
+                  >
+                    <label class="field">
+                      <span>PCA INPUT RESOLUTION</span>
+                      <input type="text" value="48 × 48 RGB" disabled />
+                    </label>
+                    <label class="field field--range">
+                      <span class="field__heading"
+                        ><span>PRINCIPAL COMPONENTS</span
+                        ><output id="studio-components-output">4</output></span
+                      >
+                      <input
+                        id="studio-components"
+                        type="range"
+                        min="2"
+                        max="8"
+                        step="1"
+                        value="4"
+                      />
+                    </label>
+                  </div>
+
+                  <div id="training-note" class="training-note">
+                    <strong>QUICK PCA PATH</strong>
+                    <p>
+                      Quick PCA stays available on ordinary devices. The 128px
+                      datamosh autoencoder is a five-minute quality run reserved
+                      for hardware that passes the FAST WebGL check.
+                    </p>
+                  </div>
+
+                  <div class="training-actions-main">
+                    <button
+                      id="train-model"
+                      class="action-button action-button--wide"
+                      type="button"
+                    >
+                      TRAIN QUICK PCA MODEL
+                    </button>
+                    <button
+                      id="stop-training"
+                      class="mini-button text-button--danger"
+                      type="button"
+                      hidden
+                    >
+                      STOP TRAINING
+                    </button>
+                  </div>
+                  <progress
+                    id="training-progress"
+                    class="training-progress"
+                    max="100"
+                    value="0"
+                  ></progress>
+                  <p id="training-status" class="training-status">
+                    PCA NEEDS AT LEAST 3 IMAGES.
+                  </p>
+
+                  <div
+                    id="pca-model-file-actions"
+                    class="model-file-actions"
+                    hidden
+                  >
+                    <button
+                      id="export-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      EXPORT PCA JSON
+                    </button>
+                    <label class="mini-button" for="import-model"
+                      >IMPORT PCA JSON</label
+                    >
+                    <input
+                      id="import-model"
+                      class="visually-hidden"
+                      type="file"
+                      accept="application/json,.json"
+                    />
+                    <button
+                      id="delete-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      DELETE PCA MODEL
+                    </button>
+                  </div>
+                  <div class="model-file-actions">
+                    <button
+                      id="delete-neural-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      DELETE NEURAL MODEL
+                    </button>
+                  </div>
+                </section>
+
+                <aside
+                  class="panel studio-panel studio-panel--analysis studio-panel--analysis-main"
+                >
+                  <div class="panel-heading">
+                    <h2 class="panel__title">03 / Analysis</h2>
+                    <span class="panel-code">MODEL</span>
+                  </div>
+
+                  <section id="neural-analysis-block">
+                    <dl class="stats-list studio-stats">
+                      <div>
+                        <dt>STATUS</dt>
+                        <dd id="neural-status">NOT TRAINED</dd>
+                      </div>
+                      <div>
+                        <dt>MODEL ID</dt>
+                        <dd id="neural-id">—</dd>
+                      </div>
+                      <div>
+                        <dt>PROFILE</dt>
+                        <dd id="neural-profile-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>OBJECTIVE</dt>
+                        <dd id="neural-objective-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>TRAINING SAMPLES</dt>
+                        <dd id="neural-samples">—</dd>
+                      </div>
+                      <div>
+                        <dt>LATENT DIMENSIONS</dt>
+                        <dd id="neural-latent">—</dd>
+                      </div>
+                      <div>
+                        <dt>BACKEND</dt>
+                        <dd id="neural-backend-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>BEST LOSS</dt>
+                        <dd id="neural-loss">—</dd>
+                      </div>
+                      <div>
+                        <dt>CREATED</dt>
+                        <dd id="neural-created">—</dd>
+                      </div>
+                    </dl>
+
+                    <div class="variance-chart-wrap">
+                      <span>TRAINING LOSS</span>
+                      <canvas
+                        id="training-loss-chart"
+                        width="360"
+                        height="180"
+                        aria-label="Neural training loss chart"
+                      ></canvas>
+                    </div>
+                  </section>
+
+                  <section id="pca-analysis-block" hidden>
+                    <dl class="stats-list studio-stats">
+                      <div>
+                        <dt>STATUS</dt>
+                        <dd id="custom-status">NOT TRAINED</dd>
+                      </div>
+                      <div>
+                        <dt>MODEL ID</dt>
+                        <dd id="custom-id">—</dd>
+                      </div>
+                      <div>
+                        <dt>TRAINING SAMPLES</dt>
+                        <dd id="custom-samples">—</dd>
+                      </div>
+                      <div>
+                        <dt>COMPONENTS</dt>
+                        <dd id="custom-components">—</dd>
+                      </div>
+                      <div>
+                        <dt>VARIANCE RETAINED</dt>
+                        <dd id="custom-variance">—</dd>
+                      </div>
+                      <div>
+                        <dt>CREATED</dt>
+                        <dd id="custom-created">—</dd>
+                      </div>
+                    </dl>
+                    <div class="variance-chart-wrap">
+                      <span>EXPLAINED VARIANCE BY COMPONENT</span>
+                      <canvas
+                        id="variance-chart"
+                        width="360"
+                        height="180"
+                        aria-label="Explained variance chart"
+                      ></canvas>
+                    </div>
+                  </section>
+
+                  <div class="studio-explanation">
+                    <strong>WHAT TO COMPARE</strong>
+                    <p>
+                      PCA is the quick linear baseline. The autoencoder learns a
+                      nonlinear reconstruction space and applies square-pixel
+                      displacement in the Lab. Training and inference remain
+                      local.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+              <details id="dataset-library" class="dataset-library">
+                <summary>Find images on Wikimedia Commons</summary>
+                <p class="field__help">
+                  Optional internet access. Review each image’s source and
+                  license before use.
+                </p>
+                <section class="panel dataset-search-panel">
+                  <div class="panel-heading">
+                    <h2 class="panel__title">Wikimedia Commons Search</h2>
+                    <span class="panel-code">LICENSE-AWARE</span>
+                  </div>
+                  <form id="commons-search-form" class="dataset-search-form">
+                    <label class="field dataset-query">
+                      <span>SEARCH TERMS</span>
+                      <input
+                        id="commons-search-input"
+                        type="search"
+                        value="portrait photography"
+                        placeholder="portrait photography"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <label class="field dataset-license">
+                      <span>LICENSE FILTER</span>
+                      <select id="commons-license-filter">
+                        <option value="reusable">REUSABLE RESULTS</option>
+                        <option value="public-domain">
+                          PUBLIC DOMAIN / CC0
+                        </option>
+                        <option value="cc-by">CC BY</option>
+                        <option value="cc-by-sa">CC BY-SA</option>
+                        <option value="all">SHOW ALL METADATA</option>
+                      </select>
+                    </label>
+                    <button
+                      id="commons-search-button"
+                      class="action-button"
+                      type="submit"
+                    >
+                      SEARCH
+                    </button>
+                  </form>
+                  <p id="commons-status" class="dataset-status">
+                    SEARCH USES THE WIKIMEDIA COMMONS MEDIAWIKI API. INTERNET
+                    ACCESS IS REQUIRED.
+                  </p>
+                  <div id="commons-results" class="commons-results"></div>
+                </section>
+              </details>
+            </div>
+          </section>
+
+          <section
+            id="view-archive"
+            class="view"
+            data-view-panel="archive"
+            hidden
+          >
+            <div class="simple-page archive-page">
+              <section class="panel page-panel">
+                <div class="page-panel__heading">
+                  <div>
+                    <p class="eyebrow">LOCAL GALLERY</p>
+                    <h1 class="page-title page-title--light">Saved Runs</h1>
+                    <p>
+                      Frames you chose to keep, stored with the exact state
+                      needed to recreate them.
+                    </p>
+                  </div>
+                  <div class="page-actions">
+                    <button id="export-csv" class="action-button" type="button">
+                      EXPORT CSV
+                    </button>
+                    <button
+                      id="clear-archive"
+                      class="action-button action-button--secondary"
+                      type="button"
+                    >
+                      CLEAR ALL
+                    </button>
+                  </div>
+                </div>
+                <div class="archive-summary">
+                  <span>RUNS <strong id="archive-runs">0</strong></span>
+                  <span>MODELS <strong id="archive-models">0</strong></span>
+                  <span
+                    >MAX RESOLUTION
+                    <strong id="archive-resolution">—</strong></span
+                  >
+                  <span
+                    >STORAGE <strong id="archive-storage">LOCAL</strong></span
+                  >
+                </div>
+                <div id="archive-grid" class="archive-grid"></div>
+              </section>
+            </div>
+          </section>
+
+          <section id="view-about" class="view" data-view-panel="about" hidden>
+            <div class="simple-page method-page">
+              <div class="page-heading">
+                <div>
+                  <p class="eyebrow">LOCAL GENERATIVE GRAPHICS</p>
+                  <h1 class="page-title">About Latent Field</h1>
+                  <p>
+                    Explore mathematical fields and pretrained image models,
+                    adjust their parameters, and save your results. Image
+                    processing runs locally; dataset search uses Wikimedia
+                    Commons. Start in the Lab with Folded Fractal.
+                  </p>
+                </div>
+              </div>
+
+              <div class="method-grid">
+                <section class="panel method-card">
+                  <h2 class="panel__title">Inception Dream</h2>
+                  <p>
+                    InceptionV3 feature visualization increases Mixed_6a and
+                    Mixed_6c activations through gradient ascent at several
+                    image scales. Quality and Reduced Compute use the same
+                    objective with different compute limits.
+                  </p>
+                  <code
+                    >image → feature activations → normalized gradients → octave
+                    ascent</code
+                  >
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">DigiFace Generator</h2>
+                  <p>
+                    A separately trained 48-dimensional beta-VAE decoder runs
+                    locally through ONNX Runtime Web. Feature controls expose
+                    the selected latent axis so users can see when eyes, nose,
+                    mouth, expression, and age-like appearance are entangled
+                    rather than pretending every slider is perfectly semantic.
+                  </p>
+                  <code
+                    >z → ONNX decoder → 112 × 112 RGB → optional color
+                    transform</code
+                  >
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">Chromatic Flow</h2>
+                  <p>
+                    A WebGL fragment shader evaluates a warped mathematical
+                    signal for every pixel.
+                  </p>
+                  <code>color = field(transform(uv, time, parameters))</code>
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">Folded Fractal</h2>
+                  <p>
+                    A recursive coordinate field repeatedly applies folding,
+                    rotation, inversion, translation, and symmetry. Ghost Effect
+                    adds offset contours only when it is enabled.
+                  </p>
+                  <code
+                    >coordinates → fold → rotate → invert → translate →
+                    repeat</code
+                  >
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">Fractal Explorer</h2>
+                  <p>
+                    Mandelbrot, Julia, Burning Ship, and Tricorn iterations
+                    visualize escape time, orbit traps, zoom, and sensitivity to
+                    complex constants. Click or drag moves through the selected
+                    equation. Right-click or touch-hold starts a small optional
+                    motion while your direct moves stay as the base view.
+                  </p>
+                  <code>zₙ₊₁ = f(zₙ) + c</code>
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">Quick Local Model</h2>
+                  <p>
+                    Model Studio reduces user-selected RGB images to a local
+                    color basis. Training happens in a Web Worker and the model
+                    can be exported as JSON.
+                  </p>
+                  <code>local images → covariance → color basis</code>
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">MODULATION & MOTION</h2>
+                  <p>
+                    Every numeric slider can connect to an internal LFO with
+                    selectable waveforms (sine, triangle, saw, square, noise),
+                    rate, and depth. Audio reactivity lets any parameter dance
+                    to whole-music bass or focused kick transients.
+                  </p>
+                  <code>base view → LFO oscillator → audio reactivity</code>
+                </section>
+                <section class="panel method-card">
+                  <h2 class="panel__title">MODULATION MATRIX</h2>
+                  <p>
+                    Any numeric slider can combine an LFO with either a
+                    bass-weighted whole-music envelope or a focused kick
+                    transient. Each audio route has a bipolar depth control,
+                    while the live markers and four-second history graph show
+                    the final effective value.
+                  </p>
+                  <code
+                    >value(t) = base + LFO(t) × depth + audio(t) × depth</code
+                  >
+                </section>
+              </div>
+
+              <section
+                id="fractal-process"
+                class="panel fractal-process"
+                data-step="fold"
+              >
+                <div class="fractal-process__intro">
+                  <p class="eyebrow">ONE FRAME, FIVE OPERATIONS</p>
+                  <h2 class="panel__title">How the Folded Fractal Grows</h2>
+                  <p id="fractal-process-copy">
+                    The coordinates mirror at the center, turning one shape into
+                    a balanced pair.
+                  </p>
+                </div>
+                <div
+                  class="fractal-process__steps"
+                  aria-label="Fractal operation explanation"
+                >
+                  <button
+                    class="is-active"
+                    type="button"
+                    data-fractal-step="fold"
+                    aria-pressed="true"
+                  >
+                    <b>01</b> FOLD
+                  </button>
+                  <button
+                    type="button"
+                    data-fractal-step="rotate"
+                    aria-pressed="false"
+                  >
+                    <b>02</b> ROTATE
+                  </button>
+                  <button
+                    type="button"
+                    data-fractal-step="invert"
+                    aria-pressed="false"
+                  >
+                    <b>03</b> INVERT
+                  </button>
+                  <button
+                    type="button"
+                    data-fractal-step="translate"
+                    aria-pressed="false"
+                  >
+                    <b>04</b> MOVE
+                  </button>
+                  <button
+                    type="button"
+                    data-fractal-step="repeat"
+                    aria-pressed="false"
+                  >
+                    <b>05</b> REPEAT
+                  </button>
+                </div>
+                <div class="fractal-process__visual" aria-hidden="true">
+                  <span class="fractal-process__grid"></span>
+                  <i></i><i></i><i></i><i></i>
+                  <strong>FOLD → ROTATE → INVERT → MOVE → REPEAT</strong>
+                </div>
+              </section>
+
+              <section class="panel pipeline-panel">
+                <h2 class="panel__title">Local Pipeline</h2>
+                <div class="pipeline">
+                  <span>BASE VIEW</span><b>→</b
+                  ><span>MODULATION MATRIX</span><b>→</b><span>MODEL ROUTE</span
+                  ><b>→</b><span>GPU / CPU CANVAS</span><b>→</b
+                  ><span>IMAGE METRICS</span><b>→</b><span>SAVED RUN</span>
+                </div>
+                <p>
+                  Quality mode changes the live square canvas from 384 to 1,536
+                  pixels. Fractal routes can separately make screen-shaped 2K or
+                  4K stills when the active WebGL limit allows it. The DigiFace
+                  VAE itself produces 112 × 112 RGB and is smoothly enlarged for
+                  display. ONNX Runtime Web requests WebGPU first and falls back
+                  to WASM CPU inference. Browsers and operating systems still
+                  decide which physical GPU is used.
+                </p>
+              </section>
+            </div>
+          </section>
+
+        <dialog id="export-modal" class="export-modal" aria-labelledby="export-modal-title">
+          <div class="export-modal__box">
+            <div class="export-modal__header">
+              <h2 id="export-modal-title" class="export-modal__title">EXPORT PNG</h2>
+              <button id="export-modal-close" class="text-button export-modal__close" type="button" aria-label="Close dialog">✕</button>
+            </div>
+            <p class="export-modal__desc">Select output render resolution:</p>
+            <div class="export-modal__options" role="radiogroup" aria-label="Export resolution options">
+              <label class="export-option">
+                <input type="radio" name="export-resolution" value="current" checked />
+                <span class="export-option__content">
+                  <span id="export-name-current" class="export-option__name">CURRENT VIEWPORT</span>
+                  <span id="export-res-current" class="export-option__res">512 × 512</span>
+                </span>
+              </label>
+              <label id="export-option-2k" class="export-option">
+                <input type="radio" name="export-resolution" value="2048" />
+                <span class="export-option__content">
+                  <span id="export-name-2k" class="export-option__name">2K SCREEN</span>
+                  <span id="export-res-2k" class="export-option__res">2048 × 2048</span>
+                </span>
+              </label>
+              <label id="export-option-4k" class="export-option">
+                <input type="radio" name="export-resolution" value="4096" />
+                <span class="export-option__content">
+                  <span id="export-name-4k" class="export-option__name">4K SCREEN</span>
+                  <span id="export-res-4k" class="export-option__res">4096 × 4096</span>
+                </span>
+              </label>
+            </div>
+            <div class="export-modal__actions">
+              <button id="export-modal-cancel" class="action-button action-button--secondary" type="button">CANCEL</button>
+              <button id="export-modal-confirm" class="action-button" type="button">EXPORT PNG</button>
+            </div>
+          </div>
+        </dialog>
+      </main>
+
+        <footer class="status-line">
+          <span id="status-message">READY</span>
+          <span id="resource-status">RENDERER: DETECTING</span>
+          <span class="status-line__shortcuts"
+            >F = FULLSCREEN · SPACE = PAUSE/RESUME ALL MOTION · CTRL/⌘ + ENTER =
+            SAVE RUN</span
+          >
+          <div
+            id="audio-monitor"
+            class="audio-monitor"
+            aria-label="Global system audio monitor"
+          >
+            <span class="audio-monitor__label">EQ</span>
+            <canvas
+              id="audio-meter"
+              class="audio-monitor__spectrum"
+              width="112"
+              height="18"
+              role="img"
+              aria-label="System audio spectrum: off"
+              >Live system audio spectrum</canvas
+            >
+            <span id="audio-share-hint" class="audio-monitor__hint"
+              >CHECK “SHARE TAB AUDIO” OR “SHARE SYSTEM AUDIO” IN THE
+              PICKER</span
+            >
+            <button
+              id="toggle-audio-input"
+              class="audio-monitor__toggle"
+              type="button"
+              aria-pressed="false"
+              aria-describedby="audio-share-hint"
+            >
+              AUDIO: OFF
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+DIGIFACE MODEL NOTICE
+
+Model: DIGIFACE_LATENT_VAE_01
+Architecture: beta-VAE decoder
+Dataset source: Microsoft DigiFace-1M research dataset
+Intended use in this project: non-commercial research
+Model terms: licenses/digiface-decoder-research.txt (relative to project root)
+
+The project author confirmed on 2026-10-05 that this decoder was trained from
+scratch with a ChatGPT-assisted workflow, without an external pretrained
+checkpoint. It is not an official Microsoft model. Training details in
+model-info.json are author-reported, not independently verified.
+
+Dataset attribution: Bae et al., DigiFace-1M: 1 Million Digital Face Images
+for Face Recognition, WACV 2023.
+Dataset source: https://github.com/microsoft/DigiFace1M
+Dataset agreement: https://github.com/microsoft/DigiFace1M/blob/main/LICENSE
+
+This project distributes model weights, not the original DigiFace image files.
+The model is intended to demonstrate latent-space generation, feature
+entanglement, browser inference, and post-processing. It is not an identity,
+biometric, nationality, ethnicity, disability, or demographic classifier.
+
+The application source-code MIT license does not cover these weights. Retain
+this notice and the decoder's non-commercial research terms when sharing it.
+The upstream agreement distinguishes trained Results from Data when they
+contain no more than a de minimis portion of the original dataset; commercial
+use of Data and Results is restricted. This notice does not certify that the
+model satisfies that condition or grant rights to the original dataset.

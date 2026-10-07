@@ -1,0 +1,23 @@
+Latent Field DigiFace-derived decoder — Non-commercial Research Terms
+
+Scope: models/digiface/digiface_decoder.onnx (DIGIFACE_LATENT_VAE_01).
+These terms apply to the decoder weights, not the application source code.
+
+The project author trained this decoder from scratch on a Microsoft
+DigiFace-1M subset. This is a project-trained model, not an official Microsoft
+checkpoint. The original dataset images are not included.
+
+Permission is granted to use, copy, modify, and redistribute these weights
+for non-commercial research only. Copies and derivative weights must retain
+these terms and the accompanying models/digiface/NOTICE.txt attribution.
+No permission is granted to use these weights or derivatives in commercial
+offerings, products, services, or improvements to them.
+
+The training dataset is governed by Microsoft's Research Use of Data
+Agreement v1.0. These project terms do not replace that agreement or grant
+rights to the dataset. The application code's MIT license does not apply to
+these weights. See the upstream agreement, particularly sections 2.1 and 5.5:
+https://github.com/microsoft/DigiFace1M/blob/main/LICENSE
+
+The model is provided as is, without warranties of quality, fitness, or
+non-infringement. No identity, biometric, or demographic claims are made.

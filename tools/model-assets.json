@@ -1,0 +1,132 @@
+[
+  {
+    "path": "models/neural-growth/checkpoint.json",
+    "bytes": 76666,
+    "sha256": "6e8a5177fb7eb600f6b21f8f888d2a28acf2ad2687f49577ec0aedbee41270de"
+  },
+  {
+    "path": "models/digiface/digiface_decoder.onnx",
+    "bytes": 5264938,
+    "sha256": "d9e4883cd689734843f15e2ee0a16e64f5f98527cdc801d40ba87bf0c2788e7d"
+  },
+  {
+    "path": "models/inception/model.json",
+    "bytes": 164672,
+    "sha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849"
+  },
+  {
+    "path": "models/inception/group1-shard1of23.bin",
+    "bytes": 4194304,
+    "sha256": "07173313708695c0a1623233fa24c43a85ce393bf39eee7f5d370087bab96542"
+  },
+  {
+    "path": "models/inception/group1-shard2of23.bin",
+    "bytes": 4194304,
+    "sha256": "e3e6d9b038ff7c1af6d34431ee4327e86a0ee26daa878f617c596283513c9b18"
+  },
+  {
+    "path": "models/inception/group1-shard3of23.bin",
+    "bytes": 4194304,
+    "sha256": "1daaf7b671763f78b0ee3959b6bda1efae45d303f94614082500b5ff19fc7a03"
+  },
+  {
+    "path": "models/inception/group1-shard4of23.bin",
+    "bytes": 4194304,
+    "sha256": "bcbe4dd7ad3c6d340bd51dd0b2de805b10ae20f56f74e2f449216c09fa77c970"
+  },
+  {
+    "path": "models/inception/group1-shard5of23.bin",
+    "bytes": 4194304,
+    "sha256": "0ee9d5d8d75b89c2d6664d72fd6d6c2f723167a42998d040d92dc96ba6fee34d"
+  },
+  {
+    "path": "models/inception/group1-shard6of23.bin",
+    "bytes": 4194304,
+    "sha256": "2349b0a39053cf12e1b23e101c281f80eb35426d45809d962d4e471f9d0290b1"
+  },
+  {
+    "path": "models/inception/group1-shard7of23.bin",
+    "bytes": 4194304,
+    "sha256": "d1300877eaa3dd6e2d4e9944b402ddb68278877ffcde6d4eba4317f1e3007527"
+  },
+  {
+    "path": "models/inception/group1-shard8of23.bin",
+    "bytes": 4194304,
+    "sha256": "1ec6303bd16dd206333905f8b63412d169ff4d50725d3b968c1917d735d62398"
+  },
+  {
+    "path": "models/inception/group1-shard9of23.bin",
+    "bytes": 4194304,
+    "sha256": "1d4bda61cbcccf75916d39b5e1b48c0a1f01b687b2a37b3d2ca6e2a38fcc495d"
+  },
+  {
+    "path": "models/inception/group1-shard10of23.bin",
+    "bytes": 4194304,
+    "sha256": "2d1616ced6242a86113470de5d319fa13c385d6d9fed1a241ee9d2cde75d6368"
+  },
+  {
+    "path": "models/inception/group1-shard11of23.bin",
+    "bytes": 4194304,
+    "sha256": "03775d3f0ec855c1e8c02041fed778d5d34bd60060cd6a6bd8bc0d382e335158"
+  },
+  {
+    "path": "models/inception/group1-shard12of23.bin",
+    "bytes": 4194304,
+    "sha256": "1b9bd6d57d7639ae5110492f15d297b0b7caa6c28063be4ec47d0b4a3c6662d8"
+  },
+  {
+    "path": "models/inception/group1-shard13of23.bin",
+    "bytes": 4194304,
+    "sha256": "5adb87726595918c1c4e47bb6bde360c5372a3c24ad734beacb18b871e1ec5c9"
+  },
+  {
+    "path": "models/inception/group1-shard14of23.bin",
+    "bytes": 4194304,
+    "sha256": "0b65c7cab013f3c93adbc6ac85479b9367607db8b0b35ad1f8c1312530bd50cc"
+  },
+  {
+    "path": "models/inception/group1-shard15of23.bin",
+    "bytes": 4194304,
+    "sha256": "6e19169e23bc3f84c07f9a68fac141264ab29da11f7c05456e5796bed12982ec"
+  },
+  {
+    "path": "models/inception/group1-shard16of23.bin",
+    "bytes": 4194304,
+    "sha256": "eaa9b98462976be8a24150a4f715d908daa87fa38164b26bba8b542f90efc9b5"
+  },
+  {
+    "path": "models/inception/group1-shard17of23.bin",
+    "bytes": 4194304,
+    "sha256": "d5eec13de3f27ffcfed2f3b504519204becd84a7da8652d02c51c64def89498a"
+  },
+  {
+    "path": "models/inception/group1-shard18of23.bin",
+    "bytes": 4194304,
+    "sha256": "bf396d20951718d4f62a1ede9556ade6083e85087c7c356a25ce8f5119c36391"
+  },
+  {
+    "path": "models/inception/group1-shard19of23.bin",
+    "bytes": 4194304,
+    "sha256": "03b6f56f1d8ce257f797ff402165debf9edf18fba01441c462980a1bc5e5f890"
+  },
+  {
+    "path": "models/inception/group1-shard20of23.bin",
+    "bytes": 4194304,
+    "sha256": "e8ffb233b654549df539262aaee455e6f681d4e959b6885b48652ed5dc40a52b"
+  },
+  {
+    "path": "models/inception/group1-shard21of23.bin",
+    "bytes": 4194304,
+    "sha256": "f4f4e5b44e2d6b1a8940d47cb84a9ad9532e680f9283bf2c3e70d15658aaf83f"
+  },
+  {
+    "path": "models/inception/group1-shard22of23.bin",
+    "bytes": 4194304,
+    "sha256": "2fd62877e9a9ab190d48044fc40224de977ef4201fb482a8ead9e749ef2f3f5f"
+  },
+  {
+    "path": "models/inception/group1-shard23of23.bin",
+    "bytes": 3002936,
+    "sha256": "815c50ff0880564737e67fe486f46f96a483385b4b9f285beaa05aca89e67d30"
+  }
+]

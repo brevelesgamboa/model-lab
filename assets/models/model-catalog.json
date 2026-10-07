@@ -1,0 +1,21 @@
+{
+  "schema": "latent-field-model-catalog-v1",
+  "version": "1.0.0",
+  "entries": [
+    {
+      "id": "digiface-vae",
+      "name": "DigiFace Generator",
+      "version": "1.0.0",
+      "publisher": "Latent Field",
+      "architecture": "BETA-VAE DECODER",
+      "resolution": "112 × 112 RGB",
+      "latentDimensions": 48,
+      "runtime": "ONNX / WEBGPU + WASM",
+      "compatibility": "LITE",
+      "license": "NON-COMMERCIAL RESEARCH / REVIEW NOTICE",
+      "sha256": "d9e4883cd689734843f15e2ee0a16e64f5f98527cdc801d40ba87bf0c2788e7d",
+      "description": "A bundled synthetic-face latent decoder with explicit axis selection and local browser inference.",
+      "installed": true
+    }
+  ]
+}
