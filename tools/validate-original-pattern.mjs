@@ -14,13 +14,15 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const browser = await chromium.launch({
   args: ["--no-sandbox", "--use-gl=angle", "--use-angle=gl", "--enable-gpu"],
 });
+let parity = null;
+const results = [];
 try {
   const page = await browser.newPage();
   await page.goto(
     `http://127.0.0.1:${server.address().port}/?pattern=${checkpoint.id}&spatial=${process.argv[4] === "spatial" ? 1 : 0}`,
   );
   await page.waitForFunction(() => Boolean(window.patternTrainer));
-  const parity = await page.evaluate(async (raw) => {
+  parity = await page.evaluate(async (raw) => {
     const tf = window.tf;
     const trainer = window.patternTrainer.trainer;
     const { TextureNcaRuntime } =
@@ -92,7 +94,6 @@ try {
     parity.runtimeMaxError <= 1,
     "GPU/reference parity exceeds one byte.",
   );
-  const results = [];
   for (const size of [128, 256])
     for (const seed of [1, 17, 42]) {
       await page.evaluate(
@@ -153,15 +154,15 @@ try {
           return { ...runtime.getStats(), rgb, loss: lossValue };
         }, steps);
         results.push(result);
+        await page.locator("#preview").screenshot({
+          path: path.join(output, `${size}-${seed}-${steps}.png`),
+        });
         assert.ok(Number.isFinite(result.loss), "Non-finite validation loss.");
         if (steps >= 512)
           assert.ok(
             result.rgb.some(({ mean, second }) => second - mean ** 2 > 0.005),
             "Pattern collapsed to a flat field.",
           );
-        await page.locator("#preview").screenshot({
-          path: path.join(output, `${size}-${seed}-${steps}.png`),
-        });
         console.log(
           JSON.stringify({
             size,
@@ -208,10 +209,29 @@ try {
     }
   await writeFile(
     path.join(output, "report.json"),
-    JSON.stringify({ checkpoint: checkpoint.id, parity, results }, null, 2) +
-      "\n",
+    JSON.stringify(
+      { checkpoint: checkpoint.id, passed: true, parity, results },
+      null,
+      2,
+    ) + "\n",
   );
   console.log(JSON.stringify(parity));
+} catch (error) {
+  await writeFile(
+    path.join(output, "report.json"),
+    JSON.stringify(
+      {
+        checkpoint: checkpoint.id,
+        passed: false,
+        reason: error.message,
+        parity,
+        results,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  throw error;
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

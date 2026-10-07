@@ -65,3 +65,18 @@ rather than an isotropic web or a copy of the target image. Spatial statistics
 drift during long rollouts, but the field retains contrast and coherent bands
 in the tested runs. The earlier complementary-color noise candidate is not
 distributed.
+
+## Xeno Reef
+
+Trained for 1,600 iterations from scratch with the same spatial-v2 recipe as
+Filament Network. Final pooled training loss: 0.04787965. The final checkpoint
+passed trainer/GPU and GPU/oracle comparisons within one byte and the same
+multi-seed 128²/256² rollouts through 8,192 updates plus 2,048 recovery updates.
+Allocation accounting remained constant and reached zero after disposal.
+
+The emitted structure is pale faceted growth with teal edges and a vertical
+preference; it does not reproduce the target's rounded coral pores. Intermediate
+training candidates sometimes flattened or became noisy and are not distributed.
+Two earlier local training-browser interruptions were followed by a completed
+standalone diagnostic run and a completed full run; their cause was not
+established. This does not alter the independent final-checkpoint validation.

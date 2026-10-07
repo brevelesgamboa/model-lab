@@ -10,6 +10,7 @@ node_modules/
 /models/neural-growth/organic-structures/*
 !/models/neural-growth/organic-structures/membrane-field.json
 !/models/neural-growth/organic-structures/filament-network.json
+!/models/neural-growth/organic-structures/xeno-reef.json
 !/models/neural-growth/organic-structures/NOTICE.md
 *.bin
 *.onnx

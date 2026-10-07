@@ -408,3 +408,51 @@ test("an obsolete pattern download cannot replace the field after selection chan
     "mixed4c-439",
   );
 });
+
+test("all original checkpoints grow in the app, fit narrow layouts, and snapshot without advancing", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const pattern = page.getByLabel("PATTERN", { exact: true });
+  for (const id of ["membrane-field", "filament-network", "xeno-reef"]) {
+    await pattern.selectOption(id);
+    await expect
+      .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+      .toBe(id);
+    await page.evaluate(() => window.__growthRuntime.step(64));
+    await page
+      .getByLabel("DISPLAY PALETTE", { exact: true })
+      .selectOption("native");
+    await expect(page.locator("#growth-status")).toHaveAttribute(
+      "data-steps",
+      "64",
+    );
+    const spread = await page.evaluate(() => {
+      const bytes = window.__growthRuntime.readState();
+      let min = 255;
+      let max = 0;
+      for (let index = 0; index < bytes.length; index += 12) {
+        min = Math.min(min, bytes[index]);
+        max = Math.max(max, bytes[index]);
+      }
+      return max - min;
+    });
+    expect(spread).toBeGreaterThan(16);
+  }
+  for (const width of [360, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await pattern.scrollIntoViewIfNeeded();
+    await expect(pattern).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  const before = await state(page);
+  await page.locator("#save-image").click();
+  const download = page.waitForEvent("download");
+  await page.locator("#export-modal-confirm").click();
+  await download;
+  expect(await state(page)).toEqual(before);
+});

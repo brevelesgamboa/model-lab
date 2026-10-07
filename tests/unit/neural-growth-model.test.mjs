@@ -242,6 +242,8 @@ test("explicit retry replaces a failed runtime, including lost contexts", async 
   assert.equal(runtimes[0].disposed, true);
 });
 
+// Adapter-only fixture. Actual release files are independently read and
+// fingerprinted in neural-growth.test.mjs; these weights are never distributed.
 const originalFixture = () => ({
   ...checkpoint,
   id: "membrane-field",
@@ -336,7 +338,8 @@ test("superseded pattern loads cannot allocate, reset or paint the retained fiel
   );
   assert.equal(model.ready, false);
   assert.match(model.technicalInfo.title, /Vesicle Study/);
-  model.onParameterChange("pattern", DEFAULT_PATTERN);
+  assert.equal(model.onParameterChange("pattern", DEFAULT_PATTERN), true);
+  assert.equal(model.onParameterChange("pattern", DEFAULT_PATTERN), false);
   assert.equal(signal.aborted, true);
   finish(originalFixture());
   assert.equal(await pending, null);

@@ -1,5 +1,10 @@
 [
   {
+    "path": "models/neural-growth/organic-structures/xeno-reef.json",
+    "bytes": 23472,
+    "sha256": "3cbdc2a553b9999b782e48cb2522a5a1c7da8f3490ffad13b0fe20caf2bc7719"
+  },
+  {
     "path": "models/neural-growth/organic-structures/filament-network.json",
     "bytes": 23503,
     "sha256": "2e84a53fda8e2243ae5be9c670e1674607c1ace48ed6f2622bfb3cab3c92d621"

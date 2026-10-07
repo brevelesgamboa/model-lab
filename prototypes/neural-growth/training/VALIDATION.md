@@ -10,10 +10,11 @@ promise bit-identical training across graphics drivers or TensorFlow.js versions
 | --- | --- | ---: | ---: | ---: |
 | Membrane Field | fixed-feature-gram-v1 | 1,200 | 0.00532799 | 0.005013–0.005716 |
 | Filament Network | fixed-feature-spatial-v2 | 1,600 | 0.02250567 | 0.028231–0.034848 |
+| Xeno Reef | fixed-feature-spatial-v2 | 1,600 | 0.04787965 | 0.022793–0.030165 |
 
 Losses from different recipes are not comparable. The final pooled training loss
 is a pre-optimizer batch measurement, not an independent visual-quality score.
-Both runs used seed 20261006, random initialization, the same fixed architecture,
+All runs used seed 20261006, random initialization, the same fixed architecture,
 and no published weights or pretrained feature extractor.
 
 Each checkpoint was checked independently with the production engine at 128²
@@ -25,7 +26,7 @@ soak or proof of stability for every seed/device.
 
 One-step trainer/GPU and numerical-oracle/GPU comparisons used a deterministic
 32² state fixture and the runtime's exact update mask. Maximum byte error was 1
-for both comparisons and both models. Color variance remained nonzero through
+for both comparisons and all three models. Color variance remained nonzero through
 the long rollouts. Handle accounting stayed at 9 textures, 5 framebuffers,
 6 programs and 1 VAO; texture-byte accounting was 1,775,340 at 128² and 7,083,756
 at 256². All counts reached zero after disposal. This is tracked handle/texture
@@ -43,8 +44,16 @@ performance or on a memory-constrained device.
 Membrane Field grows connected ridged tissue rather than copying the target's
 cavity layout. Filament Network grows finer connected bands with a strong
 diagonal bias; its spatial loss drifts during longer rollouts. Both recover a
-coherent textured field after disturbance in the inspected runs. Neither is
-photorealistic microscopy, a biological simulation, or a perceptual/drug model.
+coherent textured field after disturbance in the inspected runs. Xeno Reef
+grows pale faceted structures with teal edges and a vertical preference, rather
+than its source's rounded coral pores, and likewise recovers after damage.
+None is photorealistic microscopy, a biological simulation, or a perceptual/drug
+model.
+
+Actual native-RGB production-engine previews at 256², seed 17, 8,192 updates:
+[Membrane Field](previews/membrane-field.png),
+[Filament Network](previews/filament-network.png), and
+[Xeno Reef](previews/xeno-reef.png). These are learned outputs, not source targets.
 
 Earlier v1 filament/reef candidates matched some statistics but retained
 complementary-color pixel noise. They were excluded from the release catalog.
@@ -63,3 +72,18 @@ Complete built-in generation prompts are in [README.md](README.md). Checkpoint
 hashes and byte counts are enforced by `tools/model-assets.json`. The original
 pack's training code, source targets and validation material are not shipped to
 the app or fetched during ordinary inference.
+
+## Application regressions
+
+The final build, source/import checks, lint and all 61 unit tests passed.
+All 11 focused Neural Growth Chromium/SwiftShader browser tests passed, including
+all three actual checkpoints, 360/900-pixel layouts, immutable PNG capture,
+reference/original attribution, context loss, failed replacement and superseded
+download handling. No test substitutes a different production runtime.
+
+Two broader browser runs each passed 20 of 21 then-current tests but failed the
+Inception UI test: first a software-WebGL ascent timeout, then a concurrent test
+version selecting an unsupported 2-octave option. The latter also exhausted
+temporary trace storage; runner teardown recovered the space without removing
+project files. Concurrent Inception/app test edits were preserved. These runs
+do not establish an entirely green full-project browser suite.

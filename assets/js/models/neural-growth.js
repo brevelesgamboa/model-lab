@@ -170,7 +170,7 @@ export class NeuralGrowthModel {
   }
 
   onParameterChange(key, value) {
-    if (key !== "pattern" || value === this._requestedPattern) return;
+    if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
     this._epoch += 1;
@@ -179,6 +179,7 @@ export class NeuralGrowthModel {
     this._loadingPattern = false;
     this._lastTick = null;
     this._accumulator = 0;
+    return true;
   }
 
   render(canvas, parameters, timeSeconds, { advanceSimulation = false } = {}) {

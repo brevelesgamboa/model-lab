@@ -60,6 +60,7 @@ export const PATTERNS = Object.freeze([
   }),
   original("membrane-field", "Membrane Field"),
   original("filament-network", "Filament Network"),
+  original("xeno-reef", "Xeno Reef"),
 ]);
 
 export function getPattern(id) {

@@ -57,6 +57,8 @@ was used for the published reference's training objective, not browser inference
 No end-user training, separate model download, or additional runtime dependency
 is required. See [the original pack notice](models/neural-growth/organic-structures/NOTICE.md)
 for the training objective, provenance, and device-specific validation.
+The first pack contains Membrane Field, Filament Network and Xeno Reef. These
+are emergent texture rules, not exact reproductions of their source images.
 
 Use CLOCK to play/pause, SINGLE STEP to advance once while paused, RESTART to
 reset, and DISTURB CENTER or click/drag on the field to clear a local region.

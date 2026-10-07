@@ -210,7 +210,9 @@ const controlsController = createControlsController({
   onRange: syncRangeControl,
   onValue(definition, value) {
     currentParameters[definition.key] = value;
-    currentModel.onParameterChange?.(definition.key, value);
+    // Discard obsolete completion callbacks, without discarding GPU state.
+    if (currentModel.onParameterChange?.(definition.key, value))
+      renderer.invalidate();
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     invalidateCurrentRun("PARAMETERS CHANGED");
@@ -665,10 +667,7 @@ function moveCanvasGesture(event) {
 function endCanvasGesture(event) {
   if (!canvasGesture) return;
   if (event.pointerType === "touch") touchPoints.delete(event.pointerId);
-  if (
-    canvasGesture.pointerId === event.pointerId &&
-    !canvasGesture.moved
-  ) {
+  if (canvasGesture.pointerId === event.pointerId && !canvasGesture.moved) {
     if (currentModel.id === "fractal-functions")
       moveExplorerTo(pointOnOutputCanvas(event));
   }
@@ -1297,8 +1296,6 @@ function updateLivePerformance(now, renderMilliseconds) {
   elements.liveFps.textContent = performanceText;
   elements.liveFps.title = "Approximate display rate and renderer time";
 
-
-
   if (
     document.fullscreenElement === elements.outputPanel &&
     !hqGallery.isActive() &&
@@ -1355,7 +1352,10 @@ function animationLoop(timestamp) {
   if (canRender && timestamp - lastRenderedAt >= frameInterval) {
     lastRenderedAt = timestamp;
     lastTimeSeconds = (timestamp - animationEpoch) / 1000;
-    renderCurrentFrame({ timeSeconds: lastTimeSeconds, advanceSimulation: true });
+    renderCurrentFrame({
+      timeSeconds: lastTimeSeconds,
+      advanceSimulation: true,
+    });
   }
   animationHandle = requestAnimationFrame(animationLoop);
 }
@@ -1687,8 +1687,7 @@ function restoreRun(record) {
   animationEpoch = performance.now() - lastTimeSeconds * 1000;
   const hasLfo = hasActiveLfo(currentLfoState);
   const hasAudio = hasActiveAudioRoute(currentModel.id);
-  const shouldAnimate =
-    hasLfo || hasAudio || Boolean(record.animationRunning);
+  const shouldAnimate = hasLfo || hasAudio || Boolean(record.animationRunning);
   setAnimation(shouldAnimate, { log: false });
   renderParameterControls();
   navigate("lab");
