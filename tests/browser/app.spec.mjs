@@ -58,6 +58,8 @@ test("navigation pauses the clock, saved runs restore, and PNG capture works", a
   page,
 }) => {
   await page.goto("/");
+  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+  await page.locator("#toggle-animation").click();
   await expect(page.locator("#render-state")).toHaveText("LIVE");
   await page.locator('[data-view="about"]').click();
   const pausedFrame = await page.locator("#frame-index").textContent();
@@ -87,6 +89,7 @@ for (const width of [360, 900, 1440]) {
   test("layout remains usable at width " + width, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
+    await expect(page.locator("#render-state")).toHaveText("FRAME READY");
     await expect(page.locator("#model-select")).toBeVisible();
     await expect(page.locator("#output-canvas")).toBeVisible();
     expect(

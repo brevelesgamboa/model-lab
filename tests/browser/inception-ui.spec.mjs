@@ -4,13 +4,14 @@ test("image upload, pipeline changes, pause, and completed ascent preserve canva
   page,
 }) => {
   // Keep the real 320² graph/ascent path unmocked on software WebGL as well.
-  test.setTimeout(420_000);
+  test.setTimeout(500_000);
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
     route.abort(),
   );
   await page.goto("/");
+  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await page.locator("#model-select").selectOption("inception-dream");
   await page
     .getByRole("combobox", { name: "INFERENCE PIPELINE", exact: true })
@@ -46,7 +47,7 @@ test("image upload, pipeline changes, pause, and completed ascent preserve canva
   );
   await page.locator("#load-neural-dream").click();
   await expect(page.locator("#load-neural-dream")).toHaveText("MODEL READY", {
-    timeout: 60_000,
+    timeout: 240_000,
   });
   const source = await page
     .locator("#output-canvas")
@@ -68,7 +69,7 @@ test("image upload, pipeline changes, pause, and completed ascent preserve canva
   ).toBe(paused);
   await page.locator('[data-view="lab"]').click();
   await expect(page.locator("#neural-dream-status")).toContainText("COMPLETE", {
-    timeout: 300_000,
+    timeout: 380_000,
   });
   const completed = await page
     .locator("#output-canvas")

@@ -285,3 +285,126 @@ test("failed checkpoint loading latches once and Restart retries cleanly", async
   await expect(page.locator("#step-growth")).toBeEnabled();
   expect(requests).toBe(2);
 });
+
+test("original pattern selection loads once and refreshes committed attribution", async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route(
+    "**/organic-structures/membrane-field.json",
+    async (route) => {
+      requests += 1;
+      await route.continue();
+    },
+  );
+  await selectGrowth(page);
+  expect(requests).toBe(0);
+  await page.locator("#step-growth").click();
+  await page.evaluate(() => {
+    window.__referenceRuntime = window.__growthRuntime;
+  });
+  const pattern = page.getByLabel("PATTERN", { exact: true });
+  await pattern.selectOption("membrane-field");
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+    .toBe("membrane-field");
+  await expect(page.locator("#model-info-content")).toContainText(
+    "Organic Structures",
+  );
+  await expect(page.locator("#model-info-content")).toContainText(
+    "training from scratch",
+  );
+  expect(
+    await page.evaluate(() => window.__referenceRuntime.getStats().disposed),
+  ).toBe(true);
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  await page
+    .getByLabel("DISPLAY PALETTE", { exact: true })
+    .selectOption("spectral");
+  expect(await state(page)).toEqual(before);
+  expect(requests).toBe(1);
+  await pattern.selectOption("mixed4c-439");
+  await expect(page.locator("#model-info-content")).toContainText("CC-BY-4.0");
+  await pattern.selectOption("membrane-field");
+  await expect(page.locator("#model-info-content")).toContainText(
+    "Organic Structures",
+  );
+  expect(requests).toBe(1);
+});
+
+test("a failed replacement preserves the current pattern without retry loops", async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route(
+    "**/organic-structures/membrane-field.json",
+    async (route) => {
+      requests += 1;
+      if (requests === 1)
+        await route.fulfill({ status: 503, body: "Unavailable" });
+      else await route.continue();
+    },
+  );
+  await selectGrowth(page);
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  const pattern = page.getByLabel("PATTERN", { exact: true });
+  await pattern.selectOption("membrane-field");
+  await expect(page.locator("#growth-status")).toContainText("503");
+  expect(await state(page)).toEqual(before);
+  await expect(page.locator("#model-info-content")).toContainText(
+    "Vesicle Study",
+  );
+  await page
+    .getByLabel("DISPLAY PALETTE", { exact: true })
+    .selectOption("spectral");
+  expect(await state(page)).toEqual(before);
+  expect(requests).toBe(1);
+  await pattern.selectOption("mixed4c-439");
+  await expect(page.locator("#step-growth")).toBeEnabled();
+  expect(await state(page)).toEqual(before);
+  await pattern.selectOption("membrane-field");
+  await expect(page.locator("#step-growth")).toBeEnabled();
+  await expect(page.locator("#model-info-content")).toContainText(
+    "Organic Structures",
+  );
+  expect(requests).toBe(2);
+});
+
+test("an obsolete pattern download cannot replace the field after selection changes", async ({
+  page,
+}) => {
+  let entered;
+  let release;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const waiting = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    "**/organic-structures/membrane-field.json",
+    async (route) => {
+      entered();
+      await waiting;
+      await route.continue().catch(() => {});
+    },
+  );
+  await selectGrowth(page);
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  const pattern = page.getByLabel("PATTERN", { exact: true });
+  await pattern.selectOption("membrane-field");
+  await started;
+  await pattern.selectOption("mixed4c-439");
+  release();
+  await expect(page.locator("#step-growth")).toBeEnabled();
+  await expect(page.locator("#model-info-content")).toContainText(
+    "Vesicle Study",
+  );
+  expect(await state(page)).toEqual(before);
+  expect(await page.evaluate(() => window.__growthRuntime.model.id)).toBe(
+    "mixed4c-439",
+  );
+});

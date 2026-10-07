@@ -2,7 +2,7 @@
 
 ## Application code
 
-Latent Field's own source code and documentation are MIT-licensed; see LICENSE. This grant excludes third-party components and all model weights. Their applicable terms are documented below.
+Latent Field's own source code and documentation are MIT-licensed; see LICENSE. This grant does not automatically cover third-party components or model weights. Their applicable terms are documented below and in each model notice.
 
 ## Browser runtimes
 
@@ -35,7 +35,14 @@ Inception rights remain an unresolved public-release blocker. DigiFace's self-tr
   Pinned references, changes, hashes, numerical conventions, and reproduction
   are documented in the same model notice.
 
-This is a published reference model, not an original Latent Field checkpoint.
+- Original Organic Structures checkpoints use original AI-generated targets and
+  newly trained dense weights, initialized from scratch with no pretrained image
+  network. These weights have an explicit separate MIT grant in
+  [the pack notice](models/neural-growth/organic-structures/NOTICE.md). Source
+  targets, generation prompts, and the development-only trainer remain in the
+  source repository; they are not downloaded by the application.
+
+Vesicle Study is a published reference, not an original Latent Field checkpoint.
 Upstream terms do not independently establish all original training-data rights.
 The separate Inception and DigiFace release review remains outstanding.
 

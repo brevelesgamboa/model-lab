@@ -1,4 +1,6 @@
 // Route-local interactions only. Playback remains owned by the app controller.
+import { renderModelTechnicalInfo } from "./controls-controller.js";
+
 export function createGrowthController({
   elements,
   getModel,
@@ -10,6 +12,7 @@ export function createGrowthController({
 }) {
   let busy = false;
   let pointerId = null;
+  let lastInfo = null;
   const listeners = [];
   const activeModel = () =>
     getView() === "lab" && getModel()?.id === "neural-growth"
@@ -21,12 +24,18 @@ export function createGrowthController({
     elements.growthTools.hidden = !model;
     elements.canvas.classList.toggle("is-growth", Boolean(model));
     if (!model) return;
+    if (model.technicalInfo !== lastInfo) {
+      renderModelTechnicalInfo(elements, model);
+      lastInfo = model.technicalInfo;
+    }
     const stats = model.getStats();
     elements.growthStatus.textContent = model.lastError
       ? `${model.lastError} Use Restart to retry.`
-      : stats
-        ? `${stats.size} × ${stats.size} · ${stats.steps} updates · click or drag to disturb`
-        : "Initializing WebGL2 field…";
+      : model.state === "LOADING"
+        ? "Loading pattern; retaining the current field…"
+        : stats
+          ? `${stats.size} × ${stats.size} · ${stats.steps} updates · click or drag to disturb`
+          : "Initializing WebGL2 field…";
     elements.growthStatus.dataset.steps = String(stats?.steps || 0);
     elements.growthStatus.dataset.size = String(stats?.size || 0);
     elements.stepGrowth.disabled = busy || !model.ready;

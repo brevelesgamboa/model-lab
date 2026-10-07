@@ -210,6 +210,7 @@ const controlsController = createControlsController({
   onRange: syncRangeControl,
   onValue(definition, value) {
     currentParameters[definition.key] = value;
+    currentModel.onParameterChange?.(definition.key, value);
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     invalidateCurrentRun("PARAMETERS CHANGED");
@@ -1378,9 +1379,8 @@ function setAnimation(enabled, { log = true } = {}) {
   playback.sync();
   if (animationEnabled) {
     animationEpoch = performance.now() - lastTimeSeconds * 1000;
-  } else {
-    renderCurrentFrame({ forceAnalysis: true, timeSeconds: lastTimeSeconds });
   }
+  renderCurrentFrame({ forceAnalysis: true, timeSeconds: lastTimeSeconds });
   updateAnimationButton();
   if (log)
     terminal(

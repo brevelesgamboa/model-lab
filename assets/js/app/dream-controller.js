@@ -106,6 +106,7 @@ export function createDreamController({
     if (!isActive()) return;
     const model = getModel();
     elements.loadNeuralDream.disabled = true;
+    elements.loadNeuralDream.textContent = "LOADING MODEL";
     try {
       await withExclusiveCompute(() =>
         model.ensureModel((message) => {

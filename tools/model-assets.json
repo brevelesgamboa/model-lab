@@ -1,5 +1,15 @@
 [
   {
+    "path": "models/neural-growth/organic-structures/filament-network.json",
+    "bytes": 23503,
+    "sha256": "2e84a53fda8e2243ae5be9c670e1674607c1ace48ed6f2622bfb3cab3c92d621"
+  },
+  {
+    "path": "models/neural-growth/organic-structures/membrane-field.json",
+    "bytes": 23509,
+    "sha256": "a0e8ddbdd0c963a6ef248cbce9103ed6de4a03ac0ae757e3a0f0f9263f97da81"
+  },
+  {
     "path": "models/neural-growth/checkpoint.json",
     "bytes": 76666,
     "sha256": "6e8a5177fb7eb600f6b21f8f888d2a28acf2ad2687f49577ec0aedbee41270de"

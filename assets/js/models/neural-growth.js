@@ -1,14 +1,14 @@
 import { sanitizeParameters } from "../core/model-contract.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
 import { TextureNcaRuntime } from "./neural-growth/runtime.js";
+import {
+  DEFAULT_PATTERN,
+  PATTERNS,
+  getPattern,
+} from "./neural-growth/patterns.js";
 
-const checkpointUrl = new URL(
-  "../../../models/neural-growth/checkpoint.json",
-  import.meta.url,
-);
-
-async function loadCheckpoint(signal) {
-  const response = await fetch(checkpointUrl, { signal });
+async function loadCheckpoint(signal, pattern) {
+  const response = await fetch(pattern.checkpointUrl, { signal });
   if (!response.ok)
     throw new Error(`Checkpoint request failed (${response.status}).`);
   return response.json();
@@ -25,7 +25,7 @@ export class NeuralGrowthModel {
     this.family = "TEXTURE NEURAL CELLULAR AUTOMATON";
     this.backend = "WEBGL2 NCA";
     this.description =
-      "Vesicle Study: a learned local update rule grows membrane-like textures across a persistent cellular grid. Disturb the field to observe regeneration.";
+      "Learned local update rules grow original organic textures or a published reference across a persistent cellular grid. Choose a pattern and disturb the field to observe regeneration.";
     this.available = true;
     this.supportsModulation = false;
     this.supportsRandomize = false;
@@ -36,24 +36,12 @@ export class NeuralGrowthModel {
       highResolution: false,
       savedRun: false,
     };
-    this.technicalInfo = {
-      title: "Vesicle Study · mixed4c_439",
-      architecture:
-        "12 state channels → 48 fixed-filter features → 96 ReLU units → 12 state deltas",
-      objective:
-        "Published Inception v1 mixed4c channel 439 activation target (training only)",
-      inferenceFramework: "Native WebGL2 · quantized RGBA8",
-      inferenceBackend: "WebGL2 required; half the cells update each step",
-      browserInput: "Seeded update schedule; toroidal 128² or 256² grid",
-      browserOutput: "RGB state projection; spectral palette is display-only",
-      reference:
-        "Niklasson, Mordvintsev, Randazzo & Levin · Self-Organising Textures (2021)",
-      license: "Checkpoint: CC-BY-4.0 · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/NOTICE.md",
-    };
     this._load = load;
     this._createRuntime = createRuntime;
-    this._checkpoint = null;
+    this._checkpoints = new Map();
+    this._activePattern = null;
+    this._requestedPattern = DEFAULT_PATTERN;
+    this._loadingPattern = false;
     this._runtime = null;
     this._needsRuntime = false;
     this._pending = null;
@@ -70,6 +58,17 @@ export class NeuralGrowthModel {
 
   get controls() {
     return [
+      {
+        key: "pattern",
+        label: "PATTERN",
+        type: "select",
+        default: DEFAULT_PATTERN,
+        options: PATTERNS.map(({ id, name, pack }) => ({
+          value: id,
+          label: `${pack} · ${name}`,
+        })),
+        help: "Changing pattern loads its checkpoint and restarts once. Failed loads retain the current field; use Restart to retry.",
+      },
       {
         key: "seed",
         label: "SEED",
@@ -119,6 +118,7 @@ export class NeuralGrowthModel {
   get ready() {
     return Boolean(
       this._runtime &&
+      !this._loadingPattern &&
       !this._needsRuntime &&
       !this.lastError &&
       !this._disposed,
@@ -126,6 +126,12 @@ export class NeuralGrowthModel {
   }
   get state() {
     return this.lastError ? "ERROR" : this.ready ? "READY" : "LOADING";
+  }
+  get activePattern() {
+    return this._activePattern;
+  }
+  get technicalInfo() {
+    return getPattern(this._activePattern || DEFAULT_PATTERN).technicalInfo;
   }
   get simulationSize() {
     return this._runtime?.size || this._parameters.simulationSize;
@@ -136,6 +142,7 @@ export class NeuralGrowthModel {
   isDynamic(parameters) {
     return (
       !this.lastError &&
+      !this._loadingPattern &&
       !this._disposed &&
       this._clockRunning &&
       Number(parameters.growthSpeed) > 0
@@ -153,6 +160,8 @@ export class NeuralGrowthModel {
   cancel() {
     this._epoch += 1;
     this._abort?.abort();
+    this._abort = null;
+    this._loadingPattern = false;
     this.setClockRunning(false);
   }
 
@@ -160,11 +169,25 @@ export class NeuralGrowthModel {
     return this._pending || Promise.resolve();
   }
 
+  onParameterChange(key, value) {
+    if (key !== "pattern" || value === this._requestedPattern) return;
+    getPattern(value);
+    this._requestedPattern = value;
+    this._epoch += 1;
+    this._abort?.abort();
+    this._abort = null;
+    this._loadingPattern = false;
+    this._lastTick = null;
+    this._accumulator = 0;
+  }
+
   render(canvas, parameters, timeSeconds, { advanceSimulation = false } = {}) {
+    const sanitized = sanitizeParameters(this, parameters);
+    this.onParameterChange("pattern", sanitized.pattern);
     const epoch = this._epoch;
     const task = this._render(
       canvas,
-      sanitizeParameters(this, parameters),
+      sanitized,
       timeSeconds,
       advanceSimulation,
       epoch,
@@ -177,8 +200,9 @@ export class NeuralGrowthModel {
 
   async _render(canvas, parameters, timeSeconds, advance, epoch) {
     if (this._disposed) return null;
-    const configuration = `${parameters.simulationSize}:${parameters.seed}`;
+    const configuration = `${parameters.pattern}:${parameters.simulationSize}:${parameters.seed}`;
     let candidate = null;
+    let runtimeOperation = false;
     try {
       if (this.lastError && configuration === this._failedConfiguration) {
         // Redraw the retained state after viewport resizing, if its context is
@@ -187,25 +211,37 @@ export class NeuralGrowthModel {
           this._runtime.draw(canvas, this._parameters.palette);
         return this._result();
       }
-      if (!this._checkpoint) {
+      const pattern = getPattern(parameters.pattern);
+      let checkpoint = this._checkpoints.get(pattern.id);
+      if (!checkpoint) {
         const abort = new AbortController();
         this._abort = abort;
-        const raw = await this._load(abort.signal);
-        if (epoch !== this._epoch || this._disposed) return null;
-        this._checkpoint = validateCheckpoint(raw);
-        if (this._abort === abort) this._abort = null;
+        this._loadingPattern = true;
+        try {
+          const raw = await this._load(abort.signal, pattern);
+          if (epoch !== this._epoch || this._disposed) return null;
+          checkpoint = validateCheckpoint(raw);
+          if (checkpoint.id !== pattern.id)
+            throw new Error("Checkpoint does not match the selected pattern.");
+          this._checkpoints.set(pattern.id, checkpoint);
+        } finally {
+          if (this._abort === abort) {
+            this._abort = null;
+            this._loadingPattern = false;
+          }
+        }
       }
       if (epoch !== this._epoch || this._disposed) return null;
       if (
         !this._runtime ||
+        this._activePattern !== pattern.id ||
         this._runtime.size !== parameters.simulationSize ||
-        this._needsRuntime ||
-        this.lastError
+        this._needsRuntime
       ) {
         // Build and draw privately before committing. Failed grid changes retain
         // the old state and displayed frame instead of repeatedly clearing them.
         candidate = this._createRuntime({
-          model: this._checkpoint,
+          model: checkpoint,
           size: parameters.simulationSize,
           seed: parameters.seed,
         });
@@ -215,9 +251,13 @@ export class NeuralGrowthModel {
         candidate.draw(preview, parameters.palette);
         this._runtime?.dispose();
         this._runtime = candidate;
+        this._activePattern = pattern.id;
         this._needsRuntime = false;
+        this._lastTick = null;
+        this._accumulator = 0;
         candidate = null;
       } else if (this._runtime.seed !== parameters.seed) {
+        runtimeOperation = true;
         this._runtime.restart(parameters.seed);
         this._lastTick = null;
         this._accumulator = 0;
@@ -232,6 +272,7 @@ export class NeuralGrowthModel {
       this._parameters = parameters;
       this.lastError = null;
       this._failedConfiguration = null;
+      runtimeOperation = true;
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
         if (this._lastTick !== null) {
           const delta = Math.max(
@@ -253,18 +294,19 @@ export class NeuralGrowthModel {
     } catch (error) {
       candidate?.dispose();
       if (epoch !== this._epoch || this._disposed) return null;
-      this._fail(error, configuration);
+      this._fail(error, configuration, { invalidateRuntime: runtimeOperation });
       return this._result();
     }
   }
 
   _fail(
     error,
-    configuration = `${this._parameters.simulationSize}:${this._parameters.seed}`,
+    configuration = `${this._parameters.pattern}:${this._parameters.simulationSize}:${this._parameters.seed}`,
+    { invalidateRuntime = true } = {},
   ) {
     this.lastError = error instanceof Error ? error.message : String(error);
     this._failedConfiguration = configuration;
-    this._needsRuntime = true;
+    this._needsRuntime ||= invalidateRuntime;
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -288,6 +330,7 @@ export class NeuralGrowthModel {
         steps: stats?.steps || 0,
         gridSize: stats?.size || 0,
         textureBytes: stats?.resources.bytes || 0,
+        pattern: this._activePattern,
       },
     };
   }
@@ -330,6 +373,6 @@ export class NeuralGrowthModel {
     this._disposed = true;
     this._runtime?.dispose();
     this._runtime = null;
-    this._checkpoint = null;
+    this._checkpoints.clear();
   }
 }

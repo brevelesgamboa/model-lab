@@ -10,6 +10,8 @@ import {
   validateSize,
 } from "../../assets/js/models/neural-growth/reference.js";
 import { TextureNcaRuntime } from "../../assets/js/models/neural-growth/runtime.js";
+import { PATTERNS } from "../../assets/js/models/neural-growth/patterns.js";
+import { createHash } from "node:crypto";
 
 const checkpointUrl = new URL(
   "../../models/neural-growth/checkpoint.json",
@@ -40,6 +42,37 @@ test("the shipped checkpoint decodes the fixed Texture NCA weight layout", async
     assert.equal(layer.weights.byteLength, length);
     assert.equal(layer.coefficients.length, length);
     assert.ok(layer.coefficients.every(Number.isFinite));
+  }
+});
+
+test("every release pattern has a matching checkpoint and integrity manifest entry", async () => {
+  const manifest = JSON.parse(
+    await readFile(
+      new URL("../../tools/model-assets.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const weights = new Set();
+  for (const pattern of PATTERNS) {
+    const bytes = await readFile(pattern.checkpointUrl);
+    const raw = JSON.parse(bytes);
+    const model = validateCheckpoint(raw);
+    assert.equal(model.id, pattern.id);
+    assert.equal(model.name, pattern.name);
+    const relative = pattern.checkpointUrl.pathname.split("/models/")[1];
+    const entry = manifest.find(({ path }) => path === `models/${relative}`);
+    assert.ok(entry, `Missing asset: ${pattern.id}`);
+    assert.equal(bytes.length, entry.bytes);
+    assert.equal(
+      createHash("sha256").update(bytes).digest("hex"),
+      entry.sha256,
+    );
+    const fingerprint = JSON.stringify(raw.layers);
+    assert.ok(
+      !weights.has(fingerprint),
+      "Distinct patterns cannot share renamed weights.",
+    );
+    weights.add(fingerprint);
   }
 });
 

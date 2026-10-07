@@ -10,7 +10,7 @@ export default [
     ],
   },
   {
-    files: ["assets/js/**/*.js"],
+    files: ["assets/js/**/*.js", "prototypes/neural-growth/training/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

@@ -48,24 +48,32 @@ Quality and Reduced Compute both use this same objective. Reduced Compute caps t
 
 ## Neural Growth
 
-Vesicle Study is a published Texture Neural Cellular Automaton checkpoint: a
-learned local rule evolves 12 state channels per cell into membrane-like textures.
-It is not a biological simulation or a model of human perception. Inception v1
-was used for the published training objective, not for browser inference.
-No training, user download, or additional runtime dependency is required.
+Neural Growth uses small learned local rules to evolve 12 state channels per
+cell into textures. PATTERN includes the original Organic Structures pack and
+the explicitly labeled published Vesicle Study reference. Original patterns are
+trained from scratch against AI-generated imagined biological/alien textures;
+they are not biological simulations or models of human perception. Inception v1
+was used for the published reference's training objective, not browser inference.
+No end-user training, separate model download, or additional runtime dependency
+is required. See [the original pack notice](models/neural-growth/organic-structures/NOTICE.md)
+for the training objective, provenance, and device-specific validation.
 
 Use CLOCK to play/pause, SINGLE STEP to advance once while paused, RESTART to
 reset, and DISTURB CENTER or click/drag on the field to clear a local region.
-Seed and 128/256 grid changes deliberately restart; speed, palette, viewport
+Pattern, seed and 128/256 grid changes deliberately restart; speed, palette, viewport
 resizing, navigation, and model switching preserve the current grid. Growth speed
 is a requested rate, capped at two updates per frame without accumulated catch-up.
 The default 128² grid is lighter; 256² adds simulation detail, not just display pixels.
+Patterns load on demand and cache their weights, not their simulation grids.
+Failed replacements retain the previous field and attribution; Restart retries
+explicitly. Superseded downloads cannot paint or reset the current field.
 
 WebGL2 is required. PNG exports a display-sized snapshot without advancing state.
 GIF, high-resolution resimulation, and restorable Saved Runs are unavailable;
 parameter records do not contain the hidden cell state. Session state is not
 retained after reload. Source attribution and separate CC-BY-4.0/Apache-2.0 terms:
-[Neural Growth notice](models/neural-growth/NOTICE.md).
+[published Neural Growth notice](models/neural-growth/NOTICE.md). Original pack
+weights have their own explicit MIT grant in the original pack notice.
 
 The [development harness](prototypes/neural-growth/README.md) shares the production
 engine and checkpoint; it remains outside the static build. Validation commands

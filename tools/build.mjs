@@ -34,6 +34,7 @@ const modelAssets = JSON.parse(
 );
 const staticFiles = [
   "models/neural-growth/NOTICE.md",
+  "models/neural-growth/organic-structures/NOTICE.md",
   ...modelAssets.map((entry) => entry.path),
   "models/digiface/README.txt",
   "models/digiface/model-info.json",

@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { NeuralGrowthModel } from "../../assets/js/models/neural-growth.js";
 import {
+  PATTERNS,
+  DEFAULT_PATTERN,
+  getPattern,
+} from "../../assets/js/models/neural-growth/patterns.js";
+import {
   captureCapabilities,
   defaultParameters,
   validateModelDefinition,
@@ -235,4 +240,118 @@ test("explicit retry replaces a failed runtime, including lost contexts", async 
   assert.equal(model.ready, true);
   assert.equal(runtimes.length, 2);
   assert.equal(runtimes[0].disposed, true);
+});
+
+const originalFixture = () => ({
+  ...checkpoint,
+  id: "membrane-field",
+  name: "Membrane Field",
+});
+
+test("pattern catalog binds distinct validated files and rejects unknown IDs", () => {
+  const model = new NeuralGrowthModel();
+  const control = model.controls.find(({ key }) => key === "pattern");
+  assert.equal(control.default, DEFAULT_PATTERN);
+  assert.equal(new Set(PATTERNS.map(({ id }) => id)).size, PATTERNS.length);
+  assert.equal(
+    new Set(PATTERNS.map(({ checkpointUrl }) => checkpointUrl.href)).size,
+    PATTERNS.length,
+  );
+  assert.match(getPattern(DEFAULT_PATTERN).technicalInfo.license, /CC-BY/);
+  assert.match(
+    getPattern("membrane-field").technicalInfo.title,
+    /Organic Structures/,
+  );
+  assert.throws(() => getPattern("../checkpoint"), /Unknown/);
+});
+
+test("pattern replacement commits once, updates metadata, and caches weights lazily", async (context) => {
+  const loads = [];
+  const { model, params, canvas, runtimes } = setup(context, {
+    load: async (_signal, pattern) => {
+      loads.push(pattern.id);
+      return pattern.id === DEFAULT_PATTERN ? checkpoint : originalFixture();
+    },
+  });
+  await model.render(canvas, params, 0);
+  model.step();
+  const original = { ...params, pattern: "membrane-field" };
+  await model.render(canvas, original, 100);
+  await model.render(canvas, original, 101);
+  assert.equal(runtimes.length, 2);
+  assert.equal(runtimes[0].disposed, true);
+  assert.equal(runtimes[1].steps, 0);
+  assert.equal(model.activePattern, "membrane-field");
+  assert.match(model.technicalInfo.title, /Membrane Field/);
+  await model.render(canvas, params, 102);
+  assert.equal(runtimes[1].disposed, true);
+  assert.deepEqual(loads, [DEFAULT_PATTERN, "membrane-field"]);
+  assert.match(model.technicalInfo.title, /Vesicle Study/);
+});
+
+test("failed pattern loads retain old state and metadata; returning to it never resets", async (context) => {
+  let loads = 0;
+  const { model, params, canvas, runtimes } = setup(context, {
+    load: async (_signal, pattern) => {
+      loads += 1;
+      if (pattern.id !== DEFAULT_PATTERN)
+        throw new Error("Pattern unavailable");
+      return checkpoint;
+    },
+  });
+  await model.render(canvas, params, 0);
+  model.step();
+  const original = { ...params, pattern: "membrane-field" };
+  await model.render(canvas, original, 1);
+  await model.render(canvas, original, 2);
+  assert.equal(loads, 2);
+  assert.equal(canvas.paintedBy, runtimes[0]);
+  assert.equal(runtimes[0].disposed, false);
+  assert.equal(model.activePattern, DEFAULT_PATTERN);
+  await model.render(canvas, params, 3);
+  assert.equal(model.ready, true);
+  assert.equal(runtimes.length, 1);
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].restarts, 0);
+});
+
+test("superseded pattern loads cannot allocate, reset or paint the retained field", async (context) => {
+  let finish;
+  let signal;
+  const { model, params, canvas, runtimes } = setup(context, {
+    load: async (abort, pattern) => {
+      if (pattern.id === DEFAULT_PATTERN) return checkpoint;
+      signal = abort;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
+  await model.render(canvas, params, 0);
+  model.step();
+  const pending = model.render(
+    canvas,
+    { ...params, pattern: "membrane-field" },
+    1,
+  );
+  assert.equal(model.ready, false);
+  assert.match(model.technicalInfo.title, /Vesicle Study/);
+  model.onParameterChange("pattern", DEFAULT_PATTERN);
+  assert.equal(signal.aborted, true);
+  finish(originalFixture());
+  assert.equal(await pending, null);
+  await model.render(canvas, params, 2);
+  assert.equal(runtimes.length, 1);
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].disposed, false);
+});
+
+test("wrong checkpoint identity cannot be presented as an original pattern", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  await model.render(canvas, { ...params, pattern: "membrane-field" }, 1);
+  assert.match(model.lastError, /does not match/);
+  assert.equal(model.activePattern, DEFAULT_PATTERN);
+  assert.equal(runtimes.length, 1);
+  assert.equal(runtimes[0].disposed, false);
 });

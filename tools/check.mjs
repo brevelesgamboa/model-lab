@@ -29,6 +29,7 @@ async function scriptsIn(directory) {
 const files = [
   ...(await scriptsIn(path.join(root, "assets/js"))),
   ...(await scriptsIn(path.join(root, "tools"))),
+  ...(await scriptsIn(path.join(root, "prototypes/neural-growth/training"))),
   path.join(root, "server.mjs"),
 ];
 for (const file of files) {
@@ -59,6 +60,7 @@ for (const relative of [
   "models/digiface/README.txt",
   "models/digiface/model-info.json",
   "models/neural-growth/NOTICE.md",
+  "models/neural-growth/organic-structures/NOTICE.md",
   "licenses/neural-growth-Apache-2.0.txt",
 ])
   await access(path.join(root, relative));
