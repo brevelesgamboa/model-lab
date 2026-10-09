@@ -211,8 +211,20 @@ const controlsController = createControlsController({
   onValue(definition, value) {
     currentParameters[definition.key] = value;
     // Discard obsolete completion callbacks, without discarding GPU state.
-    if (currentModel.onParameterChange?.(definition.key, value))
+    if (currentModel.onParameterChange?.(definition.key, value)) {
       renderer.invalidate();
+      const defaults = currentModel.parameterDefaultsForChange?.(
+        definition.key,
+        value,
+      );
+      if (defaults) {
+        currentParameters = sanitizedStoredParameters(currentModel, {
+          ...currentParameters,
+          ...defaults,
+        });
+        controlsController.render();
+      }
+    }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     invalidateCurrentRun("PARAMETERS CHANGED");

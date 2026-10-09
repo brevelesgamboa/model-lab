@@ -1,4 +1,5 @@
-// Release catalog: independently validated checkpoints with verified provenance.
+// Release catalog: checkpoint provenance and validation are listed per pack.
+import { SELECTED_PATTERNS } from "./selected-patterns.js";
 const commonInfo = Object.freeze({
   architecture:
     "12 state channels → 48 fixed-filter features → 96 ReLU units → 12 state deltas",
@@ -42,7 +43,7 @@ export const PATTERNS = Object.freeze([
       objective: "Multiscale fixed-feature Gram statistics and RGB moments; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     }),
   }),
   Object.freeze({
@@ -59,7 +60,7 @@ export const PATTERNS = Object.freeze([
       objective: "Multiscale fixed-feature Gram statistics, RGB correlation and spatial differences; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     }),
   }),
   Object.freeze({
@@ -76,9 +77,10 @@ export const PATTERNS = Object.freeze([
       objective: "Multiscale fixed-feature Gram statistics, RGB correlation and spatial differences; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     }),
   }),
+  ...SELECTED_PATTERNS,
   Object.freeze({
     id: "bubbly-0101",
     technicalId: "bubbly_0101",

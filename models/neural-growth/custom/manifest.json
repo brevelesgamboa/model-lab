@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "count": 22,
+  "integration": "Replace the previous selected entries using replaces_id; add all models to the existing Originals/Custom catalog without run-named packs or new gallery tabs.",
+  "preview_destination": "models/neural-growth/previews/",
+  "initialization": "init uses zero/noise; checkpoints also retain startup.seedState as zeros/noise with saved seed, noiseStd, gridSize, and previewSteps.",
+  "weights_and_scales": "Preserved exactly from the selected original checkpoints.",
+  "models": [
+    {
+      "id": "bumpy-surface",
+      "name": "Bumpy Surface",
+      "init": "zero",
+      "checkpoint": "bumpy-surface.json",
+      "preview": "bumpy-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "bumpy_0106-5b3db6d63b4b-r0007",
+      "selection": "overnight/bumpy_0106-5b3db6d63b4b/round-0007",
+      "checkpoint_sha256": "85d08547c098d63657891b08d98258daba4cf7c3ef502789ce2a0397c9d5158b",
+      "preview_sha256": "81191ce7f78786e97c855fdf81fbff5e85e4a15bd78220ddc52dc24021b5a1d3"
+    },
+    {
+      "id": "circuit-board",
+      "name": "Circuit Board",
+      "init": "zero",
+      "checkpoint": "circuit-board.json",
+      "preview": "circuit-board.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "circuit-boards-15_hg-8ed3261fed7c-r0007",
+      "selection": "overnight/circuit-boards-15_hg-8ed3261fed7c/round-0007",
+      "checkpoint_sha256": "441abd42420452ab4ec2bf621ddd6773072a80621812e9d2a2b9f857b0c4f7f3",
+      "preview_sha256": "a3ceba60fe52da1ccf3fa2b1bb06ded9b77199d36e00a81e3dcaba16c3b7e0a9"
+    },
+    {
+      "id": "microscopic-eye",
+      "name": "Microscopic Eye",
+      "init": "zero",
+      "checkpoint": "microscopic-eye.json",
+      "preview": "microscopic-eye.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "eye_-x2-5k-cc7bcb952d73-r0003",
+      "selection": "overnight/eye_-x2-5k-cc7bcb952d73/round-0003",
+      "checkpoint_sha256": "2511b6b0b495d0251506ea1b7e6f93740aeea4e9a1c03385f807dfa6b88a6880",
+      "preview_sha256": "24e99e0faaf289b6a4d31c95d85e8173ba8f41e63fcb1a479439542820142c9e"
+    },
+    {
+      "id": "metal-surface",
+      "name": "Metal Surface",
+      "init": "zero",
+      "checkpoint": "metal-surface.json",
+      "preview": "metal-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "metal049b-dce2b1e4a215-r0005",
+      "selection": "overnight/metal049b-dce2b1e4a215/round-0005",
+      "checkpoint_sha256": "ec5a2dd8aaf7988348253c5f18b6b89479522f8ac80c9c4e01673a8d9bc9762e",
+      "preview_sha256": "c385f3169c0040fdb2a3b9cf80bf63d671339691f62a6efeb6c6dfa6d0027744"
+    },
+    {
+      "id": "pia00313-surface",
+      "name": "PIA00313 Surface",
+      "init": "zero",
+      "checkpoint": "pia00313-surface.json",
+      "preview": "pia00313-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia00313-ca073f7e7e6c-r0005",
+      "selection": "overnight/pia00313-ca073f7e7e6c/round-0005",
+      "checkpoint_sha256": "9b247f18c998a5a0c7fbca456e957c919a3f14cbccc14b3116ccce806bf13c6d",
+      "preview_sha256": "b99d7323024aff313c816334b9ed27f19e3370f15b1bac1e5026d31757e6c7e8"
+    },
+    {
+      "id": "rock-surface",
+      "name": "Rock Surface",
+      "init": "zero",
+      "checkpoint": "rock-surface.json",
+      "preview": "rock-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "rocks002-045ee9bdc1e3-r0007",
+      "selection": "overnight/rocks002-045ee9bdc1e3/round-0007",
+      "checkpoint_sha256": "ca8ace7497eb6ec3f764938acb14447b26aa0fe96bf941da1dc930113a3761b4",
+      "preview_sha256": "416d2512d253a6b5ecd952ac437b2ef073d5ea54780c7f84c49990eb0b6f894c"
+    },
+    {
+      "id": "swirled-surface",
+      "name": "Swirled Surface",
+      "init": "zero",
+      "checkpoint": "swirled-surface.json",
+      "preview": "swirled-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "swirly_0057-c825099c459b-r0005",
+      "selection": "overnight/swirly_0057-c825099c459b/round-0005",
+      "checkpoint_sha256": "fbd976b6e7795bc485cf7423951cf9dd821414346652633f1ff38767896f7061",
+      "preview_sha256": "300d52bd88c5ed75fea88c58c9564d859b636f5fb86fb8a6323b0bcd85f83f19"
+    },
+    {
+      "id": "wrinkled-surface",
+      "name": "Wrinkled Surface",
+      "init": "zero",
+      "checkpoint": "wrinkled-surface.json",
+      "preview": "wrinkled-surface.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 42,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "wrinkled_0062-76135a170be6-r0007",
+      "selection": "overnight/wrinkled_0062-76135a170be6/round-0007",
+      "checkpoint_sha256": "bd99855a7284ac137ee14bcb9c8e27315c57e78187b4ccc455c6f7f547246e1c",
+      "preview_sha256": "f814d0c102b9f57450423b8a54bf27ddff705dec70155e63585e08e4a2d812c5"
+    },
+    {
+      "id": "bumpy-contours",
+      "name": "Bumpy Contours",
+      "init": "zero",
+      "checkpoint": "bumpy-contours.json",
+      "preview": "bumpy-contours.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 568525450,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "bumpy_0106-5b3db6d63b4b-v05",
+      "selection": "glitch/bumpy_0106-5b3db6d63b4b/variant-05-edges",
+      "checkpoint_sha256": "d0b57d858cef266484f977b35af84778d998730f9ac2914b6f9e3ffc1c85f22f",
+      "preview_sha256": "4266dd7247f3e2aac02dbaf09afb603013c97c1df3b61fc68d2863dd8c43735c"
+    },
+    {
+      "id": "circuit-mosaic",
+      "name": "Circuit Mosaic",
+      "init": "noise",
+      "checkpoint": "circuit-mosaic.json",
+      "preview": "circuit-mosaic.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 188257907,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "circuit-boards-15_hg-8ed3261fed7c-v04",
+      "selection": "glitch/circuit-boards-15_hg-8ed3261fed7c/variant-04-blocks",
+      "checkpoint_sha256": "0348f3bd282029141963a5c240b98f39fe8a2b4bc2dd6bb34e7298cd388fc063",
+      "preview_sha256": "31cfb536aa5176a07ed012af8a1a54d86ea3f9e93d1464acdc76ede632d00a81"
+    },
+    {
+      "id": "eye-mosaic",
+      "name": "Eye Mosaic",
+      "init": "zero",
+      "checkpoint": "eye-mosaic.json",
+      "preview": "eye-mosaic.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 229365697,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "eye_-x2-5k-cc7bcb952d73-v04",
+      "selection": "glitch/eye_-x2-5k-cc7bcb952d73/variant-04-blocks",
+      "checkpoint_sha256": "1eb4110e419e99c1c7d24e29e26a801f407b8008ad58233fea0c3dbbdca4f15c",
+      "preview_sha256": "f487d84d9d0f1c18a383b765734c2e9eabfb90bdf8431ac389a39a0510e2b0ff"
+    },
+    {
+      "id": "hp-1813-inversion",
+      "name": "HP 1813 Inversion",
+      "init": "zero",
+      "checkpoint": "hp-1813-inversion.json",
+      "preview": "hp-1813-inversion.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 881334284,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "hp_1813-0091_top_case_removed-b8322a7eee2f-v06",
+      "selection": "glitch/hp_1813-0091_top_case_removed-b8322a7eee2f/variant-06-inverted",
+      "checkpoint_sha256": "094c41ef5cf203802bf60c2bac917a662ccc4d85e75ce1c4aa41a06d973070b2",
+      "preview_sha256": "1aa7766140a649514ce252d775e749427ca90e898ba781c7815285ea87118ada"
+    },
+    {
+      "id": "metal-remix",
+      "name": "Metal Remix",
+      "init": "noise",
+      "checkpoint": "metal-remix.json",
+      "preview": "metal-remix.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 1302380494,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "metal049b-dce2b1e4a215-v10",
+      "selection": "glitch/metal049b-dce2b1e4a215/variant-10-mutation",
+      "checkpoint_sha256": "1fcd6cb3bdab5e1d069874865d8b58bdddef17f28b48529e25c81d25b384c5c4",
+      "preview_sha256": "04a3b1775c7b1772b81511c3b6efca81932c1f0ba0a68dc68c801e451c8a1413"
+    },
+    {
+      "id": "pia00313-remix",
+      "name": "PIA00313 Remix",
+      "init": "noise",
+      "checkpoint": "pia00313-remix.json",
+      "preview": "pia00313-remix.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 1381368396,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia00313-ca073f7e7e6c-v10",
+      "selection": "glitch/pia00313-ca073f7e7e6c/variant-10-mutation",
+      "checkpoint_sha256": "e336394004f05a575d5ca68f7b5049e8364457c017ff009fcaf79fb09cdb25e2",
+      "preview_sha256": "7f92da1121d39dd4ef1629adf1b4e62a1980bd686a69f55cf26ac6e6e9010374"
+    },
+    {
+      "id": "pia19445-contours",
+      "name": "PIA19445 Contours",
+      "init": "zero",
+      "checkpoint": "pia19445-contours.json",
+      "preview": "pia19445-contours.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 1524432755,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia19445-6f01f1db2b1f-v05",
+      "selection": "glitch/pia19445-6f01f1db2b1f/variant-05-edges",
+      "checkpoint_sha256": "f216b8a67eab4400069ab5834b4a6880c35b027e5d04f4f19496bb7194455316",
+      "preview_sha256": "83ea852b3716e55a31360df0e7022caa3765c1d6571010a80e7e0724cabd833d"
+    },
+    {
+      "id": "pia19445-warp",
+      "name": "PIA19445 Warp",
+      "init": "zero",
+      "checkpoint": "pia19445-warp.json",
+      "preview": "pia19445-warp.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 1214583499,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia19445-6f01f1db2b1f-v08",
+      "selection": "glitch/pia19445-6f01f1db2b1f/variant-08-warped",
+      "checkpoint_sha256": "4749df8b488ff3cd9c52f59f85cc4c85399111da710eaeabe4fb195a5bb5a94e",
+      "preview_sha256": "35f48194a606a3e82433663803044f09bb1f833206d266dc79c30efad6ee895b"
+    },
+    {
+      "id": "pia26281-warp",
+      "name": "PIA26281 Warp",
+      "init": "noise",
+      "checkpoint": "pia26281-warp.json",
+      "preview": "pia26281-warp.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 373952376,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia26281-52e0685d589c-v08",
+      "selection": "glitch/pia26281-52e0685d589c/variant-08-warped",
+      "checkpoint_sha256": "e796da704773640b207b7770f77f8aca5bf34a2affbc116892b19cc8b80d8a3e",
+      "preview_sha256": "0130fe4cd0aa980c5fec12d1dba2d7d51c6e924fc679bbaa5ace6d8c9022d8c8"
+    },
+    {
+      "id": "pia26634-scanlines",
+      "name": "PIA26634 Scanlines",
+      "init": "noise",
+      "checkpoint": "pia26634-scanlines.json",
+      "preview": "pia26634-scanlines.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 1521283055,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "pia26634-612d14453a87-v03",
+      "selection": "glitch/pia26634-612d14453a87/variant-03-scanlines",
+      "checkpoint_sha256": "9d87d32090f5b3d281895c3f76f1e1f217aba48a904217194bc5e47afb908c34",
+      "preview_sha256": "48c6061c0b49af56fd7458d793bedbeda450950952f0c399ad72574772fecb58"
+    },
+    {
+      "id": "rock-mosaic",
+      "name": "Rock Mosaic",
+      "init": "noise",
+      "checkpoint": "rock-mosaic.json",
+      "preview": "rock-mosaic.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 2090073088,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "rocks002-045ee9bdc1e3-v04",
+      "selection": "glitch/rocks002-045ee9bdc1e3/variant-04-blocks",
+      "checkpoint_sha256": "e235c6fb275540072e1821dc018cc553aa34ef755d5c9279c06c46a09c1d545a",
+      "preview_sha256": "be4786b028ba835fe015777220d98da6c9946ce86a260f24084033a009d6ee6a"
+    },
+    {
+      "id": "swirled-neon",
+      "name": "Swirled Neon",
+      "init": "noise",
+      "checkpoint": "swirled-neon.json",
+      "preview": "swirled-neon.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 1580925767,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "swirly_0057-c825099c459b-v01",
+      "selection": "glitch/swirly_0057-c825099c459b/variant-01-neon",
+      "checkpoint_sha256": "9590be4da6468425ee46d48130e1259c8ef871a64e01152599e4c3383f65c36a",
+      "preview_sha256": "0e035fa7c35aa5c8cab6512fd17fcc8f75f289bf6be3400c178ac9e99d1e34d4"
+    },
+    {
+      "id": "swirled-remix",
+      "name": "Swirled Remix",
+      "init": "zero",
+      "checkpoint": "swirled-remix.json",
+      "preview": "swirled-remix.png",
+      "startup": {
+        "seedState": "zeros",
+        "noiseStd": 0.0,
+        "seed": 1069801624,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "swirly_0057-c825099c459b-v10",
+      "selection": "glitch/swirly_0057-c825099c459b/variant-10-mutation",
+      "checkpoint_sha256": "6eb19c1675fb2b34611b6091f7162e8bf0320d8f9ed08eca5f18d84d4585d094",
+      "preview_sha256": "1fc17bafd4ac5639584291e98b409884709017cbb0de7bc79d15ff3aa9aa4317"
+    },
+    {
+      "id": "wrinkled-contours",
+      "name": "Wrinkled Contours",
+      "init": "noise",
+      "checkpoint": "wrinkled-contours.json",
+      "preview": "wrinkled-contours.png",
+      "startup": {
+        "seedState": "noise",
+        "noiseStd": 0.05,
+        "seed": 987123406,
+        "gridSize": 128,
+        "previewSteps": 96
+      },
+      "replaces_id": "wrinkled_0062-76135a170be6-v05",
+      "selection": "glitch/wrinkled_0062-76135a170be6/variant-05-edges",
+      "checkpoint_sha256": "3b44daef2ed743bea176def857ce57a02ab8e8a0cdcf0b4ed65a61b1cde00675",
+      "preview_sha256": "068ed44bb036a0560dcd3421a27356611305afe0f1062279b0f21cdc8b2adc55"
+    }
+  ]
+}

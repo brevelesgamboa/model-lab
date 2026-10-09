@@ -1,13 +1,25 @@
-# Scope and release priorities
+# Latent Field Roadmap
 
-The current scope is a graphics/feature-visualization Lab with optional local Experiments. New importing systems, community catalogs, additional training profiles, live morph engines, and more presets are deferred.
+Development milestones and planned directions for Latent Field.
 
-Before public release:
+## Current Milestone: Neural Growth Custom Texture Library
 
-1. Preserve the application MIT license and separate model terms in release packages.
-2. Record Inception checkpoint provenance and confirm redistribution rights.
-3. Review DigiFace release scope and dataset-agreement compliance; its from-scratch origin and research terms are recorded.
-4. Run the manual browser/device checks in RELEASE_CHECKLIST.md.
-5. Review the release diff and tag only after these gates pass.
+Integrating 22 custom-trained Neural Cellular Automata (NCA) models alongside the reference catalog.
 
-After release, prioritize measured performance, accessibility, and regression coverage. Introduce a feature only when its purpose, resource cost, and maintenance path are clear.
+- Clean Model Packaging: Store all custom models in models/neural-growth/custom with clean IDs, readable names, and preserved weight scales.
+- Noise Initialization Runtime: Support models that require Gaussian noise seeds (seedState: noise) on canvas reset alongside zero-state models.
+- Unified Gallery: Present custom models directly in the Pattern Gallery under the Originals category without unnecessary sub-pack clutter.
+- Verification and Integrity: Maintain verified SHA-256 asset checksums and unit test coverage.
+
+## Milestone 2: Visual Style Expansions
+
+- 3D Relief and Depth Illusions: Train models focusing on directional lighting, chiseled stone, and embossed metallic textures.
+- Ocular and Biological Pareidolia: Explore high-pareidolia eye colonies and organic cell structures.
+- Alien and Xenomorphic Surfaces: Train iridescent chitin and bioluminescent pore patterns.
+
+## Milestone 3: Interaction and Audio Modulation
+
+- Enhanced Brush Tools: Additional disturbance modes and brush shape controls.
+- Audio Reactive Controls: Expand modulation routing for rotation, speed, and disturbance from audio analysis.
+- Performance Tuning: WebGL2 shader optimizations for higher frame rates on mobile and lower-power hardware.
+

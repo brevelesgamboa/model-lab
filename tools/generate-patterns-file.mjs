@@ -75,7 +75,7 @@ async function main() {
       objective: "Multiscale fixed-feature Gram statistics and RGB moments; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     },
     {
       id: "filament-network",
@@ -89,7 +89,7 @@ async function main() {
       objective: "Multiscale fixed-feature Gram statistics, RGB correlation and spatial differences; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     },
     {
       id: "xeno-reef",
@@ -103,7 +103,7 @@ async function main() {
       objective: "Multiscale fixed-feature Gram statistics, RGB correlation and spatial differences; quantization-aware training from scratch",
       reference: "Texture NCA architecture; original target and newly trained dense weights",
       license: "Original checkpoint: project MIT terms · adapted runtime: Apache-2.0",
-      provenanceUrl: "models/neural-growth/organic-structures/NOTICE.md",
+      provenanceUrl: "models/neural-growth/NOTICE.md",
     },
   ];
 
@@ -112,7 +112,8 @@ async function main() {
   const otherReferences = referenceEntries.filter((e) => e.id !== "mixed4c-439");
   const allEntries = [defaultEntry, ...organicEntries, ...otherReferences];
 
-  let code = `// Release catalog: independently validated checkpoints with verified provenance.
+  let code = `// Release catalog: checkpoint provenance and validation are listed per pack.
+import { SELECTED_PATTERNS } from ${JSON.stringify("./selected-patterns.js")};
 const commonInfo = Object.freeze({
   architecture:
     "12 state channels → 48 fixed-filter features → 96 ReLU units → 12 state deltas",
@@ -127,6 +128,7 @@ export const DEFAULT_PATTERN = "mixed4c-439";
 export const PATTERNS = Object.freeze([\n`;
 
   for (const entry of allEntries) {
+    if (entry === otherReferences[0]) code += "  ...SELECTED_PATTERNS,\n";
     code += `  Object.freeze({
     id: ${JSON.stringify(entry.id)},
     technicalId: ${JSON.stringify(entry.technicalId)},

@@ -60,7 +60,6 @@ for (const relative of [
   "models/digiface/README.txt",
   "models/digiface/model-info.json",
   "models/neural-growth/NOTICE.md",
-  "models/neural-growth/organic-structures/NOTICE.md",
   "licenses/neural-growth-Apache-2.0.txt",
 ])
   await access(path.join(root, relative));

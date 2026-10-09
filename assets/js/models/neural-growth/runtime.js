@@ -7,6 +7,7 @@
  */
 import {
   CHANNELS,
+  createInitialState,
   createSparseLayout,
   validateSeed,
   validateSize,
@@ -225,7 +226,11 @@ function link(gl, source) {
 }
 
 export class TextureNcaRuntime {
-  constructor({ model, size = 128, seed = 1 }) {
+  constructor({
+    model,
+    size = model?.startup?.gridSize ?? 128,
+    seed = model?.startup?.seed ?? 1,
+  }) {
     this.size = validateSize(size);
     this.seed = validateSeed(seed);
     if (
@@ -419,10 +424,14 @@ export class TextureNcaRuntime {
         data,
       );
     }
-    for (const buffer of [this.state, this.nextState]) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
-      gl.clearColor(127 / 255, 127 / 255, 127 / 255, 127 / 255);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+    if (this.model.startup?.seedState === "noise") {
+      this.writeState(createInitialState(this.size, this.seed, this.model.startup));
+    } else {
+      for (const buffer of [this.state, this.nextState]) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
+        gl.clearColor(127 / 255, 127 / 255, 127 / 255, 127 / 255);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
     }
     this.steps = 0;
   }

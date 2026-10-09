@@ -36,6 +36,36 @@ export function validateSeed(seed) {
   return seed;
 }
 
+export function validateStartup(input = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Invalid checkpoint startup settings.");
+  }
+  const seedState = input.seedState ?? "zeros";
+  if (seedState !== "zeros" && seedState !== "noise") {
+    throw new Error("Startup state must be zeros or noise.");
+  }
+  const noiseStd = input.noiseStd ?? (seedState === "noise" ? 0.05 : 0);
+  if (
+    !Number.isFinite(noiseStd) ||
+    noiseStd < 0 ||
+    noiseStd > 1 ||
+    (seedState === "noise" && noiseStd === 0)
+  ) {
+    throw new Error("Invalid startup noise standard deviation.");
+  }
+  const previewSteps = input.previewSteps ?? 96;
+  if (!Number.isInteger(previewSteps) || previewSteps < 1 || previewSteps > 10000) {
+    throw new Error("Invalid preview step count.");
+  }
+  return Object.freeze({
+    seedState,
+    noiseStd,
+    seed: validateSeed(input.seed ?? 1),
+    gridSize: validateSize(input.gridSize ?? 128),
+    previewSteps,
+  });
+}
+
 export function validateCheckpoint(input) {
   if (!input || input.format !== PROFILE)
     throw new Error("Unsupported Texture NCA profile.");
@@ -100,6 +130,7 @@ export function validateCheckpoint(input) {
     format: PROFILE,
     id: input.id,
     name: input.name,
+    startup: validateStartup(input.startup),
     layers: Object.freeze(layers),
   });
 }
@@ -150,6 +181,24 @@ const quantizeHidden = (value) => {
   );
   return Math.fround(NORMALIZED_BYTES[byte] * 2);
 };
+
+// Gaussian initialization uses an independent seeded stream. It matches the
+// training noise distribution, not PyTorch's random sequence or saved pool state.
+export function createInitialState(size, seed, startup = {}) {
+  validateSize(size);
+  validateSeed(seed);
+  const settings = validateStartup(startup);
+  const state = new Uint8Array(size * size * CHANNELS).fill(127);
+  if (settings.seedState === "zeros") return state;
+  const random = createRandom((seed ^ 0x9e3779b9) >>> 0);
+  for (let index = 0; index < state.length; index += 2) {
+    const radius = Math.sqrt(-2 * Math.log(1 - random())) * settings.noiseStd;
+    const angle = 2 * Math.PI * random();
+    state[index] = encode(radius * Math.cos(angle));
+    state[index + 1] = encode(radius * Math.sin(angle));
+  }
+  return state;
+}
 
 function dense(input, layer, hidden) {
   const [rows, columns] = layer.shape;

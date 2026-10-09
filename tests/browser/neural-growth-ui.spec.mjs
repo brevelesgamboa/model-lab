@@ -539,7 +539,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   const dialog = page.locator("#growth-gallery-dialog");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#growth-gallery-count")).toContainText("69");
+  await expect(page.locator("#growth-gallery-count")).toContainText("91");
 
   // Filter tab: Textures (39)
   await page.locator(".growth-gallery__tab[data-filter='texture']").click();

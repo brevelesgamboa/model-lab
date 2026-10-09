@@ -233,6 +233,13 @@ export class NeuralGrowthModel {
     return this._pending || Promise.resolve();
   }
 
+  parameterDefaultsForChange(key, value) {
+    if (key !== "pattern") return null;
+    const startup = getPattern(value).startup;
+    if (!startup) return null;
+    return { seed: startup.seed, simulationSize: startup.gridSize };
+  }
+
   onParameterChange(key, value) {
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
