@@ -51,6 +51,53 @@ export function createGrowthController({
     }
   }
 
+  function getPatternCitation(pattern) {
+    if (pattern.citation) return pattern.citation;
+    if (pattern.category === "inception") {
+      const raw = pattern.technicalId || pattern.id;
+      const parts = raw.split("_");
+      const layer = parts[0] || "Inception v1";
+      const ch = parts[1] ? `#${parts[1]}` : "";
+      return {
+        source: "GoogLeNet Inception v1",
+        details: `${layer} activation ${ch}`.trim(),
+        license: "Distill CC-BY-4.0",
+      };
+    }
+    if (pattern.category === "texture") {
+      return {
+        source: "Describing Textures in the Wild (DTD)",
+        details: "Oxford VGG Gram Style Loss",
+        license: "Distill CC-BY-4.0",
+      };
+    }
+    return {
+      source: "Latent Field Baseline",
+      details: "Multiscale Gram and RGB Moments",
+      license: "Project MIT terms",
+    };
+  }
+
+  function updateTabCounts() {
+    if (!elements.growthGalleryTabs) return;
+    const allCount = PATTERNS.length;
+    const textureCount = PATTERNS.filter((p) => p.category === "texture").length;
+    const inceptionCount = PATTERNS.filter((p) => p.category === "inception").length;
+    const organicCount = PATTERNS.filter((p) => p.category === "organic").length;
+
+    const allBtn = elements.growthGalleryTabs.querySelector('[data-filter="all"]');
+    if (allBtn) allBtn.textContent = `All (${allCount})`;
+
+    const texBtn = elements.growthGalleryTabs.querySelector('[data-filter="texture"]');
+    if (texBtn) texBtn.textContent = `Textures (${textureCount})`;
+
+    const incBtn = elements.growthGalleryTabs.querySelector('[data-filter="inception"]');
+    if (incBtn) incBtn.textContent = `Inception (${inceptionCount})`;
+
+    const orgBtn = elements.growthGalleryTabs.querySelector('[data-filter="organic"]');
+    if (orgBtn) orgBtn.textContent = `Originals (${organicCount})`;
+  }
+
   function addRecent(patternId) {
     recents = [patternId, ...recents.filter((id) => id !== patternId)].slice(0, 8);
     saveStorageJson(RECENTS_KEY, recents);
@@ -195,7 +242,66 @@ export function createGrowthController({
         }
       });
 
-      thumbWrapper.append(thumb, favBtn);
+      const infoBtn = document.createElement("button");
+      infoBtn.type = "button";
+      infoBtn.className = "growth-gallery__info-btn";
+      infoBtn.title = "View source citation";
+      infoBtn.textContent = "ℹ";
+
+      infoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const existingOverlay = thumbWrapper.querySelector(".growth-gallery__info-overlay");
+        if (existingOverlay) {
+          existingOverlay.remove();
+          infoBtn.classList.remove("is-active");
+          return;
+        }
+
+        elements.growthGalleryGrid
+          .querySelectorAll(".growth-gallery__info-overlay")
+          .forEach((el) => el.remove());
+        elements.growthGalleryGrid
+          .querySelectorAll(".growth-gallery__info-btn.is-active")
+          .forEach((btn) => btn.classList.remove("is-active"));
+
+        infoBtn.classList.add("is-active");
+
+        const citation = getPatternCitation(pattern);
+        const overlay = document.createElement("div");
+        overlay.className = "growth-gallery__info-overlay";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.className = "growth-gallery__info-overlay-close";
+        closeBtn.textContent = "✕";
+        closeBtn.title = "Close info";
+        closeBtn.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          overlay.remove();
+          infoBtn.classList.remove("is-active");
+        });
+
+        const title = document.createElement("div");
+        title.className = "growth-gallery__info-overlay-title";
+        title.textContent = "Source Imagery";
+
+        const srcEl = document.createElement("div");
+        srcEl.className = "growth-gallery__info-overlay-source";
+        srcEl.textContent = citation.source;
+
+        const detailsEl = document.createElement("div");
+        detailsEl.className = "growth-gallery__info-overlay-details";
+        detailsEl.textContent = citation.details;
+
+        const licenseEl = document.createElement("div");
+        licenseEl.className = "growth-gallery__info-overlay-license";
+        licenseEl.textContent = citation.license;
+
+        overlay.append(closeBtn, title, srcEl, detailsEl, licenseEl);
+        thumbWrapper.appendChild(overlay);
+      });
+
+      thumbWrapper.append(thumb, favBtn, infoBtn);
 
       const nameEl = document.createElement("div");
       nameEl.className = "growth-gallery__card-name";
@@ -203,7 +309,7 @@ export function createGrowthController({
 
       const idEl = document.createElement("div");
       idEl.className = "growth-gallery__card-id";
-      idEl.textContent = pattern.technicalId || pattern.id;
+      idEl.textContent = (pattern.technicalId || pattern.id).split("/").pop();
 
       const badge = document.createElement("span");
       badge.className = `growth-gallery__card-badge growth-gallery__card-badge--${pattern.category}`;
@@ -382,7 +488,9 @@ export function createGrowthController({
 
   // Gallery events
   if (elements.openGrowthGallery && elements.growthGalleryDialog) {
+    updateTabCounts();
     listen(elements.openGrowthGallery, "click", () => {
+      updateTabCounts();
       renderGalleryGrid();
       renderRecents();
       elements.growthGalleryDialog.showModal();

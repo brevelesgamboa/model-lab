@@ -561,6 +561,27 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
   await expect(page.locator("#growth-gallery-count")).toContainText("1");
 
+  // Filter tab: Originals (25) and check citation info overlay
+  await page.locator(".growth-gallery__tab[data-filter='organic']").click();
+  await expect(page.locator("#growth-gallery-count")).toContainText("25");
+
+  const organicCard = page.locator(".growth-gallery__card").first();
+  const cardSubId = await organicCard.locator(".growth-gallery__card-id").textContent();
+  expect(cardSubId).not.toContain("glitch/");
+  expect(cardSubId).not.toContain("overnight/");
+
+  const infoBtn = organicCard.locator(".growth-gallery__info-btn");
+  await expect(infoBtn).toBeVisible();
+  await infoBtn.click();
+  const infoOverlay = organicCard.locator(".growth-gallery__info-overlay");
+  await expect(infoOverlay).toBeVisible();
+  await expect(infoOverlay).toContainText("Source Imagery");
+  await organicCard.locator(".growth-gallery__info-overlay-close").click();
+  await expect(infoOverlay).not.toBeVisible();
+
+  // Switch back to favorites tab to select the bookmarked card
+  await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
+
   // Select pattern from gallery
   const card = page.locator(".growth-gallery__card").first();
   await card.click();
