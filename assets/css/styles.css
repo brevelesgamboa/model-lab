@@ -1008,6 +1008,18 @@ summary {
   padding: 1px 6px;
   height: 20px;
 }
+#growth-clear-barrier-btn {
+  font-size: 10px;
+  height: 20px;
+  padding: 1px 7px;
+  transition: box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+#growth-clear-barrier-btn.is-active {
+  border-color: var(--cyan);
+  color: #fff;
+  background: rgba(43, 219, 219, 0.2);
+  box-shadow: 0 0 8px rgba(43, 219, 219, 0.4);
+}
 .terminal-panel {
   grid-column: 1 / -1;
   grid-row: 2;

@@ -744,7 +744,7 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
 
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
-  // Test clear barrier button
+  // Test clear barrier button is accessible across modes
   const clearBarrierBtn = page.locator("#growth-clear-barrier-btn");
   await expect(clearBarrierBtn).toBeVisible();
   await clearBarrierBtn.click();
@@ -752,6 +752,7 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   // Switch to unfreeze and click
   const thawBtn = page.locator('.growth-brush-btn[data-brush="thaw"]');
   await thawBtn.click();
+  await expect(clearBarrierBtn).toBeVisible();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
   // Switch to flow and drag stroke
@@ -761,6 +762,17 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   await page.mouse.down();
   await page.mouse.move(box.x + 80, box.y + 20);
   await page.mouse.up();
+
+  // Test C key shortcut clearing barriers when canvas is focused
+  await freezeBtn.click();
+  await page.mouse.click(box.x + 40, box.y + 40);
+  await page.keyboard.press("c");
+  await expect(clearBarrierBtn).toBeVisible();
+
+  // Test clicking outside unfocuses canvas for C key
+  const brand = page.locator("#brand-home");
+  await brand.click();
+  await page.keyboard.press("c");
 
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),

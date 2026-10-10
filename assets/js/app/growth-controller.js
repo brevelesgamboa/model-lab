@@ -671,14 +671,57 @@ export function createGrowthController({
     });
   }
 
-  if (elements.growthClearBarrierBtn) {
-    listen(elements.growthClearBarrierBtn, "click", () => {
-      const model = activeModel();
-      if (!model) return;
-      model.clearBarrier();
-      schedulePausedRender();
-    });
+  let canvasFocused = false;
+
+  function isTypingTarget(target) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable
+    );
   }
+
+  function clearBarriersAction() {
+    const model = activeModel();
+    if (!model?.ready) return;
+    model.clearBarrier();
+    if (elements.growthClearBarrierBtn) {
+      elements.growthClearBarrierBtn.classList.add("is-active");
+      setTimeout(() => {
+        elements.growthClearBarrierBtn?.classList.remove("is-active");
+      }, 180);
+    }
+    schedulePausedRender();
+  }
+
+  if (elements.growthClearBarrierBtn) {
+    listen(elements.growthClearBarrierBtn, "click", clearBarriersAction);
+  }
+
+  listen(document, "pointerdown", (event) => {
+    const isCanvas =
+      elements.canvas &&
+      (elements.canvas === event.target || elements.canvas.contains(event.target));
+    const isToolbar =
+      elements.growthCanvasTools &&
+      elements.growthCanvasTools.contains(event.target);
+    if (isCanvas) {
+      canvasFocused = true;
+    } else if (!isToolbar) {
+      canvasFocused = false;
+    }
+  });
+
+  listen(window, "keydown", (event) => {
+    if (!canvasFocused) return;
+    if (isTypingTarget(event.target)) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === "c" || event.key === "C") {
+      event.preventDefault();
+      clearBarriersAction();
+    }
+  });
 
   listen(elements.canvas, "pointerdown", handlePointerDown);
   listen(elements.canvas, "pointermove", handlePointerMove);
