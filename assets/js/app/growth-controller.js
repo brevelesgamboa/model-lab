@@ -733,12 +733,12 @@ export function createGrowthController({
     if (mode === "off") return;
     if (!levels.hasSignal) return;
 
-    const kick = Number(levels.kick) || 0;
-    if (kick < 0.25) {
+    const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
+    if (triggerKick < 0.25) {
       beatArmed = true;
     }
     const elapsed = timestamp - lastBeatTime;
-    if (beatArmed && kick >= 0.55 && elapsed >= 240) {
+    if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
       const coords =
