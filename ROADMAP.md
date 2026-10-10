@@ -1,25 +1,47 @@
-# Latent Field Roadmap
+# Neural Growth Roadmap
 
-Development milestones and planned directions for Latent Field.
+Development roadmap focusing on expanding Neural Growth into a high-fidelity, interactive, and audio-reactive cellular synthesis engine.
 
-## Current Milestone: Neural Growth Custom Texture Library
+## Completed Milestones
 
-Integrating 22 custom-trained Neural Cellular Automata (NCA) models alongside the reference catalog.
+- Custom Model Library: Integrated 22 curated custom NCA models (25 Originals total, 91 patterns overall) across ambientCG, NASA, Wikimedia, and DTD sources.
+- Startup and Noise Initialization: Added runtime support for Gaussian noise seeding (seedState: noise) on reset.
+- Unified Pattern Gallery: Integrated gallery modal with instant search, tab filters, favorites bookmarking, recents strip, and citation info overlays.
+- Provenance and Citations: Documented dataset origins and licenses in CITATIONS.md with verified SHA-256 asset checksums.
+- Real-Time 3D Relief Shading: WebGL2 fragment shader surface normal shading with directional diffuse, specular gloss, and normal vector map inspection modes.
+- High-Fidelity 256x256 Default Grid: Simulations default to 256x256 resolution and preserve the active grid size across pattern selections.
+- Viewport Display Filtering: Configurable smooth bilinear interpolation versus crisp nearest-neighbor cell magnification.
+- Light Angle and Relief Depth Modulation: Circularly wrapping directional light angle and relief depth controls wired for LFO and audio modulation.
 
-- Clean Model Packaging: Store all custom models in models/neural-growth/custom with clean IDs, readable names, and preserved weight scales.
-- Noise Initialization Runtime: Support models that require Gaussian noise seeds (seedState: noise) on canvas reset alongside zero-state models.
-- Unified Gallery: Present custom models directly in the Pattern Gallery under the Originals category without unnecessary sub-pack clutter.
-- Verification and Integrity: Maintain verified SHA-256 asset checksums and unit test coverage.
+## Phase 1: Coordinate Geometries and Vector Fields
 
-## Milestone 2: Visual Style Expansions
+Introduce non-Euclidean spatial transformations and orientation fields inspired by the reference research.
 
-- 3D Relief and Depth Illusions: Train models focusing on directional lighting, chiseled stone, and embossed metallic textures.
-- Ocular and Biological Pareidolia: Explore high-pareidolia eye colonies and organic cell structures.
-- Alien and Xenomorphic Surfaces: Train iridescent chitin and bioluminescent pore patterns.
+- Log-Polar and Spiral Grids: Conformal logarithmic spiral mapping where patterns swirl outward or inward along exponential spiral rays.
+- Concentric and Vortex Coordinate Fields: Radial coordinate mapping producing centered mandala and eye-like concentric rings.
+- Spatial Orientation Fields: Replace uniform global angle with a 2D orientation texture, enabling swirls, sinks, sources, and saddle vectors.
 
-## Milestone 3: Interaction and Audio Modulation
+## Phase 2: Interactive Brush Toolkit
 
-- Enhanced Brush Tools: Additional disturbance modes and brush shape controls.
-- Audio Reactive Controls: Expand modulation routing for rotation, speed, and disturbance from audio analysis.
-- Performance Tuning: WebGL2 shader optimizations for higher frame rates on mobile and lower-power hardware.
+Expand interactive painting beyond erase and noise into tactile creative tools.
 
+- Directional Flow Grooming Brush: Dragging the cursor paints vector orientations into the field, aligning scales, ridges, and eyes with stroke velocity.
+- Chemical Dye Injection Brush: Inject specific color pigments and state values directly into cell channels to seed distinct colonies.
+- Stasis and Freeze Barrier Brush: Paint non-updating boundary masks so living textures must grow around user-drawn walls and stencils.
+- Shockwave and Pulse Tool: Click or tap to dispatch an expanding sinusoidal displacement wave that ripples outward.
+
+## Phase 3: Audio-Visual Reactivity and Modulation
+
+Transform Neural Growth into an expressive audio-reactive performance visualizer.
+
+- Beat-Synced Shockwaves: Trigger radial disturbance pulses or ripples timed to detected kicks and transients.
+- Cellular Activity Modulation: Route audio energy to the stochastic update probability mask (chill slow evolution during quiet passages, explosive rapid evolution on drops).
+- Frequency-Dependent Perception Scaling: Modulate perception filter step strides so bass dilates macro structures while treble excites fine granular details.
+- Audio-Driven 3D Lighting Wobble: Modulate directional light angles and specular intensity with audio volume and frequency bands.
+
+## Phase 4: Extended Visual Fidelity
+
+Further explore high-density rendering and state introspection.
+
+- 512x512 High-DPI Grid Option: Support higher resolution simulations for high-density desktop displays.
+- Hidden Channel Inspector: False-color visualization modes displaying hidden memory channels (channels 3 to 11) to inspect electrical waves moving beneath the surface.

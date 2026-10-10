@@ -43,7 +43,7 @@ async function selectGrowth(page) {
   await expect(page.locator("#step-growth")).toBeEnabled();
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
-    "128",
+    "256",
   );
 }
 
@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(2);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(4);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeDisabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -222,10 +222,10 @@ test("live growth pauses without catch-up; seed, grid and restart reset only exp
     "0",
   );
   expect((await state(page)).seed).toBe(42);
-  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("256");
+  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("128");
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
-    "256",
+    "128",
   );
   expect((await state(page)).steps).toBe(0);
   await page.locator("#step-growth").click();
@@ -263,7 +263,7 @@ test("pointer disturbance uses the displayed field's bottom-up coordinates", asy
   );
   await expect
     .poll(() => page.evaluate(() => window.__lastDisturbance))
-    .toEqual([64, 95, 8]);
+    .toEqual([128, 191, 8]);
   expect((await state(page)).steps).toBe(2);
 });
 
@@ -600,6 +600,9 @@ test("continuous rotation and growth speed expose modulation controls with circu
   // Ensure rotation has MOD button and circular wrap works
   const rotationMod = page.locator('button.modulation-toggle[data-key="rotation"]');
   await expect(rotationMod).toBeVisible();
+
+  const lightAngleMod = page.locator('button.modulation-toggle[data-key="lightAngle"]');
+  await expect(lightAngleMod).toBeVisible();
 
   const speedMod = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
   await expect(speedMod).toBeVisible();

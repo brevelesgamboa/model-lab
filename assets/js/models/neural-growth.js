@@ -94,7 +94,7 @@ export class NeuralGrowthModel {
         key: "simulationSize",
         label: "SIMULATION GRID",
         type: "select",
-        default: 128,
+        default: 256,
         options: [
           { value: 128, label: "128 × 128 · lighter" },
           { value: 256, label: "256 × 256 · more detail" },
@@ -168,6 +168,51 @@ export class NeuralGrowthModel {
         ],
         help: "Display mapping only; does not alter the learned state or update rule.",
       },
+      {
+        key: "shading",
+        label: "3D SHADING",
+        type: "select",
+        default: "relief",
+        options: [
+          { value: "relief", label: "Relief · Diffuse 3D" },
+          { value: "gloss", label: "Gloss · Specular Sheen" },
+          { value: "flat", label: "Flat · Unshaded 2D" },
+          { value: "normals", label: "Normals · Vector Map" },
+        ],
+        help: "Real-time surface gradient shading computed from cell state differentials in WebGL2.",
+      },
+      {
+        key: "reliefStrength",
+        label: "RELIEF DEPTH",
+        type: "range",
+        min: 0,
+        max: 3,
+        step: 0.1,
+        default: 1.2,
+        help: "Height gradient multiplier for directional diffuse and specular relief shading.",
+      },
+      {
+        key: "lightAngle",
+        label: "LIGHT ANGLE",
+        type: "range",
+        min: 0,
+        max: 360,
+        step: 1,
+        default: 45,
+        wrap: true,
+        help: "Directional light source angle in degrees. Wraps circularly and supports audio/LFO modulation.",
+      },
+      {
+        key: "displayFilter",
+        label: "DISPLAY FILTER",
+        type: "select",
+        default: "smooth",
+        options: [
+          { value: "smooth", label: "Smooth · Bilinear" },
+          { value: "crisp", label: "Crisp · Nearest Cell" },
+        ],
+        help: "Viewport sampling interpolation: smooth bilinear blending or crisp individual cell pixels.",
+      },
     ];
   }
 
@@ -237,7 +282,7 @@ export class NeuralGrowthModel {
     if (key !== "pattern") return null;
     const startup = getPattern(value).startup;
     if (!startup) return null;
-    return { seed: startup.seed, simulationSize: startup.gridSize };
+    return { seed: startup.seed };
   }
 
   onParameterChange(key, value) {
@@ -324,7 +369,14 @@ export class NeuralGrowthModel {
         const preview = document.createElement("canvas");
         preview.width = canvas.width;
         preview.height = canvas.height;
-        candidate.draw(preview, parameters.palette);
+        candidate.draw(preview, {
+          palette: parameters.palette,
+          zoom: parameters.zoom,
+          shading: parameters.shading,
+          reliefStrength: parameters.reliefStrength,
+          lightAngle: parameters.lightAngle,
+          displayFilter: parameters.displayFilter,
+        });
         this._runtime?.dispose();
         this._runtime = candidate;
         this._activePattern = pattern.id;
@@ -373,7 +425,14 @@ export class NeuralGrowthModel {
         }
         this._lastTick = timeSeconds;
       }
-      this._runtime.draw(canvas, parameters.palette, parameters.zoom);
+      this._runtime.draw(canvas, {
+        palette: parameters.palette,
+        zoom: parameters.zoom,
+        shading: parameters.shading,
+        reliefStrength: parameters.reliefStrength,
+        lightAngle: parameters.lightAngle,
+        displayFilter: parameters.displayFilter,
+      });
       return this._result();
     } catch (error) {
       candidate?.dispose();
@@ -525,7 +584,14 @@ export class NeuralGrowthModel {
         this.lastError || "Wait for Neural Growth to initialize.",
       );
     this._runRuntime(() =>
-      this._runtime.draw(canvas, this._parameters.palette, 1),
+      this._runtime.draw(canvas, {
+        palette: this._parameters.palette,
+        zoom: 1,
+        shading: this._parameters.shading,
+        reliefStrength: this._parameters.reliefStrength,
+        lightAngle: this._parameters.lightAngle,
+        displayFilter: this._parameters.displayFilter,
+      }),
     );
   }
 

@@ -177,15 +177,58 @@ void main() {
 const VISUALIZE = `${PREFIX}
 uniform sampler2D u_state;
 uniform int u_palette;
+uniform int u_shading;
+uniform float u_relief;
+uniform float u_lightAngle;
+
+float cellLuminance(ivec2 p) {
+  vec3 c = decodeState(texelFetch(u_state, p, 0)).rgb / 2.0 + 0.5;
+  return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
 void main() {
   ivec2 xy = ivec2(gl_FragCoord.xy);
-  vec3 rgb = clamp(decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5, 0.0, 1.0);
+  vec3 rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
+
+  // Soft highlight compression: smoothly rolls off intense highlights above 0.5
+  // so bright metallic models retain texture and gradients without clipping to white.
+  vec3 rgb = rawRgb / (1.0 + max(vec3(0.0), rawRgb - 0.5) * 0.85);
+  rgb = clamp(rgb, 0.0, 1.0);
+
+  float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
+
   if (u_palette == 1) {
-    float luminance = dot(rgb, vec3(0.299, 0.587, 0.114));
-    vec3 spectrum = 0.5 + 0.5 * cos(6.283185307 * (vec3(0.0, 0.33, 0.67) + luminance * 0.85));
-    rgb = spectrum * (0.35 + luminance * 0.65);
+    vec3 spectrum = 0.5 + 0.5 * cos(6.283185307 * (vec3(0.0, 0.33, 0.67) + lum * 0.85));
+    rgb = spectrum * (0.35 + lum * 0.65);
   }
-  out_color = vec4(rgb, 1.0);
+
+  if (u_shading > 0) {
+    float lumLeft = cellLuminance(wrapCell(xy + ivec2(-1, 0)));
+    float lumRight = cellLuminance(wrapCell(xy + ivec2(1, 0)));
+    float lumDown = cellLuminance(wrapCell(xy + ivec2(0, -1)));
+    float lumUp = cellLuminance(wrapCell(xy + ivec2(0, 1)));
+
+    float dx = (lumRight - lumLeft) * u_relief;
+    float dy = (lumUp - lumDown) * u_relief;
+    vec3 normal = normalize(vec3(-dx, -dy, 1.0));
+
+    if (u_shading == 3) {
+      rgb = normal * 0.5 + 0.5;
+    } else {
+      vec3 lightDir = normalize(vec3(cos(u_lightAngle), sin(u_lightAngle), 0.85));
+      float diffuse = max(dot(normal, lightDir), 0.0);
+      float lighting = 0.35 + 0.65 * diffuse;
+      rgb = rgb * lighting;
+
+      if (u_shading == 2) {
+        vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
+        float specular = pow(max(dot(normal, halfVec), 0.0), 24.0);
+        rgb = mix(rgb, vec3(1.0), specular * 0.45);
+      }
+    }
+  }
+
+  out_color = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }`;
 
 function compile(gl, type, source) {
@@ -228,7 +271,7 @@ function link(gl, source) {
 export class TextureNcaRuntime {
   constructor({
     model,
-    size = model?.startup?.gridSize ?? 128,
+    size = model?.startup?.gridSize ?? 256,
     seed = model?.startup?.seed ?? 1,
   }) {
     this.size = validateSize(size);
@@ -394,7 +437,7 @@ export class TextureNcaRuntime {
     }
     for (const [key, value] of Object.entries(uniforms)) {
       if (Array.isArray(value)) gl.uniform2i(location(key), value[0], value[1]);
-      else if (key === "u_palette" || key === "u_topology")
+      else if (["u_palette", "u_topology", "u_mode", "u_shading"].includes(key))
         gl.uniform1i(location(key), value);
       else gl.uniform1f(location(key), value);
     }
@@ -508,23 +551,51 @@ export class TextureNcaRuntime {
     [this.state, this.nextState] = [this.nextState, this.state];
   }
 
-  draw(targetCanvas, palette = "native", zoom = 1) {
+  draw(targetCanvas, optionsOrPalette = "native", zoomArg = 1) {
     this.assertActive();
+    const options =
+      typeof optionsOrPalette === "object" && optionsOrPalette !== null
+        ? optionsOrPalette
+        : { palette: optionsOrPalette, zoom: zoomArg };
+
+    const {
+      palette = "native",
+      zoom = 1,
+      shading = "relief",
+      reliefStrength = 1.2,
+      lightAngle = 45,
+      displayFilter = "smooth",
+    } = options;
+
     if (!["native", "spectral"].includes(palette))
       throw new Error("Unknown display palette.");
     const context = targetCanvas.getContext("2d");
     if (!context) throw new Error("A 2D display canvas is required.");
+
+    const shadingModes = { flat: 0, relief: 1, gloss: 2, normals: 3 };
+    const shadingMode = shadingModes[shading] ?? 1;
+    const lightAngleRad = (Number(lightAngle || 0) * Math.PI) / 180;
+    const reliefVal = Math.max(0, Math.min(5, Number(reliefStrength) || 0));
+
     this.run(
       "visualize",
       null,
       { u_state: this.state },
-      { u_palette: palette === "spectral" ? 1 : 0 },
+      {
+        u_palette: palette === "spectral" ? 1 : 0,
+        u_shading: shadingMode,
+        u_relief: reliefVal,
+        u_lightAngle: lightAngleRad,
+      },
     );
+
     const extent = Math.min(targetCanvas.width, targetCanvas.height);
     context.fillStyle = "#101218";
     context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
     const z = Math.max(1, Math.min(8, Number(zoom) || 1));
-    context.imageSmoothingEnabled = z === 1;
+    context.imageSmoothingEnabled = displayFilter
+      ? displayFilter === "smooth"
+      : z === 1;
     const srcExtent = this.size / z;
     const srcOffset = (this.size - srcExtent) / 2;
     context.drawImage(

@@ -20,7 +20,7 @@ const checkpoint = JSON.parse(
   ),
 );
 
-function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
+function setup(context, { load = async () => checkpoint, failSize = 0, initialSize = 128 } = {}) {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: () => ({ width: 0, height: 0 }) };
   context.after(() => {
@@ -70,7 +70,7 @@ function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
       return runtime;
     },
   });
-  const params = defaultParameters(model);
+  const params = { ...defaultParameters(model), simulationSize: initialSize };
   const canvas = { width: 128, height: 128 };
   context.after(() => model.dispose());
   return { model, params, canvas, runtimes };
@@ -110,7 +110,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
   );
 });
 
-test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
+test("redraws, palette, shading, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
   model.step();
@@ -121,6 +121,10 @@ test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots 
     {
       ...params,
       palette: "spectral",
+      shading: "gloss",
+      reliefStrength: 2.0,
+      lightAngle: 120,
+      displayFilter: "crisp",
       growthSpeed: 60,
       rotation: 180,
       topology: "hexagonal",
@@ -135,6 +139,23 @@ test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots 
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].restarts, 0);
   assert.deepEqual(runtimes[0].disturbances, [[12, 34, 8]]);
+});
+
+test("default simulation size is 256 and pattern switching preserves simulation size", async () => {
+  const model = new NeuralGrowthModel();
+  const defaults = defaultParameters(model);
+  assert.equal(defaults.simulationSize, 256);
+  assert.equal(defaults.shading, "relief");
+  assert.equal(defaults.reliefStrength, 1.2);
+  assert.equal(defaults.lightAngle, 45);
+  assert.equal(defaults.displayFilter, "smooth");
+
+  // Pattern change should only default seed, NOT override simulationSize
+  const patternDefaults = model.parameterDefaultsForChange("pattern", "bumpy-surface");
+  assert.ok(patternDefaults);
+  assert.equal(patternDefaults.simulationSize, undefined);
+  assert.equal(typeof patternDefaults.seed, "number");
+  assert.equal(patternDefaults.seed, 42);
 });
 
 test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {
