@@ -35,6 +35,7 @@ ivec2 wrapCell(ivec2 p) { return (p % u_size + u_size) % u_size; }
 const PERCEPTION = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_shuffle;
+uniform sampler2D u_orientation;
 uniform ivec2 u_offset;
 uniform float u_angle;
 uniform int u_topology;
@@ -65,7 +66,8 @@ void main() {
     if (u_transform == 1) {
       theta = phi + 1.5707963 + u_twist + u_angle;
     } else if (u_transform == 2) {
-      theta = phi + 1.5707963 + u_twist + u_angle;
+      float r = max(length(pos), 0.01);
+      theta = phi + 1.5707963 + log(r) * tan(u_twist) + u_angle;
     } else if (u_transform == 3) {
       vec2 z = pos * 1.25;
       vec2 c = vec2(-0.8, 0.156);
@@ -81,6 +83,12 @@ void main() {
       vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
       theta = atan(flow.y, flow.x) + u_twist + u_angle;
     }
+  }
+  vec4 orient = texelFetch(u_orientation, xy, 0);
+  if (orient.b > 0.05) {
+    vec2 dir = orient.rg * 2.0 - 1.0;
+    float groomedAngle = atan(dir.y, dir.x);
+    theta = mix(theta, groomedAngle, orient.b);
   }
   float cosA = cos(theta);
   float sinA = sin(theta);
@@ -163,12 +171,17 @@ const UPDATE = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_delta;
 uniform sampler2D u_inverse;
+uniform sampler2D u_barrier;
 uniform ivec2 u_offset;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int group = p.x / u_size;
   ivec2 xy = ivec2(p.x % u_size, p.y);
   vec4 previous = texelFetch(u_state, p, 0);
+  if (texelFetch(u_barrier, xy, 0).r > 0.5) {
+    out_color = previous;
+    return;
+  }
   vec4 inverse = texelFetch(u_inverse, wrapCell(xy - u_offset), 0);
   if (inverse.b < 0.5) { out_color = previous; return; }
   ivec2 compressed = ivec2(round(inverse.rg * 255.0));
@@ -176,16 +189,74 @@ void main() {
   out_color = encodeState(decodeState(previous) + delta);
 }`;
 
+const BARRIER_PASS = `${PREFIX}
+uniform sampler2D u_barrier;
+uniform ivec2 u_center;
+uniform float u_radius;
+uniform int u_barrierMode;
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec2 distance = vec2(abs(p - u_center));
+  distance = min(distance, vec2(float(u_size)) - distance);
+  float dist = length(distance);
+  float current = texelFetch(u_barrier, p, 0).r;
+  if (dist <= u_radius) {
+    float target = u_barrierMode == 1 ? 1.0 : 0.0;
+    out_color = vec4(target, 0.0, 0.0, 1.0);
+  } else {
+    out_color = vec4(current, 0.0, 0.0, 1.0);
+  }
+}`;
+
+const ORIENTATION_PASS = `${PREFIX}
+uniform sampler2D u_orientation;
+uniform ivec2 u_center;
+uniform float u_radius;
+uniform float u_strokeAngle;
+uniform int u_orientMode;
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec2 distance = vec2(abs(p - u_center));
+  distance = min(distance, vec2(float(u_size)) - distance);
+  float dist = length(distance);
+  vec4 current = texelFetch(u_orientation, p, 0);
+  if (dist <= u_radius) {
+    float weight = smoothstep(u_radius, u_radius * 0.25, dist);
+    if (u_orientMode == 1) {
+      vec2 targetDir = vec2(cos(u_strokeAngle), sin(u_strokeAngle));
+      vec2 existingDir = current.b > 0.05 ? (current.rg * 2.0 - 1.0) : targetDir;
+      vec2 blended = normalize(mix(existingDir, targetDir, weight * 0.85));
+      float newStrength = min(1.0, current.b + weight * 0.85);
+      out_color = vec4(blended * 0.5 + 0.5, newStrength, 1.0);
+    } else {
+      out_color = mix(current, vec4(0.5, 0.5, 0.0, 0.0), weight);
+    }
+  } else {
+    out_color = current;
+  }
+}
+`;
+
 const DISTURB = `${PREFIX}
 uniform sampler2D u_state;
+uniform sampler2D u_barrier;
 uniform ivec2 u_center;
 uniform float u_radius;
 uniform int u_mode;
+uniform vec3 u_dyeColor;
+uniform int u_lockBarrier;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
-  vec2 distance = vec2(abs(ivec2(p.x % u_size, p.y) - u_center));
+  int group = p.x / u_size;
+  ivec2 xy = ivec2(p.x % u_size, p.y);
+  vec2 distance = vec2(abs(xy - u_center));
   distance = min(distance, vec2(float(u_size)) - distance);
-  if (length(distance) <= u_radius) {
+  float dist = length(distance);
+  if (dist <= u_radius) {
+    if (u_lockBarrier == 1 && texelFetch(u_barrier, xy, 0).r > 0.5) {
+      out_color = texelFetch(u_state, p, 0);
+      return;
+    }
     if (u_mode == 1) {
       vec2 coord = vec2(p);
       float n1 = fract(sin(dot(coord, vec2(12.9898, 78.233))) * 43758.5453);
@@ -193,6 +264,22 @@ void main() {
       float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
       float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
       out_color = vec4(n1, n2, n3, n4);
+    } else if (u_mode == 2) {
+      vec4 current = texelFetch(u_state, p, 0);
+      float weight = smoothstep(u_radius, u_radius * 0.35, dist);
+      if (group == 0) {
+        vec4 targetState = encodeState(vec4((u_dyeColor - 0.5) * 2.0, 1.0));
+        out_color = mix(current, targetState, weight);
+      } else {
+        out_color = current;
+      }
+    } else if (u_mode == 3) {
+      vec4 current = texelFetch(u_state, p, 0);
+      float phase = dist / max(u_radius * 0.28, 1.0);
+      float wave = sin(phase * 3.1415926) * exp(-dist / max(u_radius * 0.85, 1.0));
+      vec4 decoded = decodeState(current);
+      decoded.rgb += wave * 0.8;
+      out_color = encodeState(decoded);
     } else {
       out_color = vec4(127.0 / 255.0);
     }
@@ -203,10 +290,12 @@ void main() {
 
 const VISUALIZE = `${PREFIX}
 uniform sampler2D u_state;
+uniform sampler2D u_barrier;
 uniform int u_palette;
 uniform int u_shading;
 uniform float u_relief;
 uniform float u_lightAngle;
+uniform int u_showBarrier;
 
 float cellLuminance(ivec2 p) {
   vec3 c = decodeState(texelFetch(u_state, p, 0)).rgb / 2.0 + 0.5;
@@ -251,6 +340,20 @@ void main() {
         vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
         float specular = pow(max(dot(normal, halfVec), 0.0), 24.0);
         rgb = mix(rgb, vec3(1.0), specular * 0.45);
+      }
+    }
+  }
+
+  if (u_showBarrier == 1) {
+    float bL = texelFetch(u_barrier, wrapCell(xy + ivec2(-1, 0)), 0).r;
+    float bR = texelFetch(u_barrier, wrapCell(xy + ivec2(1, 0)), 0).r;
+    float bD = texelFetch(u_barrier, wrapCell(xy + ivec2(0, -1)), 0).r;
+    float bU = texelFetch(u_barrier, wrapCell(xy + ivec2(0, 1)), 0).r;
+    float bEdge = max(abs(bR - bL), abs(bU - bD));
+    if (bEdge > 0.2) {
+      bool dash = mod(float(xy.x + xy.y), 8.0) < 4.0;
+      if (dash) {
+        rgb = mix(rgb, vec3(1.0) - rgb, 0.85);
       }
     }
   }
@@ -360,6 +463,8 @@ export class TextureNcaRuntime {
         delta: denseShader(96, true, false),
         update: UPDATE,
         disturb: DISTURB,
+        barrier: BARRIER_PASS,
+        orientation: ORIENTATION_PASS,
         visualize: VISUALIZE,
       })) {
         const handle = link(gl, source);
@@ -373,6 +478,10 @@ export class TextureNcaRuntime {
       this.delta = this.allocate(size * 3, size / 2, true);
       this.shuffleTexture = this.allocate(size, size / 2, false);
       this.inverseTexture = this.allocate(size, size, false);
+      this.barrier = this.allocate(size, size, true);
+      this.nextBarrier = this.allocate(size, size, true);
+      this.orientation = this.allocate(size, size, true);
+      this.nextOrientation = this.allocate(size, size, true);
       this.weights = model.layers.map((layer) =>
         this.allocate(layer.shape[1] / 4, layer.shape[0], false, layer.weights),
       );
@@ -465,7 +574,11 @@ export class TextureNcaRuntime {
       unit += 1;
     }
     for (const [key, value] of Object.entries(uniforms)) {
-      if (Array.isArray(value)) gl.uniform2i(location(key), value[0], value[1]);
+      if (Array.isArray(value)) {
+        if (value.length === 3)
+          gl.uniform3f(location(key), value[0], value[1], value[2]);
+        else gl.uniform2i(location(key), value[0], value[1]);
+      }
       else if (
         [
           "u_palette",
@@ -473,6 +586,10 @@ export class TextureNcaRuntime {
           "u_mode",
           "u_shading",
           "u_transform",
+          "u_barrierMode",
+          "u_orientMode",
+          "u_showBarrier",
+          "u_lockBarrier",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -503,6 +620,16 @@ export class TextureNcaRuntime {
         gl.UNSIGNED_BYTE,
         data,
       );
+    }
+    for (const buffer of [
+      this.barrier,
+      this.nextBarrier,
+      this.orientation,
+      this.nextOrientation,
+    ]) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
     }
     if (this.model.startup?.seedState === "noise") {
       this.writeState(createInitialState(this.size, this.seed, this.model.startup));
@@ -550,7 +677,11 @@ export class TextureNcaRuntime {
       this.run(
         "perception",
         this.perception,
-        { u_state: this.state, u_shuffle: this.shuffleTexture },
+        {
+          u_state: this.state,
+          u_shuffle: this.shuffleTexture,
+          u_orientation: this.orientation,
+        },
         {
           u_offset: this.lastOffset,
           u_angle: this.rotation,
@@ -578,6 +709,7 @@ export class TextureNcaRuntime {
           u_state: this.state,
           u_delta: this.delta,
           u_inverse: this.inverseTexture,
+          u_barrier: this.barrier,
         },
         { u_offset: this.lastOffset },
       );
@@ -586,7 +718,13 @@ export class TextureNcaRuntime {
     }
   }
 
-  disturb(x, y, radius = 8, mode = "erase") {
+  disturb(
+    x,
+    y,
+    radius = 8,
+    mode = "erase",
+    { dyeColor = [0, 0.94, 1], strokeAngle = 0, lockBarrier = true } = {},
+  ) {
     this.assertActive();
     if (
       ![x, y, radius].every(Number.isFinite) ||
@@ -601,13 +739,93 @@ export class TextureNcaRuntime {
     ) {
       throw new RangeError("Disturbance must lie within the simulation grid.");
     }
+    if (mode === "freeze") {
+      this.run(
+        "barrier",
+        this.nextBarrier,
+        { u_barrier: this.barrier },
+        { u_center: [x, y], u_radius: radius, u_barrierMode: 1 },
+      );
+      [this.barrier, this.nextBarrier] = [this.nextBarrier, this.barrier];
+      return;
+    }
+    if (mode === "thaw") {
+      this.run(
+        "barrier",
+        this.nextBarrier,
+        { u_barrier: this.barrier },
+        { u_center: [x, y], u_radius: radius, u_barrierMode: 0 },
+      );
+      [this.barrier, this.nextBarrier] = [this.nextBarrier, this.barrier];
+      return;
+    }
+    if (mode === "groom") {
+      this.run(
+        "orientation",
+        this.nextOrientation,
+        { u_orientation: this.orientation },
+        {
+          u_center: [x, y],
+          u_radius: radius,
+          u_strokeAngle: strokeAngle,
+          u_orientMode: 1,
+        },
+      );
+      [this.orientation, this.nextOrientation] = [
+        this.nextOrientation,
+        this.orientation,
+      ];
+      return;
+    }
+    if (mode === "erase") {
+      this.run(
+        "barrier",
+        this.nextBarrier,
+        { u_barrier: this.barrier },
+        { u_center: [x, y], u_radius: radius, u_barrierMode: 0 },
+      );
+      [this.barrier, this.nextBarrier] = [this.nextBarrier, this.barrier];
+      this.run(
+        "orientation",
+        this.nextOrientation,
+        { u_orientation: this.orientation },
+        {
+          u_center: [x, y],
+          u_radius: radius,
+          u_strokeAngle: 0,
+          u_orientMode: 0,
+        },
+      );
+      [this.orientation, this.nextOrientation] = [
+        this.nextOrientation,
+        this.orientation,
+      ];
+    }
+    const modeCode =
+      mode === "noise" ? 1 : mode === "dye" ? 2 : mode === "shockwave" ? 3 : 0;
     this.run(
       "disturb",
       this.nextState,
-      { u_state: this.state },
-      { u_center: [x, y], u_radius: radius, u_mode: mode === "noise" ? 1 : 0 },
+      { u_state: this.state, u_barrier: this.barrier },
+      {
+        u_center: [x, y],
+        u_radius: radius,
+        u_mode: modeCode,
+        u_dyeColor: Array.isArray(dyeColor) ? dyeColor : [0, 0.94, 1],
+        u_lockBarrier: lockBarrier ? 1 : 0,
+      },
     );
     [this.state, this.nextState] = [this.nextState, this.state];
+  }
+
+  clearBarrier() {
+    this.assertActive();
+    const gl = this.gl;
+    for (const buffer of [this.barrier, this.nextBarrier]) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
   }
 
   draw(targetCanvas, optionsOrPalette = "native", zoomArg = 1) {
@@ -624,6 +842,7 @@ export class TextureNcaRuntime {
       reliefStrength = 1.2,
       lightAngle = 45,
       displayFilter = "smooth",
+      showBarrier = false,
     } = options;
 
     if (!["native", "spectral"].includes(palette))
@@ -639,12 +858,13 @@ export class TextureNcaRuntime {
     this.run(
       "visualize",
       null,
-      { u_state: this.state },
+      { u_state: this.state, u_barrier: this.barrier },
       {
         u_palette: palette === "spectral" ? 1 : 0,
         u_shading: shadingMode,
         u_relief: reliefVal,
         u_lightAngle: lightAngleRad,
+        u_showBarrier: showBarrier ? 1 : 0,
       },
     );
 

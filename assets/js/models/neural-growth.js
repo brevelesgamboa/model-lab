@@ -1,4 +1,5 @@
 import { sanitizeParameters } from "../core/model-contract.js";
+import { hexToRgb } from "../core/utils.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
 import { TextureNcaRuntime } from "./neural-growth/runtime.js";
 import {
@@ -154,10 +155,53 @@ export class NeuralGrowthModel {
         type: "select",
         default: "erase",
         options: [
-          { value: "erase", label: "Erase · Neutral (0)" },
-          { value: "noise", label: "Noise · Scramble" },
+          { value: "erase", label: "Erase" },
+          { value: "noise", label: "Noise" },
+          { value: "dye", label: "Color" },
+          { value: "shockwave", label: "Ripple" },
+          { value: "freeze", label: "Freeze" },
+          { value: "thaw", label: "Unfreeze" },
+          { value: "groom", label: "Flow" },
         ],
-        help: "Interactive disturbance mode: zero channels to neutral or inject high-frequency noise.",
+        help: "Interactive brush: Erase, Noise, Color, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
+      },
+      {
+        key: "dyeColor",
+        label: "BRUSH COLOR",
+        type: "color",
+        default: "#00f0ff",
+        presets: [
+          { label: "Cyan", value: "#00f0ff" },
+          { label: "Magenta", value: "#ff00a0" },
+          { label: "Gold", value: "#ffb800" },
+          { label: "Lime", value: "#00ff66" },
+          { label: "Violet", value: "#9d4edd" },
+          { label: "White", value: "#ffffff" },
+        ],
+        help: "Color pigment for Color brush. Injects RGB states while preserving hidden channels.",
+      },
+      {
+        key: "barrierOutline",
+        label: "BARRIER OUTLINE",
+        type: "select",
+        default: "auto",
+        options: [
+          { value: "auto", label: "Auto · While Active" },
+          { value: "always", label: "Always On" },
+          { value: "off", label: "Off" },
+        ],
+        help: "Visibility of dashed inverted outlines along frozen barrier borders.",
+      },
+      {
+        key: "barrierLock",
+        label: "FREEZE LOCK",
+        type: "select",
+        default: "mask",
+        options: [
+          { value: "mask", label: "Mask · Protected" },
+          { value: "draw", label: "Draw · Editable" },
+        ],
+        help: "Mask prevents brushes and growth from modifying frozen cells; Draw permits custom painting on frozen cells before unfreezing.",
       },
       {
         key: "topology",
@@ -324,7 +368,10 @@ export class NeuralGrowthModel {
   }
 
   onParameterChange(key, value) {
-    if (key === "coordinateTransform") return true;
+    if (this._parameters && key in this._parameters) {
+      this._parameters[key] = value;
+    }
+    if (key === "coordinateTransform" || key === "barrierLock") return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
@@ -468,6 +515,12 @@ export class NeuralGrowthModel {
         }
         this._lastTick = timeSeconds;
       }
+      const outlineMode = parameters.barrierOutline || "auto";
+      const showBarrier =
+        outlineMode === "always" ||
+        (outlineMode === "auto" &&
+          (parameters.disturbanceMode === "freeze" ||
+            parameters.disturbanceMode === "thaw"));
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         zoom: parameters.zoom,
@@ -475,6 +528,7 @@ export class NeuralGrowthModel {
         reliefStrength: parameters.reliefStrength,
         lightAngle: parameters.lightAngle,
         displayFilter: parameters.displayFilter,
+        showBarrier,
       });
       return this._result();
     } catch (error) {
@@ -556,6 +610,7 @@ export class NeuralGrowthModel {
     radius = Number(this._parameters.brushRadius) ||
       Math.max(2, Math.round(this.simulationSize * 0.06)),
     mode = this._parameters.disturbanceMode || "erase",
+    options = {},
   ) {
     if (!this.ready) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -574,6 +629,8 @@ export class NeuralGrowthModel {
       y: clampedY,
       radius: clampedRadius,
       mode,
+      dyeColor: options.dyeColor || this._parameters.dyeColor || "#00f0ff",
+      strokeAngle: options.strokeAngle || 0,
     });
   }
 
@@ -585,27 +642,39 @@ export class NeuralGrowthModel {
     radius = Number(this._parameters.brushRadius) ||
       Math.max(2, Math.round(this.simulationSize * 0.06)),
     mode = this._parameters.disturbanceMode || "erase",
+    options = {},
   ) {
     if (!this.ready) return;
     const dx = x1 - x0;
     const dy = y1 - y0;
     const dist = Math.hypot(dx, dy);
+    const strokeAngle = Math.atan2(dy, dx);
     const step = Math.max(1, radius * 0.5);
     const count = Math.min(32, Math.max(1, Math.ceil(dist / step)));
     for (let i = 0; i <= count; i += 1) {
       const t = count === 0 ? 0 : i / count;
-      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode);
+      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode, {
+        ...options,
+        strokeAngle: options.strokeAngle ?? strokeAngle,
+      });
     }
   }
 
   _drainDisturbances() {
     if (!this._runtime || this._queuedDisturbances.length === 0) return false;
     let applied = false;
+    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
     while (this._queuedDisturbances.length > 0) {
-      const { x, y, radius, mode } = this._queuedDisturbances.shift();
+      const { x, y, radius, mode, dyeColor, strokeAngle } =
+        this._queuedDisturbances.shift();
       try {
+        const rgb = hexToRgb(dyeColor || this._parameters.dyeColor || "#00f0ff");
         if (mode && mode !== "erase") {
-          this._runtime.disturb(x, y, radius, mode);
+          this._runtime.disturb(x, y, radius, mode, {
+            dyeColor: rgb,
+            strokeAngle: strokeAngle || 0,
+            lockBarrier,
+          });
         } else {
           this._runtime.disturb(x, y, radius);
         }
@@ -624,6 +693,12 @@ export class NeuralGrowthModel {
     }
   }
 
+  clearBarrier() {
+    if (this.ready) {
+      this._runRuntime(() => this._runtime?.clearBarrier());
+    }
+  }
+
   renderSnapshot(canvas) {
     if (!this.ready)
       throw new Error(
@@ -637,6 +712,7 @@ export class NeuralGrowthModel {
         reliefStrength: this._parameters.reliefStrength,
         lightAngle: this._parameters.lightAngle,
         displayFilter: this._parameters.displayFilter,
+        showBarrier: false,
       }),
     );
   }

@@ -423,6 +423,105 @@ export function createControlsController({
         });
         block.append(label, select, guidance.container);
         controlElements.set(definition.key, { definition, select, guidance });
+      } else if (definition.type === "color") {
+        block.classList.add("color-control");
+        const label = makeLabel(definition);
+
+        const presetsContainer = document.createElement("div");
+        presetsContainer.className = "color-control__presets";
+        const presets = definition.presets || [
+          { label: "Cyan", value: "#00f0ff" },
+          { label: "Magenta", value: "#ff00a0" },
+          { label: "Gold", value: "#ffb800" },
+          { label: "Lime", value: "#00ff66" },
+          { label: "Violet", value: "#9d4edd" },
+          { label: "White", value: "#ffffff" },
+        ];
+
+        const inputRow = document.createElement("div");
+        inputRow.className = "color-control__input-row";
+
+        const pickerInput = document.createElement("input");
+        pickerInput.type = "color";
+        pickerInput.className = "color-picker-input";
+        pickerInput.setAttribute(
+          "aria-label",
+          `${definition.label} color picker`,
+        );
+
+        const hexInput = document.createElement("input");
+        hexInput.type = "text";
+        hexInput.className = "color-hex-input";
+        hexInput.maxLength = 7;
+        hexInput.spellcheck = false;
+        hexInput.setAttribute("aria-label", `${definition.label} hex value`);
+
+        const guidance = createGuidanceElement(
+          definition,
+          currentParameters[definition.key],
+        );
+
+        const normalizeHex = (val) => {
+          let s = String(val || "#00f0ff").trim();
+          if (!s.startsWith("#")) s = "#" + s;
+          return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : "#00f0ff";
+        };
+
+        const updateActivePreset = (currentVal) => {
+          const norm = normalizeHex(currentVal);
+          presetsContainer
+            .querySelectorAll(".color-preset-pill")
+            .forEach((pill) => {
+              const pillVal = pill.getAttribute("data-color");
+              pill.classList.toggle("is-active", pillVal === norm);
+            });
+        };
+
+        const setColor = (val) => {
+          const norm = normalizeHex(val);
+          pickerInput.value = norm;
+          hexInput.value = norm.toUpperCase();
+          updateActivePreset(norm);
+          onValue(definition, norm);
+          guidance.update(norm);
+        };
+
+        presets.forEach((preset) => {
+          const pill = document.createElement("button");
+          pill.type = "button";
+          pill.className = "color-preset-pill";
+          pill.setAttribute("data-color", preset.value.toLowerCase());
+          const dot = document.createElement("span");
+          dot.className = "color-preset-dot";
+          dot.style.backgroundColor = preset.value;
+          const text = document.createElement("span");
+          text.textContent = preset.label;
+          pill.append(dot, text);
+          pill.addEventListener("click", () => setColor(preset.value));
+          presetsContainer.append(pill);
+        });
+
+        pickerInput.addEventListener("input", () => setColor(pickerInput.value));
+
+        hexInput.addEventListener("change", () => {
+          const norm = normalizeHex(hexInput.value);
+          setColor(norm);
+        });
+
+        const initialVal = normalizeHex(currentParameters[definition.key]);
+        pickerInput.value = initialVal;
+        hexInput.value = initialVal.toUpperCase();
+        updateActivePreset(initialVal);
+
+        inputRow.append(pickerInput, hexInput);
+        block.append(label, presetsContainer, inputRow, guidance.container);
+        controlElements.set(definition.key, {
+          definition,
+          pickerInput,
+          hexInput,
+          guidance,
+          updateActivePreset,
+        });
       } else {
         block.classList.add("number-control");
         const label = makeLabel(definition);

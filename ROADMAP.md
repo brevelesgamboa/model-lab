@@ -12,28 +12,17 @@ Development roadmap focusing on expanding Neural Growth into a high-fidelity, in
 - High-Fidelity 256x256 Default Grid: Simulations default to 256x256 resolution and preserve the active grid size across pattern selections.
 - Viewport Display Filtering: Configurable smooth bilinear interpolation versus crisp nearest-neighbor cell magnification.
 - Light Angle and Relief Depth Modulation: Circularly wrapping directional light angle and relief depth controls wired for LFO and audio modulation.
-
-## Phase 1: Coordinate Geometries and Vector Fields
-
-Introduce non-Euclidean spatial transformations and orientation fields inspired by the reference research and mathematical dynamics.
-
-- Concentric and Vortex Perception: Radial coordinate mapping producing centered mandala and eye-like concentric rings.
-- Log-Polar Spiral Perception: Conformal logarithmic spiral mapping where patterns swirl outward or inward along exponential spiral rays with continuous spin.
-- Mathematical and Fractal Geometries:
-  - Apollonian Dipole: Two-pole conformal vortex pair creating binary star loops and magnetic flux lines.
-  - Julia Complex Dynamics: Iterated complex polynomial field ($z \leftarrow z^2 + c$) aligning cell perception along self-similar fractal dendrites.
-  - Hyperbolic Saddle: Poincaré quadrupole flow producing orthogonal hyperbolic streamlines and 4-way asymptotic crosses.
-- Interactive Vector Pitch and Twist: Dedicated pitch control with audio and LFO modulation support for live swelling and swirling.
-- Spatial Orientation Fields: Paintable 2D orientation texture enabling custom user-drawn vector flows.
-
-## Phase 2: Interactive Brush Toolkit
-
-Expand interactive painting beyond erase and noise into tactile creative tools.
-
-- Directional Flow Grooming Brush: Dragging the cursor paints vector orientations into the field, aligning scales, ridges, and eyes with stroke velocity.
-- Chemical Dye Injection Brush: Inject specific color pigments and state values directly into cell channels to seed distinct colonies.
-- Stasis and Freeze Barrier Brush: Paint non-updating boundary masks so living textures must grow around user-drawn walls and stencils.
-- Shockwave and Pulse Tool: Click or tap to dispatch an expanding sinusoidal displacement wave that ripples outward.
+- Phase 1 Coordinate Geometries and Vector Fields:
+  - Concentric and Vortex Perception: Radial coordinate mapping producing centered mandala and eye-like concentric rings.
+  - Log-Polar Spiral Perception: Conformal logarithmic spiral mapping where patterns swirl along exponential spiral rays with continuous spin.
+  - Mathematical and Fractal Geometries: Integrated Apollonian Dipole and Julia Complex Dynamics ($z \leftarrow z^2 + c$) conformal vector fields.
+  - Interactive Vector Pitch and Twist: Dedicated pitch control with audio and LFO modulation support for live swelling and swirling.
+- Phase 2 Interactive Brush Toolkit:
+  - Top Canvas Toolbar: Quick-access toolbar above the stage with Set A tools (Erase, Noise, Color, Ripple, Freeze, Unfreeze, Flow).
+  - Color Infusion Brush: Direct RGB state infusion with preset pills, native color picker, and hex input.
+  - Ripple Pulse Tool: Sinusoidal radial displacement wave rippling outward from pointer clicks and drags.
+  - Freeze Barrier with Mask vs Draw Toggle: Inverted dashed perimeter outline for frozen barriers. Supports Mask mode (protected wall blocking growth and brushes) and Draw mode (editable canvas allowing drawing on frozen cells before unfreezing).
+  - Directional Flow Grooming Brush: Dragging pointer combs local cell orientation angles along stroke velocity vectors.
 
 ## Phase 3: Audio-Visual Reactivity and Modulation
 

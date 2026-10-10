@@ -95,3 +95,19 @@ export function formatPercent(value, digits = 1) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? `${(numeric * 100).toFixed(digits)}%` : "—";
 }
+
+export function hexToRgb(hex) {
+  if (typeof hex !== "string") return [0, 0.94, 1];
+  let clean = hex.replace("#", "").trim();
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
+  }
+  if (clean.length !== 6) return [0, 0.94, 1];
+  const num = parseInt(clean, 16);
+  if (Number.isNaN(num)) return [0, 0.94, 1];
+  return [
+    ((num >> 16) & 255) / 255,
+    ((num >> 8) & 255) / 255,
+    (num & 255) / 255,
+  ];
+}

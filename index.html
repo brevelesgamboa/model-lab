@@ -312,6 +312,54 @@
                   ></div>
                 </div>
 
+                <div id="growth-canvas-tools" class="growth-canvas-tools" hidden>
+                  <div class="growth-canvas-tools__row" role="toolbar" aria-label="Neural Growth interactive brushes">
+                    <span class="growth-tools-label">BRUSH:</span>
+                    <button class="mini-button growth-brush-btn is-active" type="button" data-brush="erase">ERASE</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="noise">NOISE</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="dye">COLOR</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="shockwave">RIPPLE</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="freeze">FREEZE</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="thaw">UNFREEZE</button>
+                    <button class="mini-button growth-brush-btn" type="button" data-brush="groom">FLOW</button>
+                  </div>
+                  <div id="growth-brush-options" class="growth-brush-options">
+                    <div class="growth-option-group">
+                      <span class="growth-option-label">SIZE</span>
+                      <input id="growth-brush-radius" type="range" min="4" max="32" step="1" value="8" aria-label="Brush radius" />
+                      <span id="growth-brush-radius-val" class="growth-option-val">8px</span>
+                    </div>
+                    <div id="growth-color-options" class="growth-option-group" hidden>
+                      <span class="growth-option-label">COLOR</span>
+                      <div id="growth-color-pills" class="growth-color-pills">
+                        <button class="color-preset-pill is-active" type="button" data-color="#00f0ff" style="--pill-color: #00f0ff" title="Cyan"></button>
+                        <button class="color-preset-pill" type="button" data-color="#ff00a0" style="--pill-color: #ff00a0" title="Magenta"></button>
+                        <button class="color-preset-pill" type="button" data-color="#ffb800" style="--pill-color: #ffb800" title="Gold"></button>
+                        <button class="color-preset-pill" type="button" data-color="#00ff66" style="--pill-color: #00ff66" title="Lime"></button>
+                        <button class="color-preset-pill" type="button" data-color="#9d4edd" style="--pill-color: #9d4edd" title="Violet"></button>
+                        <button class="color-preset-pill" type="button" data-color="#ffffff" style="--pill-color: #ffffff" title="White"></button>
+                      </div>
+                      <input id="growth-color-picker" type="color" value="#00f0ff" aria-label="Brush color picker" />
+                      <input id="growth-color-hex" class="growth-color-hex" type="text" value="#00F0FF" maxlength="7" spellcheck="false" aria-label="Brush color hex value" />
+                    </div>
+                    <div id="growth-freeze-options" class="growth-option-group" hidden>
+                      <div class="growth-freeze-lock-group" role="group" aria-label="Freeze lock mode">
+                        <button id="growth-freeze-lock-mask" class="mini-button mini-button--brush is-active" type="button" data-freeze-lock="mask" title="Mask: locked barrier, nothing can draw or grow over it">MASK</button>
+                        <button id="growth-freeze-lock-draw" class="mini-button mini-button--brush" type="button" data-freeze-lock="draw" title="Draw: editable barrier, draw on frozen cells then unfreeze">DRAW</button>
+                      </div>
+                      <label class="growth-option-label-select">
+                        <span>OUTLINE</span>
+                        <select id="growth-outline-select" aria-label="Barrier outline visibility">
+                          <option value="auto">Auto</option>
+                          <option value="always">Always</option>
+                          <option value="off">Off</option>
+                        </select>
+                      </label>
+                      <button id="growth-clear-barrier-btn" class="mini-button" type="button" title="Clear all frozen barriers">CLEAR BARRIERS</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="output-stage">
                   <div class="output-frame">
                     <canvas

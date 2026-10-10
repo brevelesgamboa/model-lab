@@ -683,4 +683,89 @@ test("coordinate geometry selector switches modes, updates smart pitch defaults,
   ).toBe(false);
 });
 
+test("interactive brushes support top toolbar, color presets, ripple, freeze/thaw and flow grooming", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  // Check top canvas toolbar is visible
+  const canvasToolbar = page.locator("#growth-canvas-tools");
+  await expect(canvasToolbar).toBeVisible();
+
+  // Click COLOR brush in top toolbar
+  const colorBtn = page.locator('.growth-brush-btn[data-brush="dye"]');
+  await expect(colorBtn).toBeVisible();
+  await colorBtn.click();
+  await expect(colorBtn).toHaveClass(/is-active/);
+
+  // Check color options row is visible in canvas toolbar
+  const colorOptions = page.locator("#growth-color-options");
+  await expect(colorOptions).toBeVisible();
+
+  // Click Magenta preset pill in canvas toolbar
+  const magentaPill = colorOptions.locator(".color-preset-pill[data-color='#ff00a0']");
+  await expect(magentaPill).toBeVisible();
+  await magentaPill.click();
+
+  const colorPicker = page.locator("#growth-color-picker");
+  await expect(colorPicker).toHaveValue("#ff00a0");
+  const hexInput = page.locator("#growth-color-hex");
+  await expect(hexInput).toHaveValue("#FF00A0");
+
+  // Perform pointer disturbance in color mode
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to ripple and click
+  const rippleBtn = page.locator('.growth-brush-btn[data-brush="shockwave"]');
+  await rippleBtn.click();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to freeze and click/drag
+  const freezeBtn = page.locator('.growth-brush-btn[data-brush="freeze"]');
+  await freezeBtn.click();
+  const freezeOptions = page.locator("#growth-freeze-options");
+  await expect(freezeOptions).toBeVisible();
+
+  // Test freeze lock mode toggle (MASK vs DRAW)
+  const maskBtn = page.locator("#growth-freeze-lock-mask");
+  const drawBtn = page.locator("#growth-freeze-lock-draw");
+  await expect(maskBtn).toBeVisible();
+  await expect(drawBtn).toBeVisible();
+  await expect(maskBtn).toHaveClass(/is-active/);
+  await drawBtn.click();
+  await expect(drawBtn).toHaveClass(/is-active/);
+  await expect(maskBtn).not.toHaveClass(/is-active/);
+  await maskBtn.click();
+  await expect(maskBtn).toHaveClass(/is-active/);
+
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Test clear barrier button
+  const clearBarrierBtn = page.locator("#growth-clear-barrier-btn");
+  await expect(clearBarrierBtn).toBeVisible();
+  await clearBarrierBtn.click();
+
+  // Switch to unfreeze and click
+  const thawBtn = page.locator('.growth-brush-btn[data-brush="thaw"]');
+  await thawBtn.click();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to flow and drag stroke
+  const flowBtn = page.locator('.growth-brush-btn[data-brush="groom"]');
+  await flowBtn.click();
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 80, box.y + 20);
+  await page.mouse.up();
+
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
+
 

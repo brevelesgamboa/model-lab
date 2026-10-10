@@ -192,6 +192,14 @@ const growthController = createGrowthController({
   setAnimation,
   setStatus,
   withExclusiveCompute,
+  onParameterChange: (key, value) => {
+    currentParameters[key] = value;
+    currentModel?.onParameterChange?.(key, value);
+    modelParameterState.set(currentModel.id, deepClone(currentParameters));
+    markPresetCustom();
+    controlsController.render();
+    renderCurrentFrame({ forceAnalysis: true });
+  },
 });
 const controlsController = createControlsController({
   elements,
@@ -230,6 +238,9 @@ const controlsController = createControlsController({
     invalidateCurrentRun("PARAMETERS CHANGED");
     if (definition.key === "spatialFocus") {
       dreamController.spatialMaskController?.onSpatialFocusSelect?.(value);
+    }
+    if (currentModel.id === "neural-growth") {
+      growthController.update();
     }
     renderCurrentFrame({ forceAnalysis: true });
   },
@@ -925,6 +936,10 @@ function applyParameterSet(
       control.fine.value = String(value);
     } else if (definition.type === "select") {
       control.select.value = String(value);
+    } else if (definition.type === "color") {
+      if (control.pickerInput) control.pickerInput.value = String(value);
+      if (control.hexInput) control.hexInput.value = String(value).toUpperCase();
+      control.updateActivePreset?.(value);
     } else if (control.input) {
       control.input.value = String(value);
     }
@@ -1217,6 +1232,18 @@ function randomizedValue(definition) {
     return definition.options[
       Math.floor(Math.random() * definition.options.length)
     ].value;
+  }
+  if (definition.type === "color") {
+    const presets = definition.presets || [
+      { value: "#00f0ff" },
+      { value: "#ff00a0" },
+      { value: "#ffb800" },
+      { value: "#00ff66" },
+      { value: "#9d4edd" },
+      { value: "#ffffff" },
+    ];
+    const pick = presets[Math.floor(Math.random() * presets.length)];
+    return typeof pick === "object" ? pick.value : pick;
   }
   const minimum = Number(definition.min);
   const maximum = Number(definition.max);

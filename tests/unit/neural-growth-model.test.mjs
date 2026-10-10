@@ -55,6 +55,9 @@ function setup(context, { load = async () => checkpoint, failSize = 0, initialSi
         disturb(...values) {
           this.disturbances.push(values);
         },
+        clearBarrier() {
+          this.barrierCleared = true;
+        },
         dispose() {
           this.disposed = true;
         },
@@ -154,6 +157,9 @@ test("default simulation size is 256 and pattern switching preserves simulation 
   assert.equal(defaults.displayFilter, "smooth");
   assert.equal(defaults.coordinateTransform, "cartesian");
   assert.equal(defaults.twist, 0);
+  assert.equal(defaults.disturbanceMode, "erase");
+  assert.equal(defaults.dyeColor, "#00f0ff");
+  assert.equal(defaults.barrierLock, "mask");
 
   // Pattern change should only default seed, NOT override simulationSize
   const patternDefaults = model.parameterDefaultsForChange("pattern", "bumpy-surface");
@@ -210,6 +216,58 @@ test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpol
   await model.render(canvas, params, 3);
   assert.equal(runtimes[0].disturbances.length, 64);
   assert.deepEqual(runtimes[0].disturbances[63], [99, 99, 4]);
+});
+
+test("interactive brushes dispatch chromophore, shockwave, stasis freeze/thaw and flow grooming", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0" }, 0);
+  model.queueDisturbance(15, 25, 8, "dye", { dyeColor: "#ff00a0" });
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0" }, 1);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][0], 15);
+  assert.equal(runtimes[0].disturbances[0][1], 25);
+  assert.equal(runtimes[0].disturbances[0][2], 8);
+  assert.equal(runtimes[0].disturbances[0][3], "dye");
+  assert.deepEqual(runtimes[0].disturbances[0][4], { dyeColor: [1, 0, 160 / 255], strokeAngle: 0, lockBarrier: true });
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0", barrierLock: "draw" }, 2);
+  model.queueDisturbance(15, 25, 8, "dye", { dyeColor: "#ff00a0" });
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0", barrierLock: "draw" }, 3);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][4].lockBarrier, false);
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "shockwave" }, 4);
+  model.queueDisturbance(30, 40, 12, "shockwave");
+  await model.render(canvas, { ...params, disturbanceMode: "shockwave" }, 5);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "shockwave");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "freeze" }, 6);
+  model.queueDisturbance(50, 50, 6, "freeze");
+  await model.render(canvas, { ...params, disturbanceMode: "freeze" }, 7);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "freeze");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "thaw" }, 8);
+  model.queueDisturbance(50, 50, 6, "thaw");
+  await model.render(canvas, { ...params, disturbanceMode: "thaw" }, 9);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "thaw");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "groom" }, 10);
+  model.queueDisturbanceStroke(10, 10, 20, 10, 4, "groom");
+  await model.render(canvas, { ...params, disturbanceMode: "groom" }, 11);
+  assert.ok(runtimes[0].disturbances.length > 0);
+  assert.equal(runtimes[0].disturbances[0][3], "groom");
+  assert.equal(runtimes[0].disturbances[0][4].strokeAngle, 0);
+
+  model.clearBarrier();
+  assert.equal(runtimes[0].barrierCleared, true);
 });
 
 test("seed resets once, grid replacement disposes once, and model switching retains state", async (context) => {
