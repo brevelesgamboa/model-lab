@@ -12,6 +12,10 @@ import {
   defaultParameters,
   validateModelDefinition,
 } from "../../assets/js/core/model-contract.js";
+import {
+  AUDIO_PROFILES,
+  detectAudioProfile,
+} from "../../assets/js/models/neural-growth/audio-profiles.js";
 
 const checkpoint = JSON.parse(
   await readFile(
@@ -88,7 +92,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
     png: true,
     gif: false,
     highResolution: false,
-    savedRun: false,
+    savedRun: true,
   });
   assert.deepEqual(captureCapabilities({}), {
     png: true,
@@ -497,4 +501,110 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(model.activePattern, DEFAULT_PATTERN);
   assert.equal(runtimes.length, 1);
   assert.equal(runtimes[0].disposed, false);
+});
+
+test("audio-reactive profiles and beat shockwaves map routes and dispatch kick disturbances", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+
+  const profileControl = model.controls.find((c) => c.key === "audioProfile");
+  assert.ok(profileControl);
+  assert.equal(profileControl.default, "off");
+  assert.deepEqual(
+    profileControl.options.map((o) => o.value),
+    ["off", "breathe", "groove", "surge", "custom"],
+  );
+
+  assert.equal(AUDIO_PROFILES.groove.beatShockwave, "center");
+  assert.equal(AUDIO_PROFILES.surge.beatShockwave, "pointer");
+  assert.equal(AUDIO_PROFILES.breathe.beatShockwave, "off");
+
+  const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
+  assert.ok(shockwaveControl);
+  assert.equal(shockwaveControl.default, "off");
+  assert.deepEqual(
+    shockwaveControl.options.map((o) => o.value),
+    ["off", "center", "pointer"],
+  );
+
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "groove"), {
+    beatShockwave: "center",
+  });
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "surge"), {
+    beatShockwave: "pointer",
+  });
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "breathe"), {
+    beatShockwave: "off",
+  });
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "off"), {
+    beatShockwave: "off",
+  });
+
+  assert.equal(detectAudioProfile({}, "off"), "off");
+  assert.equal(
+    detectAudioProfile(
+      {
+        growthSpeed: { source: "bass", depth: 0.25 },
+        reliefStrength: { source: "bass", depth: 0.2 },
+        lightAngle: { source: "bass", depth: 0.15 },
+      },
+      "off",
+    ),
+    "breathe",
+  );
+  assert.equal(
+    detectAudioProfile(
+      {
+        growthSpeed: { source: "kick", depth: 0.4 },
+        twist: { source: "bass", depth: 0.35 },
+        reliefStrength: { source: "kick", depth: 0.3 },
+      },
+      "center",
+    ),
+    "groove",
+  );
+  assert.equal(
+    detectAudioProfile(
+      {
+        growthSpeed: { source: "kick", depth: 0.6 },
+        twist: { source: "bass", depth: 0.55 },
+        lightAngle: { source: "bass", depth: 0.5 },
+        reliefStrength: { source: "kick", depth: 0.45 },
+      },
+      "pointer",
+    ),
+    "surge",
+  );
+  assert.equal(
+    detectAudioProfile(
+      {
+        growthSpeed: { source: "kick", depth: 0.8 },
+      },
+      "center",
+    ),
+    "custom",
+  );
+
+  assert.equal(model.triggerBeatShockwave("off"), false);
+  assert.equal(model.triggerBeatShockwave("center"), true);
+  assert.equal(model._queuedDisturbances.length, 1);
+  const centerPulse = model._queuedDisturbances[0];
+  assert.equal(centerPulse.x, 64);
+  assert.equal(centerPulse.y, 64);
+  assert.equal(centerPulse.mode, "shockwave");
+
+  assert.equal(
+    model.triggerBeatShockwave("pointer", { x: 30, y: 40 }),
+    true,
+  );
+  assert.equal(model._queuedDisturbances.length, 2);
+  const pointerPulse = model._queuedDisturbances[1];
+  assert.equal(pointerPulse.x, 30);
+  assert.equal(pointerPulse.y, 40);
+  assert.equal(pointerPulse.mode, "shockwave");
+
+  model.step();
+  assert.equal(runtimes[0].disturbances.length, 2);
+  assert.equal(runtimes[0].disturbances[0][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[1][3], "shockwave");
 });

@@ -723,10 +723,43 @@ export function createGrowthController({
     }
   });
 
+  let lastBeatTime = 0;
+  let beatArmed = true;
+
+  function onAudioFrame(levels, timestamp) {
+    const model = activeModel();
+    if (!model?.ready || !levels) return;
+    const mode = model.parameters?.beatShockwave || "off";
+    if (mode === "off") return;
+    if (!levels.hasSignal) return;
+
+    const kick = Number(levels.kick) || 0;
+    if (kick < 0.25) {
+      beatArmed = true;
+    }
+    const elapsed = timestamp - lastBeatTime;
+    if (beatArmed && kick >= 0.55 && elapsed >= 240) {
+      lastBeatTime = timestamp;
+      beatArmed = false;
+      const coords =
+        mode === "pointer" && lastCoord
+          ? { x: lastCoord.gx, y: lastCoord.gy }
+          : null;
+      model.triggerBeatShockwave(mode, coords);
+      if (!model.isClockRunning) {
+        schedulePausedRender();
+      }
+    }
+  }
+
   listen(elements.canvas, "pointerdown", handlePointerDown);
   listen(elements.canvas, "pointermove", handlePointerMove);
   listen(elements.canvas, "pointerup", release);
   listen(elements.canvas, "pointercancel", release);
   listen(elements.canvas, "lostpointercapture", release);
-  return { update, dispose: () => listeners.forEach((remove) => remove()) };
+  return {
+    update,
+    onAudioFrame,
+    dispose: () => listeners.forEach((remove) => remove()),
+  };
 }

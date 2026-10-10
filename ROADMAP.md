@@ -28,10 +28,10 @@ Development roadmap focusing on expanding Neural Growth into a high-fidelity, in
 
 Transform Neural Growth into an expressive audio-reactive performance visualizer.
 
-- Beat-Synced Shockwaves: Trigger radial disturbance pulses or ripples timed to detected kicks and transients.
-- Cellular Activity Modulation: Route audio energy to the stochastic update probability mask (chill slow evolution during quiet passages, explosive rapid evolution on drops).
-- Frequency-Dependent Perception Scaling: Modulate perception filter step strides so bass dilates macro structures while treble excites fine granular details.
-- Audio-Driven 3D Lighting Wobble: Modulate directional light angles and specular intensity with audio volume and frequency bands.
+- Beat-Synced Shockwaves: Trigger radial disturbance pulses timed to detected audio kicks and transients (center pulse or pointer-focused).
+- Audio-Reactive Modulation Profiles: High-level presets (Breathe, Groove, Surge) that automatically configure modulation routes for speed, vector twist, relief depth, and 3D lighting without manual routing bloat.
+- Full Custom Modulation Parity: Any preset configuration maps directly to Latent Field's parameter MOD panels, giving users full visibility and freedom to fine-tune depths, with automatic fallback to Custom mode when edited.
+- Saved Run Enablement: Full experiment saving and archive restoration for Neural Growth configurations (pattern checkpoint, seed, parameters, modulation matrix, and thumbnail).
 
 ## Phase 4: Extended Visual Fidelity
 
@@ -39,3 +39,11 @@ Further explore high-density rendering and state introspection.
 
 - 512x512 High-DPI Grid Option: Support higher resolution simulations for high-density desktop displays.
 - Hidden Channel Inspector: False-color visualization modes displaying hidden memory channels (channels 3 to 11) to inspect electrical waves moving beneath the surface.
+
+## Future Milestones: Shared Audio and Modulation Architecture
+
+Shared engine enhancements benefiting all generative models across Latent Field:
+
+- Audio Feature Extraction Rework: Multi-band frequency separation (sub-bass, mid, highs), adaptive energy normalization, and cleaner kick/transient separation in the shared rhythm controller.
+- Modulation Panel UX Overhaul: Redesign parameter modulation popups with visual response curves, bidirectional bipolar depth controls, and streamlined routing.
+

@@ -7,6 +7,7 @@ import {
   PATTERNS,
   getPattern,
 } from "./neural-growth/patterns.js";
+import { AUDIO_PROFILES } from "./neural-growth/audio-profiles.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -35,7 +36,7 @@ export class NeuralGrowthModel {
       png: true,
       gif: false,
       highResolution: false,
-      savedRun: false,
+      savedRun: true,
     };
     this._load = load;
     this._createRuntime = createRuntime;
@@ -137,6 +138,32 @@ export class NeuralGrowthModel {
         default: 0,
         format: "degrees",
         help: "Pitch and angular twist in degrees for spiral and vortex geometries. Modulates inward/outward swirl.",
+      },
+      {
+        key: "audioProfile",
+        label: "AUDIO REACT",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off · Manual MOD" },
+          { value: "breathe", label: "Breathe · Ambient Swell" },
+          { value: "groove", label: "Groove · Rhythmic Drive" },
+          { value: "surge", label: "Surge · Dynamic Burst" },
+          { value: "custom", label: "Custom · User Defined" },
+        ],
+        help: "Audio-reactive presets configuring modulation routes for speed, twist, relief, and lighting. Fully editable in parameter MOD panels.",
+      },
+      {
+        key: "beatShockwave",
+        label: "BEAT SHOCKWAVE",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off" },
+          { value: "center", label: "Center · Radial Kick Pulse" },
+          { value: "pointer", label: "Pointer · Interactive Focus" },
+        ],
+        help: "Triggers radial ripple disturbances on detected audio kicks. Bursts originate from grid center or recent brush pointer.",
       },
       {
         key: "brushRadius",
@@ -364,6 +391,12 @@ export class NeuralGrowthModel {
         return { twist: 0 };
       }
     }
+    if (key === "audioProfile") {
+      const profile = AUDIO_PROFILES[value];
+      if (profile && profile.beatShockwave) {
+        return { beatShockwave: profile.beatShockwave };
+      }
+    }
     return null;
   }
 
@@ -371,7 +404,13 @@ export class NeuralGrowthModel {
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
     }
-    if (key === "coordinateTransform" || key === "barrierLock") return true;
+    if (
+      key === "coordinateTransform" ||
+      key === "barrierLock" ||
+      key === "audioProfile" ||
+      key === "beatShockwave"
+    )
+      return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
@@ -577,6 +616,7 @@ export class NeuralGrowthModel {
 
   step() {
     if (!this.ready) return;
+    this._drainDisturbances();
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
     const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
     this._runRuntime(() =>
@@ -699,6 +739,25 @@ export class NeuralGrowthModel {
     }
   }
 
+  triggerBeatShockwave(mode = this._parameters.beatShockwave, coords = null) {
+    if (!this.ready || !mode || mode === "off") return false;
+    const size = this.simulationSize;
+    let x = Math.floor(size / 2);
+    let y = Math.floor(size / 2);
+    if (
+      mode === "pointer" &&
+      coords &&
+      Number.isFinite(coords.x) &&
+      Number.isFinite(coords.y)
+    ) {
+      x = coords.x;
+      y = coords.y;
+    }
+    const radius = Math.max(10, Math.round(size * 0.12));
+    this.queueDisturbance(x, y, radius, "shockwave");
+    return true;
+  }
+
   renderSnapshot(canvas) {
     if (!this.ready)
       throw new Error(
@@ -725,3 +784,5 @@ export class NeuralGrowthModel {
     this._checkpoints.clear();
   }
 }
+
+export { AUDIO_PROFILES };

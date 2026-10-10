@@ -64,6 +64,7 @@ import {
   getAudioRoute,
   hasActiveAudioRoute,
   restoreAudioMatrix,
+  setAudioRoute,
 } from "./core/modulation-matrix.js";
 import {
   LFO_WAVEFORMS,
@@ -72,6 +73,10 @@ import {
   hasActiveLfo,
 } from "./core/lfo.js";
 import { clamp, deepClone, randomSeed } from "./core/utils.js";
+import {
+  AUDIO_PROFILES,
+  detectAudioProfile,
+} from "./models/neural-growth/audio-profiles.js";
 
 const elements = collectElements();
 
@@ -195,6 +200,11 @@ const growthController = createGrowthController({
   onParameterChange: (key, value) => {
     currentParameters[key] = value;
     currentModel?.onParameterChange?.(key, value);
+    if (key === "audioProfile") {
+      applyAudioProfile(value);
+    } else if (key === "beatShockwave") {
+      checkAudioProfileMatch();
+    }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     controlsController.render();
@@ -218,6 +228,17 @@ const controlsController = createControlsController({
   onRange: syncRangeControl,
   onValue(definition, value) {
     currentParameters[definition.key] = value;
+    if (
+      definition.key === "audioProfile" &&
+      currentModel.id === "neural-growth"
+    ) {
+      applyAudioProfile(value);
+    } else if (
+      definition.key === "beatShockwave" &&
+      currentModel.id === "neural-growth"
+    ) {
+      checkAudioProfileMatch();
+    }
     // Discard obsolete completion callbacks, without discarding GPU state.
     if (currentModel.onParameterChange?.(definition.key, value)) {
       renderer.invalidate();
@@ -884,6 +905,64 @@ function showParameterInfo(definition) {
   setStatus(`${definition.label} EXPLAINED IN SESSION LOG`);
 }
 
+function applyAudioProfile(profileKey) {
+  if (currentModel.id !== "neural-growth") return;
+  if (profileKey === "custom") return;
+  const profile = AUDIO_PROFILES[profileKey];
+  if (!profile) return;
+
+  const targetParams = [
+    "growthSpeed",
+    "twist",
+    "lightAngle",
+    "reliefStrength",
+  ];
+  targetParams.forEach((key) => {
+    const route = profile.routes[key] || { source: "none", depth: 0.25 };
+    setAudioRoute("neural-growth", key, route);
+    const control = controlElements.get(key);
+    const hasAudio = route.source !== "none";
+    const lfoActive = Boolean(currentLfoState[key]?.enabled);
+    const active = hasAudio || lfoActive;
+    control?.modulationToggle?.classList.toggle("is-active", active);
+    control?.modulationToggle?.setAttribute("aria-pressed", String(active));
+  });
+
+  if (profile.beatShockwave) {
+    currentParameters.beatShockwave = profile.beatShockwave;
+    const shockwaveControl = controlElements.get("beatShockwave");
+    if (shockwaveControl?.select) {
+      shockwaveControl.select.value = profile.beatShockwave;
+    }
+  }
+
+  modelParameterState.set(currentModel.id, deepClone(currentParameters));
+  invalidateCurrentRun("AUDIO PROFILE APPLIED - SAVE WHEN READY");
+  updateLfoCount();
+  if (profileKey !== "off" && rhythmController.status !== "active") {
+    terminal(
+      "AUDIO",
+      "Loaded " + profile.label + ". Connect audio input (click EQ in status bar) to activate.",
+    );
+  }
+}
+
+function checkAudioProfileMatch() {
+  if (currentModel.id !== "neural-growth") return;
+  const currentProfileKey = currentParameters.audioProfile || "off";
+  const matrix = audioMatrixForModel("neural-growth");
+  const beatShockwave = currentParameters.beatShockwave || "off";
+  const detected = detectAudioProfile(matrix, beatShockwave);
+  if (currentProfileKey !== detected) {
+    currentParameters.audioProfile = detected;
+    modelParameterState.set("neural-growth", deepClone(currentParameters));
+    const control = controlElements.get("audioProfile");
+    if (control?.select) {
+      control.select.value = detected;
+    }
+  }
+}
+
 function makeModulationPanel(definition, config, supportsLfo) {
   return buildModulationPanel({
     definition,
@@ -900,6 +979,9 @@ function makeModulationPanel(definition, config, supportsLfo) {
       currentLfoState[definition.key] = nextConfig;
       modelLfoState.set(currentModel.id, deepClone(currentLfoState));
       markPresetCustom();
+      if (currentModel.id === "neural-growth") {
+        checkAudioProfileMatch();
+      }
       invalidateCurrentRun("MODULATION CHANGED - SAVE WHEN READY");
       const control = controlElements.get(definition.key);
       control?.modulationToggle?.classList.toggle("is-active", active);
@@ -1359,7 +1441,10 @@ function modelNeedsAnimation() {
   if (!playback.isActive() || !currentModel?.available) return false;
   if (
     rhythmController.status === "active" &&
-    hasActiveAudioRoute(currentModel.id)
+    (hasActiveAudioRoute(currentModel.id) ||
+      (currentModel.id === "neural-growth" &&
+        currentParameters.beatShockwave &&
+        currentParameters.beatShockwave !== "off"))
   )
     return true;
   if (currentModel.usesInternalClock) return false;
@@ -1372,6 +1457,9 @@ function modelNeedsAnimation() {
 function animationLoop(timestamp) {
   rhythmController.update(timestamp);
   drawAudioMeter();
+  if (currentView === "lab" && currentModel.id === "neural-growth") {
+    growthController.onAudioFrame(rhythmController.getLevels(), timestamp);
+  }
   const siteActive = elements.site.classList.contains("is-visible");
   const canRender =
     siteActive &&
@@ -1729,6 +1817,9 @@ function restoreRun(record) {
   const shouldAnimate = hasLfo || hasAudio || Boolean(record.animationRunning);
   setAnimation(shouldAnimate, { log: false });
   renderParameterControls();
+  if (currentModel.id === "neural-growth") {
+    checkAudioProfileMatch();
+  }
   navigate("lab");
   renderCurrentFrame({ forceAnalysis: true, timeSeconds: lastTimeSeconds });
   elements.runId.textContent = record.id;

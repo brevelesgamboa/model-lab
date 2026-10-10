@@ -118,7 +118,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   await selectGrowth(page);
   await expect(page.locator(".modulation-toggle:visible")).toHaveCount(5);
   await expect(page.locator("#save-gif")).toBeDisabled();
-  await expect(page.locator("#run-experiment")).toBeDisabled();
+  await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
   await page.locator("#step-growth").click();
   await expect(page.locator("#growth-status")).toHaveAttribute(
@@ -152,7 +152,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   expect(errors).toEqual([]);
 });
 
-test("PNG is an immutable snapshot, with no fictitious high-resolution or Saved Run capture", async ({
+test("PNG is an immutable snapshot and experiment runs save to archive", async ({
   page,
   request,
 }) => {
@@ -176,11 +176,9 @@ test("PNG is an immutable snapshot, with no fictitious high-resolution or Saved 
   );
   expect(await state(page)).toEqual(before);
   await page.keyboard.press("Control+Enter");
-  await expect(page.locator("#status-message")).toContainText(
-    "SAVED RUNS DO NOT STORE GRID STATE",
-  );
+  await expect(page.locator("#status-message")).toContainText("SAVED");
   await page.locator('[data-view="archive"]').click();
-  await expect(page.locator(".run-card")).toHaveCount(0);
+  await expect(page.locator(".run-card")).toHaveCount(1);
   for (const [asset, text] of [
     ["/models/neural-growth/NOTICE.md", "CC-BY-4.0"],
     ["/licenses/neural-growth-Apache-2.0.txt", "Apache License"],
@@ -777,6 +775,55 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
   ).toBe(false);
+});
+
+test("audio-reactive presets configure modulation routes and synchronize with MOD panels", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  const audioSelect = page.getByLabel("AUDIO REACT", { exact: true });
+  await expect(audioSelect).toBeVisible();
+  await expect(audioSelect).toHaveValue("off");
+
+  const shockwaveSelect = page.getByLabel("BEAT SHOCKWAVE", { exact: true });
+  await expect(shockwaveSelect).toBeVisible();
+  await expect(shockwaveSelect).toHaveValue("off");
+
+  // Select Groove preset: sets routes and beat shockwave to center
+  await audioSelect.selectOption("groove");
+  await expect(shockwaveSelect).toHaveValue("center");
+
+  // Check growthSpeed MOD toggle is active
+  const speedModToggle = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
+  await expect(speedModToggle).toHaveClass(/is-active/);
+
+  // Open growthSpeed MOD drawer if not already open
+  const speedSource = page.locator('select[aria-label="GROWTH SPEED audio source"]');
+  if (await speedSource.isHidden()) {
+    await speedModToggle.click();
+  }
+  await expect(speedSource).toBeVisible();
+  await expect(speedSource).toHaveValue("kick");
+
+  // Switch to Breathe preset
+  await audioSelect.selectOption("breathe");
+  await expect(shockwaveSelect).toHaveValue("off");
+  await expect(speedSource).toHaveValue("bass");
+
+  // Tweak audio depth to trigger custom profile detection
+  const depthInput = page.locator('.control-block:has-text("GROWTH SPEED") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  await depthInput.fill("0.85");
+  await depthInput.dispatchEvent("input");
+
+  // Verify AUDIO REACT select dynamically transitioned to custom
+  await expect(audioSelect).toHaveValue("custom");
+
+  // Save run to archive and verify
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator("#status-message")).toContainText("SAVED");
+  await page.locator('[data-view="archive"]').click();
+  await expect(page.locator(".run-card")).toHaveCount(1);
 });
 
 
