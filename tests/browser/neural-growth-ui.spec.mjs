@@ -261,7 +261,7 @@ test("pointer disturbance uses the displayed field's bottom-up coordinates", asy
   );
   await expect
     .poll(() => page.evaluate(() => window.__lastDisturbance))
-    .toEqual([128, 191, 8]);
+    .toEqual([128, 191, 16]);
   expect((await state(page)).steps).toBe(2);
 });
 
@@ -790,8 +790,8 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(shockwaveSelect).toBeVisible();
   await expect(shockwaveSelect).toHaveValue("off");
 
-  // Select Groove preset: sets routes and beat shockwave to center
-  await audioSelect.selectOption("groove");
+  // Select Rhythm preset: sets routes and beat shockwave to center
+  await audioSelect.selectOption("rhythm");
   await expect(shockwaveSelect).toHaveValue("center");
 
   // Check growthSpeed MOD toggle is active
@@ -806,8 +806,8 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(speedSource).toBeVisible();
   await expect(speedSource).toHaveValue("kick");
 
-  // Switch to Breathe preset
-  await audioSelect.selectOption("breathe");
+  // Switch to Ambient preset
+  await audioSelect.selectOption("ambient");
   await expect(shockwaveSelect).toHaveValue("off");
   await expect(speedSource).toHaveValue("bass");
 

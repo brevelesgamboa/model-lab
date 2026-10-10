@@ -249,9 +249,9 @@ void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int group = p.x / u_size;
   ivec2 xy = ivec2(p.x % u_size, p.y);
-  vec2 distance = vec2(abs(xy - u_center));
-  distance = min(distance, vec2(float(u_size)) - distance);
-  float dist = length(distance);
+  vec2 delta = vec2(xy - u_center);
+  delta = delta - round(delta / float(u_size)) * float(u_size);
+  float dist = length(delta);
   if (dist <= u_radius) {
     if (u_lockBarrier == 1 && texelFetch(u_barrier, xy, 0).r > 0.5) {
       out_color = texelFetch(u_state, p, 0);
@@ -274,12 +274,21 @@ void main() {
         out_color = current;
       }
     } else if (u_mode == 3) {
-      vec4 current = texelFetch(u_state, p, 0);
-      float phase = dist / max(u_radius * 0.28, 1.0);
-      float wave = sin(phase * 3.1415926) * exp(-dist / max(u_radius * 0.85, 1.0));
-      vec4 decoded = decodeState(current);
-      decoded.rgb += wave * 0.8;
-      out_color = encodeState(decoded);
+      float normDist = dist / max(u_radius, 1.0);
+      float envelope = smoothstep(0.0, 0.18, normDist) * (1.0 - smoothstep(0.75, 1.0, normDist));
+      float wave = sin(normDist * 3.14159265 * 3.0) * envelope;
+      vec2 dir = dist > 0.5 ? delta / dist : vec2(0.0);
+      float displacement = wave * min(u_radius * 0.22, 10.0);
+      ivec2 sampleXY = wrapCell(xy - ivec2(round(dir * displacement)));
+      ivec2 sampleP = ivec2(sampleXY.x + group * u_size, sampleXY.y);
+      vec4 sampled = texelFetch(u_state, sampleP, 0);
+      if (group == 0) {
+        vec4 decoded = decodeState(sampled);
+        decoded.rgb += wave * 0.4;
+        out_color = encodeState(decoded);
+      } else {
+        out_color = sampled;
+      }
     } else {
       out_color = vec4(127.0 / 255.0);
     }

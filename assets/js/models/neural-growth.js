@@ -146,9 +146,9 @@ export class NeuralGrowthModel {
         default: "off",
         options: [
           { value: "off", label: "Off · Manual MOD" },
-          { value: "breathe", label: "Breathe · Ambient Swell" },
-          { value: "groove", label: "Groove · Rhythmic Drive" },
-          { value: "surge", label: "Surge · Dynamic Burst" },
+          { value: "ambient", label: "Ambient · Sub-Bass Swell" },
+          { value: "rhythm", label: "Rhythm · Beat Drive" },
+          { value: "dynamic", label: "Dynamic · High Energy" },
           { value: "custom", label: "Custom · User Defined" },
         ],
         help: "Audio-reactive presets configuring modulation routes for speed, twist, relief, and lighting. Fully editable in parameter MOD panels.",
@@ -170,11 +170,11 @@ export class NeuralGrowthModel {
         label: "BRUSH RADIUS",
         type: "range",
         min: 4,
-        max: 32,
+        max: 96,
         step: 1,
-        default: 8,
+        default: 16,
         modulation: false,
-        help: "Pointer disturbance brush radius in grid cells.",
+        help: "Pointer disturbance and shockwave brush radius in grid cells.",
       },
       {
         key: "disturbanceMode",
@@ -739,7 +739,11 @@ export class NeuralGrowthModel {
     }
   }
 
-  triggerBeatShockwave(mode = this._parameters.beatShockwave, coords = null) {
+  triggerBeatShockwave(
+    mode = this._parameters.beatShockwave,
+    coords = null,
+    customRadius = null,
+  ) {
     if (!this.ready || !mode || mode === "off") return false;
     const size = this.simulationSize;
     let x = Math.floor(size / 2);
@@ -753,7 +757,13 @@ export class NeuralGrowthModel {
       x = coords.x;
       y = coords.y;
     }
-    const radius = Math.max(10, Math.round(size * 0.12));
+    const chosenRadius =
+      Number(customRadius || this._parameters.brushRadius) ||
+      Math.round(size * 0.15);
+    const radius = Math.max(
+      8,
+      Math.min(Math.floor(size / 2), Math.round(chosenRadius)),
+    );
     this.queueDisturbance(x, y, radius, "shockwave");
     return true;
   }

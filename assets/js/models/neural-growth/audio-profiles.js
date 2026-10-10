@@ -9,10 +9,10 @@ export const AUDIO_PROFILES = Object.freeze({
     beatShockwave: "off",
     routes: Object.freeze({}),
   }),
-  breathe: Object.freeze({
-    id: "breathe",
-    label: "Breathe · Ambient Swell",
-    description: "Gentle organic swelling of speed and relief depth with music volume.",
+  ambient: Object.freeze({
+    id: "ambient",
+    label: "Ambient · Sub-Bass Swell",
+    description: "Gentle organic swelling of speed, relief depth, and light with music volume.",
     beatShockwave: "off",
     routes: Object.freeze({
       growthSpeed: Object.freeze({ source: "bass", depth: 0.25 }),
@@ -20,9 +20,9 @@ export const AUDIO_PROFILES = Object.freeze({
       lightAngle: Object.freeze({ source: "bass", depth: 0.15 }),
     }),
   }),
-  groove: Object.freeze({
-    id: "groove",
-    label: "Groove · Rhythmic Drive",
+  rhythm: Object.freeze({
+    id: "rhythm",
+    label: "Rhythm · Beat Drive",
     description: "Punchy kick-driven speed pops and bass vector twist with center beat shockwaves.",
     beatShockwave: "center",
     routes: Object.freeze({
@@ -31,9 +31,9 @@ export const AUDIO_PROFILES = Object.freeze({
       reliefStrength: Object.freeze({ source: "kick", depth: 0.3 }),
     }),
   }),
-  surge: Object.freeze({
-    id: "surge",
-    label: "Surge · Dynamic Burst",
+  dynamic: Object.freeze({
+    id: "dynamic",
+    label: "Dynamic · High Energy",
     description: "High-intensity audio reaction across speed, twist, relief, and lighting with interactive beat shockwaves.",
     beatShockwave: "pointer",
     routes: Object.freeze({

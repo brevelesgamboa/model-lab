@@ -512,12 +512,12 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   assert.equal(profileControl.default, "off");
   assert.deepEqual(
     profileControl.options.map((o) => o.value),
-    ["off", "breathe", "groove", "surge", "custom"],
+    ["off", "ambient", "rhythm", "dynamic", "custom"],
   );
 
-  assert.equal(AUDIO_PROFILES.groove.beatShockwave, "center");
-  assert.equal(AUDIO_PROFILES.surge.beatShockwave, "pointer");
-  assert.equal(AUDIO_PROFILES.breathe.beatShockwave, "off");
+  assert.equal(AUDIO_PROFILES.rhythm.beatShockwave, "center");
+  assert.equal(AUDIO_PROFILES.dynamic.beatShockwave, "pointer");
+  assert.equal(AUDIO_PROFILES.ambient.beatShockwave, "off");
 
   const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
   assert.ok(shockwaveControl);
@@ -527,13 +527,13 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["off", "center", "pointer"],
   );
 
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "groove"), {
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "rhythm"), {
     beatShockwave: "center",
   });
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "surge"), {
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "dynamic"), {
     beatShockwave: "pointer",
   });
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "breathe"), {
+  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "ambient"), {
     beatShockwave: "off",
   });
   assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "off"), {
@@ -550,7 +550,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
       },
       "off",
     ),
-    "breathe",
+    "ambient",
   );
   assert.equal(
     detectAudioProfile(
@@ -561,7 +561,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
       },
       "center",
     ),
-    "groove",
+    "rhythm",
   );
   assert.equal(
     detectAudioProfile(
@@ -573,7 +573,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
       },
       "pointer",
     ),
-    "surge",
+    "dynamic",
   );
   assert.equal(
     detectAudioProfile(
