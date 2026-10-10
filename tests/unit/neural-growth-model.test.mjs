@@ -39,8 +39,9 @@ function setup(context, { load = async () => checkpoint, failSize = 0, initialSi
         draws: 0,
         disturbances: [],
         disposed: false,
-        step(count) {
+        step(count, options) {
           this.steps += count;
+          this.lastStepOptions = options;
         },
         draw(canvas) {
           this.draws += 1;
@@ -125,6 +126,8 @@ test("redraws, palette, shading, speed, rotation, topology, zoom, viewport and s
       reliefStrength: 2.0,
       lightAngle: 120,
       displayFilter: "crisp",
+      coordinateTransform: "spiral",
+      twist: 45,
       growthSpeed: 60,
       rotation: 180,
       topology: "hexagonal",
@@ -149,6 +152,8 @@ test("default simulation size is 256 and pattern switching preserves simulation 
   assert.equal(defaults.reliefStrength, 1.2);
   assert.equal(defaults.lightAngle, 45);
   assert.equal(defaults.displayFilter, "smooth");
+  assert.equal(defaults.coordinateTransform, "cartesian");
+  assert.equal(defaults.twist, 0);
 
   // Pattern change should only default seed, NOT override simulationSize
   const patternDefaults = model.parameterDefaultsForChange("pattern", "bumpy-surface");
@@ -156,6 +161,24 @@ test("default simulation size is 256 and pattern switching preserves simulation 
   assert.equal(patternDefaults.simulationSize, undefined);
   assert.equal(typeof patternDefaults.seed, "number");
   assert.equal(patternDefaults.seed, 42);
+});
+
+test("coordinateTransform suggests smart defaults and forwards to runtime steps", async (context) => {
+  const model = new NeuralGrowthModel();
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "spiral"), { twist: 35 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
+  assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
+
+  const { model: runModel, params, canvas, runtimes } = setup(context);
+  await runModel.render(canvas, { ...params, coordinateTransform: "julia", twist: 30, rotation: 90 }, 0);
+  runModel.step();
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].lastStepOptions.coordinateTransform, "julia");
+  assert.ok(Math.abs(runtimes[0].lastStepOptions.twist - (30 * Math.PI) / 180) < 1e-6);
+  assert.ok(Math.abs(runtimes[0].lastStepOptions.rotation - (90 * Math.PI) / 180) < 1e-6);
 });
 
 test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {

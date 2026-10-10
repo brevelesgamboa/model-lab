@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(4);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(5);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeDisabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -621,4 +621,66 @@ test("continuous rotation and growth speed expose modulation controls with circu
   });
   expect(wrapped).toEqual([15, 345, 0]);
 });
+
+test("coordinate geometry selector switches modes, updates smart pitch defaults, and steps WebGL cleanly", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  // Check controls exist
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await expect(geometrySelect).toBeVisible();
+  await expect(geometrySelect).toHaveValue("cartesian");
+
+  const twistInput = page.getByLabel("SPIRAL PITCH / TWIST", { exact: true });
+  await expect(twistInput).toBeVisible();
+  await expect(twistInput).toHaveValue("0");
+
+  const twistMod = page.locator('button.modulation-toggle[data-key="twist"]');
+  await expect(twistMod).toBeVisible();
+
+  // Switch to spiral: should apply smart default 35 deg pitch
+  await geometrySelect.selectOption("spiral");
+  await expect(twistInput).toHaveValue("35");
+
+  // Step growth in spiral mode
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "1",
+  );
+
+  // Switch to julia fractal
+  await geometrySelect.selectOption("julia");
+  await expect(twistInput).toHaveValue("0");
+
+  // Step in julia mode
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "2",
+  );
+
+  // Switch to dipole
+  await geometrySelect.selectOption("dipole");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "3",
+  );
+
+  // Switch to vortex
+  await geometrySelect.selectOption("vortex");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "4",
+  );
+
+  // Context is healthy with 0 errors
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
 

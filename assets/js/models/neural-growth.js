@@ -113,6 +113,31 @@ export class NeuralGrowthModel {
         help: "Rotates directional perception filters in real time without resetting or losing field state.",
       },
       {
+        key: "coordinateTransform",
+        label: "COORDINATE GEOMETRY",
+        type: "select",
+        default: "cartesian",
+        options: [
+          { value: "cartesian", label: "Cartesian · Standard 2D" },
+          { value: "vortex", label: "Vortex · Concentric Ring" },
+          { value: "spiral", label: "Spiral · Logarithmic Swirl" },
+          { value: "julia", label: "Julia · Complex Fractal" },
+          { value: "dipole", label: "Dipole · Binary Vortex" },
+        ],
+        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, or Julia fractal dendrites.",
+      },
+      {
+        key: "twist",
+        label: "SPIRAL PITCH / TWIST",
+        type: "range",
+        min: -90,
+        max: 90,
+        step: 1,
+        default: 0,
+        format: "degrees",
+        help: "Pitch and angular twist in degrees for spiral and vortex geometries. Modulates inward/outward swirl.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
@@ -279,13 +304,27 @@ export class NeuralGrowthModel {
   }
 
   parameterDefaultsForChange(key, value) {
-    if (key !== "pattern") return null;
-    const startup = getPattern(value).startup;
-    if (!startup) return null;
-    return { seed: startup.seed };
+    if (key === "pattern") {
+      const startup = getPattern(value).startup;
+      if (!startup) return null;
+      return { seed: startup.seed };
+    }
+    if (key === "coordinateTransform") {
+      if (value === "spiral") return { twist: 35 };
+      if (
+        value === "vortex" ||
+        value === "julia" ||
+        value === "dipole" ||
+        value === "cartesian"
+      ) {
+        return { twist: 0 };
+      }
+    }
+    return null;
   }
 
   onParameterChange(key, value) {
+    if (key === "coordinateTransform") return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
@@ -416,9 +455,13 @@ export class NeuralGrowthModel {
           if (count) {
             const angleRad =
               (Number(parameters.rotation || 0) * Math.PI) / 180;
+            const twistRad =
+              (Number(parameters.twist || 0) * Math.PI) / 180;
             this._runtime.step(count, {
               rotation: angleRad,
               topology: parameters.topology,
+              coordinateTransform: parameters.coordinateTransform,
+              twist: twistRad,
             });
           }
           this._accumulator -= count;
@@ -481,10 +524,13 @@ export class NeuralGrowthModel {
   step() {
     if (!this.ready) return;
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
+    const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
     this._runRuntime(() =>
       this._runtime.step(1, {
         rotation: angleRad,
         topology: this._parameters.topology,
+        coordinateTransform: this._parameters.coordinateTransform,
+        twist: twistRad,
       }),
     );
     this._lastTick = null;

@@ -38,6 +38,8 @@ uniform sampler2D u_shuffle;
 uniform ivec2 u_offset;
 uniform float u_angle;
 uniform int u_topology;
+uniform int u_transform;
+uniform float u_twist;
 const int SX[9] = int[9](-1, 0, 1, -2, 0, 2, -1, 0, 1);
 const int SY[9] = int[9](-1, -2, -1, 0, 0, 0, 1, 2, 1);
 const int LP[9] = int[9](1, 2, 1, 2, -12, 2, 1, 2, 1);
@@ -55,8 +57,33 @@ void main() {
     out_color = texelFetch(u_state, ivec2(xy.x + inputGroup * u_size, xy.y), 0);
     return;
   }
-  float cosA = cos(u_angle);
-  float sinA = sin(u_angle);
+  float theta = u_angle;
+  if (u_transform != 0) {
+    vec2 center = vec2(float(u_size) * 0.5);
+    vec2 pos = (vec2(xy) + 0.5 - center) / (float(u_size) * 0.5);
+    float phi = atan(pos.y, pos.x);
+    if (u_transform == 1) {
+      theta = phi + 1.5707963 + u_twist + u_angle;
+    } else if (u_transform == 2) {
+      theta = phi + 1.5707963 + u_twist + u_angle;
+    } else if (u_transform == 3) {
+      vec2 z = pos * 1.25;
+      vec2 c = vec2(-0.8, 0.156);
+      for (int i = 0; i < 5; i++) {
+        z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
+      }
+      theta = atan(z.y, z.x) + u_twist + u_angle;
+    } else if (u_transform == 4) {
+      vec2 p1 = pos - vec2(-0.45, 0.0);
+      vec2 p2 = pos - vec2(0.45, 0.0);
+      float d1 = dot(p1, p1) + 0.01;
+      float d2 = dot(p2, p2) + 0.01;
+      vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
+      theta = atan(flow.y, flow.x) + u_twist + u_angle;
+    }
+  }
+  float cosA = cos(theta);
+  float sinA = sin(theta);
   vec4 result = vec4(0.0);
   if (u_topology == 0) {
     for (int y = 0; y < 3; y++) {
@@ -351,6 +378,8 @@ export class TextureNcaRuntime {
       );
       this.rotation = 0;
       this.topology = "square";
+      this.coordinateTransform = "cartesian";
+      this.twist = 0;
       this.restart(seed);
       if (gl.getError() !== gl.NO_ERROR)
         throw new Error("WebGL initialization failed.");
@@ -437,7 +466,15 @@ export class TextureNcaRuntime {
     }
     for (const [key, value] of Object.entries(uniforms)) {
       if (Array.isArray(value)) gl.uniform2i(location(key), value[0], value[1]);
-      else if (["u_palette", "u_topology", "u_mode", "u_shading"].includes(key))
+      else if (
+        [
+          "u_palette",
+          "u_topology",
+          "u_mode",
+          "u_shading",
+          "u_transform",
+        ].includes(key)
+      )
         gl.uniform1i(location(key), value);
       else gl.uniform1f(location(key), value);
     }
@@ -479,12 +516,32 @@ export class TextureNcaRuntime {
     this.steps = 0;
   }
 
-  step(count = 1, { rotation = this.rotation, topology = this.topology } = {}) {
+  step(
+    count = 1,
+    {
+      rotation = this.rotation,
+      topology = this.topology,
+      coordinateTransform = this.coordinateTransform,
+      twist = this.twist,
+    } = {},
+  ) {
     this.assertActive();
     this.rotation = Number(rotation) || 0;
     this.topology = topology === "hexagonal" ? "hexagonal" : "square";
+    this.coordinateTransform = coordinateTransform || "cartesian";
+    this.twist = Number(twist) || 0;
     if (!Number.isInteger(count) || count < 0 || count > 128)
       throw new RangeError("Step count must be between zero and 128.");
+    const transformCode =
+      this.coordinateTransform === "vortex"
+        ? 1
+        : this.coordinateTransform === "spiral"
+          ? 2
+          : this.coordinateTransform === "julia"
+            ? 3
+            : this.coordinateTransform === "dipole"
+              ? 4
+              : 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
         Math.floor(this.layout.random() * this.size),
@@ -498,6 +555,8 @@ export class TextureNcaRuntime {
           u_offset: this.lastOffset,
           u_angle: this.rotation,
           u_topology: this.topology === "hexagonal" ? 1 : 0,
+          u_transform: transformCode,
+          u_twist: this.twist,
         },
       );
       this.run(

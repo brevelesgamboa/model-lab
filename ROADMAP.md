@@ -15,11 +15,16 @@ Development roadmap focusing on expanding Neural Growth into a high-fidelity, in
 
 ## Phase 1: Coordinate Geometries and Vector Fields
 
-Introduce non-Euclidean spatial transformations and orientation fields inspired by the reference research.
+Introduce non-Euclidean spatial transformations and orientation fields inspired by the reference research and mathematical dynamics.
 
-- Log-Polar and Spiral Grids: Conformal logarithmic spiral mapping where patterns swirl outward or inward along exponential spiral rays.
-- Concentric and Vortex Coordinate Fields: Radial coordinate mapping producing centered mandala and eye-like concentric rings.
-- Spatial Orientation Fields: Replace uniform global angle with a 2D orientation texture, enabling swirls, sinks, sources, and saddle vectors.
+- Concentric and Vortex Perception: Radial coordinate mapping producing centered mandala and eye-like concentric rings.
+- Log-Polar Spiral Perception: Conformal logarithmic spiral mapping where patterns swirl outward or inward along exponential spiral rays with continuous spin.
+- Mathematical and Fractal Geometries:
+  - Apollonian Dipole: Two-pole conformal vortex pair creating binary star loops and magnetic flux lines.
+  - Julia Complex Dynamics: Iterated complex polynomial field ($z \leftarrow z^2 + c$) aligning cell perception along self-similar fractal dendrites.
+  - Hyperbolic Saddle: Poincaré quadrupole flow producing orthogonal hyperbolic streamlines and 4-way asymptotic crosses.
+- Interactive Vector Pitch and Twist: Dedicated pitch control with audio and LFO modulation support for live swelling and swirling.
+- Spatial Orientation Fields: Paintable 2D orientation texture enabling custom user-drawn vector flows.
 
 ## Phase 2: Interactive Brush Toolkit
 
