@@ -202,8 +202,6 @@ const growthController = createGrowthController({
     currentModel?.onParameterChange?.(key, value);
     if (key === "audioProfile") {
       applyAudioProfile(value);
-    } else if (key === "beatShockwave") {
-      checkAudioProfileMatch();
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
@@ -233,11 +231,6 @@ const controlsController = createControlsController({
       currentModel.id === "neural-growth"
     ) {
       applyAudioProfile(value);
-    } else if (
-      definition.key === "beatShockwave" &&
-      currentModel.id === "neural-growth"
-    ) {
-      checkAudioProfileMatch();
     }
     // Discard obsolete completion callbacks, without discarding GPU state.
     if (currentModel.onParameterChange?.(definition.key, value)) {
@@ -921,20 +914,13 @@ function applyAudioProfile(profileKey) {
     const route = profile.routes[key] || { source: "none", depth: 0.25 };
     setAudioRoute("neural-growth", key, route);
     const control = controlElements.get(key);
+    control?.syncAudioRoute?.(route);
     const hasAudio = route.source !== "none";
     const lfoActive = Boolean(currentLfoState[key]?.enabled);
     const active = hasAudio || lfoActive;
     control?.modulationToggle?.classList.toggle("is-active", active);
     control?.modulationToggle?.setAttribute("aria-pressed", String(active));
   });
-
-  if (profile.beatShockwave) {
-    currentParameters.beatShockwave = profile.beatShockwave;
-    const shockwaveControl = controlElements.get("beatShockwave");
-    if (shockwaveControl?.select) {
-      shockwaveControl.select.value = profile.beatShockwave;
-    }
-  }
 
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
   invalidateCurrentRun("AUDIO PROFILE APPLIED - SAVE WHEN READY");
@@ -951,8 +937,7 @@ function checkAudioProfileMatch() {
   if (currentModel.id !== "neural-growth") return;
   const currentProfileKey = currentParameters.audioProfile || "off";
   const matrix = audioMatrixForModel("neural-growth");
-  const beatShockwave = currentParameters.beatShockwave || "off";
-  const detected = detectAudioProfile(matrix, beatShockwave);
+  const detected = detectAudioProfile(matrix);
   if (currentProfileKey !== detected) {
     currentParameters.audioProfile = detected;
     modelParameterState.set("neural-growth", deepClone(currentParameters));

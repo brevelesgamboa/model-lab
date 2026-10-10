@@ -790,29 +790,34 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(shockwaveSelect).toBeVisible();
   await expect(shockwaveSelect).toHaveValue("off");
 
-  // Select Rhythm preset: sets routes and beat shockwave to center
+  // Select Rhythm preset: sets reliefStrength route while preserving independent shockwave select
   await audioSelect.selectOption("rhythm");
-  await expect(shockwaveSelect).toHaveValue("center");
-
-  // Check growthSpeed MOD toggle is active
-  const speedModToggle = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
-  await expect(speedModToggle).toHaveClass(/is-active/);
-
-  // Open growthSpeed MOD drawer if not already open
-  const speedSource = page.locator('select[aria-label="GROWTH SPEED audio source"]');
-  if (await speedSource.isHidden()) {
-    await speedModToggle.click();
-  }
-  await expect(speedSource).toBeVisible();
-  await expect(speedSource).toHaveValue("kick");
-
-  // Switch to Ambient preset
-  await audioSelect.selectOption("ambient");
   await expect(shockwaveSelect).toHaveValue("off");
-  await expect(speedSource).toHaveValue("bass");
+
+  // Check reliefStrength MOD toggle is active
+  const reliefModToggle = page.locator('button.modulation-toggle[data-key="reliefStrength"]');
+  await expect(reliefModToggle).toHaveClass(/is-active/);
+
+  // Open reliefStrength MOD drawer if not already open
+  const reliefSource = page.locator('select[aria-label="RELIEF DEPTH audio source"]');
+  if (await reliefSource.isHidden()) {
+    await reliefModToggle.click();
+  }
+  await expect(reliefSource).toBeVisible();
+  await expect(reliefSource).toHaveValue("kick");
+
+  // Changing shockwave mode independently preserves audio preset
+  await shockwaveSelect.selectOption("center");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(audioSelect).toHaveValue("rhythm");
+
+  // Switch to Ambient preset: preserves shockwave selection
+  await audioSelect.selectOption("ambient");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(reliefSource).toHaveValue("bass");
 
   // Tweak audio depth to trigger custom profile detection
-  const depthInput = page.locator('.control-block:has-text("GROWTH SPEED") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  const depthInput = page.locator('.control-block:has-text("RELIEF DEPTH") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
   await depthInput.fill("0.85");
   await depthInput.dispatchEvent("input");
 

@@ -6,41 +6,34 @@ export const AUDIO_PROFILES = Object.freeze({
     id: "off",
     label: "Off · Manual MOD",
     description: "No automatic audio routes. Full manual control via parameter MOD panels.",
-    beatShockwave: "off",
     routes: Object.freeze({}),
   }),
   ambient: Object.freeze({
     id: "ambient",
     label: "Ambient · Sub-Bass Swell",
-    description: "Gentle organic swelling of speed, relief depth, and light with music volume.",
-    beatShockwave: "off",
+    description: "Gentle organic swelling of relief depth and lighting with sub-bass volume.",
     routes: Object.freeze({
-      growthSpeed: Object.freeze({ source: "bass", depth: 0.25 }),
-      reliefStrength: Object.freeze({ source: "bass", depth: 0.2 }),
+      reliefStrength: Object.freeze({ source: "bass", depth: 0.25 }),
       lightAngle: Object.freeze({ source: "bass", depth: 0.15 }),
     }),
   }),
   rhythm: Object.freeze({
     id: "rhythm",
     label: "Rhythm · Beat Drive",
-    description: "Punchy kick-driven speed pops and bass vector twist with center beat shockwaves.",
-    beatShockwave: "center",
+    description: "Punchy kick-driven relief pulses and subtle vector twist.",
     routes: Object.freeze({
-      growthSpeed: Object.freeze({ source: "kick", depth: 0.4 }),
-      twist: Object.freeze({ source: "bass", depth: 0.35 }),
-      reliefStrength: Object.freeze({ source: "kick", depth: 0.3 }),
+      reliefStrength: Object.freeze({ source: "kick", depth: 0.35 }),
+      twist: Object.freeze({ source: "bass", depth: 0.15 }),
     }),
   }),
   dynamic: Object.freeze({
     id: "dynamic",
     label: "Dynamic · High Energy",
-    description: "High-intensity audio reaction across speed, twist, relief, and lighting with interactive beat shockwaves.",
-    beatShockwave: "pointer",
+    description: "High-intensity audio reaction across relief, lighting, and vector twist.",
     routes: Object.freeze({
-      growthSpeed: Object.freeze({ source: "kick", depth: 0.6 }),
-      twist: Object.freeze({ source: "bass", depth: 0.55 }),
-      lightAngle: Object.freeze({ source: "bass", depth: 0.5 }),
       reliefStrength: Object.freeze({ source: "kick", depth: 0.45 }),
+      lightAngle: Object.freeze({ source: "bass", depth: 0.3 }),
+      twist: Object.freeze({ source: "bass", depth: 0.2 }),
     }),
   }),
 });
@@ -54,10 +47,9 @@ const MODULATION_PARAMS = Object.freeze([
   "reliefStrength",
 ]);
 
-export function matchesAudioProfile(profileId, matrix = {}, beatShockwave = "off") {
+export function matchesAudioProfile(profileId, matrix = {}) {
   const profile = AUDIO_PROFILES[profileId];
   if (!profile) return false;
-  if (profile.beatShockwave !== beatShockwave) return false;
 
   for (const param of MODULATION_PARAMS) {
     const route = matrix[param] || { source: "none", depth: 0.25 };
@@ -78,9 +70,9 @@ export function matchesAudioProfile(profileId, matrix = {}, beatShockwave = "off
   return true;
 }
 
-export function detectAudioProfile(matrix = {}, beatShockwave = "off") {
+export function detectAudioProfile(matrix = {}) {
   for (const key of AUDIO_PROFILE_KEYS) {
-    if (matchesAudioProfile(key, matrix, beatShockwave)) {
+    if (matchesAudioProfile(key, matrix)) {
       return key;
     }
   }

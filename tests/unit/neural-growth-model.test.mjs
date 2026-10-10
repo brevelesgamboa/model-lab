@@ -13,7 +13,6 @@ import {
   validateModelDefinition,
 } from "../../assets/js/core/model-contract.js";
 import {
-  AUDIO_PROFILES,
   detectAudioProfile,
 } from "../../assets/js/models/neural-growth/audio-profiles.js";
 
@@ -515,9 +514,13 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["off", "ambient", "rhythm", "dynamic", "custom"],
   );
 
-  assert.equal(AUDIO_PROFILES.rhythm.beatShockwave, "center");
-  assert.equal(AUDIO_PROFILES.dynamic.beatShockwave, "pointer");
-  assert.equal(AUDIO_PROFILES.ambient.beatShockwave, "off");
+  const reachControl = model.controls.find((c) => c.key === "shockwaveReach");
+  assert.ok(reachControl);
+  assert.equal(reachControl.default, "brush");
+  assert.deepEqual(
+    reachControl.options.map((o) => o.value),
+    ["brush", "canvas"],
+  );
 
   const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
   assert.ok(shockwaveControl);
@@ -527,61 +530,41 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["off", "center", "pointer"],
   );
 
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "rhythm"), {
-    beatShockwave: "center",
-  });
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "dynamic"), {
-    beatShockwave: "pointer",
-  });
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "ambient"), {
-    beatShockwave: "off",
-  });
-  assert.deepEqual(model.parameterDefaultsForChange("audioProfile", "off"), {
-    beatShockwave: "off",
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "rhythm"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "ambient"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "off"), null);
+  assert.deepEqual(model.parameterDefaultsForChange("beatShockwave", "pointer"), {
+    disturbanceMode: "shockwave",
   });
 
-  assert.equal(detectAudioProfile({}, "off"), "off");
+  assert.equal(detectAudioProfile({}), "off");
   assert.equal(
-    detectAudioProfile(
-      {
-        growthSpeed: { source: "bass", depth: 0.25 },
-        reliefStrength: { source: "bass", depth: 0.2 },
-        lightAngle: { source: "bass", depth: 0.15 },
-      },
-      "off",
-    ),
+    detectAudioProfile({
+      reliefStrength: { source: "bass", depth: 0.25 },
+      lightAngle: { source: "bass", depth: 0.15 },
+    }),
     "ambient",
   );
   assert.equal(
-    detectAudioProfile(
-      {
-        growthSpeed: { source: "kick", depth: 0.4 },
-        twist: { source: "bass", depth: 0.35 },
-        reliefStrength: { source: "kick", depth: 0.3 },
-      },
-      "center",
-    ),
+    detectAudioProfile({
+      reliefStrength: { source: "kick", depth: 0.35 },
+      twist: { source: "bass", depth: 0.15 },
+    }),
     "rhythm",
   );
   assert.equal(
-    detectAudioProfile(
-      {
-        growthSpeed: { source: "kick", depth: 0.6 },
-        twist: { source: "bass", depth: 0.55 },
-        lightAngle: { source: "bass", depth: 0.5 },
-        reliefStrength: { source: "kick", depth: 0.45 },
-      },
-      "pointer",
-    ),
+    detectAudioProfile({
+      reliefStrength: { source: "kick", depth: 0.45 },
+      lightAngle: { source: "bass", depth: 0.3 },
+      twist: { source: "bass", depth: 0.2 },
+    }),
     "dynamic",
   );
   assert.equal(
-    detectAudioProfile(
-      {
-        growthSpeed: { source: "kick", depth: 0.8 },
-      },
-      "center",
-    ),
+    detectAudioProfile({
+      reliefStrength: { source: "kick", depth: 0.8 },
+    }),
     "custom",
   );
 

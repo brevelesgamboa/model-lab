@@ -451,6 +451,9 @@ export function createGrowthController({
       try {
         await render({ forceAnalysis: true });
       } catch (_) {}
+      if (model.hasActiveRipples) {
+        schedulePausedRender();
+      }
     });
   }
 
@@ -473,6 +476,8 @@ export function createGrowthController({
     };
   }
 
+  let lastPointerRippleTime = 0;
+
   function handlePointerDown(event) {
     const model = activeModel();
     if (!model?.ready || event.button !== 0) return;
@@ -483,9 +488,13 @@ export function createGrowthController({
     const coords = getGridCoords(event, model);
     if (!coords) return;
     lastCoord = coords;
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     model.queueDisturbance(coords.gx, coords.gy, radius, mode);
+    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+      lastPointerRippleTime = performance.now();
+      model.triggerRipple(coords.gx, coords.gy, radius);
+    }
     if (!model.isClockRunning) {
       schedulePausedRender();
     }
@@ -496,12 +505,19 @@ export function createGrowthController({
     if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1) return;
     const coords = getGridCoords(event, model);
     if (!coords) return;
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     if (lastCoord) {
       model.queueDisturbanceStroke(lastCoord.gx, lastCoord.gy, coords.gx, coords.gy, radius, mode);
     } else {
       model.queueDisturbance(coords.gx, coords.gy, radius, mode);
+    }
+    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+      const now = performance.now();
+      if (now - lastPointerRippleTime >= 90) {
+        lastPointerRippleTime = now;
+        model.triggerRipple(coords.gx, coords.gy, radius);
+      }
     }
     lastCoord = coords;
     if (!model.isClockRunning) {
@@ -730,7 +746,7 @@ export function createGrowthController({
     const model = activeModel();
     if (!model?.ready || !levels) return;
     const mode = model.parameters?.beatShockwave || "off";
-    if (mode === "off") return;
+    if (mode !== "center") return;
     if (!levels.hasSignal) return;
 
     const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
@@ -741,11 +757,7 @@ export function createGrowthController({
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
-      const coords =
-        mode === "pointer" && lastCoord
-          ? { x: lastCoord.gx, y: lastCoord.gy }
-          : null;
-      model.triggerBeatShockwave(mode, coords);
+      model.triggerBeatShockwave("center");
       if (!model.isClockRunning) {
         schedulePausedRender();
       }

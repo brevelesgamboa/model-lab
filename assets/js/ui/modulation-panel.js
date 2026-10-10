@@ -206,6 +206,15 @@ export function makeModulationPanel({
   audioControls.append(audioSourceField, audioDepthField);
   syncAudioAvailability();
 
+  const syncAudioRoute = (nextRoute) => {
+    if (!nextRoute) return;
+    audioRoute = { ...audioRoute, ...nextRoute };
+    audioSource.value = audioRoute.source;
+    audioDepth.value = String(audioRoute.depth);
+    audioDepthNumber.value = String(audioRoute.depth);
+    syncAudioAvailability();
+  };
+
   panel.append(header, lfoControls, audioControls, visualizerWrap);
-  return { panel, visualizer };
+  return { panel, visualizer, syncAudioRoute };
 }

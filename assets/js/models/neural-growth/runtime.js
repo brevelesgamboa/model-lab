@@ -274,21 +274,7 @@ void main() {
         out_color = current;
       }
     } else if (u_mode == 3) {
-      float normDist = dist / max(u_radius, 1.0);
-      float envelope = smoothstep(0.0, 0.18, normDist) * (1.0 - smoothstep(0.75, 1.0, normDist));
-      float wave = sin(normDist * 3.14159265 * 3.0) * envelope;
-      vec2 dir = dist > 0.5 ? delta / dist : vec2(0.0);
-      float displacement = wave * min(u_radius * 0.22, 10.0);
-      ivec2 sampleXY = wrapCell(xy - ivec2(round(dir * displacement)));
-      ivec2 sampleP = ivec2(sampleXY.x + group * u_size, sampleXY.y);
-      vec4 sampled = texelFetch(u_state, sampleP, 0);
-      if (group == 0) {
-        vec4 decoded = decodeState(sampled);
-        decoded.rgb += wave * 0.4;
-        out_color = encodeState(decoded);
-      } else {
-        out_color = sampled;
-      }
+      out_color = texelFetch(u_state, p, 0);
     } else {
       out_color = vec4(127.0 / 255.0);
     }
@@ -305,6 +291,44 @@ uniform int u_shading;
 uniform float u_relief;
 uniform float u_lightAngle;
 uniform int u_showBarrier;
+uniform int u_rippleCount;
+uniform vec4 u_ripple0;
+uniform vec4 u_ripple1;
+uniform vec4 u_ripple2;
+uniform vec4 u_ripple3;
+uniform vec4 u_rippleAmps;
+
+vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude) {
+  if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return vec2(0.0);
+  vec2 origin = rippleData.xy;
+  float progress = rippleData.z;
+  float maxRadius = rippleData.w;
+  vec2 delta = pos - origin;
+  float dist = length(delta);
+  float currentRadius = progress * maxRadius;
+  float diff = dist - currentRadius;
+  float waveWidth = max(8.0, maxRadius * 0.12);
+  float spatialEnv = exp(-(diff * diff) / (2.0 * waveWidth * waveWidth));
+  float timeFade = 1.0 - progress;
+  timeFade = timeFade * timeFade;
+  float wave = sin(diff * (3.14159265 / waveWidth)) * spatialEnv * timeFade * amplitude;
+  vec2 dir = dist > 0.5 ? delta / dist : vec2(0.0);
+  return dir * wave;
+}
+
+vec4 sampleStateBilinear(vec2 pos) {
+  vec2 clampedPos = clamp(pos, vec2(0.0), vec2(float(u_size - 1)));
+  ivec2 i0 = ivec2(floor(clampedPos));
+  ivec2 i1 = clamp(i0 + ivec2(1, 1), ivec2(0), ivec2(u_size - 1));
+  vec2 f = fract(clampedPos);
+  vec4 s00 = decodeState(texelFetch(u_state, ivec2(i0.x, i0.y), 0));
+  vec4 s10 = decodeState(texelFetch(u_state, ivec2(i1.x, i0.y), 0));
+  vec4 s01 = decodeState(texelFetch(u_state, ivec2(i0.x, i1.y), 0));
+  vec4 s11 = decodeState(texelFetch(u_state, ivec2(i1.x, i1.y), 0));
+  vec4 sTop = mix(s00, s10, f.x);
+  vec4 sBot = mix(s01, s11, f.x);
+  return mix(sTop, sBot, f.y);
+}
 
 float cellLuminance(ivec2 p) {
   vec3 c = decodeState(texelFetch(u_state, p, 0)).rgb / 2.0 + 0.5;
@@ -313,7 +337,30 @@ float cellLuminance(ivec2 p) {
 
 void main() {
   ivec2 xy = ivec2(gl_FragCoord.xy);
-  vec3 rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
+  vec2 pos = vec2(xy);
+  vec2 disp = vec2(0.0);
+  if (u_rippleCount > 0) {
+    disp += computeRippleDisplacement(pos, u_ripple0, u_rippleAmps.x);
+  }
+  if (u_rippleCount > 1) {
+    disp += computeRippleDisplacement(pos, u_ripple1, u_rippleAmps.y);
+  }
+  if (u_rippleCount > 2) {
+    disp += computeRippleDisplacement(pos, u_ripple2, u_rippleAmps.z);
+  }
+  if (u_rippleCount > 3) {
+    disp += computeRippleDisplacement(pos, u_ripple3, u_rippleAmps.w);
+  }
+  float dispLen = length(disp);
+  if (dispLen > 1.8) {
+    disp = (disp / dispLen) * 1.8;
+  }
+  vec3 rawRgb;
+  if (dispLen > 0.001) {
+    rawRgb = sampleStateBilinear(pos - disp).rgb / 2.0 + 0.5;
+  } else {
+    rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
+  }
 
   // Soft highlight compression: smoothly rolls off intense highlights above 0.5
   // so bright metallic models retain texture and gradients without clipping to white.
@@ -584,7 +631,9 @@ export class TextureNcaRuntime {
     }
     for (const [key, value] of Object.entries(uniforms)) {
       if (Array.isArray(value)) {
-        if (value.length === 3)
+        if (value.length === 4)
+          gl.uniform4f(location(key), value[0], value[1], value[2], value[3]);
+        else if (value.length === 3)
           gl.uniform3f(location(key), value[0], value[1], value[2]);
         else gl.uniform2i(location(key), value[0], value[1]);
       }
@@ -599,6 +648,7 @@ export class TextureNcaRuntime {
           "u_orientMode",
           "u_showBarrier",
           "u_lockBarrier",
+          "u_rippleCount",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -852,6 +902,7 @@ export class TextureNcaRuntime {
       lightAngle = 45,
       displayFilter = "smooth",
       showBarrier = false,
+      ripples = [],
     } = options;
 
     if (!["native", "spectral"].includes(palette))
@@ -864,6 +915,27 @@ export class TextureNcaRuntime {
     const lightAngleRad = (Number(lightAngle || 0) * Math.PI) / 180;
     const reliefVal = Math.max(0, Math.min(5, Number(reliefStrength) || 0));
 
+    const activeRipples = Array.isArray(ripples) ? ripples.slice(0, 4) : [];
+    const rippleCount = activeRipples.length;
+    const now = performance.now();
+    const rippleUniforms = {
+      u_rippleCount: rippleCount,
+      u_ripple0: [0, 0, 0, 0],
+      u_ripple1: [0, 0, 0, 0],
+      u_ripple2: [0, 0, 0, 0],
+      u_ripple3: [0, 0, 0, 0],
+      u_rippleAmps: [0, 0, 0, 0],
+    };
+    for (let i = 0; i < rippleCount; i += 1) {
+      const r = activeRipples[i];
+      const progress = Math.max(
+        0,
+        Math.min(1, (now - r.startTime) / (r.duration * 1000)),
+      );
+      rippleUniforms[`u_ripple${i}`] = [r.x, r.y, progress, r.radius];
+      rippleUniforms.u_rippleAmps[i] = r.amplitude || 1.2;
+    }
+
     this.run(
       "visualize",
       null,
@@ -874,6 +946,7 @@ export class TextureNcaRuntime {
         u_relief: reliefVal,
         u_lightAngle: lightAngleRad,
         u_showBarrier: showBarrier ? 1 : 0,
+        ...rippleUniforms,
       },
     );
 

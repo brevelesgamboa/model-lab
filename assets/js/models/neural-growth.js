@@ -160,10 +160,21 @@ export class NeuralGrowthModel {
         default: "off",
         options: [
           { value: "off", label: "Off" },
-          { value: "center", label: "Center · Radial Kick Pulse" },
-          { value: "pointer", label: "Pointer · Interactive Focus" },
+          { value: "center", label: "Center · Audio" },
+          { value: "pointer", label: "Pointer · Draw" },
         ],
-        help: "Triggers radial ripple disturbances on detected audio kicks. Bursts originate from grid center or recent brush pointer.",
+        help: "Shockwave ripple mode: audio kick-triggered at center, or drawing-triggered at pointer.",
+      },
+      {
+        key: "shockwaveReach",
+        label: "SHOCKWAVE REACH",
+        type: "select",
+        default: "brush",
+        options: [
+          { value: "brush", label: "Follow Brush" },
+          { value: "canvas", label: "Whole Canvas" },
+        ],
+        help: "Shockwave coverage range: follow current brush radius or expand across the entire canvas.",
       },
       {
         key: "brushRadius",
@@ -339,13 +350,22 @@ export class NeuralGrowthModel {
   getStats() {
     return this._runtime?.getStats() || null;
   }
+  get hasActiveRipples() {
+    if (!this._activeRipples || this._activeRipples.length === 0) return false;
+    const now = performance.now();
+    this._activeRipples = this._activeRipples.filter(
+      (r) => now - r.startTime < r.duration * 1000,
+    );
+    return this._activeRipples.length > 0;
+  }
+
   isDynamic(parameters) {
     return (
       !this.lastError &&
       !this._loadingPattern &&
       !this._disposed &&
-      this._clockRunning &&
-      Number(parameters.growthSpeed) > 0
+      ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
+        this.hasActiveRipples)
     );
   }
 
@@ -391,11 +411,8 @@ export class NeuralGrowthModel {
         return { twist: 0 };
       }
     }
-    if (key === "audioProfile") {
-      const profile = AUDIO_PROFILES[value];
-      if (profile && profile.beatShockwave) {
-        return { beatShockwave: profile.beatShockwave };
-      }
+    if (key === "beatShockwave" && value === "pointer") {
+      return { disturbanceMode: "shockwave" };
     }
     return null;
   }
@@ -408,7 +425,8 @@ export class NeuralGrowthModel {
       key === "coordinateTransform" ||
       key === "barrierLock" ||
       key === "audioProfile" ||
-      key === "beatShockwave"
+      key === "beatShockwave" ||
+      key === "shockwaveReach"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
@@ -515,10 +533,7 @@ export class NeuralGrowthModel {
         this._lastTick = null;
         this._accumulator = 0;
       }
-      if (
-        this._parameters.growthSpeed !== parameters.growthSpeed ||
-        this._parameters.simulationSize !== parameters.simulationSize
-      ) {
+      if (this._parameters.simulationSize !== parameters.simulationSize) {
         this._lastTick = null;
         this._accumulator = 0;
       }
@@ -560,6 +575,12 @@ export class NeuralGrowthModel {
         (outlineMode === "auto" &&
           (parameters.disturbanceMode === "freeze" ||
             parameters.disturbanceMode === "thaw"));
+      if (this._activeRipples?.length) {
+        const now = performance.now();
+        this._activeRipples = this._activeRipples.filter(
+          (r) => now - r.startTime < r.duration * 1000,
+        );
+      }
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         zoom: parameters.zoom,
@@ -568,6 +589,7 @@ export class NeuralGrowthModel {
         lightAngle: parameters.lightAngle,
         displayFilter: parameters.displayFilter,
         showBarrier,
+        ripples: this._activeRipples || [],
       });
       return this._result();
     } catch (error) {
@@ -661,6 +683,9 @@ export class NeuralGrowthModel {
       1,
       Math.min(Math.floor(size / 2), Math.round(radius)),
     );
+    if (mode === "shockwave") {
+      this.triggerRipple(clampedX, clampedY, clampedRadius);
+    }
     if (this._queuedDisturbances.length >= 64) {
       this._queuedDisturbances.shift();
     }
@@ -737,6 +762,49 @@ export class NeuralGrowthModel {
     if (this.ready) {
       this._runRuntime(() => this._runtime?.clearBarrier());
     }
+  }
+
+  triggerRipple(x, y, customRadius = null, maxAmplitude = null) {
+    if (!this.ready) return false;
+    const size = this.simulationSize;
+    const originX = Math.max(
+      0,
+      Math.min(size - 1, Math.round(Number(x) || Math.floor(size / 2))),
+    );
+    const originY = Math.max(
+      0,
+      Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
+    );
+    const reach = this._parameters?.shockwaveReach || "brush";
+    let radius = 16;
+    if (reach === "canvas") {
+      const d1 = Math.hypot(originX, originY);
+      const d2 = Math.hypot(size - originX, originY);
+      const d3 = Math.hypot(originX, size - originY);
+      const d4 = Math.hypot(size - originX, size - originY);
+      radius = Math.ceil(Math.max(d1, d2, d3, d4));
+    } else {
+      const chosen =
+        Number(customRadius || this._parameters?.brushRadius) || 16;
+      radius = Math.max(8, Math.min(96, Math.round(chosen)));
+    }
+    const amp =
+      Number(maxAmplitude) ||
+      Math.min(1.5, Math.max(0.8, radius * 0.015));
+    const ripple = {
+      x: originX,
+      y: originY,
+      radius,
+      amplitude: amp,
+      startTime: performance.now(),
+      duration: 0.55,
+    };
+    if (!this._activeRipples) this._activeRipples = [];
+    this._activeRipples.push(ripple);
+    if (this._activeRipples.length > 4) {
+      this._activeRipples.shift();
+    }
+    return true;
   }
 
   triggerBeatShockwave(
