@@ -567,6 +567,21 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
   assert.equal(kickInputControl, undefined);
 
+  const channelControl = model.controls.find((c) => c.key === "channelView");
+  assert.ok(channelControl);
+  assert.equal(channelControl.default, "phenotype");
+  assert.deepEqual(
+    channelControl.options.map((o) => o.value),
+    [
+      "phenotype",
+      "vitality",
+      "fast_signals",
+      "memory_waves",
+      "energy_heat",
+      "xray",
+    ],
+  );
+
   assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
@@ -580,6 +595,8 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   assert.equal(model.normalizeStoredParameter("audioProfile", "rhythm"), "custom");
   assert.equal(model.normalizeStoredParameter("audioProfile", "subtle"), "subtle");
   assert.equal(model.normalizeStoredParameter("audioProfile", "continuous"), "continuous");
+  assert.equal(model.normalizeStoredParameter("channelView", "invalid"), "phenotype");
+  assert.equal(model.normalizeStoredParameter("channelView", "fast_signals"), "fast_signals");
 
   assert.equal(detectAudioProfile({}), "off");
 
@@ -768,6 +785,11 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
 
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
   assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
+  assert.equal(runtimes[0].lastDrawOptions.channelView, "phenotype");
+
+  model.onParameterChange("channelView", "fast_signals");
+  await model.render(canvas, model.parameters, 0.2, { advanceSimulation: true });
+  assert.equal(runtimes[0].lastDrawOptions.channelView, "fast_signals");
 
   // Kick input: active when impact is color
   model.onParameterChange("shockwaveImpact", "color");

@@ -304,6 +304,21 @@ export class NeuralGrowthModel {
         help: "Display mapping only; does not alter the learned state or update rule.",
       },
       {
+        key: "channelView",
+        label: "CHANNEL INSPECTOR",
+        type: "select",
+        default: "phenotype",
+        options: [
+          { value: "phenotype", label: "Phenotype · Native RGB" },
+          { value: "vitality", label: "Vitality · Cell Mask (α)" },
+          { value: "fast_signals", label: "Hidden 1 · Fast Signals (Ch 4-6)" },
+          { value: "memory_waves", label: "Hidden 2 · Memory Waves (Ch 8-10)" },
+          { value: "energy_heat", label: "Energy · Metabolic Heatmap" },
+          { value: "xray", label: "Neural X-Ray · Phenotype + Glow" },
+        ],
+        help: "Inspects hidden biochemical and electrical memory channels operating beneath the living pattern.",
+      },
+      {
         key: "shading",
         label: "3D SHADING",
         type: "select",
@@ -459,6 +474,19 @@ export class NeuralGrowthModel {
         return "color";
       }
     }
+    if (key === "channelView") {
+      const valid = [
+        "phenotype",
+        "vitality",
+        "fast_signals",
+        "memory_waves",
+        "energy_heat",
+        "xray",
+      ];
+      if (!valid.includes(value)) {
+        return "phenotype";
+      }
+    }
     return value;
   }
 
@@ -473,7 +501,8 @@ export class NeuralGrowthModel {
       key === "beatShockwave" ||
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
-      key === "shockwaveImpact"
+      key === "shockwaveImpact" ||
+      key === "channelView"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
@@ -566,6 +595,7 @@ export class NeuralGrowthModel {
           reliefStrength: parameters.reliefStrength,
           lightAngle: parameters.lightAngle,
           displayFilter: parameters.displayFilter,
+          channelView: parameters.channelView,
         });
         this._runtime?.dispose();
         this._runtime = candidate;
@@ -639,6 +669,7 @@ export class NeuralGrowthModel {
         ripples: this._activeRipples || [],
         shockwaveStyle: parameters.shockwaveStyle,
         dyeColor: parameters.dyeColor,
+        channelView: parameters.channelView,
       });
       return this._result();
     } catch (error) {
@@ -995,6 +1026,7 @@ export class NeuralGrowthModel {
         ripples: [],
         shockwaveStyle: this._parameters.shockwaveStyle,
         dyeColor: this._parameters.dyeColor,
+        channelView: this._parameters.channelView,
       }),
     );
   }

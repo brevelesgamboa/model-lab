@@ -872,5 +872,38 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(page.locator(".run-card")).toHaveCount(1);
 });
 
+test("channel inspector exposes hidden channel modes and preserves simulation state", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  const channelSelect = page.getByLabel("CHANNEL INSPECTOR", { exact: true });
+  await expect(channelSelect).toBeVisible();
+  await expect(channelSelect).toHaveValue("phenotype");
+
+  // Step simulation once
+  await page.locator("#step-growth").click();
+
+  // Switch to Vitality
+  await channelSelect.selectOption("vitality");
+  await expect(channelSelect).toHaveValue("vitality");
+
+  // Switch to Fast Signals
+  await channelSelect.selectOption("fast_signals");
+  await expect(channelSelect).toHaveValue("fast_signals");
+
+  // Switch to Energy Heatmap
+  await channelSelect.selectOption("energy_heat");
+  await expect(channelSelect).toHaveValue("energy_heat");
+
+  // Switch to Neural X-Ray
+  await channelSelect.selectOption("xray");
+  await expect(channelSelect).toHaveValue("xray");
+
+  // Return to phenotype
+  await channelSelect.selectOption("phenotype");
+  await expect(channelSelect).toHaveValue("phenotype");
+});
+
 
 

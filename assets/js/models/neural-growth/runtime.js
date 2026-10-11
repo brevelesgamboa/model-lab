@@ -371,6 +371,7 @@ uniform vec4 u_ripple1;
 uniform vec4 u_ripple2;
 uniform vec4 u_ripple3;
 uniform vec4 u_rippleAmps;
+uniform int u_channelView;
 
 vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int style) {
   if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return vec2(0.0);
@@ -408,21 +409,39 @@ float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
   return spatialEnv * timeFade * timeFade * amplitude;
 }
 
-vec4 sampleStateBilinear(vec2 pos) {
+vec4 sampleGroupBilinear(vec2 pos, int groupIdx) {
   vec2 clampedPos = clamp(pos, vec2(0.0), vec2(float(u_size - 1)));
   ivec2 i0 = ivec2(floor(clampedPos));
   ivec2 i1 = clamp(i0 + ivec2(1, 1), ivec2(0), ivec2(u_size - 1));
   vec2 f = fract(clampedPos);
-  vec4 s00 = decodeState(texelFetch(u_state, ivec2(i0.x, i0.y), 0));
-  vec4 s10 = decodeState(texelFetch(u_state, ivec2(i1.x, i0.y), 0));
-  vec4 s01 = decodeState(texelFetch(u_state, ivec2(i0.x, i1.y), 0));
-  vec4 s11 = decodeState(texelFetch(u_state, ivec2(i1.x, i1.y), 0));
+  int xOff = groupIdx * u_size;
+  vec4 s00 = decodeState(texelFetch(u_state, ivec2(i0.x + xOff, i0.y), 0));
+  vec4 s10 = decodeState(texelFetch(u_state, ivec2(i1.x + xOff, i0.y), 0));
+  vec4 s01 = decodeState(texelFetch(u_state, ivec2(i0.x + xOff, i1.y), 0));
+  vec4 s11 = decodeState(texelFetch(u_state, ivec2(i1.x + xOff, i1.y), 0));
   vec4 sTop = mix(s00, s10, f.x);
   vec4 sBot = mix(s01, s11, f.x);
   return mix(sTop, sBot, f.y);
 }
 
+vec4 sampleStateBilinear(vec2 pos) {
+  return sampleGroupBilinear(pos, 0);
+}
+
 float cellLuminance(ivec2 p) {
+  if (u_channelView == 1) {
+    return clamp(decodeState(texelFetch(u_state, p, 0)).a * 0.5 + 0.5, 0.0, 1.0);
+  } else if (u_channelView == 2) {
+    vec3 c = decodeState(texelFetch(u_state, ivec2(p.x + u_size, p.y), 0)).rgb * 0.5 + 0.5;
+    return dot(clamp(c, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+  } else if (u_channelView == 3) {
+    vec3 c = decodeState(texelFetch(u_state, ivec2(p.x + 2 * u_size, p.y), 0)).rgb * 0.5 + 0.5;
+    return dot(clamp(c, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+  } else if (u_channelView >= 4) {
+    vec4 g1 = decodeState(texelFetch(u_state, ivec2(p.x + u_size, p.y), 0));
+    vec4 g2 = decodeState(texelFetch(u_state, ivec2(p.x + 2 * u_size, p.y), 0));
+    return clamp((length(g1) + length(g2)) * 0.22, 0.0, 1.0);
+  }
   vec3 c = decodeState(texelFetch(u_state, p, 0)).rgb / 2.0 + 0.5;
   return dot(c, vec3(0.299, 0.587, 0.114));
 }
@@ -453,17 +472,51 @@ void main() {
     disp = (disp / dispLen) * 1.8;
   }
   vec3 rawRgb;
-  if (dispLen > 0.001) {
-    if (u_rippleStyle == 1) {
-      float r = sampleStateBilinear(pos - disp * 1.35).r / 2.0 + 0.5;
-      float g = sampleStateBilinear(pos - disp * 1.00).g / 2.0 + 0.5;
-      float b = sampleStateBilinear(pos - disp * 0.65).b / 2.0 + 0.5;
-      rawRgb = vec3(r, g, b);
+  if (u_channelView == 0) {
+    if (dispLen > 0.001) {
+      if (u_rippleStyle == 1) {
+        float r = sampleStateBilinear(pos - disp * 1.35).r / 2.0 + 0.5;
+        float g = sampleStateBilinear(pos - disp * 1.00).g / 2.0 + 0.5;
+        float b = sampleStateBilinear(pos - disp * 0.65).b / 2.0 + 0.5;
+        rawRgb = vec3(r, g, b);
+      } else {
+        rawRgb = sampleStateBilinear(pos - disp).rgb / 2.0 + 0.5;
+      }
     } else {
-      rawRgb = sampleStateBilinear(pos - disp).rgb / 2.0 + 0.5;
+      rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
     }
+  } else if (u_channelView == 1) {
+    vec4 g0 = dispLen > 0.001 ? sampleStateBilinear(pos - disp) : decodeState(texelFetch(u_state, xy, 0));
+    float alpha = clamp(g0.a * 0.5 + 0.5, 0.0, 1.0);
+    rawRgb = vec3(alpha);
+  } else if (u_channelView == 2) {
+    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
+    rawRgb = clamp(g1.rgb * 0.5 + 0.5, 0.0, 1.0);
+  } else if (u_channelView == 3) {
+    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
+    rawRgb = clamp(g2.rgb * 0.5 + 0.5, 0.0, 1.0);
+  } else if (u_channelView == 4) {
+    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
+    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
+    float eVal = length(g1) + length(g2);
+    float normE = clamp(eVal * 0.22, 0.0, 1.0);
+    vec3 heatColor;
+    if (normE < 0.35) {
+      heatColor = mix(vec3(0.02, 0.04, 0.18), vec3(0.0, 0.92, 1.0), normE / 0.35);
+    } else if (normE < 0.70) {
+      heatColor = mix(vec3(0.0, 0.92, 1.0), vec3(1.0, 0.72, 0.0), (normE - 0.35) / 0.35);
+    } else {
+      heatColor = mix(vec3(1.0, 0.72, 0.0), vec3(1.0, 0.15, 0.75), (normE - 0.70) / 0.30);
+    }
+    rawRgb = heatColor;
   } else {
-    rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
+    vec3 baseRgb = (dispLen > 0.001 ? sampleStateBilinear(pos - disp) : decodeState(texelFetch(u_state, xy, 0))).rgb / 2.0 + 0.5;
+    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
+    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
+    float eVal = length(g1) + length(g2);
+    float glow = clamp(eVal * 0.20, 0.0, 1.0);
+    vec3 neuralGlow = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.0, 0.7), glow) * glow * 0.85;
+    rawRgb = clamp(baseRgb * 0.65 + neuralGlow, 0.0, 1.0);
   }
 
   // Soft highlight compression: smoothly rolls off intense highlights above 0.5
@@ -477,7 +530,7 @@ void main() {
 
   float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
 
-  if (u_palette == 1) {
+  if (u_palette == 1 && u_channelView == 0) {
     vec3 spectrum = 0.5 + 0.5 * cos(6.283185307 * (vec3(0.0, 0.33, 0.67) + lum * 0.85));
     rgb = spectrum * (0.35 + lum * 0.65);
   }
@@ -758,6 +811,7 @@ export class TextureNcaRuntime {
           "u_lockBarrier",
           "u_rippleCount",
           "u_rippleStyle",
+          "u_channelView",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -1044,6 +1098,7 @@ export class TextureNcaRuntime {
       ripples = [],
       shockwaveStyle = "refract",
       dyeColor = "#00f0ff",
+      channelView = "phenotype",
     } = options;
 
     if (!["native", "spectral"].includes(palette))
@@ -1055,6 +1110,16 @@ export class TextureNcaRuntime {
     const shadingMode = shadingModes[shading] ?? 1;
     const lightAngleRad = (Number(lightAngle || 0) * Math.PI) / 180;
     const reliefVal = Math.max(0, Math.min(5, Number(reliefStrength) || 0));
+
+    const channelViewModes = {
+      phenotype: 0,
+      vitality: 1,
+      fast_signals: 2,
+      memory_waves: 3,
+      energy_heat: 4,
+      xray: 5,
+    };
+    const channelViewCode = channelViewModes[channelView] ?? 0;
 
     const rippleStyles = { refract: 0, chromatic: 1, glow: 2, harmonic: 3 };
     const rippleStyleCode = rippleStyles[shockwaveStyle] ?? 0;
@@ -1103,6 +1168,7 @@ export class TextureNcaRuntime {
         u_showBarrier: showBarrier ? 1 : 0,
         u_rippleStyle: rippleStyleCode,
         u_rippleTint: rippleTint,
+        u_channelView: channelViewCode,
         ...rippleUniforms,
       },
     );
