@@ -28,9 +28,10 @@ Development roadmap focusing on expanding Neural Growth into a high-fidelity, in
 
 Transform Neural Growth into an expressive audio-reactive performance visualizer.
 
-- Beat-Synced Shockwaves: Trigger radial disturbance pulses timed to detected audio kicks and transients (center pulse or pointer-focused).
-- Audio-Reactive Modulation Profiles: High-level presets (Breathe, Groove, Surge) that automatically configure modulation routes for speed, vector twist, relief depth, and 3D lighting without manual routing bloat.
+- Beat-Synced Shockwaves: Trigger non-destructive radial display ripples timed to detected audio kicks or interactive pointer drawing, with independent reach modes (Follow Brush, Whole Canvas default).
+- Audio-Reactive Modulation Presets: Built-in presets (Subtle, Continuous, Dynamic) configuring speed, vector twist, relief depth, and 3D lighting routes, featuring dynamic audio activity energy scaling and instant synchronization.
 - Full Custom Modulation Parity: Any preset configuration maps directly to Latent Field's parameter MOD panels, giving users full visibility and freedom to fine-tune depths, with automatic fallback to Custom mode when edited.
+- Shockwave Stylization and Color: Configurable shockwave styles including chromatic aberration dispersion, luminous color glow rings matching active brush pigment, and harmonic multi-ring resonance wavefronts.
 - Saved Run Enablement: Full experiment saving and archive restoration for Neural Growth configurations (pattern checkpoint, seed, parameters, modulation matrix, and thumbnail).
 
 ## Phase 4: Extended Visual Fidelity
