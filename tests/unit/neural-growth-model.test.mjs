@@ -12,6 +12,9 @@ import {
   defaultParameters,
   validateModelDefinition,
 } from "../../assets/js/core/model-contract.js";
+import {
+  detectAudioProfile,
+} from "../../assets/js/models/neural-growth/audio-profiles.js";
 
 const checkpoint = JSON.parse(
   await readFile(
@@ -20,7 +23,7 @@ const checkpoint = JSON.parse(
   ),
 );
 
-function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
+function setup(context, { load = async () => checkpoint, failSize = 0, initialSize = 128 } = {}) {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: () => ({ width: 0, height: 0 }) };
   context.after(() => {
@@ -39,11 +42,13 @@ function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
         draws: 0,
         disturbances: [],
         disposed: false,
-        step(count) {
+        step(count, options) {
           this.steps += count;
+          this.lastStepOptions = options;
         },
-        draw(canvas) {
+        draw(canvas, options) {
           this.draws += 1;
+          this.lastDrawOptions = options;
           canvas.paintedBy = this;
         },
         restart(value) {
@@ -53,6 +58,9 @@ function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
         },
         disturb(...values) {
           this.disturbances.push(values);
+        },
+        clearBarrier() {
+          this.barrierCleared = true;
         },
         dispose() {
           this.disposed = true;
@@ -70,7 +78,7 @@ function setup(context, { load = async () => checkpoint, failSize = 0 } = {}) {
       return runtime;
     },
   });
-  const params = defaultParameters(model);
+  const params = { ...defaultParameters(model), simulationSize: initialSize };
   const canvas = { width: 128, height: 128 };
   context.after(() => model.dispose());
   return { model, params, canvas, runtimes };
@@ -84,7 +92,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
     png: true,
     gif: false,
     highResolution: false,
-    savedRun: false,
+    savedRun: true,
   });
   assert.deepEqual(captureCapabilities({}), {
     png: true,
@@ -110,7 +118,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
   );
 });
 
-test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
+test("redraws, palette, shading, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
   model.step();
@@ -121,6 +129,12 @@ test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots 
     {
       ...params,
       palette: "spectral",
+      shading: "gloss",
+      reliefStrength: 2.0,
+      lightAngle: 120,
+      displayFilter: "crisp",
+      coordinateTransform: "spiral",
+      twist: 45,
       growthSpeed: 60,
       rotation: 180,
       topology: "hexagonal",
@@ -135,6 +149,46 @@ test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots 
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].restarts, 0);
   assert.deepEqual(runtimes[0].disturbances, [[12, 34, 8]]);
+});
+
+test("default simulation size is 256 and pattern switching preserves simulation size", async () => {
+  const model = new NeuralGrowthModel();
+  const defaults = defaultParameters(model);
+  assert.equal(defaults.simulationSize, 256);
+  assert.equal(defaults.shading, "relief");
+  assert.equal(defaults.reliefStrength, 1.2);
+  assert.equal(defaults.lightAngle, 45);
+  assert.equal(defaults.displayFilter, "smooth");
+  assert.equal(defaults.coordinateTransform, "cartesian");
+  assert.equal(defaults.twist, 0);
+  assert.equal(defaults.disturbanceMode, "erase");
+  assert.equal(defaults.dyeColor, "#00f0ff");
+  assert.equal(defaults.barrierLock, "mask");
+
+  // Pattern change should only default seed, NOT override simulationSize
+  const patternDefaults = model.parameterDefaultsForChange("pattern", "bumpy-surface");
+  assert.ok(patternDefaults);
+  assert.equal(patternDefaults.simulationSize, undefined);
+  assert.equal(typeof patternDefaults.seed, "number");
+  assert.equal(patternDefaults.seed, 42);
+});
+
+test("coordinateTransform suggests smart defaults and forwards to runtime steps", async (context) => {
+  const model = new NeuralGrowthModel();
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "spiral"), { twist: 35 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
+  assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
+
+  const { model: runModel, params, canvas, runtimes } = setup(context);
+  await runModel.render(canvas, { ...params, coordinateTransform: "julia", twist: 30, rotation: 90 }, 0);
+  runModel.step();
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].lastStepOptions.coordinateTransform, "julia");
+  assert.ok(Math.abs(runtimes[0].lastStepOptions.twist - (30 * Math.PI) / 180) < 1e-6);
+  assert.ok(Math.abs(runtimes[0].lastStepOptions.rotation - (90 * Math.PI) / 180) < 1e-6);
 });
 
 test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {
@@ -166,6 +220,58 @@ test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpol
   await model.render(canvas, params, 3);
   assert.equal(runtimes[0].disturbances.length, 64);
   assert.deepEqual(runtimes[0].disturbances[63], [99, 99, 4]);
+});
+
+test("interactive brushes dispatch chromophore, shockwave, stasis freeze/thaw and flow grooming", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0" }, 0);
+  model.queueDisturbance(15, 25, 8, "dye", { dyeColor: "#ff00a0" });
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0" }, 1);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][0], 15);
+  assert.equal(runtimes[0].disturbances[0][1], 25);
+  assert.equal(runtimes[0].disturbances[0][2], 8);
+  assert.equal(runtimes[0].disturbances[0][3], "dye");
+  assert.deepEqual(runtimes[0].disturbances[0][4], { dyeColor: [1, 0, 160 / 255], strokeAngle: 0, lockBarrier: true });
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0", barrierLock: "draw" }, 2);
+  model.queueDisturbance(15, 25, 8, "dye", { dyeColor: "#ff00a0" });
+  await model.render(canvas, { ...params, disturbanceMode: "dye", dyeColor: "#ff00a0", barrierLock: "draw" }, 3);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][4].lockBarrier, false);
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "shockwave" }, 4);
+  model.queueDisturbance(30, 40, 12, "shockwave");
+  await model.render(canvas, { ...params, disturbanceMode: "shockwave" }, 5);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "shockwave");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "freeze" }, 6);
+  model.queueDisturbance(50, 50, 6, "freeze");
+  await model.render(canvas, { ...params, disturbanceMode: "freeze" }, 7);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "freeze");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "thaw" }, 8);
+  model.queueDisturbance(50, 50, 6, "thaw");
+  await model.render(canvas, { ...params, disturbanceMode: "thaw" }, 9);
+  assert.equal(runtimes[0].disturbances.length, 1);
+  assert.equal(runtimes[0].disturbances[0][3], "thaw");
+
+  runtimes[0].disturbances.length = 0;
+  await model.render(canvas, { ...params, disturbanceMode: "groom" }, 10);
+  model.queueDisturbanceStroke(10, 10, 20, 10, 4, "groom");
+  await model.render(canvas, { ...params, disturbanceMode: "groom" }, 11);
+  assert.ok(runtimes[0].disturbances.length > 0);
+  assert.equal(runtimes[0].disturbances[0][3], "groom");
+  assert.equal(runtimes[0].disturbances[0][4].strokeAngle, 0);
+
+  model.clearBarrier();
+  assert.equal(runtimes[0].barrierCleared, true);
 });
 
 test("seed resets once, grid replacement disposes once, and model switching retains state", async (context) => {
@@ -395,4 +501,288 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(model.activePattern, DEFAULT_PATTERN);
   assert.equal(runtimes.length, 1);
   assert.equal(runtimes[0].disposed, false);
+});
+
+test("audio-reactive profiles and beat shockwaves map routes and dispatch kick disturbances", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+
+  const profileControl = model.controls.find((c) => c.key === "audioProfile");
+  assert.ok(profileControl);
+  assert.equal(profileControl.default, "off");
+  assert.deepEqual(
+    profileControl.options.map((o) => o.value),
+    ["off", "subtle", "continuous", "dynamic", "custom"],
+  );
+  assert.deepEqual(
+    profileControl.options.map((o) => o.label),
+    ["Off", "Subtle", "Continuous", "Dynamic", "Custom"],
+  );
+
+  const reachControl = model.controls.find((c) => c.key === "shockwaveReach");
+  assert.ok(reachControl);
+  assert.equal(reachControl.default, "canvas");
+  assert.deepEqual(
+    reachControl.options.map((o) => o.value),
+    ["canvas", "brush"],
+  );
+
+  const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
+  assert.ok(shockwaveControl);
+  assert.equal(shockwaveControl.default, "off");
+  assert.deepEqual(
+    shockwaveControl.options.map((o) => o.value),
+    ["off", "center", "pointer"],
+  );
+
+  const styleControl = model.controls.find((c) => c.key === "shockwaveStyle");
+  assert.ok(styleControl);
+  assert.equal(styleControl.default, "refract");
+  assert.deepEqual(
+    styleControl.options.map((o) => o.value),
+    ["refract", "chromatic", "glow", "harmonic"],
+  );
+  assert.deepEqual(
+    styleControl.options.map((o) => o.label),
+    [
+      "Water Ripple · Clear Refraction",
+      "Prism Split · Rainbow Aberration",
+      "Neon Halo · Radiant Energy Ring",
+      "Cymatic Echo · Concentric Double Wave",
+    ],
+  );
+
+  const impactControl = model.controls.find((c) => c.key === "shockwaveImpact");
+  assert.ok(impactControl);
+  assert.equal(impactControl.default, "color");
+  assert.deepEqual(
+    impactControl.options.map((o) => o.value),
+    ["color", "none"],
+  );
+  assert.deepEqual(
+    impactControl.options.map((o) => o.label),
+    ["Color Blend · Auto Standout", "Visual Only · Optical Lens"],
+  );
+
+  const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
+  assert.equal(kickInputControl, undefined);
+
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "off"), null);
+  assert.deepEqual(model.parameterDefaultsForChange("beatShockwave", "pointer"), {
+    disturbanceMode: "shockwave",
+  });
+
+  // Backward compatibility: legacy saved ambient and rhythm runs reopen as custom
+  assert.equal(model.normalizeStoredParameter("audioProfile", "ambient"), "custom");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "rhythm"), "custom");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "continuous"), "continuous");
+
+  assert.equal(detectAudioProfile({}), "off");
+
+  // Subtle route detection
+  const subtleRoutes = {
+    rotation: { source: "kick", depth: 0.25 },
+    twist: { source: "kick", depth: 0.01 },
+    reliefStrength: { source: "kick", depth: 0.25 },
+    lightAngle: { source: "kick", depth: -0.10 },
+  };
+  assert.equal(detectAudioProfile(subtleRoutes), "subtle");
+
+  // Continuous route detection
+  const continuousRoutes = {
+    rotation: { source: "kick", depth: 0.05 },
+    twist: { source: "kick", depth: 0.05 },
+    reliefStrength: { source: "kick", depth: -1.00 },
+    lightAngle: { source: "kick", depth: 1.00 },
+  };
+  assert.equal(detectAudioProfile(continuousRoutes), "continuous");
+
+  // Dynamic route detection
+  const dynamicRoutes = {
+    rotation: { source: "kick", depth: 0.10 },
+    twist: { source: "kick", depth: 0.06 },
+    reliefStrength: { source: "kick", depth: -0.80 },
+    lightAngle: { source: "kick", depth: 0.90 },
+  };
+  assert.equal(detectAudioProfile(dynamicRoutes), "dynamic");
+
+  // Custom route detection
+  assert.equal(
+    detectAudioProfile({
+      reliefStrength: { source: "kick", depth: 0.8 },
+    }),
+    "custom",
+  );
+
+  // Composite preset recognition with base values and LFOs
+  const subtleBase = {
+    growthSpeed: 60,
+    rotation: 185,
+    twist: 0,
+    reliefStrength: 1.8,
+    lightAngle: 210,
+    shading: "relief",
+    coordinateTransform: "cartesian",
+    beatShockwave: "center",
+    shockwaveReach: "canvas",
+  };
+  const subtleLfos = {
+    rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
+    twist: { enabled: true, rate: 0.04, depth: 0.72, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: false, rate: 0.10, depth: 1.00, phase: 0 },
+    lightAngle: { enabled: false, rate: 0.10, depth: 0.20, phase: 0 },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: subtleBase,
+      lfoState: subtleLfos,
+    }),
+    "subtle",
+  );
+
+  // Editing base values switches selection to custom
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: { ...subtleBase, rotation: 200 },
+      lfoState: subtleLfos,
+    }),
+    "custom",
+  );
+
+  // Editing LFO settings switches selection to custom
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: subtleBase,
+      lfoState: {
+        ...subtleLfos,
+        twist: { enabled: false },
+      },
+    }),
+    "custom",
+  );
+
+  // Continuous with Cartesian geometry fails recognition (must be vortex or other non-cartesian)
+  const continuousBase = {
+    growthSpeed: 100,
+    rotation: 180,
+    twist: 0,
+    reliefStrength: 1.5,
+    lightAngle: 180,
+    shading: "relief",
+    coordinateTransform: "cartesian",
+  };
+  const continuousLfos = {
+    rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
+    twist: { enabled: true, rate: 0.01, depth: 0.50, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: true, rate: 0.005, depth: 1.00, phase: 1.00, waveform: "sine" },
+    lightAngle: { enabled: true, rate: 0.01, depth: 1.00, phase: 0, waveform: "sine" },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: continuousRoutes,
+      parameters: continuousBase,
+      lfoState: continuousLfos,
+    }),
+    "custom",
+  );
+  assert.equal(
+    detectAudioProfile({
+      matrix: continuousRoutes,
+      parameters: { ...continuousBase, coordinateTransform: "vortex" },
+      lfoState: continuousLfos,
+    }),
+    "continuous",
+  );
+
+  // Dynamic composite preset recognition
+  const dynamicBase = {
+    growthSpeed: 45,
+    rotation: 180,
+    twist: 0,
+    reliefStrength: 1.4,
+    lightAngle: 180,
+    shading: "relief",
+    coordinateTransform: "vortex",
+  };
+  const dynamicLfos = {
+    rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
+    twist: { enabled: true, rate: 0.015, depth: 0.60, calmDepth: 0.08, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: true, rate: 0.008, depth: 0.90, calmDepth: 0.15, phase: 1.00, waveform: "sine" },
+    lightAngle: { enabled: true, rate: 0.012, depth: 0.90, calmDepth: 0.10, phase: 0, waveform: "sine" },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: dynamicRoutes,
+      parameters: dynamicBase,
+      lfoState: dynamicLfos,
+    }),
+    "dynamic",
+  );
+  assert.equal(
+    detectAudioProfile({
+      matrix: dynamicRoutes,
+      parameters: { ...dynamicBase, growthSpeed: 60 },
+      lfoState: dynamicLfos,
+    }),
+    "custom",
+  );
+
+  assert.equal(model.triggerBeatShockwave("off"), false);
+  assert.equal(model.triggerBeatShockwave("center"), true);
+  assert.equal(model._queuedDisturbances.length, 1);
+  const centerPulse = model._queuedDisturbances[0];
+  assert.equal(centerPulse.x, 64);
+  assert.equal(centerPulse.y, 64);
+  assert.equal(centerPulse.mode, "shockwave");
+
+  assert.equal(
+    model.triggerBeatShockwave("pointer", { x: 30, y: 40 }),
+    true,
+  );
+  assert.equal(model._queuedDisturbances.length, 2);
+  const pointerPulse = model._queuedDisturbances[1];
+  assert.equal(pointerPulse.x, 30);
+  assert.equal(pointerPulse.y, 40);
+  assert.equal(pointerPulse.mode, "shockwave");
+
+  model.step();
+  assert.equal(runtimes[0].disturbances.length, 2);
+  assert.equal(runtimes[0].disturbances[0][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[0][4].shockwaveImpact, "color");
+  assert.equal(runtimes[0].disturbances[1][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[1][4].shockwaveImpact, "color");
+
+  model.onParameterChange("shockwaveImpact", "none");
+  assert.equal(model.triggerBeatShockwave("center"), true);
+  model.step();
+  assert.equal(runtimes[0].disturbances.length, 3);
+  assert.equal(runtimes[0].disturbances[2][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "none");
+
+  await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
+  assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
+
+  // Kick input: active when impact is color
+  model.onParameterChange("shockwaveImpact", "color");
+  assert.equal(model.triggerKickInput(0.8, 1000), true);
+  // Refractory lockout (< 180ms)
+  assert.equal(model.triggerKickInput(0.8, 1050), false);
+  // Allowed after cooldown
+  assert.equal(model.triggerKickInput(0.8, 1250), true);
+
+  model.onParameterChange("shockwaveImpact", "none");
+  assert.equal(model.triggerKickInput(0.8, 1500), false);
+
+  model.queueDisturbance(20, 20, 10, "invert");
+  model.step();
+  const distModes = runtimes[0].disturbances.map((d) => d[3]);
+  assert.ok(distModes.includes("kick_color"));
+  assert.equal(distModes[distModes.length - 1], "invert");
 });

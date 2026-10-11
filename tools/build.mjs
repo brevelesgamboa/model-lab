@@ -19,6 +19,7 @@ for (const relative of [
   "LICENSE",
   "licenses",
   "THIRD_PARTY_NOTICES.md",
+  "CITATIONS.md",
 ]) {
   await cp(path.join(root, relative), path.join(destination, relative), {
     recursive: true,
@@ -34,7 +35,6 @@ const modelAssets = JSON.parse(
 );
 const staticFiles = [
   "models/neural-growth/NOTICE.md",
-  "models/neural-growth/organic-structures/NOTICE.md",
   ...modelAssets.map((entry) => entry.path),
   "models/digiface/README.txt",
   "models/digiface/model-info.json",

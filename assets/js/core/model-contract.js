@@ -21,6 +21,10 @@ export function sanitizeParameters(model, stored) {
         (entry) => String(entry.value) === String(value),
       );
       if (option) parameters[definition.key] = option.value;
+    } else if (definition.type === "color") {
+      if (typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value.trim())) {
+        parameters[definition.key] = value.trim();
+      }
     } else if (Number.isFinite(Number(value))) {
       const bounded = clamp(Number(value), definition.min, definition.max);
       parameters[definition.key] =
@@ -57,7 +61,7 @@ export function validateModelDefinition(model) {
     if (
       !control.key ||
       keys.has(control.key) ||
-      !["range", "number", "select"].includes(control.type)
+      !["range", "number", "select", "color"].includes(control.type)
     ) {
       throw new Error(`Invalid control schema in ${model.id}: ${control.key}`);
     }
@@ -71,6 +75,13 @@ export function validateModelDefinition(model) {
         throw new Error(
           `Invalid default option in ${model.id}: ${control.key}`,
         );
+      }
+    } else if (control.type === "color") {
+      if (
+        typeof control.default !== "string" ||
+        !/^#[0-9a-fA-F]{3,8}$/.test(control.default.trim())
+      ) {
+        throw new Error(`Invalid color default in ${model.id}: ${control.key}`);
       }
     } else if (
       ![control.min, control.max, control.step, control.default].every(

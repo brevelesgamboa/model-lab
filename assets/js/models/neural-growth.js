@@ -1,4 +1,5 @@
 import { sanitizeParameters } from "../core/model-contract.js";
+import { hexToRgb } from "../core/utils.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
 import { TextureNcaRuntime } from "./neural-growth/runtime.js";
 import {
@@ -6,6 +7,7 @@ import {
   PATTERNS,
   getPattern,
 } from "./neural-growth/patterns.js";
+import { AUDIO_PROFILES } from "./neural-growth/audio-profiles.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -34,7 +36,7 @@ export class NeuralGrowthModel {
       png: true,
       gif: false,
       highResolution: false,
-      savedRun: false,
+      savedRun: true,
     };
     this._load = load;
     this._createRuntime = createRuntime;
@@ -52,6 +54,9 @@ export class NeuralGrowthModel {
     this._lastTick = null;
     this._accumulator = 0;
     this._queuedDisturbances = [];
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
@@ -94,7 +99,7 @@ export class NeuralGrowthModel {
         key: "simulationSize",
         label: "SIMULATION GRID",
         type: "select",
-        default: 128,
+        default: 256,
         options: [
           { value: 128, label: "128 × 128 · lighter" },
           { value: 256, label: "256 × 256 · more detail" },
@@ -113,15 +118,101 @@ export class NeuralGrowthModel {
         help: "Rotates directional perception filters in real time without resetting or losing field state.",
       },
       {
+        key: "coordinateTransform",
+        label: "COORDINATE GEOMETRY",
+        type: "select",
+        default: "cartesian",
+        options: [
+          { value: "cartesian", label: "Cartesian · Standard 2D" },
+          { value: "vortex", label: "Vortex · Concentric Ring" },
+          { value: "spiral", label: "Spiral · Logarithmic Swirl" },
+          { value: "julia", label: "Julia · Complex Fractal" },
+          { value: "dipole", label: "Dipole · Binary Vortex" },
+        ],
+        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, or Julia fractal dendrites.",
+      },
+      {
+        key: "twist",
+        label: "SPIRAL PITCH / TWIST",
+        type: "range",
+        min: -90,
+        max: 90,
+        step: 1,
+        default: 0,
+        format: "degrees",
+        help: "Pitch and angular twist in degrees for spiral and vortex geometries. Modulates inward/outward swirl.",
+      },
+      {
+        key: "audioProfile",
+        label: "AUDIO REACT",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off" },
+          { value: "subtle", label: "Subtle" },
+          { value: "continuous", label: "Continuous" },
+          { value: "dynamic", label: "Dynamic" },
+          { value: "custom", label: "Custom" },
+        ],
+        help: "Audio-reactive presets configuring base parameters, modulation routes, and LFOs. Fully editable in parameter MOD panels.",
+      },
+      {
+        key: "beatShockwave",
+        label: "BEAT SHOCKWAVE",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off" },
+          { value: "center", label: "Center · Audio" },
+          { value: "pointer", label: "Pointer · Draw" },
+        ],
+        help: "Shockwave ripple mode: audio kick-triggered at center, or drawing-triggered at pointer.",
+      },
+      {
+        key: "shockwaveReach",
+        label: "SHOCKWAVE REACH",
+        type: "select",
+        default: "canvas",
+        options: [
+          { value: "canvas", label: "Whole Canvas" },
+          { value: "brush", label: "Follow Brush" },
+        ],
+        help: "Shockwave coverage range: expand across the entire canvas or follow current brush radius.",
+      },
+      {
+        key: "shockwaveStyle",
+        label: "SHOCKWAVE STYLE",
+        type: "select",
+        default: "refract",
+        options: [
+          { value: "refract", label: "Water Ripple · Clear Refraction" },
+          { value: "chromatic", label: "Prism Split · Rainbow Aberration" },
+          { value: "glow", label: "Neon Halo · Radiant Energy Ring" },
+          { value: "harmonic", label: "Cymatic Echo · Concentric Double Wave" },
+        ],
+        help: "Wavefront appearance: clear water ripple, prism chromatic split, radiant neon halo, or concentric cymatic double wave.",
+      },
+      {
+        key: "shockwaveImpact",
+        label: "SHOCKWAVE IMPACT",
+        type: "select",
+        default: "color",
+        options: [
+          { value: "color", label: "Color Blend · Auto Standout" },
+          { value: "none", label: "Visual Only · Optical Lens" },
+        ],
+        help: "Cellular effect on shockwave: gently infuses high-contrast pigment that cells weave into the living pattern, or pure optical wave.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
         min: 4,
-        max: 32,
+        max: 96,
         step: 1,
-        default: 8,
+        default: 16,
         modulation: false,
-        help: "Pointer disturbance brush radius in grid cells.",
+        help: "Pointer disturbance and shockwave brush radius in grid cells.",
       },
       {
         key: "disturbanceMode",
@@ -129,10 +220,54 @@ export class NeuralGrowthModel {
         type: "select",
         default: "erase",
         options: [
-          { value: "erase", label: "Erase · Neutral (0)" },
-          { value: "noise", label: "Noise · Scramble" },
+          { value: "erase", label: "Erase" },
+          { value: "noise", label: "Noise" },
+          { value: "dye", label: "Color" },
+          { value: "invert", label: "Invert" },
+          { value: "shockwave", label: "Ripple" },
+          { value: "freeze", label: "Freeze" },
+          { value: "thaw", label: "Unfreeze" },
+          { value: "groom", label: "Flow" },
         ],
-        help: "Interactive disturbance mode: zero channels to neutral or inject high-frequency noise.",
+        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
+      },
+      {
+        key: "dyeColor",
+        label: "BRUSH COLOR",
+        type: "color",
+        default: "#00f0ff",
+        presets: [
+          { label: "Cyan", value: "#00f0ff" },
+          { label: "Magenta", value: "#ff00a0" },
+          { label: "Gold", value: "#ffb800" },
+          { label: "Lime", value: "#00ff66" },
+          { label: "Violet", value: "#9d4edd" },
+          { label: "White", value: "#ffffff" },
+        ],
+        help: "Color pigment for Color brush. Injects RGB states while preserving hidden channels.",
+      },
+      {
+        key: "barrierOutline",
+        label: "BARRIER OUTLINE",
+        type: "select",
+        default: "auto",
+        options: [
+          { value: "auto", label: "Auto · While Active" },
+          { value: "always", label: "Always On" },
+          { value: "off", label: "Off" },
+        ],
+        help: "Visibility of dashed inverted outlines along frozen barrier borders.",
+      },
+      {
+        key: "barrierLock",
+        label: "FREEZE LOCK",
+        type: "select",
+        default: "mask",
+        options: [
+          { value: "mask", label: "Mask · Protected" },
+          { value: "draw", label: "Draw · Editable" },
+        ],
+        help: "Mask prevents brushes and growth from modifying frozen cells; Draw permits custom painting on frozen cells before unfreezing.",
       },
       {
         key: "topology",
@@ -168,6 +303,51 @@ export class NeuralGrowthModel {
         ],
         help: "Display mapping only; does not alter the learned state or update rule.",
       },
+      {
+        key: "shading",
+        label: "3D SHADING",
+        type: "select",
+        default: "relief",
+        options: [
+          { value: "relief", label: "Relief · Diffuse 3D" },
+          { value: "gloss", label: "Gloss · Specular Sheen" },
+          { value: "flat", label: "Flat · Unshaded 2D" },
+          { value: "normals", label: "Normals · Vector Map" },
+        ],
+        help: "Real-time surface gradient shading computed from cell state differentials in WebGL2.",
+      },
+      {
+        key: "reliefStrength",
+        label: "RELIEF DEPTH",
+        type: "range",
+        min: 0,
+        max: 3,
+        step: 0.1,
+        default: 1.2,
+        help: "Height gradient multiplier for directional diffuse and specular relief shading.",
+      },
+      {
+        key: "lightAngle",
+        label: "LIGHT ANGLE",
+        type: "range",
+        min: 0,
+        max: 360,
+        step: 1,
+        default: 45,
+        wrap: true,
+        help: "Directional light source angle in degrees. Wraps circularly and supports audio/LFO modulation.",
+      },
+      {
+        key: "displayFilter",
+        label: "DISPLAY FILTER",
+        type: "select",
+        default: "smooth",
+        options: [
+          { value: "smooth", label: "Smooth · Bilinear" },
+          { value: "crisp", label: "Crisp · Nearest Cell" },
+        ],
+        help: "Viewport sampling interpolation: smooth bilinear blending or crisp individual cell pixels.",
+      },
     ];
   }
 
@@ -198,13 +378,22 @@ export class NeuralGrowthModel {
   getStats() {
     return this._runtime?.getStats() || null;
   }
+  get hasActiveRipples() {
+    if (!this._activeRipples || this._activeRipples.length === 0) return false;
+    const now = performance.now();
+    this._activeRipples = this._activeRipples.filter(
+      (r) => now - r.startTime < r.duration * 1000,
+    );
+    return this._activeRipples.length > 0;
+  }
+
   isDynamic(parameters) {
     return (
       !this.lastError &&
       !this._loadingPattern &&
       !this._disposed &&
-      this._clockRunning &&
-      Number(parameters.growthSpeed) > 0
+      ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
+        this.hasActiveRipples)
     );
   }
 
@@ -226,6 +415,9 @@ export class NeuralGrowthModel {
     this._abort = null;
     this._loadingPattern = false;
     this._queuedDisturbances = [];
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this.setClockRunning(false);
   }
 
@@ -233,7 +425,57 @@ export class NeuralGrowthModel {
     return this._pending || Promise.resolve();
   }
 
+  parameterDefaultsForChange(key, value) {
+    if (key === "pattern") {
+      const startup = getPattern(value).startup;
+      if (!startup) return null;
+      return { seed: startup.seed };
+    }
+    if (key === "coordinateTransform") {
+      if (value === "spiral") return { twist: 35 };
+      if (
+        value === "vortex" ||
+        value === "julia" ||
+        value === "dipole" ||
+        value === "cartesian"
+      ) {
+        return { twist: 0 };
+      }
+    }
+    if (key === "beatShockwave" && value === "pointer") {
+      return { disturbanceMode: "shockwave" };
+    }
+    return null;
+  }
+
+  normalizeStoredParameter(key, value) {
+    if (key === "audioProfile") {
+      if (value === "ambient" || value === "rhythm") {
+        return "custom";
+      }
+    }
+    if (key === "shockwaveImpact") {
+      if (value !== "none" && value !== "color") {
+        return "color";
+      }
+    }
+    return value;
+  }
+
   onParameterChange(key, value) {
+    if (this._parameters && key in this._parameters) {
+      this._parameters[key] = value;
+    }
+    if (
+      key === "coordinateTransform" ||
+      key === "barrierLock" ||
+      key === "audioProfile" ||
+      key === "beatShockwave" ||
+      key === "shockwaveReach" ||
+      key === "shockwaveStyle" ||
+      key === "shockwaveImpact"
+    )
+      return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
@@ -317,7 +559,14 @@ export class NeuralGrowthModel {
         const preview = document.createElement("canvas");
         preview.width = canvas.width;
         preview.height = canvas.height;
-        candidate.draw(preview, parameters.palette);
+        candidate.draw(preview, {
+          palette: parameters.palette,
+          zoom: parameters.zoom,
+          shading: parameters.shading,
+          reliefStrength: parameters.reliefStrength,
+          lightAngle: parameters.lightAngle,
+          displayFilter: parameters.displayFilter,
+        });
         this._runtime?.dispose();
         this._runtime = candidate;
         this._activePattern = pattern.id;
@@ -331,10 +580,7 @@ export class NeuralGrowthModel {
         this._lastTick = null;
         this._accumulator = 0;
       }
-      if (
-        this._parameters.growthSpeed !== parameters.growthSpeed ||
-        this._parameters.simulationSize !== parameters.simulationSize
-      ) {
+      if (this._parameters.simulationSize !== parameters.simulationSize) {
         this._lastTick = null;
         this._accumulator = 0;
       }
@@ -357,16 +603,43 @@ export class NeuralGrowthModel {
           if (count) {
             const angleRad =
               (Number(parameters.rotation || 0) * Math.PI) / 180;
+            const twistRad =
+              (Number(parameters.twist || 0) * Math.PI) / 180;
             this._runtime.step(count, {
               rotation: angleRad,
               topology: parameters.topology,
+              coordinateTransform: parameters.coordinateTransform,
+              twist: twistRad,
             });
           }
           this._accumulator -= count;
         }
         this._lastTick = timeSeconds;
       }
-      this._runtime.draw(canvas, parameters.palette, parameters.zoom);
+      const outlineMode = parameters.barrierOutline || "auto";
+      const showBarrier =
+        outlineMode === "always" ||
+        (outlineMode === "auto" &&
+          (parameters.disturbanceMode === "freeze" ||
+            parameters.disturbanceMode === "thaw"));
+      if (this._activeRipples?.length) {
+        const now = performance.now();
+        this._activeRipples = this._activeRipples.filter(
+          (r) => now - r.startTime < r.duration * 1000,
+        );
+      }
+      this._runtime.draw(canvas, {
+        palette: parameters.palette,
+        zoom: parameters.zoom,
+        shading: parameters.shading,
+        reliefStrength: parameters.reliefStrength,
+        lightAngle: parameters.lightAngle,
+        displayFilter: parameters.displayFilter,
+        showBarrier,
+        ripples: this._activeRipples || [],
+        shockwaveStyle: parameters.shockwaveStyle,
+        dyeColor: parameters.dyeColor,
+      });
       return this._result();
     } catch (error) {
       candidate?.dispose();
@@ -414,11 +687,15 @@ export class NeuralGrowthModel {
 
   step() {
     if (!this.ready) return;
+    this._drainDisturbances();
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
+    const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
     this._runRuntime(() =>
       this._runtime.step(1, {
         rotation: angleRad,
         topology: this._parameters.topology,
+        coordinateTransform: this._parameters.coordinateTransform,
+        twist: twistRad,
       }),
     );
     this._lastTick = null;
@@ -434,6 +711,9 @@ export class NeuralGrowthModel {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
     this._queuedDisturbances = [];
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -444,6 +724,7 @@ export class NeuralGrowthModel {
     radius = Number(this._parameters.brushRadius) ||
       Math.max(2, Math.round(this.simulationSize * 0.06)),
     mode = this._parameters.disturbanceMode || "erase",
+    options = {},
   ) {
     if (!this.ready) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -454,6 +735,9 @@ export class NeuralGrowthModel {
       1,
       Math.min(Math.floor(size / 2), Math.round(radius)),
     );
+    if (mode === "shockwave") {
+      this.triggerRipple(clampedX, clampedY, clampedRadius);
+    }
     if (this._queuedDisturbances.length >= 64) {
       this._queuedDisturbances.shift();
     }
@@ -462,6 +746,8 @@ export class NeuralGrowthModel {
       y: clampedY,
       radius: clampedRadius,
       mode,
+      dyeColor: options.dyeColor || this._parameters.dyeColor || "#00f0ff",
+      strokeAngle: options.strokeAngle || 0,
     });
   }
 
@@ -473,27 +759,46 @@ export class NeuralGrowthModel {
     radius = Number(this._parameters.brushRadius) ||
       Math.max(2, Math.round(this.simulationSize * 0.06)),
     mode = this._parameters.disturbanceMode || "erase",
+    options = {},
   ) {
     if (!this.ready) return;
     const dx = x1 - x0;
     const dy = y1 - y0;
     const dist = Math.hypot(dx, dy);
+    const strokeAngle = Math.atan2(dy, dx);
     const step = Math.max(1, radius * 0.5);
     const count = Math.min(32, Math.max(1, Math.ceil(dist / step)));
     for (let i = 0; i <= count; i += 1) {
       const t = count === 0 ? 0 : i / count;
-      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode);
+      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode, {
+        ...options,
+        strokeAngle: options.strokeAngle ?? strokeAngle,
+      });
     }
   }
 
   _drainDisturbances() {
     if (!this._runtime || this._queuedDisturbances.length === 0) return false;
     let applied = false;
+    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
     while (this._queuedDisturbances.length > 0) {
-      const { x, y, radius, mode } = this._queuedDisturbances.shift();
+      const { x, y, radius, mode, dyeColor, strokeAngle } =
+        this._queuedDisturbances.shift();
       try {
+        const rgb = hexToRgb(dyeColor || this._parameters.dyeColor || "#00f0ff");
         if (mode && mode !== "erase") {
-          this._runtime.disturb(x, y, radius, mode);
+          const opts = {
+            dyeColor: rgb,
+            strokeAngle: strokeAngle || 0,
+            lockBarrier,
+          };
+          if (mode === "shockwave") {
+            opts.shockwaveImpact = this._parameters.shockwaveImpact || "color";
+            opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
+            opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
+            opts.strength = 1.0;
+          }
+          this._runtime.disturb(x, y, radius, mode, opts);
         } else {
           this._runtime.disturb(x, y, radius);
         }
@@ -512,13 +817,185 @@ export class NeuralGrowthModel {
     }
   }
 
+  clearBarrier() {
+    if (this.ready) {
+      this._runRuntime(() => this._runtime?.clearBarrier());
+    }
+  }
+
+  triggerRipple(x, y, customRadius = null, maxAmplitude = null) {
+    if (!this.ready) return false;
+    const size = this.simulationSize;
+    const originX = Math.max(
+      0,
+      Math.min(size - 1, Math.round(Number(x) || Math.floor(size / 2))),
+    );
+    const originY = Math.max(
+      0,
+      Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
+    );
+    const reach = this._parameters?.shockwaveReach || "canvas";
+    let radius = 16;
+    if (reach === "canvas") {
+      const d1 = Math.hypot(originX, originY);
+      const d2 = Math.hypot(size - originX, originY);
+      const d3 = Math.hypot(originX, size - originY);
+      const d4 = Math.hypot(size - originX, size - originY);
+      radius = Math.ceil(Math.max(d1, d2, d3, d4));
+    } else {
+      const chosen =
+        Number(customRadius || this._parameters?.brushRadius) || 16;
+      radius = Math.max(8, Math.min(96, Math.round(chosen)));
+    }
+    const amp =
+      Number(maxAmplitude) ||
+      Math.min(1.5, Math.max(0.8, radius * 0.015));
+    const ripple = {
+      x: originX,
+      y: originY,
+      radius,
+      amplitude: amp,
+      startTime: performance.now(),
+      duration: 0.55,
+    };
+    if (!this._activeRipples) this._activeRipples = [];
+    this._activeRipples.push(ripple);
+    if (this._activeRipples.length > 4) {
+      this._activeRipples.shift();
+    }
+    return true;
+  }
+
+  triggerBeatShockwave(
+    mode = this._parameters.beatShockwave,
+    coords = null,
+    customRadius = null,
+  ) {
+    if (!this.ready || !mode || mode === "off") return false;
+    const size = this.simulationSize;
+    let x = Math.floor(size / 2);
+    let y = Math.floor(size / 2);
+    if (
+      mode === "pointer" &&
+      coords &&
+      Number.isFinite(coords.x) &&
+      Number.isFinite(coords.y)
+    ) {
+      x = coords.x;
+      y = coords.y;
+    }
+    const reach = this._parameters?.shockwaveReach || "canvas";
+    let radius = 16;
+    if (reach === "canvas") {
+      const d1 = Math.hypot(x, y);
+      const d2 = Math.hypot(size - x, y);
+      const d3 = Math.hypot(x, size - y);
+      const d4 = Math.hypot(size - x, size - y);
+      radius = Math.ceil(Math.max(d1, d2, d3, d4));
+    } else {
+      const chosen =
+        Number(customRadius || this._parameters?.brushRadius) ||
+        Math.round(size * 0.15);
+      radius = Math.max(
+        8,
+        Math.min(Math.floor(size / 2), Math.round(chosen)),
+      );
+    }
+    this.queueDisturbance(x, y, radius, "shockwave");
+    return true;
+  }
+
+  triggerKickInput(strength = 1.0, timestamp = null) {
+    if (!this.ready) return false;
+    const impact = this._parameters?.shockwaveImpact || "color";
+    if (impact === "none") return false;
+
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    const elapsed = now - (this._lastKickInputTime || 0);
+
+    // Refractory lockout: at least 180 ms between kick inputs
+    if (elapsed < 180) return false;
+
+    // Leaky bucket cumulative rate limiter: max 3 injections per second
+    const drain = (elapsed / 1000) * 2.0;
+    this._kickInputBudget = Math.max(0, (this._kickInputBudget || 0) - drain);
+    if (this._kickInputBudget >= 3.0) return false;
+    this._kickInputBudget += 1.0;
+    this._lastKickInputTime = now;
+
+    // Conservative strength scaling: normalized kick onset amplitude mapped to [0.06, 0.20]
+    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
+    const injectStrength = 0.06 + norm * 0.14;
+
+    // Deterministic spatial distribution without modifying simulation seed
+    this._kickInputIndex = (this._kickInputIndex || 0) + 1;
+    const idx = this._kickInputIndex;
+    const phi1 = 0.618033988749895;
+    const phi2 = 0.414213562373095;
+    const rFrac = Math.sqrt((idx * phi1) % 1.0);
+    const theta = 2 * Math.PI * ((idx * phi2) % 1.0);
+    const size = this.simulationSize;
+    const center = size / 2;
+    const maxR = size * 0.32;
+    const targetX = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
+    );
+    const targetY = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
+    );
+
+    const patchRadius = 10;
+    const rgb = hexToRgb(this._parameters.dyeColor || "#00f0ff");
+    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
+    const disturbMode = "kick_color";
+
+    this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
+      dyeColor: rgb,
+      lockBarrier,
+      strength: injectStrength,
+    });
+
+    if (norm > 0.8) {
+      const satTheta = theta + Math.PI + 0.3;
+      const satR = maxR * 0.5 * rFrac;
+      const satX = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.cos(satTheta))),
+      );
+      const satY = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.sin(satTheta))),
+      );
+      this._runtime.disturb(satX, satY, 8, disturbMode, {
+        dyeColor: rgb,
+        lockBarrier,
+        strength: injectStrength * 0.75,
+      });
+    }
+
+    return true;
+  }
+
   renderSnapshot(canvas) {
     if (!this.ready)
       throw new Error(
         this.lastError || "Wait for Neural Growth to initialize.",
       );
     this._runRuntime(() =>
-      this._runtime.draw(canvas, this._parameters.palette, 1),
+      this._runtime.draw(canvas, {
+        palette: this._parameters.palette,
+        zoom: 1,
+        shading: this._parameters.shading,
+        reliefStrength: this._parameters.reliefStrength,
+        lightAngle: this._parameters.lightAngle,
+        displayFilter: this._parameters.displayFilter,
+        showBarrier: false,
+        ripples: [],
+        shockwaveStyle: this._parameters.shockwaveStyle,
+        dyeColor: this._parameters.dyeColor,
+      }),
     );
   }
 
@@ -530,3 +1007,5 @@ export class NeuralGrowthModel {
     this._checkpoints.clear();
   }
 }
+
+export { AUDIO_PROFILES };

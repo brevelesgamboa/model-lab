@@ -78,6 +78,7 @@ export function makeModulationPanel({
     onChange({ config, audioRoute, active });
   };
 
+  const lfoInputs = {};
   const fields = numericDefinitions.map(([labelText, key, min, max, step]) => {
     const field = document.createElement("label");
     field.className = "modulation-field";
@@ -95,6 +96,8 @@ export function makeModulationPanel({
     number.max = String(max);
     number.step = String(step);
     number.value = String(config[key]);
+
+    lfoInputs[key] = { slider, number, min, max };
 
     const setValue = (value) => {
       const next = clamp(Number(value), min, max);
@@ -206,6 +209,31 @@ export function makeModulationPanel({
   audioControls.append(audioSourceField, audioDepthField);
   syncAudioAvailability();
 
+  const syncAudioRoute = (nextRoute) => {
+    if (!nextRoute) return;
+    audioRoute = { ...audioRoute, ...nextRoute };
+    audioSource.value = audioRoute.source;
+    audioDepth.value = String(audioRoute.depth);
+    audioDepthNumber.value = String(audioRoute.depth);
+    syncAudioAvailability();
+  };
+
+  const syncLfoConfig = (nextConfig) => {
+    if (!nextConfig) return;
+    config = { ...config, ...nextConfig };
+    lfoCheckbox.checked = Boolean(config.enabled);
+    if (config.waveform) {
+      waveformSelect.value = config.waveform;
+    }
+    numericDefinitions.forEach(([, key, min, max]) => {
+      if (key in nextConfig && lfoInputs[key]) {
+        const val = clamp(Number(nextConfig[key]), min, max);
+        lfoInputs[key].slider.value = String(val);
+        lfoInputs[key].number.value = String(val);
+      }
+    });
+  };
+
   panel.append(header, lfoControls, audioControls, visualizerWrap);
-  return { panel, visualizer };
+  return { panel, visualizer, syncAudioRoute, syncLfoConfig };
 }

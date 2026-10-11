@@ -28,6 +28,7 @@ export function createGrowthController({
   setAnimation,
   setStatus,
   withExclusiveCompute,
+  onParameterChange,
 }) {
   let busy = false;
   let pointerId = null;
@@ -49,6 +50,53 @@ export function createGrowthController({
     if (elements.growthFavoritesCount) {
       elements.growthFavoritesCount.textContent = String(favorites.size);
     }
+  }
+
+  function getPatternCitation(pattern) {
+    if (pattern.citation) return pattern.citation;
+    if (pattern.category === "inception") {
+      const raw = pattern.technicalId || pattern.id;
+      const parts = raw.split("_");
+      const layer = parts[0] || "Inception v1";
+      const ch = parts[1] ? `#${parts[1]}` : "";
+      return {
+        source: "GoogLeNet Inception v1",
+        details: `${layer} activation ${ch}`.trim(),
+        license: "Distill CC-BY-4.0",
+      };
+    }
+    if (pattern.category === "texture") {
+      return {
+        source: "Describing Textures in the Wild (DTD)",
+        details: "Oxford VGG Gram Style Loss",
+        license: "Distill CC-BY-4.0",
+      };
+    }
+    return {
+      source: "Latent Field Baseline",
+      details: "Multiscale Gram and RGB Moments",
+      license: "Project MIT terms",
+    };
+  }
+
+  function updateTabCounts() {
+    if (!elements.growthGalleryTabs) return;
+    const allCount = PATTERNS.length;
+    const textureCount = PATTERNS.filter((p) => p.category === "texture").length;
+    const inceptionCount = PATTERNS.filter((p) => p.category === "inception").length;
+    const organicCount = PATTERNS.filter((p) => p.category === "organic").length;
+
+    const allBtn = elements.growthGalleryTabs.querySelector('[data-filter="all"]');
+    if (allBtn) allBtn.textContent = `All (${allCount})`;
+
+    const texBtn = elements.growthGalleryTabs.querySelector('[data-filter="texture"]');
+    if (texBtn) texBtn.textContent = `Textures (${textureCount})`;
+
+    const incBtn = elements.growthGalleryTabs.querySelector('[data-filter="inception"]');
+    if (incBtn) incBtn.textContent = `Inception (${inceptionCount})`;
+
+    const orgBtn = elements.growthGalleryTabs.querySelector('[data-filter="organic"]');
+    if (orgBtn) orgBtn.textContent = `Originals (${organicCount})`;
   }
 
   function addRecent(patternId) {
@@ -195,7 +243,66 @@ export function createGrowthController({
         }
       });
 
-      thumbWrapper.append(thumb, favBtn);
+      const infoBtn = document.createElement("button");
+      infoBtn.type = "button";
+      infoBtn.className = "growth-gallery__info-btn";
+      infoBtn.title = "View source citation";
+      infoBtn.textContent = "ℹ";
+
+      infoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const existingOverlay = thumbWrapper.querySelector(".growth-gallery__info-overlay");
+        if (existingOverlay) {
+          existingOverlay.remove();
+          infoBtn.classList.remove("is-active");
+          return;
+        }
+
+        elements.growthGalleryGrid
+          .querySelectorAll(".growth-gallery__info-overlay")
+          .forEach((el) => el.remove());
+        elements.growthGalleryGrid
+          .querySelectorAll(".growth-gallery__info-btn.is-active")
+          .forEach((btn) => btn.classList.remove("is-active"));
+
+        infoBtn.classList.add("is-active");
+
+        const citation = getPatternCitation(pattern);
+        const overlay = document.createElement("div");
+        overlay.className = "growth-gallery__info-overlay";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.className = "growth-gallery__info-overlay-close";
+        closeBtn.textContent = "✕";
+        closeBtn.title = "Close info";
+        closeBtn.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          overlay.remove();
+          infoBtn.classList.remove("is-active");
+        });
+
+        const title = document.createElement("div");
+        title.className = "growth-gallery__info-overlay-title";
+        title.textContent = "Source Imagery";
+
+        const srcEl = document.createElement("div");
+        srcEl.className = "growth-gallery__info-overlay-source";
+        srcEl.textContent = citation.source;
+
+        const detailsEl = document.createElement("div");
+        detailsEl.className = "growth-gallery__info-overlay-details";
+        detailsEl.textContent = citation.details;
+
+        const licenseEl = document.createElement("div");
+        licenseEl.className = "growth-gallery__info-overlay-license";
+        licenseEl.textContent = citation.license;
+
+        overlay.append(closeBtn, title, srcEl, detailsEl, licenseEl);
+        thumbWrapper.appendChild(overlay);
+      });
+
+      thumbWrapper.append(thumb, favBtn, infoBtn);
 
       const nameEl = document.createElement("div");
       nameEl.className = "growth-gallery__card-name";
@@ -203,7 +310,7 @@ export function createGrowthController({
 
       const idEl = document.createElement("div");
       idEl.className = "growth-gallery__card-id";
-      idEl.textContent = pattern.technicalId || pattern.id;
+      idEl.textContent = (pattern.technicalId || pattern.id).split("/").pop();
 
       const badge = document.createElement("span");
       badge.className = `growth-gallery__card-badge growth-gallery__card-badge--${pattern.category}`;
@@ -227,6 +334,67 @@ export function createGrowthController({
   function update() {
     const model = activeModel();
     elements.growthTools.hidden = !model;
+    if (elements.growthCanvasTools) {
+      elements.growthCanvasTools.hidden = !model;
+      if (model) {
+        const currentMode = model.parameters?.disturbanceMode || "erase";
+        for (const btn of elements.growthBrushBtns) {
+          const isActive = btn.dataset.brush === currentMode;
+          btn.classList.toggle("is-active", isActive);
+          btn.setAttribute("aria-pressed", String(isActive));
+        }
+        if (elements.growthBrushRadius) {
+          const radius = Number(model.parameters?.brushRadius) || 8;
+          elements.growthBrushRadius.value = radius;
+          if (elements.growthBrushRadiusVal) {
+            elements.growthBrushRadiusVal.textContent = `${radius}px`;
+          }
+        }
+        if (elements.growthColorOptions) {
+          elements.growthColorOptions.hidden = currentMode !== "dye";
+          const color = model.parameters?.dyeColor || "#00f0ff";
+          if (elements.growthColorPicker) elements.growthColorPicker.value = color;
+          if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+          if (elements.growthColorPills) {
+            for (const pill of elements.growthColorPills.querySelectorAll(".color-preset-pill")) {
+              pill.classList.toggle(
+                "is-active",
+                pill.dataset.color.toLowerCase() === color.toLowerCase(),
+              );
+            }
+          }
+        }
+        if (elements.growthFreezeOptions) {
+          elements.growthFreezeOptions.hidden =
+            currentMode !== "freeze" && currentMode !== "thaw";
+          if (elements.growthOutlineSelect) {
+            elements.growthOutlineSelect.value =
+              model.parameters?.barrierOutline || "auto";
+          }
+          const lockMode = model.parameters?.barrierLock || "mask";
+          if (elements.growthFreezeLockMask) {
+            elements.growthFreezeLockMask.classList.toggle(
+              "is-active",
+              lockMode === "mask",
+            );
+            elements.growthFreezeLockMask.setAttribute(
+              "aria-pressed",
+              lockMode === "mask" ? "true" : "false",
+            );
+          }
+          if (elements.growthFreezeLockDraw) {
+            elements.growthFreezeLockDraw.classList.toggle(
+              "is-active",
+              lockMode === "draw",
+            );
+            elements.growthFreezeLockDraw.setAttribute(
+              "aria-pressed",
+              lockMode === "draw" ? "true" : "false",
+            );
+          }
+        }
+      }
+    }
     elements.canvas.classList.toggle("is-growth", Boolean(model));
     if (!model) return;
     if (model.technicalInfo !== lastInfo) {
@@ -283,6 +451,9 @@ export function createGrowthController({
       try {
         await render({ forceAnalysis: true });
       } catch (_) {}
+      if (model.hasActiveRipples) {
+        schedulePausedRender();
+      }
     });
   }
 
@@ -305,6 +476,8 @@ export function createGrowthController({
     };
   }
 
+  let lastPointerRippleTime = 0;
+
   function handlePointerDown(event) {
     const model = activeModel();
     if (!model?.ready || event.button !== 0) return;
@@ -315,9 +488,13 @@ export function createGrowthController({
     const coords = getGridCoords(event, model);
     if (!coords) return;
     lastCoord = coords;
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     model.queueDisturbance(coords.gx, coords.gy, radius, mode);
+    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+      lastPointerRippleTime = performance.now();
+      model.triggerRipple(coords.gx, coords.gy, radius);
+    }
     if (!model.isClockRunning) {
       schedulePausedRender();
     }
@@ -328,12 +505,19 @@ export function createGrowthController({
     if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1) return;
     const coords = getGridCoords(event, model);
     if (!coords) return;
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     if (lastCoord) {
       model.queueDisturbanceStroke(lastCoord.gx, lastCoord.gy, coords.gx, coords.gy, radius, mode);
     } else {
       model.queueDisturbance(coords.gx, coords.gy, radius, mode);
+    }
+    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+      const now = performance.now();
+      if (now - lastPointerRippleTime >= 90) {
+        lastPointerRippleTime = now;
+        model.triggerRipple(coords.gx, coords.gy, radius);
+      }
     }
     lastCoord = coords;
     if (!model.isClockRunning) {
@@ -382,7 +566,9 @@ export function createGrowthController({
 
   // Gallery events
   if (elements.openGrowthGallery && elements.growthGalleryDialog) {
+    updateTabCounts();
     listen(elements.openGrowthGallery, "click", () => {
+      updateTabCounts();
       renderGalleryGrid();
       renderRecents();
       elements.growthGalleryDialog.showModal();
@@ -417,10 +603,178 @@ export function createGrowthController({
     }
   }
 
+  if (elements.growthBrushBtns) {
+    for (const btn of elements.growthBrushBtns) {
+      listen(btn, "click", () => {
+        const model = activeModel();
+        if (!model) return;
+        const brushMode = btn.dataset.brush;
+        if (!brushMode) return;
+        onParameterChange?.("disturbanceMode", brushMode);
+        schedulePausedRender();
+        update();
+      });
+    }
+  }
+
+  if (elements.growthBrushRadius) {
+    listen(elements.growthBrushRadius, "input", (e) => {
+      const val = Number(e.target.value);
+      if (elements.growthBrushRadiusVal) {
+        elements.growthBrushRadiusVal.textContent = `${val}px`;
+      }
+      onParameterChange?.("brushRadius", val);
+    });
+  }
+
+  if (elements.growthColorPicker) {
+    listen(elements.growthColorPicker, "input", (e) => {
+      const hex = e.target.value;
+      if (elements.growthColorHex) elements.growthColorHex.value = hex.toUpperCase();
+      onParameterChange?.("dyeColor", hex);
+      update();
+    });
+  }
+
+  if (elements.growthColorHex) {
+    listen(elements.growthColorHex, "change", (e) => {
+      let val = e.target.value.trim();
+      if (!val.startsWith("#")) val = "#" + val;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        if (elements.growthColorPicker) elements.growthColorPicker.value = val;
+        onParameterChange?.("dyeColor", val);
+        update();
+      } else {
+        const current = activeModel()?.parameters?.dyeColor || "#00f0ff";
+        e.target.value = current.toUpperCase();
+      }
+    });
+  }
+
+  if (elements.growthColorPills) {
+    listen(elements.growthColorPills, "click", (e) => {
+      const pill = e.target.closest(".color-preset-pill");
+      if (!pill || !pill.dataset.color) return;
+      const color = pill.dataset.color;
+      if (elements.growthColorPicker) elements.growthColorPicker.value = color;
+      if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+      onParameterChange?.("dyeColor", color);
+      update();
+    });
+  }
+
+  if (elements.growthFreezeLockMask) {
+    listen(elements.growthFreezeLockMask, "click", () => {
+      onParameterChange?.("barrierLock", "mask");
+      schedulePausedRender();
+      update();
+    });
+  }
+
+  if (elements.growthFreezeLockDraw) {
+    listen(elements.growthFreezeLockDraw, "click", () => {
+      onParameterChange?.("barrierLock", "draw");
+      schedulePausedRender();
+      update();
+    });
+  }
+
+  if (elements.growthOutlineSelect) {
+    listen(elements.growthOutlineSelect, "change", (e) => {
+      onParameterChange?.("barrierOutline", e.target.value);
+      schedulePausedRender();
+      update();
+    });
+  }
+
+  let canvasFocused = false;
+
+  function isTypingTarget(target) {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable
+    );
+  }
+
+  function clearBarriersAction() {
+    const model = activeModel();
+    if (!model?.ready) return;
+    model.clearBarrier();
+    if (elements.growthClearBarrierBtn) {
+      elements.growthClearBarrierBtn.classList.add("is-active");
+      setTimeout(() => {
+        elements.growthClearBarrierBtn?.classList.remove("is-active");
+      }, 180);
+    }
+    schedulePausedRender();
+  }
+
+  if (elements.growthClearBarrierBtn) {
+    listen(elements.growthClearBarrierBtn, "click", clearBarriersAction);
+  }
+
+  listen(document, "pointerdown", (event) => {
+    const isCanvas =
+      elements.canvas &&
+      (elements.canvas === event.target || elements.canvas.contains(event.target));
+    const isToolbar =
+      elements.growthCanvasTools &&
+      elements.growthCanvasTools.contains(event.target);
+    if (isCanvas) {
+      canvasFocused = true;
+    } else if (!isToolbar) {
+      canvasFocused = false;
+    }
+  });
+
+  listen(window, "keydown", (event) => {
+    if (!canvasFocused) return;
+    if (isTypingTarget(event.target)) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === "c" || event.key === "C") {
+      event.preventDefault();
+      clearBarriersAction();
+    }
+  });
+
+  let lastBeatTime = 0;
+  let beatArmed = true;
+
+  function onAudioFrame(levels, timestamp) {
+    const model = activeModel();
+    if (!model?.ready || !levels) return;
+    if (!levels.hasSignal) return;
+
+    const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
+    if (triggerKick < 0.25) {
+      beatArmed = true;
+    }
+    const elapsed = timestamp - lastBeatTime;
+    if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
+      lastBeatTime = timestamp;
+      beatArmed = false;
+      const mode = model.parameters?.beatShockwave || "off";
+      let triggered = false;
+      if (mode === "center") {
+        model.triggerBeatShockwave("center");
+        triggered = true;
+      }
+      if (triggered && !model.isClockRunning) {
+        schedulePausedRender();
+      }
+    }
+  }
+
   listen(elements.canvas, "pointerdown", handlePointerDown);
   listen(elements.canvas, "pointermove", handlePointerMove);
   listen(elements.canvas, "pointerup", release);
   listen(elements.canvas, "pointercancel", release);
   listen(elements.canvas, "lostpointercapture", release);
-  return { update, dispose: () => listeners.forEach((remove) => remove()) };
+  return {
+    update,
+    onAudioFrame,
+    dispose: () => listeners.forEach((remove) => remove()),
+  };
 }

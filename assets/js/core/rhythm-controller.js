@@ -1,26 +1,29 @@
 const SILENT_LEVELS = Object.freeze({
   bass: 0,
   kick: 0,
+  kickOnset: 0,
+  activity: 0,
   bassPhase: 0,
   hasSignal: false,
 });
 
-const LEVEL_ATTACK_SECONDS = 0.03;
-const LEVEL_RELEASE_SECONDS = 0.14;
-const KICK_BASELINE_ATTACK_SECONDS = 0.18;
-const KICK_BASELINE_RELEASE_SECONDS = 0.11;
-const KICK_RELEASE_SECONDS = 0.2;
-const KICK_MIN_ENERGY = 0.04;
-const KICK_ONSET_FLOOR = 0.015;
-const KICK_ONSET_GAIN = 5.5;
+const AMBIENT_ATTACK_SECONDS = 0.04;
+const AMBIENT_RELEASE_SECONDS = 0.18;
+const KICK_BASELINE_ATTACK_SECONDS = 0.5;
+const KICK_BASELINE_RELEASE_SECONDS = 0.3;
+const KICK_HOLD_SECONDS = 0.045;
+const KICK_RELEASE_SECONDS = 0.28;
+const KICK_ONSET_RELEASE_SECONDS = 0.035;
+
+const MIN_AUDIBLE_POWER = 0.000008;
+const MIN_RUNNING_PEAK = 0.035;
+const MAX_RUNNING_PEAK = 0.85;
+const MIN_RUNNING_FLOOR = 0.001;
+const MAX_RUNNING_FLOOR = 0.02;
+const MAX_AUTO_GAIN = 5.0;
 
 function clampUnit(value) {
   return Math.min(1, Math.max(0, Number(value) || 0));
-}
-
-function visualizerLevel(value) {
-  const gated = clampUnit((Number(value) - 0.025) / 0.9);
-  return gated ** 1.15;
 }
 
 export class RhythmController {
@@ -33,6 +36,7 @@ export class RhythmController {
     this.stream = null;
     this.captureStream = null;
     this.frequencyData = null;
+    this.floatFrequencyData = null;
     this.status = "idle";
     this.error = null;
     this.levels = SILENT_LEVELS;
@@ -40,6 +44,11 @@ export class RhythmController {
     this.lastSampleTimestamp = -1;
     this.slowBass = 0;
     this.kickEnvelope = 0;
+    this.kickOnsetEnvelope = 0;
+    this.kickHoldRemaining = 0;
+    this.activityEnvelope = 0;
+    this.runningPeak = 0.08;
+    this.runningFloor = 0.005;
     this.bassPhase = 0;
     this.listeners = new Set();
   }
@@ -132,6 +141,7 @@ export class RhythmController {
     analyser.smoothingTimeConstant = 0.15;
     this.analyser = analyser;
     this.frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    this.floatFrequencyData = new Float32Array(analyser.frequencyBinCount);
     return analyser;
   }
 
@@ -251,6 +261,7 @@ export class RhythmController {
     this.stream = null;
     this.captureStream = null;
     this.frequencyData = null;
+    this.floatFrequencyData = null;
 
     if (this.mediaElement) {
       this.mediaElement.pause();
@@ -275,12 +286,51 @@ export class RhythmController {
     this.lastSampleTimestamp = -1;
     this.slowBass = 0;
     this.kickEnvelope = 0;
+    this.kickOnsetEnvelope = 0;
+    this.kickHoldRemaining = 0;
+    this.runningPeak = 0.08;
+    this.runningFloor = 0.005;
     this.bassPhase = 0;
+  }
+
+  linearBandRMS(minimumHz, maximumHz) {
+    if (!this.analyser || !this.context) return 0;
+    const binWidth = this.context.sampleRate / this.analyser.fftSize;
+    if (binWidth <= 0) return 0;
+    const first = Math.max(0, Math.ceil(minimumHz / binWidth));
+    const last = Math.min(
+      this.analyser.frequencyBinCount - 1,
+      Math.floor(maximumHz / binWidth),
+    );
+    if (last < first) return 0;
+    let powerSum = 0;
+    let count = 0;
+    if (this.floatFrequencyData) {
+      for (let index = first; index <= last; index += 1) {
+        const db = this.floatFrequencyData[index];
+        if (Number.isFinite(db) && db > -100) {
+          powerSum += 10 ** (db / 10);
+        }
+        count += 1;
+      }
+    } else if (this.frequencyData) {
+      const minDb = this.analyser.minDecibels;
+      const maxDb = this.analyser.maxDecibels;
+      const span = maxDb - minDb;
+      for (let index = first; index <= last; index += 1) {
+        const norm = this.frequencyData[index] / 255;
+        const db = minDb + norm * span;
+        powerSum += 10 ** (db / 10);
+        count += 1;
+      }
+    }
+    return count > 0 ? Math.sqrt(powerSum / count) : 0;
   }
 
   rmsBand(minimumHz, maximumHz) {
     if (!this.analyser || !this.frequencyData || !this.context) return 0;
     const binWidth = this.context.sampleRate / this.analyser.fftSize;
+    if (binWidth <= 0) return 0;
     const first = Math.max(0, Math.ceil(minimumHz / binWidth));
     const last = Math.min(
       this.frequencyData.length - 1,
@@ -306,8 +356,8 @@ export class RhythmController {
     if (
       this.status !== "active" ||
       !this.analyser ||
-      !this.frequencyData ||
-      !this.context
+      !this.context ||
+      (!this.frequencyData && !this.floatFrequencyData)
     ) {
       this.levels = SILENT_LEVELS;
       return this.levels;
@@ -328,48 +378,159 @@ export class RhythmController {
           );
     this.lastSampleTimestamp = timestamp;
 
-    this.analyser.getByteFrequencyData(this.frequencyData);
-    const lowEnergy = this.rmsBand(30, 300);
-    const bodyEnergy = this.rmsBand(300, 2500);
-    const detailEnergy = this.rmsBand(2500, 10000);
-    const kickEnergy = this.rmsBand(35, 180);
-    const musicEnergy =
-      lowEnergy * 0.72 + bodyEnergy * 0.2 + detailEnergy * 0.08;
-    const rawBass = visualizerLevel(musicEnergy);
+    if (this.frequencyData) {
+      this.analyser.getByteFrequencyData(this.frequencyData);
+    }
+    if (this.floatFrequencyData) {
+      this.analyser.getFloatFrequencyData(this.floatFrequencyData);
+    }
 
-    const previous =
-      this.levels === SILENT_LEVELS ? SILENT_LEVELS : this.levels;
+    // Sub-bass band (28 - 160 Hz): covers fundamental bass notes across keys
+    const subEnergy = this.linearBandRMS(28, 160);
+    // Lower body band (160 - 600 Hz): instrumental warmth and low-mids
+    const bodyEnergy = this.linearBandRMS(160, 600);
+    // High air band (600 - 5000 Hz): texture and detail
+    const airEnergy = this.linearBandRMS(600, 5000);
+    // Kick band (45 - 130 Hz): acoustic and electronic kick punch
+    const kickBandEnergy = this.linearBandRMS(45, 130);
+
+    const totalPower =
+      subEnergy * subEnergy +
+      bodyEnergy * bodyEnergy +
+      airEnergy * airEnergy;
+    const hasSignal = totalPower > MIN_AUDIBLE_POWER;
+
     const smoothingAmount = (timeConstant) =>
       1 - Math.exp(-elapsed / timeConstant);
-    const smoothingTime =
-      rawBass > previous.bass ? LEVEL_ATTACK_SECONDS : LEVEL_RELEASE_SECONDS;
-    const bass =
-      previous.bass +
-      (rawBass - previous.bass) * smoothingAmount(smoothingTime);
 
-    // Follow the narrow kick band slowly; only a fast rise above it becomes a kick.
+    if (!hasSignal) {
+      const bassDecay = Math.exp(-elapsed / AMBIENT_RELEASE_SECONDS);
+      const kickDecay = Math.exp(-elapsed / KICK_RELEASE_SECONDS);
+      const onsetDecay = Math.exp(-elapsed / KICK_ONSET_RELEASE_SECONDS);
+
+      const previousBass =
+        this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
+      const bass = previousBass * bassDecay;
+      this.kickEnvelope *= kickDecay;
+      this.kickOnsetEnvelope *= onsetDecay;
+      this.slowBass *= Math.exp(-elapsed / KICK_BASELINE_RELEASE_SECONDS);
+      this.activityEnvelope *= Math.exp(-elapsed / 1.8);
+      this.bassPhase = (this.bassPhase + bass * elapsed) % 4096;
+
+      this.levels = Object.freeze({
+        bass: clampUnit(bass),
+        kick: clampUnit(this.kickEnvelope),
+        kickOnset: clampUnit(this.kickOnsetEnvelope),
+        activity: clampUnit(this.activityEnvelope),
+        bassPhase: this.bassPhase,
+        hasSignal: false,
+      });
+      return this.levels;
+    }
+
+    // Ambient energy prioritizes sub-bass while retaining gentle body response
+    const ambientEnergy =
+      subEnergy * 0.78 + bodyEnergy * 0.18 + airEnergy * 0.04;
+
+    // Safeguarded dynamic range tracking:
+    // Floor only tracks downward or drifts upward very slowly to protect sustained ambient drones
+    if (ambientEnergy < this.runningFloor) {
+      this.runningFloor = Math.max(MIN_RUNNING_FLOOR, ambientEnergy);
+    } else {
+      this.runningFloor = Math.min(
+        MAX_RUNNING_FLOOR,
+        this.runningFloor +
+          (0.005 - this.runningFloor) * smoothingAmount(15.0),
+      );
+    }
+
+    // Peak tracks upward quickly and leaks downward slowly over 4 seconds
+    if (ambientEnergy > this.runningPeak) {
+      this.runningPeak = Math.min(
+        MAX_RUNNING_PEAK,
+        this.runningPeak +
+          (ambientEnergy - this.runningPeak) * smoothingAmount(0.12),
+      );
+    } else {
+      this.runningPeak = Math.max(
+        MIN_RUNNING_PEAK,
+        this.runningPeak * Math.exp(-elapsed / 4.0),
+      );
+    }
+
+    const dynamicSpan = Math.max(
+      0.025,
+      this.runningPeak - this.runningFloor,
+    );
+    const autoGain = Math.min(MAX_AUTO_GAIN, 1.0 / dynamicSpan);
+    const normalizedAmbient = clampUnit(
+      (ambientEnergy - this.runningFloor) * autoGain,
+    );
+    // Smooth perceptual curve for ambient swells
+    const targetBass = clampUnit(Math.sqrt(normalizedAmbient) * 1.05);
+
+    const previousBass =
+      this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
+    const bassTime =
+      targetBass > previousBass
+        ? AMBIENT_ATTACK_SECONDS
+        : AMBIENT_RELEASE_SECONDS;
+    const bass =
+      previousBass + (targetBass - previousBass) * smoothingAmount(bassTime);
+
+    // Kick transient detection using slow baseline tracking
+    const normalizedKick = clampUnit(
+      (kickBandEnergy - this.runningFloor) * autoGain,
+    );
     const baselineTimeConstant =
-      kickEnergy > this.slowBass
+      normalizedKick > this.slowBass
         ? KICK_BASELINE_ATTACK_SECONDS
         : KICK_BASELINE_RELEASE_SECONDS;
     this.slowBass +=
-      (kickEnergy - this.slowBass) * smoothingAmount(baselineTimeConstant);
+      (normalizedKick - this.slowBass) *
+      smoothingAmount(baselineTimeConstant);
 
-    const kickOnset = Math.max(
-      0,
-      kickEnergy - this.slowBass - KICK_ONSET_FLOOR,
-    );
-    const kickTarget =
-      kickEnergy > KICK_MIN_ENERGY ? clampUnit(kickOnset * KICK_ONSET_GAIN) : 0;
-    const kickRelease = Math.exp(-elapsed / KICK_RELEASE_SECONDS);
-    this.kickEnvelope = Math.max(kickTarget, this.kickEnvelope * kickRelease);
+    const kickExcess = Math.max(0, normalizedKick - this.slowBass - 0.06);
+    const kickHit = kickExcess > 0.04 && normalizedKick > 0.12;
+    const kickStrength = kickHit ? clampUnit(kickExcess * 4.5) : 0;
+
+    // Decoupled kick envelopes:
+    // 1. Transient onset pulse for shockwave triggering (fast decay, re-arms < 60ms)
+    if (kickStrength > this.kickOnsetEnvelope) {
+      this.kickOnsetEnvelope = kickStrength;
+    } else {
+      this.kickOnsetEnvelope *= Math.exp(
+        -elapsed / KICK_ONSET_RELEASE_SECONDS,
+      );
+    }
+
+    // 2. Sustain modulation envelope for visual parameters (hold + smooth release)
+    if (kickStrength > 0.3) {
+      this.kickEnvelope = Math.max(this.kickEnvelope, kickStrength);
+      this.kickHoldRemaining = KICK_HOLD_SECONDS;
+    } else if (this.kickHoldRemaining > 0) {
+      this.kickHoldRemaining -= elapsed;
+    } else {
+      this.kickEnvelope *= Math.exp(-elapsed / KICK_RELEASE_SECONDS);
+    }
+
+    const rawEnergy = clampUnit(Math.sqrt(normalizedAmbient));
+    if (rawEnergy > this.activityEnvelope) {
+      this.activityEnvelope +=
+        (rawEnergy - this.activityEnvelope) * smoothingAmount(0.08);
+    } else {
+      this.activityEnvelope *= Math.exp(-elapsed / 1.8);
+    }
+
     this.bassPhase = (this.bassPhase + bass * elapsed) % 4096;
 
     this.levels = Object.freeze({
       bass: clampUnit(bass),
       kick: clampUnit(this.kickEnvelope),
+      kickOnset: clampUnit(this.kickOnsetEnvelope),
+      activity: clampUnit(this.activityEnvelope),
       bassPhase: this.bassPhase,
-      hasSignal: musicEnergy > 0.02,
+      hasSignal: true,
     });
     return this.levels;
   }

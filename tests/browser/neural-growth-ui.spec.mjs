@@ -43,7 +43,7 @@ async function selectGrowth(page) {
   await expect(page.locator("#step-growth")).toBeEnabled();
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
-    "128",
+    "256",
   );
 }
 
@@ -116,9 +116,9 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(2);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(5);
   await expect(page.locator("#save-gif")).toBeDisabled();
-  await expect(page.locator("#run-experiment")).toBeDisabled();
+  await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
   await page.locator("#step-growth").click();
   await expect(page.locator("#growth-status")).toHaveAttribute(
@@ -152,7 +152,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   expect(errors).toEqual([]);
 });
 
-test("PNG is an immutable snapshot, with no fictitious high-resolution or Saved Run capture", async ({
+test("PNG is an immutable snapshot and experiment runs save to archive", async ({
   page,
   request,
 }) => {
@@ -176,11 +176,9 @@ test("PNG is an immutable snapshot, with no fictitious high-resolution or Saved 
   );
   expect(await state(page)).toEqual(before);
   await page.keyboard.press("Control+Enter");
-  await expect(page.locator("#status-message")).toContainText(
-    "SAVED RUNS DO NOT STORE GRID STATE",
-  );
+  await expect(page.locator("#status-message")).toContainText("SAVED");
   await page.locator('[data-view="archive"]').click();
-  await expect(page.locator(".run-card")).toHaveCount(0);
+  await expect(page.locator(".run-card")).toHaveCount(1);
   for (const [asset, text] of [
     ["/models/neural-growth/NOTICE.md", "CC-BY-4.0"],
     ["/licenses/neural-growth-Apache-2.0.txt", "Apache License"],
@@ -222,10 +220,10 @@ test("live growth pauses without catch-up; seed, grid and restart reset only exp
     "0",
   );
   expect((await state(page)).seed).toBe(42);
-  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("256");
+  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("128");
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
-    "256",
+    "128",
   );
   expect((await state(page)).steps).toBe(0);
   await page.locator("#step-growth").click();
@@ -263,7 +261,7 @@ test("pointer disturbance uses the displayed field's bottom-up coordinates", asy
   );
   await expect
     .poll(() => page.evaluate(() => window.__lastDisturbance))
-    .toEqual([64, 95, 8]);
+    .toEqual([128, 191, 16]);
   expect((await state(page)).steps).toBe(2);
 });
 
@@ -539,7 +537,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   const dialog = page.locator("#growth-gallery-dialog");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#growth-gallery-count")).toContainText("69");
+  await expect(page.locator("#growth-gallery-count")).toContainText("91");
 
   // Filter tab: Textures (39)
   await page.locator(".growth-gallery__tab[data-filter='texture']").click();
@@ -561,6 +559,27 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
   await expect(page.locator("#growth-gallery-count")).toContainText("1");
 
+  // Filter tab: Originals (25) and check citation info overlay
+  await page.locator(".growth-gallery__tab[data-filter='organic']").click();
+  await expect(page.locator("#growth-gallery-count")).toContainText("25");
+
+  const organicCard = page.locator(".growth-gallery__card").first();
+  const cardSubId = await organicCard.locator(".growth-gallery__card-id").textContent();
+  expect(cardSubId).not.toContain("glitch/");
+  expect(cardSubId).not.toContain("overnight/");
+
+  const infoBtn = organicCard.locator(".growth-gallery__info-btn");
+  await expect(infoBtn).toBeVisible();
+  await infoBtn.click();
+  const infoOverlay = organicCard.locator(".growth-gallery__info-overlay");
+  await expect(infoOverlay).toBeVisible();
+  await expect(infoOverlay).toContainText("Source Imagery");
+  await organicCard.locator(".growth-gallery__info-overlay-close").click();
+  await expect(infoOverlay).not.toBeVisible();
+
+  // Switch back to favorites tab to select the bookmarked card
+  await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
+
   // Select pattern from gallery
   const card = page.locator(".growth-gallery__card").first();
   await card.click();
@@ -580,6 +599,9 @@ test("continuous rotation and growth speed expose modulation controls with circu
   const rotationMod = page.locator('button.modulation-toggle[data-key="rotation"]');
   await expect(rotationMod).toBeVisible();
 
+  const lightAngleMod = page.locator('button.modulation-toggle[data-key="lightAngle"]');
+  await expect(lightAngleMod).toBeVisible();
+
   const speedMod = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
   await expect(speedMod).toBeVisible();
 
@@ -597,4 +619,258 @@ test("continuous rotation and growth speed expose modulation controls with circu
   });
   expect(wrapped).toEqual([15, 345, 0]);
 });
+
+test("coordinate geometry selector switches modes, updates smart pitch defaults, and steps WebGL cleanly", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  // Check controls exist
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await expect(geometrySelect).toBeVisible();
+  await expect(geometrySelect).toHaveValue("cartesian");
+
+  const twistInput = page.getByLabel("SPIRAL PITCH / TWIST", { exact: true });
+  await expect(twistInput).toBeVisible();
+  await expect(twistInput).toHaveValue("0");
+
+  const twistMod = page.locator('button.modulation-toggle[data-key="twist"]');
+  await expect(twistMod).toBeVisible();
+
+  // Switch to spiral: should apply smart default 35 deg pitch
+  await geometrySelect.selectOption("spiral");
+  await expect(twistInput).toHaveValue("35");
+
+  // Step growth in spiral mode
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "1",
+  );
+
+  // Switch to julia fractal
+  await geometrySelect.selectOption("julia");
+  await expect(twistInput).toHaveValue("0");
+
+  // Step in julia mode
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "2",
+  );
+
+  // Switch to dipole
+  await geometrySelect.selectOption("dipole");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "3",
+  );
+
+  // Switch to vortex
+  await geometrySelect.selectOption("vortex");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "4",
+  );
+
+  // Context is healthy with 0 errors
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
+test("interactive brushes support top toolbar, color presets, ripple, freeze/thaw and flow grooming", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  // Check top canvas toolbar is visible
+  const canvasToolbar = page.locator("#growth-canvas-tools");
+  await expect(canvasToolbar).toBeVisible();
+
+  // Click COLOR brush in top toolbar
+  const colorBtn = page.locator('.growth-brush-btn[data-brush="dye"]');
+  await expect(colorBtn).toBeVisible();
+  await colorBtn.click();
+  await expect(colorBtn).toHaveClass(/is-active/);
+
+  // Check color options row is visible in canvas toolbar
+  const colorOptions = page.locator("#growth-color-options");
+  await expect(colorOptions).toBeVisible();
+
+  // Click Magenta preset pill in canvas toolbar
+  const magentaPill = colorOptions.locator(".color-preset-pill[data-color='#ff00a0']");
+  await expect(magentaPill).toBeVisible();
+  await magentaPill.click();
+
+  const colorPicker = page.locator("#growth-color-picker");
+  await expect(colorPicker).toHaveValue("#ff00a0");
+  const hexInput = page.locator("#growth-color-hex");
+  await expect(hexInput).toHaveValue("#FF00A0");
+
+  // Perform pointer disturbance in color mode
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to ripple and click
+  const rippleBtn = page.locator('.growth-brush-btn[data-brush="shockwave"]');
+  await rippleBtn.click();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to freeze and click/drag
+  const freezeBtn = page.locator('.growth-brush-btn[data-brush="freeze"]');
+  await freezeBtn.click();
+  const freezeOptions = page.locator("#growth-freeze-options");
+  await expect(freezeOptions).toBeVisible();
+
+  // Test freeze lock mode toggle (MASK vs DRAW)
+  const maskBtn = page.locator("#growth-freeze-lock-mask");
+  const drawBtn = page.locator("#growth-freeze-lock-draw");
+  await expect(maskBtn).toBeVisible();
+  await expect(drawBtn).toBeVisible();
+  await expect(maskBtn).toHaveClass(/is-active/);
+  await drawBtn.click();
+  await expect(drawBtn).toHaveClass(/is-active/);
+  await expect(maskBtn).not.toHaveClass(/is-active/);
+  await maskBtn.click();
+  await expect(maskBtn).toHaveClass(/is-active/);
+
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Test clear barrier button is accessible across modes
+  const clearBarrierBtn = page.locator("#growth-clear-barrier-btn");
+  await expect(clearBarrierBtn).toBeVisible();
+  await clearBarrierBtn.click();
+
+  // Switch to unfreeze and click
+  const thawBtn = page.locator('.growth-brush-btn[data-brush="thaw"]');
+  await thawBtn.click();
+  await expect(clearBarrierBtn).toBeVisible();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Switch to flow and drag stroke
+  const flowBtn = page.locator('.growth-brush-btn[data-brush="groom"]');
+  await flowBtn.click();
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 80, box.y + 20);
+  await page.mouse.up();
+
+  // Test C key shortcut clearing barriers when canvas is focused
+  await freezeBtn.click();
+  await page.mouse.click(box.x + 40, box.y + 40);
+  await page.keyboard.press("c");
+  await expect(clearBarrierBtn).toBeVisible();
+
+  // Test clicking outside unfocuses canvas for C key
+  const brand = page.locator("#brand-home");
+  await brand.click();
+  await page.keyboard.press("c");
+
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
+test("audio-reactive presets configure modulation routes and synchronize with MOD panels", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  const audioSelect = page.getByLabel("AUDIO REACT", { exact: true });
+  await expect(audioSelect).toBeVisible();
+  await expect(audioSelect).toHaveValue("off");
+
+  const shockwaveSelect = page.getByLabel("BEAT SHOCKWAVE", { exact: true });
+  await expect(shockwaveSelect).toBeVisible();
+  await expect(shockwaveSelect).toHaveValue("off");
+
+  const styleSelect = page.getByLabel("SHOCKWAVE STYLE", { exact: true });
+  await expect(styleSelect).toBeVisible();
+  await expect(styleSelect).toHaveValue("refract");
+
+  const impactSelect = page.getByLabel("SHOCKWAVE IMPACT", { exact: true });
+  await expect(impactSelect).toBeVisible();
+  await expect(impactSelect).toHaveValue("color");
+
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await expect(geometrySelect).toHaveValue("cartesian");
+
+  // Select Continuous preset: switches Cartesian geometry to Vortex, sets base values and LFOs
+  await audioSelect.selectOption("continuous");
+  await expect(shockwaveSelect).toHaveValue("off");
+  await expect(geometrySelect).toHaveValue("vortex");
+
+  // Check animation starts immediately without audio
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
+
+  // Check reliefStrength MOD toggle is active
+  const reliefModToggle = page.locator('button.modulation-toggle[data-key="reliefStrength"]');
+  await expect(reliefModToggle).toHaveClass(/is-active/);
+
+  // Open reliefStrength MOD drawer if not already open
+  const reliefSource = page.locator('select[aria-label="RELIEF DEPTH audio source"]');
+  if (await reliefSource.isHidden()) {
+    await reliefModToggle.click();
+  }
+  await expect(reliefSource).toBeVisible();
+  await expect(reliefSource).toHaveValue("kick");
+
+  const reliefLfoCheckbox = page.locator('.control-block:has-text("RELIEF DEPTH") input[aria-label="Enable RELIEF DEPTH LFO"]');
+  await expect(reliefLfoCheckbox).toBeChecked();
+
+  // Changing shockwave mode independently preserves audio preset
+  await shockwaveSelect.selectOption("center");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await styleSelect.selectOption("chromatic");
+  await expect(styleSelect).toHaveValue("chromatic");
+  await impactSelect.selectOption("none");
+  await expect(impactSelect).toHaveValue("none");
+  await expect(audioSelect).toHaveValue("continuous");
+
+  // Switch to Subtle preset: preserves shockwave selection and preserves current non-Cartesian geometry (Vortex)
+  await audioSelect.selectOption("subtle");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(styleSelect).toHaveValue("chromatic");
+  await expect(impactSelect).toHaveValue("none");
+  await expect(geometrySelect).toHaveValue("vortex");
+  await expect(reliefSource).toHaveValue("kick");
+  await expect(reliefLfoCheckbox).not.toBeChecked();
+
+  // Verify twist LFO is active in Subtle
+  const twistModToggle = page.locator('button.modulation-toggle[data-key="twist"]');
+  await expect(twistModToggle).toHaveClass(/is-active/);
+
+  // Switch to Dynamic preset: verifies dynamic configuration and LFO activation
+  await audioSelect.selectOption("dynamic");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(geometrySelect).toHaveValue("vortex");
+  await expect(reliefSource).toHaveValue("kick");
+  await expect(reliefLfoCheckbox).toBeChecked();
+
+  // Verify growth speed base value for dynamic is 45 (calm baseline)
+  const growthSpeedInput = page.locator('.control-block:has-text("GROWTH SPEED") input.fine-input');
+  await expect(growthSpeedInput).toHaveValue("45");
+
+  // Tweak audio depth to trigger custom profile detection
+  const depthInput = page.locator('.control-block:has-text("RELIEF DEPTH") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  await depthInput.fill("0.85");
+  await depthInput.dispatchEvent("input");
+
+  // Verify AUDIO REACT select dynamically transitioned to custom
+  await expect(audioSelect).toHaveValue("custom");
+
+  // Save run to archive and verify
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator("#status-message")).toContainText("SAVED");
+  await page.locator('[data-view="archive"]').click();
+  await expect(page.locator(".run-card")).toHaveCount(1);
+});
+
+
 
