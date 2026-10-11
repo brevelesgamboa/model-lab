@@ -680,6 +680,7 @@ export class NeuralGrowthModel {
   step() {
     if (!this.ready) return;
     this._drainDisturbances();
+    this._applyWavefrontDisturbances();
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
     const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
     this._runRuntime(() =>
@@ -692,6 +693,52 @@ export class NeuralGrowthModel {
     );
     this._lastTick = null;
     this._accumulator = 0;
+  }
+
+  _applyWavefrontDisturbances() {
+    if (
+      !this._runtime ||
+      !this._activeRipples ||
+      this._activeRipples.length === 0
+    )
+      return;
+    const impact = this._parameters.shockwaveImpact || "none";
+    if (impact === "none") return;
+
+    const now = performance.now();
+    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
+    const rgb = hexToRgb(this._parameters.dyeColor || "#00f0ff");
+
+    for (const r of this._activeRipples) {
+      const elapsed = (now - r.startTime) / 1000;
+      const progress = elapsed / r.duration;
+      if (progress <= 0.05 || progress >= 1.0) continue;
+
+      const currentRadius = progress * r.radius;
+      if (
+        r.lastAppliedRadius &&
+        Math.abs(currentRadius - r.lastAppliedRadius) < 4
+      ) {
+        continue;
+      }
+      r.lastAppliedRadius = currentRadius;
+
+      const waveWidth = Math.max(6, Math.min(24, r.radius * 0.1));
+      const fade = Math.pow(1 - progress, 1.2);
+      const strength = Math.min(
+        1.0,
+        Math.max(0.25, (r.amplitude || 1.0) * fade),
+      );
+
+      this._runtime.disturb(r.x, r.y, r.radius, "shockwave", {
+        dyeColor: rgb,
+        lockBarrier,
+        shockwaveImpact: impact,
+        ringRadius: currentRadius,
+        ringWidth: waveWidth,
+        strength,
+      });
+    }
   }
 
   restart() {
@@ -783,6 +830,9 @@ export class NeuralGrowthModel {
           };
           if (mode === "shockwave") {
             opts.shockwaveImpact = this._parameters.shockwaveImpact || "none";
+            opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
+            opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
+            opts.strength = 1.0;
           }
           this._runtime.disturb(x, y, radius, mode, opts);
         } else {
@@ -870,13 +920,23 @@ export class NeuralGrowthModel {
       x = coords.x;
       y = coords.y;
     }
-    const chosenRadius =
-      Number(customRadius || this._parameters.brushRadius) ||
-      Math.round(size * 0.15);
-    const radius = Math.max(
-      8,
-      Math.min(Math.floor(size / 2), Math.round(chosenRadius)),
-    );
+    const reach = this._parameters?.shockwaveReach || "canvas";
+    let radius = 16;
+    if (reach === "canvas") {
+      const d1 = Math.hypot(x, y);
+      const d2 = Math.hypot(size - x, y);
+      const d3 = Math.hypot(x, size - y);
+      const d4 = Math.hypot(size - x, size - y);
+      radius = Math.ceil(Math.max(d1, d2, d3, d4));
+    } else {
+      const chosen =
+        Number(customRadius || this._parameters?.brushRadius) ||
+        Math.round(size * 0.15);
+      radius = Math.max(
+        8,
+        Math.min(Math.floor(size / 2), Math.round(chosen)),
+      );
+    }
     this.queueDisturbance(x, y, radius, "shockwave");
     return true;
   }
