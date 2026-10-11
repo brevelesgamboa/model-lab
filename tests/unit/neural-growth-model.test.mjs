@@ -520,10 +520,10 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
 
   const reachControl = model.controls.find((c) => c.key === "shockwaveReach");
   assert.ok(reachControl);
-  assert.equal(reachControl.default, "brush");
+  assert.equal(reachControl.default, "canvas");
   assert.deepEqual(
     reachControl.options.map((o) => o.value),
-    ["brush", "canvas"],
+    ["canvas", "brush"],
   );
 
   const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");

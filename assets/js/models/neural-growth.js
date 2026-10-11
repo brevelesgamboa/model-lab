@@ -169,12 +169,12 @@ export class NeuralGrowthModel {
         key: "shockwaveReach",
         label: "SHOCKWAVE REACH",
         type: "select",
-        default: "brush",
+        default: "canvas",
         options: [
-          { value: "brush", label: "Follow Brush" },
           { value: "canvas", label: "Whole Canvas" },
+          { value: "brush", label: "Follow Brush" },
         ],
-        help: "Shockwave coverage range: follow current brush radius or expand across the entire canvas.",
+        help: "Shockwave coverage range: expand across the entire canvas or follow current brush radius.",
       },
       {
         key: "brushRadius",
@@ -784,7 +784,7 @@ export class NeuralGrowthModel {
       0,
       Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
     );
-    const reach = this._parameters?.shockwaveReach || "brush";
+    const reach = this._parameters?.shockwaveReach || "canvas";
     let radius = 16;
     if (reach === "canvas") {
       const d1 = Math.hypot(originX, originY);
