@@ -790,9 +790,16 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(shockwaveSelect).toBeVisible();
   await expect(shockwaveSelect).toHaveValue("off");
 
-  // Select Rhythm preset: sets reliefStrength route while preserving independent shockwave select
-  await audioSelect.selectOption("rhythm");
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await expect(geometrySelect).toHaveValue("cartesian");
+
+  // Select Continuous preset: switches Cartesian geometry to Vortex, sets base values and LFOs
+  await audioSelect.selectOption("continuous");
   await expect(shockwaveSelect).toHaveValue("off");
+  await expect(geometrySelect).toHaveValue("vortex");
+
+  // Check animation starts immediately without audio
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
 
   // Check reliefStrength MOD toggle is active
   const reliefModToggle = page.locator('button.modulation-toggle[data-key="reliefStrength"]');
@@ -806,15 +813,24 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(reliefSource).toBeVisible();
   await expect(reliefSource).toHaveValue("kick");
 
+  const reliefLfoCheckbox = page.locator('.control-block:has-text("RELIEF DEPTH") input[aria-label="Enable RELIEF DEPTH LFO"]');
+  await expect(reliefLfoCheckbox).toBeChecked();
+
   // Changing shockwave mode independently preserves audio preset
   await shockwaveSelect.selectOption("center");
   await expect(shockwaveSelect).toHaveValue("center");
-  await expect(audioSelect).toHaveValue("rhythm");
+  await expect(audioSelect).toHaveValue("continuous");
 
-  // Switch to Ambient preset: preserves shockwave selection
-  await audioSelect.selectOption("ambient");
+  // Switch to Subtle preset: preserves shockwave selection and preserves current non-Cartesian geometry (Vortex)
+  await audioSelect.selectOption("subtle");
   await expect(shockwaveSelect).toHaveValue("center");
-  await expect(reliefSource).toHaveValue("bass");
+  await expect(geometrySelect).toHaveValue("vortex");
+  await expect(reliefSource).toHaveValue("kick");
+  await expect(reliefLfoCheckbox).not.toBeChecked();
+
+  // Verify twist LFO is active in Subtle
+  const twistModToggle = page.locator('button.modulation-toggle[data-key="twist"]');
+  await expect(twistModToggle).toHaveClass(/is-active/);
 
   // Tweak audio depth to trigger custom profile detection
   const depthInput = page.locator('.control-block:has-text("RELIEF DEPTH") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');

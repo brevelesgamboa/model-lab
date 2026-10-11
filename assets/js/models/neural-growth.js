@@ -145,13 +145,13 @@ export class NeuralGrowthModel {
         type: "select",
         default: "off",
         options: [
-          { value: "off", label: "Off · Manual MOD" },
-          { value: "ambient", label: "Ambient · Sub-Bass Swell" },
-          { value: "rhythm", label: "Rhythm · Beat Drive" },
-          { value: "dynamic", label: "Dynamic · High Energy" },
-          { value: "custom", label: "Custom · User Defined" },
+          { value: "off", label: "Off" },
+          { value: "subtle", label: "Subtle" },
+          { value: "continuous", label: "Continuous" },
+          { value: "dynamic", label: "Dynamic" },
+          { value: "custom", label: "Custom" },
         ],
-        help: "Audio-reactive presets configuring modulation routes for speed, twist, relief, and lighting. Fully editable in parameter MOD panels.",
+        help: "Audio-reactive presets configuring base parameters, modulation routes, and LFOs. Fully editable in parameter MOD panels.",
       },
       {
         key: "beatShockwave",
@@ -415,6 +415,15 @@ export class NeuralGrowthModel {
       return { disturbanceMode: "shockwave" };
     }
     return null;
+  }
+
+  normalizeStoredParameter(key, value) {
+    if (key === "audioProfile") {
+      if (value === "ambient" || value === "rhythm") {
+        return "custom";
+      }
+    }
+    return value;
   }
 
   onParameterChange(key, value) {

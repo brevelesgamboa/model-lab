@@ -75,6 +75,7 @@ import {
 import { clamp, deepClone, randomSeed } from "./core/utils.js";
 import {
   AUDIO_PROFILES,
+  PROFILE_PARAMS,
   detectAudioProfile,
 } from "./models/neural-growth/audio-profiles.js";
 
@@ -202,6 +203,8 @@ const growthController = createGrowthController({
     currentModel?.onParameterChange?.(key, value);
     if (key === "audioProfile") {
       applyAudioProfile(value);
+    } else if (key !== "beatShockwave" && key !== "shockwaveReach") {
+      checkAudioProfileMatch();
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
@@ -255,6 +258,13 @@ const controlsController = createControlsController({
     }
     if (currentModel.id === "neural-growth") {
       growthController.update();
+      if (
+        definition.key !== "audioProfile" &&
+        definition.key !== "beatShockwave" &&
+        definition.key !== "shockwaveReach"
+      ) {
+        checkAudioProfileMatch();
+      }
     }
     renderCurrentFrame({ forceAnalysis: true });
   },
@@ -833,6 +843,9 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   }
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
   markPresetCustom();
+  if (currentModel.id === "neural-growth") {
+    checkAudioProfileMatch();
+  }
   invalidateCurrentRun("PARAMETERS CHANGED - SAVE WHEN READY");
   if (
     currentModel.id === "inception-dream" &&
@@ -904,17 +917,48 @@ function applyAudioProfile(profileKey) {
   const profile = AUDIO_PROFILES[profileKey];
   if (!profile) return;
 
-  const targetParams = [
-    "growthSpeed",
-    "twist",
-    "lightAngle",
-    "reliefStrength",
-  ];
-  targetParams.forEach((key) => {
-    const route = profile.routes[key] || { source: "none", depth: 0.25 };
+  if (profile.base) {
+    Object.entries(profile.base).forEach(([key, val]) => {
+      currentParameters[key] = val;
+      const control = controlElements.get(key);
+      if (control) {
+        if (control.slider) control.slider.value = String(val);
+        if (control.fine) control.fine.value = String(val);
+        if (control.select) control.select.value = String(val);
+        control.guidance?.update(val);
+      }
+    });
+  }
+
+  if (profileKey === "continuous") {
+    if (currentParameters.coordinateTransform === "cartesian") {
+      currentParameters.coordinateTransform = "vortex";
+      const control = controlElements.get("coordinateTransform");
+      if (control?.select) {
+        control.select.value = "vortex";
+        control.guidance?.update("vortex");
+      }
+    }
+  }
+
+  PROFILE_PARAMS.forEach((key) => {
+    const route = profile.routes?.[key] || { source: "none", depth: 0.25 };
     setAudioRoute("neural-growth", key, route);
     const control = controlElements.get(key);
     control?.syncAudioRoute?.(route);
+
+    if (profile.lfos?.[key]) {
+      currentLfoState[key] = {
+        ...(currentLfoState[key] || defaultLfoConfig()),
+        ...profile.lfos[key],
+      };
+    } else {
+      if (currentLfoState[key]) {
+        currentLfoState[key].enabled = false;
+      }
+    }
+    control?.syncLfoConfig?.(currentLfoState[key]);
+
     const hasAudio = route.source !== "none";
     const lfoActive = Boolean(currentLfoState[key]?.enabled);
     const active = hasAudio || lfoActive;
@@ -922,13 +966,25 @@ function applyAudioProfile(profileKey) {
     control?.modulationToggle?.setAttribute("aria-pressed", String(active));
   });
 
+  const shouldAnimate =
+    hasActiveLfo(currentLfoState) || hasActiveAudioRoute("neural-growth");
+  if (shouldAnimate) {
+    setAnimation(true, { log: false });
+  }
+
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
+  modelLfoState.set(currentModel.id, deepClone(currentLfoState));
   invalidateCurrentRun("AUDIO PROFILE APPLIED - SAVE WHEN READY");
   updateLfoCount();
+  requestAnimationFrame(() =>
+    updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds)),
+  );
+  renderCurrentFrame({ forceAnalysis: true });
+
   if (profileKey !== "off" && rhythmController.status !== "active") {
     terminal(
       "AUDIO",
-      "Loaded " + profile.label + ". Connect audio input (click EQ in status bar) to activate.",
+      "Loaded " + profile.label + ". Connect audio input (click EQ in status bar) to activate kick modulation.",
     );
   }
 }
@@ -937,7 +993,11 @@ function checkAudioProfileMatch() {
   if (currentModel.id !== "neural-growth") return;
   const currentProfileKey = currentParameters.audioProfile || "off";
   const matrix = audioMatrixForModel("neural-growth");
-  const detected = detectAudioProfile(matrix);
+  const detected = detectAudioProfile({
+    matrix,
+    parameters: currentParameters,
+    lfoState: currentLfoState,
+  });
   if (currentProfileKey !== detected) {
     currentParameters.audioProfile = detected;
     modelParameterState.set("neural-growth", deepClone(currentParameters));

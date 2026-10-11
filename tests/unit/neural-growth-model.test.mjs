@@ -511,7 +511,11 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   assert.equal(profileControl.default, "off");
   assert.deepEqual(
     profileControl.options.map((o) => o.value),
-    ["off", "ambient", "rhythm", "dynamic", "custom"],
+    ["off", "subtle", "continuous", "dynamic", "custom"],
+  );
+  assert.deepEqual(
+    profileControl.options.map((o) => o.label),
+    ["Off", "Subtle", "Continuous", "Dynamic", "Custom"],
   );
 
   const reachControl = model.controls.find((c) => c.key === "shockwaveReach");
@@ -530,29 +534,41 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["off", "center", "pointer"],
   );
 
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "rhythm"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "ambient"), null);
+  assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "off"), null);
   assert.deepEqual(model.parameterDefaultsForChange("beatShockwave", "pointer"), {
     disturbanceMode: "shockwave",
   });
 
+  // Backward compatibility: legacy saved ambient and rhythm runs reopen as custom
+  assert.equal(model.normalizeStoredParameter("audioProfile", "ambient"), "custom");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "rhythm"), "custom");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("audioProfile", "continuous"), "continuous");
+
   assert.equal(detectAudioProfile({}), "off");
-  assert.equal(
-    detectAudioProfile({
-      reliefStrength: { source: "bass", depth: 0.25 },
-      lightAngle: { source: "bass", depth: 0.15 },
-    }),
-    "ambient",
-  );
-  assert.equal(
-    detectAudioProfile({
-      reliefStrength: { source: "kick", depth: 0.35 },
-      twist: { source: "bass", depth: 0.15 },
-    }),
-    "rhythm",
-  );
+
+  // Subtle route detection
+  const subtleRoutes = {
+    rotation: { source: "kick", depth: 0.25 },
+    twist: { source: "kick", depth: 0.01 },
+    reliefStrength: { source: "kick", depth: 0.25 },
+    lightAngle: { source: "kick", depth: -0.10 },
+  };
+  assert.equal(detectAudioProfile(subtleRoutes), "subtle");
+
+  // Continuous route detection
+  const continuousRoutes = {
+    rotation: { source: "kick", depth: 0.05 },
+    twist: { source: "kick", depth: 0.05 },
+    reliefStrength: { source: "kick", depth: -1.00 },
+    lightAngle: { source: "kick", depth: 1.00 },
+  };
+  assert.equal(detectAudioProfile(continuousRoutes), "continuous");
+
+  // Dynamic route detection
   assert.equal(
     detectAudioProfile({
       reliefStrength: { source: "kick", depth: 0.45 },
@@ -561,11 +577,96 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     }),
     "dynamic",
   );
+
+  // Custom route detection
   assert.equal(
     detectAudioProfile({
       reliefStrength: { source: "kick", depth: 0.8 },
     }),
     "custom",
+  );
+
+  // Composite preset recognition with base values and LFOs
+  const subtleBase = {
+    growthSpeed: 60,
+    rotation: 185,
+    twist: 0,
+    reliefStrength: 1.8,
+    lightAngle: 210,
+    shading: "relief",
+    coordinateTransform: "cartesian",
+    beatShockwave: "center",
+    shockwaveReach: "canvas",
+  };
+  const subtleLfos = {
+    rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
+    twist: { enabled: true, rate: 0.04, depth: 0.72, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: false, rate: 0.10, depth: 1.00, phase: 0 },
+    lightAngle: { enabled: false, rate: 0.10, depth: 0.20, phase: 0 },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: subtleBase,
+      lfoState: subtleLfos,
+    }),
+    "subtle",
+  );
+
+  // Editing base values switches selection to custom
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: { ...subtleBase, rotation: 200 },
+      lfoState: subtleLfos,
+    }),
+    "custom",
+  );
+
+  // Editing LFO settings switches selection to custom
+  assert.equal(
+    detectAudioProfile({
+      matrix: subtleRoutes,
+      parameters: subtleBase,
+      lfoState: {
+        ...subtleLfos,
+        twist: { enabled: false },
+      },
+    }),
+    "custom",
+  );
+
+  // Continuous with Cartesian geometry fails recognition (must be vortex or other non-cartesian)
+  const continuousBase = {
+    growthSpeed: 100,
+    rotation: 180,
+    twist: 0,
+    reliefStrength: 1.5,
+    lightAngle: 180,
+    shading: "relief",
+    coordinateTransform: "cartesian",
+  };
+  const continuousLfos = {
+    rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
+    twist: { enabled: true, rate: 0.01, depth: 0.50, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: true, rate: 0.005, depth: 1.00, phase: 1.00, waveform: "sine" },
+    lightAngle: { enabled: true, rate: 0.01, depth: 1.00, phase: 0, waveform: "sine" },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: continuousRoutes,
+      parameters: continuousBase,
+      lfoState: continuousLfos,
+    }),
+    "custom",
+  );
+  assert.equal(
+    detectAudioProfile({
+      matrix: continuousRoutes,
+      parameters: { ...continuousBase, coordinateTransform: "vortex" },
+      lfoState: continuousLfos,
+    }),
+    "continuous",
   );
 
   assert.equal(model.triggerBeatShockwave("off"), false);

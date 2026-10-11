@@ -393,6 +393,7 @@ export function createControlsController({
           modulationPanel: modulation.panel,
           modulationVisualizer: modulation.visualizer,
           syncAudioRoute: modulation.syncAudioRoute,
+          syncLfoConfig: modulation.syncLfoConfig,
           modulationTrack,
           modulationRange,
           baseMarker,
