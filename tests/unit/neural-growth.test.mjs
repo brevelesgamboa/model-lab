@@ -116,10 +116,10 @@ test("checkpoint validation rejects incompatible or malformed packs", () => {
 });
 
 test("simulation grids and seeds have explicit bounds", () => {
-  for (const size of [8, 16, 32, 64, 128, 256]) {
+  for (const size of [8, 16, 32, 64, 128, 256, 512]) {
     assert.equal(validateSize(size), size);
   }
-  for (const size of [0, 7, 12, 129, 512, NaN, Infinity, 8.5]) {
+  for (const size of [0, 7, 12, 129, 1024, NaN, Infinity, 8.5]) {
     assert.throws(() => validateSize(size), undefined, `size ${size}`);
   }
   for (const seed of [0, 1, 4294967295]) {

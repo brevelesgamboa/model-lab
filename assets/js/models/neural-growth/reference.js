@@ -23,8 +23,8 @@ const FILTERS = [
 ];
 
 export function validateSize(size) {
-  if (!Number.isInteger(size) || size < 8 || size > 256 || size & (size - 1)) {
-    throw new RangeError("Grid size must be a power of two between 8 and 256.");
+  if (!Number.isInteger(size) || size < 8 || size > 512 || size & (size - 1)) {
+    throw new RangeError("Grid size must be a power of two between 8 and 512.");
   }
   return size;
 }
@@ -147,7 +147,8 @@ export function createRandom(seed) {
 }
 
 // A fixed uniformly selected half-grid, translated each step as in the reference
-// browser implementation. Coordinates deliberately fit in unsigned bytes.
+// browser implementation. Coordinates fit in unsigned bytes, with high bits packed
+// for grids up to 512.
 export function createSparseLayout(size, seed) {
   validateSize(size);
   const random = createRandom(seed);
@@ -158,11 +159,19 @@ export function createSparseLayout(size, seed) {
   let selected = 0;
   for (let cell = 0; cell < cellCount; cell += 1) {
     if (random() >= (selectedCount - selected) / (cellCount - cell)) continue;
-    shuffle[selected * 4] = cell % size;
-    shuffle[selected * 4 + 1] = Math.floor(cell / size);
-    inverse[cell * 4] = selected % size;
-    inverse[cell * 4 + 1] = Math.floor(selected / size);
+    const x = cell % size;
+    const y = Math.floor(cell / size);
+    shuffle[selected * 4] = x & 0xff;
+    shuffle[selected * 4 + 1] = y & 0xff;
+    shuffle[selected * 4 + 2] = (x >>> 8) & 0xff;
+    shuffle[selected * 4 + 3] = (y >>> 8) & 0xff;
+
+    const selX = selected % size;
+    const selY = Math.floor(selected / size);
+    inverse[cell * 4] = selX & 0xff;
+    inverse[cell * 4 + 1] = selY & 0xff;
     inverse[cell * 4 + 2] = 255;
+    inverse[cell * 4 + 3] = (selX >>> 8) & 0xff;
     selected += 1;
   }
   return { shuffle, inverse, random };

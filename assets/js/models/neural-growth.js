@@ -1,5 +1,6 @@
 import { sanitizeParameters } from "../core/model-contract.js";
 import { hexToRgb } from "../core/utils.js";
+import { detectCapabilities } from "../core/quality.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
 import { TextureNcaRuntime } from "./neural-growth/runtime.js";
 import {
@@ -21,6 +22,7 @@ export class NeuralGrowthModel {
   constructor({
     load = loadCheckpoint,
     createRuntime = (options) => new TextureNcaRuntime(options),
+    capabilities = detectCapabilities(),
   } = {}) {
     this.id = "neural-growth";
     this.name = "Neural Growth";
@@ -57,9 +59,37 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
+    this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
+  }
+
+  _simulationSizeOptions() {
+    const maxTex = this._capabilities?.maxTextureSize ?? 0;
+    const options = [
+      {
+        value: 128,
+        label: "128 × 128 · lighter",
+        compute: "efficient",
+        guidance: "Ultra-fast frame rate, suitable for low-power devices.",
+      },
+      {
+        value: 256,
+        label: "256 × 256 · more detail",
+        compute: "neutral",
+        guidance: "Standard balanced resolution for desktop GPUs.",
+      },
+    ];
+    if (maxTex >= 12288) {
+      options.push({
+        value: 512,
+        label: "512 × 512 · Ultra HD",
+        compute: "demanding",
+        guidance: "262,144 neural cells. High-density grid for dedicated GPUs.",
+      });
+    }
+    return options;
   }
 
   get controls() {
@@ -100,10 +130,7 @@ export class NeuralGrowthModel {
         label: "SIMULATION GRID",
         type: "select",
         default: 256,
-        options: [
-          { value: 128, label: "128 × 128 · lighter" },
-          { value: 256, label: "256 × 256 · more detail" },
-        ],
+        options: this._simulationSizeOptions(),
         help: "Changing grid size restarts the simulation. Viewport resolution does not change the grid.",
       },
       {
@@ -387,6 +414,12 @@ export class NeuralGrowthModel {
   get technicalInfo() {
     return getPattern(this._activePattern || DEFAULT_PATTERN).technicalInfo;
   }
+  get capabilities() {
+    return this._capabilities;
+  }
+  set capabilities(caps) {
+    this._capabilities = caps;
+  }
   get simulationSize() {
     return this._runtime?.size || this._parameters.simulationSize;
   }
@@ -486,6 +519,17 @@ export class NeuralGrowthModel {
       if (!valid.includes(value)) {
         return "phenotype";
       }
+    }
+    if (key === "simulationSize") {
+      const num = Number(value);
+      if (num === 512) {
+        if ((this._capabilities?.maxTextureSize ?? 0) < 12288) {
+          return 256;
+        }
+        return 512;
+      }
+      if (num === 128) return 128;
+      return 256;
     }
     return value;
   }

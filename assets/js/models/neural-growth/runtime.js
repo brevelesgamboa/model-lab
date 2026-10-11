@@ -54,7 +54,8 @@ void main() {
   int band = group / 3;
   int inputGroup = group % 3;
   ivec2 packed = ivec2(p.x % u_size, p.y);
-  ivec2 xy = wrapCell(ivec2(round(texelFetch(u_shuffle, packed, 0).rg * 255.0)) + u_offset);
+  vec4 shuf = texelFetch(u_shuffle, packed, 0);
+  ivec2 xy = wrapCell(ivec2(round(shuf.rg * 255.0 + shuf.ba * 255.0 * 256.0)) + u_offset);
   if (band == 0) {
     out_color = texelFetch(u_state, ivec2(xy.x + inputGroup * u_size, xy.y), 0);
     return;
@@ -185,7 +186,7 @@ void main() {
   }
   vec4 inverse = texelFetch(u_inverse, wrapCell(xy - u_offset), 0);
   if (inverse.b < 0.5) { out_color = previous; return; }
-  ivec2 compressed = ivec2(round(inverse.rg * 255.0));
+  ivec2 compressed = ivec2(round(inverse.rg * 255.0 + vec2(inverse.a * 255.0 * 256.0, 0.0)));
   vec4 delta = decodeState(texelFetch(u_delta, ivec2(compressed.x + group * u_size, compressed.y), 0));
   out_color = encodeState(decodeState(previous) + delta);
 }`;
@@ -1266,8 +1267,16 @@ export class TextureNcaRuntime {
     const mask = new Uint8Array(this.size * this.size);
     const [dx, dy] = this.lastOffset;
     for (let index = 0; index < this.layout.shuffle.length; index += 4) {
-      const x = (this.layout.shuffle[index] + dx) % this.size;
-      const y = (this.layout.shuffle[index + 1] + dy) % this.size;
+      const x =
+        (this.layout.shuffle[index] +
+          (this.layout.shuffle[index + 2] << 8) +
+          dx) %
+        this.size;
+      const y =
+        (this.layout.shuffle[index + 1] +
+          (this.layout.shuffle[index + 3] << 8) +
+          dy) %
+        this.size;
       mask[y * this.size + x] = 1;
     }
     return mask;

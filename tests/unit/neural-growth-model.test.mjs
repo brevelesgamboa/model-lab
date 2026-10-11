@@ -808,3 +808,40 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   assert.ok(distModes.includes("kick_color"));
   assert.equal(distModes[distModes.length - 1], "invert");
 });
+
+test("simulationSize options and normalization adapt dynamically to hardware capabilities", () => {
+  // Constrained device (e.g. mobile or headless software WebGL with maxTextureSize 8192 or 2048)
+  const constrainedModel = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 8192 },
+  });
+  const constrainedSizes = constrainedModel.controls.find(
+    (c) => c.key === "simulationSize",
+  ).options.map((o) => o.value);
+  assert.deepEqual(constrainedSizes, [128, 256]);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 512), 256);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 256), 256);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 128), 128);
+
+  // High-DPI capable device (e.g. desktop GPU with maxTextureSize 16384 >= 12288)
+  const capableModel = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 16384 },
+  });
+  const capableControl = capableModel.controls.find(
+    (c) => c.key === "simulationSize",
+  );
+  const capableSizes = capableControl.options.map((o) => o.value);
+  assert.deepEqual(capableSizes, [128, 256, 512]);
+  assert.equal(capableModel.normalizeStoredParameter("simulationSize", 512), 512);
+
+  const ultraOption = capableControl.options.find((o) => o.value === 512);
+  assert.equal(ultraOption.compute, "demanding");
+  assert.ok(ultraOption.guidance.includes("262,144"));
+
+  // Dynamic capabilities update
+  constrainedModel.capabilities = { maxTextureSize: 16384 };
+  const updatedSizes = constrainedModel.controls.find(
+    (c) => c.key === "simulationSize",
+  ).options.map((o) => o.value);
+  assert.deepEqual(updatedSizes, [128, 256, 512]);
+});
+
