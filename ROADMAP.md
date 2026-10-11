@@ -32,6 +32,7 @@ Transform Neural Growth into an expressive audio-reactive performance visualizer
 - Audio-Reactive Modulation Presets: Built-in presets (Subtle, Continuous, Dynamic) configuring speed, vector twist, relief depth, and 3D lighting routes, featuring dynamic audio activity energy scaling and instant synchronization.
 - Full Custom Modulation Parity: Any preset configuration maps directly to Latent Field's parameter MOD panels, giving users full visibility and freedom to fine-tune depths, with automatic fallback to Custom mode when edited.
 - Shockwave Stylization and Color: Configurable shockwave styles including chromatic aberration dispersion, luminous color glow rings matching active brush pigment, and harmonic multi-ring resonance wavefronts.
+- Generative State Shockwaves (Cellular Infusion): Option for expanding shockwaves to write directly into simulation state buffers (inverting cell colors, infusing dye pigment rings, or seeding noise along the wavefront), stimulating live morphogenetic regeneration as the NCA heals and adapts to the pulse.
 - Saved Run Enablement: Full experiment saving and archive restoration for Neural Growth configurations (pattern checkpoint, seed, parameters, modulation matrix, and thumbnail).
 
 ## Phase 4: Extended Visual Fidelity
