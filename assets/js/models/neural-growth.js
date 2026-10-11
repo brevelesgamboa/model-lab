@@ -177,6 +177,33 @@ export class NeuralGrowthModel {
         help: "Shockwave coverage range: expand across the entire canvas or follow current brush radius.",
       },
       {
+        key: "shockwaveStyle",
+        label: "SHOCKWAVE STYLE",
+        type: "select",
+        default: "refract",
+        options: [
+          { value: "refract", label: "Refract · Optical Ripple" },
+          { value: "chromatic", label: "Prism · Chromatic Split" },
+          { value: "glow", label: "Glow · Radiant Ring" },
+          { value: "harmonic", label: "Harmonic · Multi-Ring" },
+        ],
+        help: "Wavefront appearance: optical refraction, chromatic dispersion prism, radiant brush color glow, or harmonic multi-ring.",
+      },
+      {
+        key: "shockwaveImpact",
+        label: "SHOCKWAVE IMPACT",
+        type: "select",
+        default: "none",
+        options: [
+          { value: "none", label: "None · Visual Only" },
+          { value: "color", label: "Color · Brush Pigment" },
+          { value: "invert", label: "Invert · Negative Shift" },
+          { value: "noise", label: "Noise · Cellular Burst" },
+          { value: "erase", label: "Erase · Clear Ring" },
+        ],
+        help: "Cellular disturbance written into simulation: pure visual ripple, color pigment, inverted colors, noise seeds, or clearing.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
@@ -196,12 +223,13 @@ export class NeuralGrowthModel {
           { value: "erase", label: "Erase" },
           { value: "noise", label: "Noise" },
           { value: "dye", label: "Color" },
+          { value: "invert", label: "Invert" },
           { value: "shockwave", label: "Ripple" },
           { value: "freeze", label: "Freeze" },
           { value: "thaw", label: "Unfreeze" },
           { value: "groom", label: "Flow" },
         ],
-        help: "Interactive brush: Erase, Noise, Color, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
+        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
       },
       {
         key: "dyeColor",
@@ -435,7 +463,9 @@ export class NeuralGrowthModel {
       key === "barrierLock" ||
       key === "audioProfile" ||
       key === "beatShockwave" ||
-      key === "shockwaveReach"
+      key === "shockwaveReach" ||
+      key === "shockwaveStyle" ||
+      key === "shockwaveImpact"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
@@ -599,6 +629,8 @@ export class NeuralGrowthModel {
         displayFilter: parameters.displayFilter,
         showBarrier,
         ripples: this._activeRipples || [],
+        shockwaveStyle: parameters.shockwaveStyle,
+        dyeColor: parameters.dyeColor,
       });
       return this._result();
     } catch (error) {
@@ -744,11 +776,15 @@ export class NeuralGrowthModel {
       try {
         const rgb = hexToRgb(dyeColor || this._parameters.dyeColor || "#00f0ff");
         if (mode && mode !== "erase") {
-          this._runtime.disturb(x, y, radius, mode, {
+          const opts = {
             dyeColor: rgb,
             strokeAngle: strokeAngle || 0,
             lockBarrier,
-          });
+          };
+          if (mode === "shockwave") {
+            opts.shockwaveImpact = this._parameters.shockwaveImpact || "none";
+          }
+          this._runtime.disturb(x, y, radius, mode, opts);
         } else {
           this._runtime.disturb(x, y, radius);
         }
@@ -859,6 +895,8 @@ export class NeuralGrowthModel {
         lightAngle: this._parameters.lightAngle,
         displayFilter: this._parameters.displayFilter,
         showBarrier: false,
+        shockwaveStyle: this._parameters.shockwaveStyle,
+        dyeColor: this._parameters.dyeColor,
       }),
     );
   }

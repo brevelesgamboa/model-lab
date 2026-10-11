@@ -534,6 +534,22 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["off", "center", "pointer"],
   );
 
+  const styleControl = model.controls.find((c) => c.key === "shockwaveStyle");
+  assert.ok(styleControl);
+  assert.equal(styleControl.default, "refract");
+  assert.deepEqual(
+    styleControl.options.map((o) => o.value),
+    ["refract", "chromatic", "glow", "harmonic"],
+  );
+
+  const impactControl = model.controls.find((c) => c.key === "shockwaveImpact");
+  assert.ok(impactControl);
+  assert.equal(impactControl.default, "none");
+  assert.deepEqual(
+    impactControl.options.map((o) => o.value),
+    ["none", "color", "invert", "noise", "erase"],
+  );
+
   assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
@@ -722,5 +738,19 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   model.step();
   assert.equal(runtimes[0].disturbances.length, 2);
   assert.equal(runtimes[0].disturbances[0][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[0][4].shockwaveImpact, "none");
   assert.equal(runtimes[0].disturbances[1][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[1][4].shockwaveImpact, "none");
+
+  model.onParameterChange("shockwaveImpact", "invert");
+  assert.equal(model.triggerBeatShockwave("center"), true);
+  model.step();
+  assert.equal(runtimes[0].disturbances.length, 3);
+  assert.equal(runtimes[0].disturbances[2][3], "shockwave");
+  assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "invert");
+
+  model.queueDisturbance(20, 20, 10, "invert");
+  model.step();
+  assert.equal(runtimes[0].disturbances.length, 4);
+  assert.equal(runtimes[0].disturbances[3][3], "invert");
 });

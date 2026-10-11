@@ -790,6 +790,14 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(shockwaveSelect).toBeVisible();
   await expect(shockwaveSelect).toHaveValue("off");
 
+  const styleSelect = page.getByLabel("SHOCKWAVE STYLE", { exact: true });
+  await expect(styleSelect).toBeVisible();
+  await expect(styleSelect).toHaveValue("refract");
+
+  const impactSelect = page.getByLabel("SHOCKWAVE IMPACT", { exact: true });
+  await expect(impactSelect).toBeVisible();
+  await expect(impactSelect).toHaveValue("none");
+
   const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
   await expect(geometrySelect).toHaveValue("cartesian");
 
@@ -819,11 +827,17 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   // Changing shockwave mode independently preserves audio preset
   await shockwaveSelect.selectOption("center");
   await expect(shockwaveSelect).toHaveValue("center");
+  await styleSelect.selectOption("chromatic");
+  await expect(styleSelect).toHaveValue("chromatic");
+  await impactSelect.selectOption("invert");
+  await expect(impactSelect).toHaveValue("invert");
   await expect(audioSelect).toHaveValue("continuous");
 
   // Switch to Subtle preset: preserves shockwave selection and preserves current non-Cartesian geometry (Vortex)
   await audioSelect.selectOption("subtle");
   await expect(shockwaveSelect).toHaveValue("center");
+  await expect(styleSelect).toHaveValue("chromatic");
+  await expect(impactSelect).toHaveValue("invert");
   await expect(geometrySelect).toHaveValue("vortex");
   await expect(reliefSource).toHaveValue("kick");
   await expect(reliefLfoCheckbox).not.toBeChecked();
