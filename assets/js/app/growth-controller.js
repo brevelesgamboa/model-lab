@@ -761,11 +761,6 @@ export function createGrowthController({
         model.triggerBeatShockwave("center");
         triggered = true;
       }
-      if (typeof model.triggerKickInput === "function") {
-        if (model.triggerKickInput(triggerKick, timestamp)) {
-          triggered = true;
-        }
-      }
       if (triggered && !model.isClockRunning) {
         schedulePausedRender();
       }

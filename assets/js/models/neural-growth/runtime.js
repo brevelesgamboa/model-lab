@@ -249,6 +249,19 @@ uniform float u_strength;
 uniform int u_mode;
 uniform vec3 u_dyeColor;
 uniform int u_lockBarrier;
+vec3 rgbToHsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+vec3 hsvToRgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int group = p.x / u_size;
@@ -288,9 +301,28 @@ void main() {
     float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
     float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
     out_color = mix(current, vec4(n1, n2, n3, n4), weight);
-  } else if (u_mode == 2 || u_mode == 5) {
+  } else if (u_mode == 2) {
     if (group == 0) {
       vec4 targetState = encodeState(vec4((u_dyeColor - 0.5) * 2.0, 1.0));
+      out_color = mix(current, targetState, weight);
+    } else {
+      out_color = current;
+    }
+  } else if (u_mode == 5) {
+    if (group == 0) {
+      ivec2 centerCoord = ivec2(wrapCell(u_center));
+      vec4 centerRaw = texelFetch(u_state, centerCoord, 0);
+      vec3 bgRgb = clamp(decodeState(centerRaw).rgb * 0.5 + 0.5, 0.0, 1.0);
+      vec3 bgHsv = rgbToHsv(bgRgb);
+      vec3 standoutRgb;
+      if (bgHsv.y < 0.18) {
+        standoutRgb = bgHsv.z < 0.5 ? vec3(0.0, 0.94, 1.0) : vec3(1.0, 0.0, 0.65);
+      } else {
+        float targetHue = fract(bgHsv.x + 0.5);
+        float targetVal = bgHsv.z < 0.5 ? 0.95 : 0.45;
+        standoutRgb = hsvToRgb(vec3(targetHue, 0.95, targetVal));
+      }
+      vec4 targetState = encodeState(vec4((standoutRgb - 0.5) * 2.0, 1.0));
       out_color = mix(current, targetState, weight);
     } else {
       out_color = current;
@@ -863,7 +895,7 @@ export class TextureNcaRuntime {
       dyeColor = [0, 0.94, 1],
       strokeAngle = 0,
       lockBarrier = true,
-      shockwaveImpact: _shockwaveImpact = "none",
+      shockwaveImpact = "color",
       ringRadius = 0,
       ringWidth = 8,
       strength = 1.0,
@@ -950,10 +982,20 @@ export class TextureNcaRuntime {
     let effectiveRingWidth =
       Number(ringWidth) || Math.max(6, Math.min(24, radius * 0.12));
     let effectiveStrength = Number(strength) ?? 1.0;
+    let effectiveRadius = radius;
     if (mode === "noise") modeCode = 1;
     else if (mode === "dye") modeCode = 2;
     else if (mode === "invert") modeCode = 4;
-    else if (mode === "shockwave") modeCode = 3;
+    else if (mode === "shockwave") {
+      const impact = shockwaveImpact || "color";
+      if (impact === "color") {
+        modeCode = 5;
+        effectiveRadius = Math.min(12, Math.max(6, Math.round(this.size * 0.05)));
+        effectiveStrength = 0.18;
+      } else {
+        modeCode = 3;
+      }
+    }
     else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
     this.run(
@@ -962,7 +1004,7 @@ export class TextureNcaRuntime {
       { u_state: this.state, u_barrier: this.barrier },
       {
         u_center: [x, y],
-        u_radius: radius,
+        u_radius: effectiveRadius,
         u_ringRadius: effectiveRingRadius,
         u_ringWidth: effectiveRingWidth,
         u_strength: effectiveStrength,

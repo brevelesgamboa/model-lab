@@ -542,22 +542,30 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     styleControl.options.map((o) => o.value),
     ["refract", "chromatic", "glow", "harmonic"],
   );
+  assert.deepEqual(
+    styleControl.options.map((o) => o.label),
+    [
+      "Water Ripple · Clear Refraction",
+      "Prism Split · Rainbow Aberration",
+      "Neon Halo · Radiant Energy Ring",
+      "Cymatic Echo · Concentric Double Wave",
+    ],
+  );
 
   const impactControl = model.controls.find((c) => c.key === "shockwaveImpact");
   assert.ok(impactControl);
-  assert.equal(impactControl.default, "none");
+  assert.equal(impactControl.default, "color");
   assert.deepEqual(
     impactControl.options.map((o) => o.value),
-    ["none", "color", "invert", "noise", "erase"],
+    ["color", "none"],
+  );
+  assert.deepEqual(
+    impactControl.options.map((o) => o.label),
+    ["Color Blend · Auto Standout", "Visual Only · Optical Lens"],
   );
 
   const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
-  assert.ok(kickInputControl);
-  assert.equal(kickInputControl.default, "off");
-  assert.deepEqual(
-    kickInputControl.options.map((o) => o.value),
-    ["off", "color", "perturb"],
-  );
+  assert.equal(kickInputControl, undefined);
 
   assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
@@ -747,38 +755,34 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   model.step();
   assert.equal(runtimes[0].disturbances.length, 2);
   assert.equal(runtimes[0].disturbances[0][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[0][4].shockwaveImpact, "none");
+  assert.equal(runtimes[0].disturbances[0][4].shockwaveImpact, "color");
   assert.equal(runtimes[0].disturbances[1][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[1][4].shockwaveImpact, "none");
+  assert.equal(runtimes[0].disturbances[1][4].shockwaveImpact, "color");
 
-  model.onParameterChange("shockwaveImpact", "invert");
+  model.onParameterChange("shockwaveImpact", "none");
   assert.equal(model.triggerBeatShockwave("center"), true);
   model.step();
   assert.equal(runtimes[0].disturbances.length, 3);
   assert.equal(runtimes[0].disturbances[2][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "invert");
+  assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "none");
 
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
   assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
 
-  // Kick Input prototype: independent from shockwave
-  assert.equal(model.triggerKickInput(0.8, 1000), false); // off by default
-
-  model.onParameterChange("kickInputMode", "color");
+  // Kick input: active when impact is color
+  model.onParameterChange("shockwaveImpact", "color");
   assert.equal(model.triggerKickInput(0.8, 1000), true);
   // Refractory lockout (< 180ms)
   assert.equal(model.triggerKickInput(0.8, 1050), false);
   // Allowed after cooldown
   assert.equal(model.triggerKickInput(0.8, 1250), true);
 
-  model.onParameterChange("kickInputMode", "perturb");
-  // Allowed after cooldown, high strength spawns primary + satellite
-  assert.equal(model.triggerKickInput(0.95, 1500), true);
+  model.onParameterChange("shockwaveImpact", "none");
+  assert.equal(model.triggerKickInput(0.8, 1500), false);
 
   model.queueDisturbance(20, 20, 10, "invert");
   model.step();
   const distModes = runtimes[0].disturbances.map((d) => d[3]);
   assert.ok(distModes.includes("kick_color"));
-  assert.ok(distModes.includes("kick_perturb"));
   assert.equal(distModes[distModes.length - 1], "invert");
 });

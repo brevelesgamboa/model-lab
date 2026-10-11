@@ -185,38 +185,23 @@ export class NeuralGrowthModel {
         type: "select",
         default: "refract",
         options: [
-          { value: "refract", label: "Refract · Optical Ripple" },
-          { value: "chromatic", label: "Prism · Chromatic Split" },
-          { value: "glow", label: "Glow · Radiant Ring" },
-          { value: "harmonic", label: "Harmonic · Multi-Ring" },
+          { value: "refract", label: "Water Ripple · Clear Refraction" },
+          { value: "chromatic", label: "Prism Split · Rainbow Aberration" },
+          { value: "glow", label: "Neon Halo · Radiant Energy Ring" },
+          { value: "harmonic", label: "Cymatic Echo · Concentric Double Wave" },
         ],
-        help: "Wavefront appearance: optical refraction, chromatic dispersion prism, radiant brush color glow, or harmonic multi-ring.",
+        help: "Wavefront appearance: clear water ripple, prism chromatic split, radiant neon halo, or concentric cymatic double wave.",
       },
       {
         key: "shockwaveImpact",
         label: "SHOCKWAVE IMPACT",
         type: "select",
-        default: "none",
+        default: "color",
         options: [
-          { value: "none", label: "None · Visual Only" },
-          { value: "color", label: "Color · Brush Pigment" },
-          { value: "invert", label: "Invert · Negative Shift" },
-          { value: "noise", label: "Noise · Cellular Burst" },
-          { value: "erase", label: "Erase · Clear Ring" },
+          { value: "color", label: "Color Blend · Auto Standout" },
+          { value: "none", label: "Visual Only · Optical Lens" },
         ],
-        help: "Cellular disturbance written into simulation: pure visual ripple, color pigment, inverted colors, noise seeds, or clearing.",
-      },
-      {
-        key: "kickInputMode",
-        label: "KICK INPUT",
-        type: "select",
-        default: "off",
-        options: [
-          { value: "off", label: "Off · Shockwave Only" },
-          { value: "color", label: "Color · Gentle Blend" },
-          { value: "perturb", label: "Perturb · Smooth Noise" },
-        ],
-        help: "Optional kick onset cellular injection: injects controlled feathered patches that the pattern evolves over time.",
+        help: "Cellular effect on shockwave: gently infuses high-contrast pigment that cells weave into the living pattern, or pure optical wave.",
       },
       {
         key: "brushRadius",
@@ -469,6 +454,11 @@ export class NeuralGrowthModel {
         return "custom";
       }
     }
+    if (key === "shockwaveImpact") {
+      if (value !== "none" && value !== "color") {
+        return "color";
+      }
+    }
     return value;
   }
 
@@ -483,8 +473,7 @@ export class NeuralGrowthModel {
       key === "beatShockwave" ||
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
-      key === "shockwaveImpact" ||
-      key === "kickInputMode"
+      key === "shockwaveImpact"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
@@ -804,7 +793,7 @@ export class NeuralGrowthModel {
             lockBarrier,
           };
           if (mode === "shockwave") {
-            opts.shockwaveImpact = this._parameters.shockwaveImpact || "none";
+            opts.shockwaveImpact = this._parameters.shockwaveImpact || "color";
             opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
             opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
             opts.strength = 1.0;
@@ -918,8 +907,8 @@ export class NeuralGrowthModel {
 
   triggerKickInput(strength = 1.0, timestamp = null) {
     if (!this.ready) return false;
-    const mode = this._parameters?.kickInputMode || "off";
-    if (mode === "off") return false;
+    const impact = this._parameters?.shockwaveImpact || "color";
+    if (impact === "none") return false;
 
     const now = typeof timestamp === "number" ? timestamp : performance.now();
     const elapsed = now - (this._lastKickInputTime || 0);
@@ -960,7 +949,7 @@ export class NeuralGrowthModel {
     const patchRadius = 10;
     const rgb = hexToRgb(this._parameters.dyeColor || "#00f0ff");
     const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
-    const disturbMode = mode === "perturb" ? "kick_perturb" : "kick_color";
+    const disturbMode = "kick_color";
 
     this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
       dyeColor: rgb,
