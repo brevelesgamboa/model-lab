@@ -54,7 +54,9 @@ export class NeuralGrowthModel {
     this._lastTick = null;
     this._accumulator = 0;
     this._queuedDisturbances = [];
-    this._energySurge = null;
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
@@ -203,6 +205,18 @@ export class NeuralGrowthModel {
           { value: "erase", label: "Erase · Clear Ring" },
         ],
         help: "Cellular disturbance written into simulation: pure visual ripple, color pigment, inverted colors, noise seeds, or clearing.",
+      },
+      {
+        key: "kickInputMode",
+        label: "KICK INPUT",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off · Shockwave Only" },
+          { value: "color", label: "Color · Gentle Blend" },
+          { value: "perturb", label: "Perturb · Smooth Noise" },
+        ],
+        help: "Optional kick onset cellular injection: injects controlled feathered patches that the pattern evolves over time.",
       },
       {
         key: "brushRadius",
@@ -394,26 +408,8 @@ export class NeuralGrowthModel {
       !this._loadingPattern &&
       !this._disposed &&
       ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
-        this.hasActiveRipples ||
-        this._getEnergySurge() > 0.005)
+        this.hasActiveRipples)
     );
-  }
-
-  triggerEnergySurge(amplitude = 1.0, duration = 0.28) {
-    if (!this.ready) return;
-    this._energySurge = {
-      amplitude: Math.max(0, Math.min(2.0, Number(amplitude) || 1.0)),
-      startTime: performance.now(),
-      duration: Math.max(0.05, Math.min(2.0, Number(duration) || 0.28)),
-    };
-  }
-
-  _getEnergySurge() {
-    if (!this._energySurge || this._energySurge.amplitude <= 0) return 0;
-    const elapsed = (performance.now() - this._energySurge.startTime) / 1000;
-    const progress = elapsed / this._energySurge.duration;
-    if (progress >= 1.0 || progress < 0) return 0;
-    return this._energySurge.amplitude * Math.exp(-5.0 * progress);
   }
 
   get isClockRunning() {
@@ -434,7 +430,9 @@ export class NeuralGrowthModel {
     this._abort = null;
     this._loadingPattern = false;
     this._queuedDisturbances = [];
-    this._energySurge = null;
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this.setClockRunning(false);
   }
 
@@ -485,7 +483,8 @@ export class NeuralGrowthModel {
       key === "beatShockwave" ||
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
-      key === "shockwaveImpact"
+      key === "shockwaveImpact" ||
+      key === "kickInputMode"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
@@ -601,17 +600,15 @@ export class NeuralGrowthModel {
       this._failedConfiguration = null;
       runtimeOperation = true;
       this._drainDisturbances();
-      const surge = this._getEnergySurge();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
         if (this._lastTick !== null) {
           const delta = Math.max(
             0,
             Math.min(0.05, timeSeconds - this._lastTick),
           );
-          const effectiveSpeed = parameters.growthSpeed * (1.0 + surge * 1.8);
           this._accumulator = Math.min(
             2,
-            this._accumulator + delta * effectiveSpeed,
+            this._accumulator + delta * parameters.growthSpeed,
           );
           const count = Math.floor(this._accumulator + 1e-9);
           if (count) {
@@ -652,8 +649,6 @@ export class NeuralGrowthModel {
         showBarrier,
         ripples: this._activeRipples || [],
         shockwaveStyle: parameters.shockwaveStyle,
-        shockwaveImpact: parameters.shockwaveImpact,
-        energySurge: surge,
         dyeColor: parameters.dyeColor,
       });
       return this._result();
@@ -727,7 +722,9 @@ export class NeuralGrowthModel {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
     this._queuedDisturbances = [];
-    this._energySurge = null;
+    this._lastKickInputTime = 0;
+    this._kickInputBudget = 0;
+    this._kickInputIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -751,7 +748,6 @@ export class NeuralGrowthModel {
     );
     if (mode === "shockwave") {
       this.triggerRipple(clampedX, clampedY, clampedRadius);
-      this.triggerEnergySurge(1.0, 0.28);
     }
     if (this._queuedDisturbances.length >= 64) {
       this._queuedDisturbances.shift();
@@ -920,6 +916,79 @@ export class NeuralGrowthModel {
     return true;
   }
 
+  triggerKickInput(strength = 1.0, timestamp = null) {
+    if (!this.ready) return false;
+    const mode = this._parameters?.kickInputMode || "off";
+    if (mode === "off") return false;
+
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    const elapsed = now - (this._lastKickInputTime || 0);
+
+    // Refractory lockout: at least 180 ms between kick inputs
+    if (elapsed < 180) return false;
+
+    // Leaky bucket cumulative rate limiter: max 3 injections per second
+    const drain = (elapsed / 1000) * 2.0;
+    this._kickInputBudget = Math.max(0, (this._kickInputBudget || 0) - drain);
+    if (this._kickInputBudget >= 3.0) return false;
+    this._kickInputBudget += 1.0;
+    this._lastKickInputTime = now;
+
+    // Conservative strength scaling: normalized kick onset amplitude mapped to [0.06, 0.20]
+    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
+    const injectStrength = 0.06 + norm * 0.14;
+
+    // Deterministic spatial distribution without modifying simulation seed
+    this._kickInputIndex = (this._kickInputIndex || 0) + 1;
+    const idx = this._kickInputIndex;
+    const phi1 = 0.618033988749895;
+    const phi2 = 0.414213562373095;
+    const rFrac = Math.sqrt((idx * phi1) % 1.0);
+    const theta = 2 * Math.PI * ((idx * phi2) % 1.0);
+    const size = this.simulationSize;
+    const center = size / 2;
+    const maxR = size * 0.32;
+    const targetX = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
+    );
+    const targetY = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
+    );
+
+    const patchRadius = 10;
+    const rgb = hexToRgb(this._parameters.dyeColor || "#00f0ff");
+    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
+    const disturbMode = mode === "perturb" ? "kick_perturb" : "kick_color";
+
+    this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
+      dyeColor: rgb,
+      lockBarrier,
+      strength: injectStrength,
+    });
+
+    if (norm > 0.8) {
+      const satTheta = theta + Math.PI + 0.3;
+      const satR = maxR * 0.5 * rFrac;
+      const satX = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.cos(satTheta))),
+      );
+      const satY = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.sin(satTheta))),
+      );
+      this._runtime.disturb(satX, satY, 8, disturbMode, {
+        dyeColor: rgb,
+        lockBarrier,
+        strength: injectStrength * 0.75,
+      });
+    }
+
+    return true;
+  }
+
   renderSnapshot(canvas) {
     if (!this.ready)
       throw new Error(
@@ -936,8 +1005,6 @@ export class NeuralGrowthModel {
         showBarrier: false,
         ripples: [],
         shockwaveStyle: this._parameters.shockwaveStyle,
-        shockwaveImpact: this._parameters.shockwaveImpact,
-        energySurge: 0,
         dyeColor: this._parameters.dyeColor,
       }),
     );

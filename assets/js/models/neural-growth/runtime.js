@@ -257,7 +257,14 @@ void main() {
   delta = delta - round(delta / float(u_size)) * float(u_size);
   float dist = length(delta);
   float weight = 0.0;
-  if (u_ringRadius > 0.0) {
+  if (u_mode == 5 || u_mode == 6) {
+    float angle = atan(delta.y, delta.x);
+    float rMod = u_radius * (1.0 + 0.22 * cos(3.0 * angle + 1.25) + 0.12 * sin(5.0 * angle));
+    if (dist <= rMod) {
+      float sigma = max(2.0, rMod * 0.45);
+      weight = exp(-(dist * dist) / (2.0 * sigma * sigma)) * u_strength;
+    }
+  } else if (u_ringRadius > 0.0) {
     float diff = dist - u_ringRadius;
     if (abs(diff) <= 3.5 * u_ringWidth) {
       weight = exp(-(diff * diff) / (2.0 * u_ringWidth * u_ringWidth)) * u_strength;
@@ -281,10 +288,22 @@ void main() {
     float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
     float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
     out_color = mix(current, vec4(n1, n2, n3, n4), weight);
-  } else if (u_mode == 2) {
+  } else if (u_mode == 2 || u_mode == 5) {
     if (group == 0) {
       vec4 targetState = encodeState(vec4((u_dyeColor - 0.5) * 2.0, 1.0));
       out_color = mix(current, targetState, weight);
+    } else {
+      out_color = current;
+    }
+  } else if (u_mode == 6) {
+    if (group <= 1) {
+      vec2 sCoord = vec2(xy) * 0.06;
+      float sn1 = sin(sCoord.x * 3.14 + sCoord.y * 1.7) * cos(sCoord.x * 1.3 - sCoord.y * 2.8);
+      float sn2 = sin((sCoord.x + 4.2) * 2.1) * cos((sCoord.y + 1.8) * 2.4);
+      float sn3 = cos((sCoord.x - 2.1) * 2.7) * sin((sCoord.y - 3.4) * 1.9);
+      float sn4 = sin((sCoord.x + 7.5) * 1.8 + (sCoord.y - 5.1) * 2.2);
+      vec4 perturb = vec4(sn1, sn2, sn3, sn4) * 0.15;
+      out_color = clamp(current + perturb * weight, 0.0, 1.0);
     } else {
       out_color = current;
     }
@@ -314,8 +333,6 @@ uniform float u_lightAngle;
 uniform int u_showBarrier;
 uniform int u_rippleCount;
 uniform int u_rippleStyle;
-uniform int u_shockwaveImpact;
-uniform float u_energySurge;
 uniform vec3 u_rippleTint;
 uniform vec4 u_ripple0;
 uniform vec4 u_ripple1;
@@ -332,9 +349,9 @@ vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int s
   float dist = length(delta);
   float currentRadius = progress * maxRadius;
   float diff = dist - currentRadius;
-  float waveWidth = max(5.0, maxRadius * 0.05);
+  float waveWidth = max(8.0, maxRadius * 0.12);
   float spatialEnv = exp(-(diff * diff) / (2.0 * waveWidth * waveWidth));
-  float timeFade = progress > 0.85 ? (1.0 - progress) / 0.15 : 1.0;
+  float timeFade = 1.0 - progress;
   timeFade = timeFade * timeFade;
   float wave = sin(diff * (3.14159265 / waveWidth));
   if (style == 3) {
@@ -353,9 +370,9 @@ float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
   float dist = length(pos - origin);
   float currentRadius = progress * maxRadius;
   float diff = dist - currentRadius;
-  float waveWidth = max(5.0, maxRadius * 0.05);
+  float waveWidth = max(8.0, maxRadius * 0.12);
   float spatialEnv = exp(-(diff * diff) / (2.0 * waveWidth * waveWidth));
-  float timeFade = progress > 0.85 ? (1.0 - progress) / 0.15 : 1.0;
+  float timeFade = 1.0 - progress;
   return spatialEnv * timeFade * timeFade * amplitude;
 }
 
@@ -422,24 +439,8 @@ void main() {
   vec3 rgb = rawRgb / (1.0 + max(vec3(0.0), rawRgb - 0.5) * 0.85);
   rgb = clamp(rgb, 0.0, 1.0);
 
-  if (u_rippleStyle == 2) {
-    float totalGlowVal = totalGlow + u_energySurge * 0.45;
-    if (totalGlowVal > 0.001) {
-      rgb = clamp(rgb + u_rippleTint * totalGlowVal * 0.75, 0.0, 1.0);
-    }
-  }
-
-  if (u_energySurge > 0.001) {
-    if (u_shockwaveImpact == 1) {
-      rgb = mix(rgb, u_rippleTint, u_energySurge * 0.75);
-    } else if (u_shockwaveImpact == 2) {
-      rgb = mix(rgb, vec3(1.0) - rgb, u_energySurge * 0.95);
-    } else if (u_shockwaveImpact == 3) {
-      float n = fract(sin(dot(pos + vec2(fract(u_energySurge * 137.0)), vec2(12.9898, 78.233))) * 43758.5453);
-      rgb = mix(rgb, vec3(n), u_energySurge * 0.55);
-    } else if (u_shockwaveImpact == 4) {
-      rgb = mix(rgb, vec3(0.0), u_energySurge * 0.85);
-    }
+  if (u_rippleStyle == 2 && totalGlow > 0.001) {
+    rgb = clamp(rgb + u_rippleTint * totalGlow * 0.75, 0.0, 1.0);
   }
 
   float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
@@ -455,9 +456,8 @@ void main() {
     float lumDown = cellLuminance(wrapCell(xy + ivec2(0, -1)));
     float lumUp = cellLuminance(wrapCell(xy + ivec2(0, 1)));
 
-    float effectiveRelief = u_relief * (1.0 + u_energySurge * 0.6);
-    float dx = (lumRight - lumLeft) * effectiveRelief;
-    float dy = (lumUp - lumDown) * effectiveRelief;
+    float dx = (lumRight - lumLeft) * u_relief;
+    float dy = (lumUp - lumDown) * u_relief;
     vec3 normal = normalize(vec3(-dx, -dy, 1.0));
 
     if (u_shading == 3) {
@@ -471,8 +471,7 @@ void main() {
       if (u_shading == 2) {
         vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
         float specular = pow(max(dot(normal, halfVec), 0.0), 24.0);
-        float specBoost = 1.0 + u_energySurge * 2.5;
-        rgb = mix(rgb, vec3(1.0), specular * 0.45 * specBoost);
+        rgb = mix(rgb, vec3(1.0), specular * 0.45);
       }
     }
   }
@@ -727,7 +726,6 @@ export class TextureNcaRuntime {
           "u_lockBarrier",
           "u_rippleCount",
           "u_rippleStyle",
-          "u_shockwaveImpact",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -955,9 +953,9 @@ export class TextureNcaRuntime {
     if (mode === "noise") modeCode = 1;
     else if (mode === "dye") modeCode = 2;
     else if (mode === "invert") modeCode = 4;
-    else if (mode === "shockwave") {
-      modeCode = 3;
-    }
+    else if (mode === "shockwave") modeCode = 3;
+    else if (mode === "kick_color") modeCode = 5;
+    else if (mode === "kick_perturb") modeCode = 6;
     this.run(
       "disturb",
       this.nextState,
@@ -1003,8 +1001,6 @@ export class TextureNcaRuntime {
       showBarrier = false,
       ripples = [],
       shockwaveStyle = "refract",
-      shockwaveImpact = "none",
-      energySurge = 0,
       dyeColor = "#00f0ff",
     } = options;
 
@@ -1020,16 +1016,6 @@ export class TextureNcaRuntime {
 
     const rippleStyles = { refract: 0, chromatic: 1, glow: 2, harmonic: 3 };
     const rippleStyleCode = rippleStyles[shockwaveStyle] ?? 0;
-    const impactModes = {
-      none: 0,
-      color: 1,
-      dye: 1,
-      invert: 2,
-      noise: 3,
-      erase: 4,
-    };
-    const shockwaveImpactCode = impactModes[shockwaveImpact] ?? 0;
-    const energySurgeVal = Math.max(0, Math.min(2, Number(energySurge) || 0));
     const dyeRgb =
       typeof dyeColor === "string"
         ? hexToRgb(dyeColor)
@@ -1074,8 +1060,6 @@ export class TextureNcaRuntime {
         u_lightAngle: lightAngleRad,
         u_showBarrier: showBarrier ? 1 : 0,
         u_rippleStyle: rippleStyleCode,
-        u_shockwaveImpact: shockwaveImpactCode,
-        u_energySurge: energySurgeVal,
         u_rippleTint: rippleTint,
         ...rippleUniforms,
       },

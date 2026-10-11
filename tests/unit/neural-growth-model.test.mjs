@@ -551,6 +551,14 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["none", "color", "invert", "noise", "erase"],
   );
 
+  const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
+  assert.ok(kickInputControl);
+  assert.equal(kickInputControl.default, "off");
+  assert.deepEqual(
+    kickInputControl.options.map((o) => o.value),
+    ["off", "color", "perturb"],
+  );
+
   assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
@@ -745,19 +753,32 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
 
   model.onParameterChange("shockwaveImpact", "invert");
   assert.equal(model.triggerBeatShockwave("center"), true);
-  assert.ok(model._getEnergySurge() > 0);
   model.step();
   assert.equal(runtimes[0].disturbances.length, 3);
   assert.equal(runtimes[0].disturbances[2][3], "shockwave");
   assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "invert");
 
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
-  assert.equal(runtimes[0].lastDrawOptions.shockwaveImpact, "invert");
   assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
-  assert.ok(runtimes[0].lastDrawOptions.energySurge > 0);
+
+  // Kick Input prototype: independent from shockwave
+  assert.equal(model.triggerKickInput(0.8, 1000), false); // off by default
+
+  model.onParameterChange("kickInputMode", "color");
+  assert.equal(model.triggerKickInput(0.8, 1000), true);
+  // Refractory lockout (< 180ms)
+  assert.equal(model.triggerKickInput(0.8, 1050), false);
+  // Allowed after cooldown
+  assert.equal(model.triggerKickInput(0.8, 1250), true);
+
+  model.onParameterChange("kickInputMode", "perturb");
+  // Allowed after cooldown, high strength spawns primary + satellite
+  assert.equal(model.triggerKickInput(0.95, 1500), true);
 
   model.queueDisturbance(20, 20, 10, "invert");
   model.step();
-  assert.equal(runtimes[0].disturbances.length, 4);
-  assert.equal(runtimes[0].disturbances[3][3], "invert");
+  const distModes = runtimes[0].disturbances.map((d) => d[3]);
+  assert.ok(distModes.includes("kick_color"));
+  assert.ok(distModes.includes("kick_perturb"));
+  assert.equal(distModes[distModes.length - 1], "invert");
 });
