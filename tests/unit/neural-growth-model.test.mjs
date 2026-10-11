@@ -46,8 +46,9 @@ function setup(context, { load = async () => checkpoint, failSize = 0, initialSi
           this.steps += count;
           this.lastStepOptions = options;
         },
-        draw(canvas) {
+        draw(canvas, options) {
           this.draws += 1;
+          this.lastDrawOptions = options;
           canvas.paintedBy = this;
         },
         restart(value) {
@@ -744,10 +745,16 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
 
   model.onParameterChange("shockwaveImpact", "invert");
   assert.equal(model.triggerBeatShockwave("center"), true);
+  assert.ok(model._getEnergySurge() > 0);
   model.step();
   assert.equal(runtimes[0].disturbances.length, 3);
   assert.equal(runtimes[0].disturbances[2][3], "shockwave");
   assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "invert");
+
+  await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
+  assert.equal(runtimes[0].lastDrawOptions.shockwaveImpact, "invert");
+  assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
+  assert.ok(runtimes[0].lastDrawOptions.energySurge > 0);
 
   model.queueDisturbance(20, 20, 10, "invert");
   model.step();
