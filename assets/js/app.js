@@ -769,13 +769,30 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
       const lfoActive = Boolean(
         canModulate && currentLfoState[definition.key]?.enabled && !loopActive,
       );
+      let lfoConfig = currentLfoState[definition.key];
+      let effectiveBase = baseValue;
+      if (
+        currentModel.id === "neural-growth" &&
+        currentParameters.audioProfile === "dynamic"
+      ) {
+        const activity = clamp(Number(audioLevels?.activity) || 0, 0, 1);
+        if (definition.key === "growthSpeed") {
+          effectiveBase = Math.round(45 + 55 * activity);
+        }
+        if (lfoActive && lfoConfig?.calmDepth !== undefined) {
+          const scaledDepth =
+            lfoConfig.calmDepth +
+            (lfoConfig.depth - lfoConfig.calmDepth) * activity;
+          lfoConfig = { ...lfoConfig, depth: scaledDepth };
+        }
+      }
       const oscillatorValue =
         loopActive || !canModulate
-          ? baseValue
+          ? effectiveBase
           : applyLfo(
               definition,
-              baseValue,
-              currentLfoState[definition.key],
+              effectiveBase,
+              lfoConfig,
               timeSeconds,
             );
       const audioRoute = canModulate
@@ -930,7 +947,7 @@ function applyAudioProfile(profileKey) {
     });
   }
 
-  if (profileKey === "continuous") {
+  if (profileKey === "continuous" || profileKey === "dynamic") {
     if (currentParameters.coordinateTransform === "cartesian") {
       currentParameters.coordinateTransform = "vortex";
       const control = controlElements.get("coordinateTransform");

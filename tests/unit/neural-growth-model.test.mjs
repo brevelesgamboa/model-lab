@@ -569,14 +569,13 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   assert.equal(detectAudioProfile(continuousRoutes), "continuous");
 
   // Dynamic route detection
-  assert.equal(
-    detectAudioProfile({
-      reliefStrength: { source: "kick", depth: 0.45 },
-      lightAngle: { source: "bass", depth: 0.3 },
-      twist: { source: "bass", depth: 0.2 },
-    }),
-    "dynamic",
-  );
+  const dynamicRoutes = {
+    rotation: { source: "kick", depth: 0.10 },
+    twist: { source: "kick", depth: 0.06 },
+    reliefStrength: { source: "kick", depth: -0.80 },
+    lightAngle: { source: "kick", depth: 0.90 },
+  };
+  assert.equal(detectAudioProfile(dynamicRoutes), "dynamic");
 
   // Custom route detection
   assert.equal(
@@ -667,6 +666,39 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
       lfoState: continuousLfos,
     }),
     "continuous",
+  );
+
+  // Dynamic composite preset recognition
+  const dynamicBase = {
+    growthSpeed: 45,
+    rotation: 180,
+    twist: 0,
+    reliefStrength: 1.4,
+    lightAngle: 180,
+    shading: "relief",
+    coordinateTransform: "vortex",
+  };
+  const dynamicLfos = {
+    rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
+    twist: { enabled: true, rate: 0.015, depth: 0.60, calmDepth: 0.08, phase: 0, waveform: "sine" },
+    reliefStrength: { enabled: true, rate: 0.008, depth: 0.90, calmDepth: 0.15, phase: 1.00, waveform: "sine" },
+    lightAngle: { enabled: true, rate: 0.012, depth: 0.90, calmDepth: 0.10, phase: 0, waveform: "sine" },
+  };
+  assert.equal(
+    detectAudioProfile({
+      matrix: dynamicRoutes,
+      parameters: dynamicBase,
+      lfoState: dynamicLfos,
+    }),
+    "dynamic",
+  );
+  assert.equal(
+    detectAudioProfile({
+      matrix: dynamicRoutes,
+      parameters: { ...dynamicBase, growthSpeed: 60 },
+      lfoState: dynamicLfos,
+    }),
+    "custom",
   );
 
   assert.equal(model.triggerBeatShockwave("off"), false);

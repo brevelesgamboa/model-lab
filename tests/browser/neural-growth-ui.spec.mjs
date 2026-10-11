@@ -832,6 +832,17 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   const twistModToggle = page.locator('button.modulation-toggle[data-key="twist"]');
   await expect(twistModToggle).toHaveClass(/is-active/);
 
+  // Switch to Dynamic preset: verifies dynamic configuration and LFO activation
+  await audioSelect.selectOption("dynamic");
+  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(geometrySelect).toHaveValue("vortex");
+  await expect(reliefSource).toHaveValue("kick");
+  await expect(reliefLfoCheckbox).toBeChecked();
+
+  // Verify growth speed base value for dynamic is 45 (calm baseline)
+  const growthSpeedInput = page.locator('.control-block:has-text("GROWTH SPEED") input.fine-input');
+  await expect(growthSpeedInput).toHaveValue("45");
+
   // Tweak audio depth to trigger custom profile detection
   const depthInput = page.locator('.control-block:has-text("RELIEF DEPTH") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
   await depthInput.fill("0.85");

@@ -60,6 +60,7 @@ test("initial levels are zero and inactive", () => {
   assert.equal(levels.bass, 0);
   assert.equal(levels.kick, 0);
   assert.equal(levels.kickOnset, 0);
+  assert.equal(levels.activity, 0);
   assert.equal(levels.hasSignal, false);
 });
 
@@ -78,6 +79,7 @@ test("complete silence rejects signal and returns silent levels without auto-gai
   assert.equal(levels.bass, 0);
   assert.equal(levels.kick, 0);
   assert.equal(levels.kickOnset, 0);
+  assert.equal(levels.activity, 0);
 });
 
 test("sustained ambient drone preserves bass level without decaying to zero", () => {

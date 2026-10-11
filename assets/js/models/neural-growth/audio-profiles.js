@@ -73,11 +73,28 @@ export const AUDIO_PROFILES = Object.freeze({
   dynamic: Object.freeze({
     id: "dynamic",
     label: "Dynamic",
-    description: "High-intensity audio reaction across relief, lighting, and vector twist.",
+    description: "Energy-reactive field scaling between vibrant polyrhythms and a calm baseline.",
+    base: Object.freeze({
+      growthSpeed: 45,
+      rotation: 180,
+      twist: 0,
+      reliefStrength: 1.4,
+      lightAngle: 180,
+      shading: "relief",
+    }),
     routes: Object.freeze({
-      reliefStrength: Object.freeze({ source: "kick", depth: 0.45 }),
-      lightAngle: Object.freeze({ source: "bass", depth: 0.3 }),
-      twist: Object.freeze({ source: "bass", depth: 0.2 }),
+      growthSpeed: Object.freeze({ source: "none", depth: 0.25 }),
+      rotation: Object.freeze({ source: "kick", depth: 0.10 }),
+      twist: Object.freeze({ source: "kick", depth: 0.06 }),
+      reliefStrength: Object.freeze({ source: "kick", depth: -0.80 }),
+      lightAngle: Object.freeze({ source: "kick", depth: 0.90 }),
+    }),
+    lfos: Object.freeze({
+      growthSpeed: Object.freeze({ enabled: false, waveform: "sine", rate: 0.1, depth: 0.2, phase: 0 }),
+      rotation: Object.freeze({ enabled: true, waveform: "sine", rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50 }),
+      twist: Object.freeze({ enabled: true, waveform: "sine", rate: 0.015, depth: 0.60, calmDepth: 0.08, phase: 0 }),
+      reliefStrength: Object.freeze({ enabled: true, waveform: "sine", rate: 0.008, depth: 0.90, calmDepth: 0.15, phase: 1.00 }),
+      lightAngle: Object.freeze({ enabled: true, waveform: "sine", rate: 0.012, depth: 0.90, calmDepth: 0.10, phase: 0 }),
     }),
   }),
 });
@@ -124,8 +141,11 @@ export function matchesAudioProfile(profileId, context = {}) {
         return false;
       }
     }
-    // For Continuous, coordinateTransform must not be cartesian (switched to vortex or preserved other)
-    if (profileId === "continuous" && parameters.coordinateTransform === "cartesian") {
+    // For Continuous and Dynamic, coordinateTransform must not be cartesian (switched to vortex or preserved other)
+    if (
+      (profileId === "continuous" || profileId === "dynamic") &&
+      parameters.coordinateTransform === "cartesian"
+    ) {
       return false;
     }
   }
@@ -145,13 +165,6 @@ export function matchesAudioProfile(profileId, context = {}) {
         if (Math.abs(Number(currentLfo.phase) - Number(expectedLfo.phase)) > 0.005) return false;
         if (currentLfo.waveform && currentLfo.waveform !== expectedLfo.waveform) return false;
       }
-    }
-  }
-
-  // For profiles without LFOs (dynamic or off), if lfoState is provided, ensure no LFOs are active on PROFILE_PARAMS
-  if (lfoState && profileId === "dynamic") {
-    for (const param of PROFILE_PARAMS) {
-      if (lfoState[param]?.enabled) return false;
     }
   }
 

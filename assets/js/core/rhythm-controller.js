@@ -2,6 +2,7 @@ const SILENT_LEVELS = Object.freeze({
   bass: 0,
   kick: 0,
   kickOnset: 0,
+  activity: 0,
   bassPhase: 0,
   hasSignal: false,
 });
@@ -45,6 +46,7 @@ export class RhythmController {
     this.kickEnvelope = 0;
     this.kickOnsetEnvelope = 0;
     this.kickHoldRemaining = 0;
+    this.activityEnvelope = 0;
     this.runningPeak = 0.08;
     this.runningFloor = 0.005;
     this.bassPhase = 0;
@@ -412,12 +414,14 @@ export class RhythmController {
       this.kickEnvelope *= kickDecay;
       this.kickOnsetEnvelope *= onsetDecay;
       this.slowBass *= Math.exp(-elapsed / KICK_BASELINE_RELEASE_SECONDS);
+      this.activityEnvelope *= Math.exp(-elapsed / 1.8);
       this.bassPhase = (this.bassPhase + bass * elapsed) % 4096;
 
       this.levels = Object.freeze({
         bass: clampUnit(bass),
         kick: clampUnit(this.kickEnvelope),
         kickOnset: clampUnit(this.kickOnsetEnvelope),
+        activity: clampUnit(this.activityEnvelope),
         bassPhase: this.bassPhase,
         hasSignal: false,
       });
@@ -510,12 +514,21 @@ export class RhythmController {
       this.kickEnvelope *= Math.exp(-elapsed / KICK_RELEASE_SECONDS);
     }
 
+    const rawEnergy = clampUnit(Math.sqrt(normalizedAmbient));
+    if (rawEnergy > this.activityEnvelope) {
+      this.activityEnvelope +=
+        (rawEnergy - this.activityEnvelope) * smoothingAmount(0.08);
+    } else {
+      this.activityEnvelope *= Math.exp(-elapsed / 1.8);
+    }
+
     this.bassPhase = (this.bassPhase + bass * elapsed) % 4096;
 
     this.levels = Object.freeze({
       bass: clampUnit(bass),
       kick: clampUnit(this.kickEnvelope),
       kickOnset: clampUnit(this.kickOnsetEnvelope),
+      activity: clampUnit(this.activityEnvelope),
       bassPhase: this.bassPhase,
       hasSignal: true,
     });
