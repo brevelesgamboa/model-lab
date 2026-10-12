@@ -200,7 +200,7 @@ export function createControlsController({
 
     function resolveGuidance(value) {
       if (typeof definition.getGuidance === "function") {
-        return definition.getGuidance(value);
+        return definition.getGuidance(value, typeof getParameters === "function" ? getParameters() : undefined);
       }
       if (definition.type === "select" && Array.isArray(definition.options)) {
         const match = definition.options.find(

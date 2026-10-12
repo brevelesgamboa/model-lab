@@ -931,5 +931,78 @@ test("display filter switches between Smooth Continuous and Crisp Pixel Grid cle
   ).toBe(false);
 });
 
+test("contextual guidance pills render beneath key controls and tap recovery sprouts dormant fields", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  // 1. Verify guidance pill under Growth Speed
+  const speedBlock = page.locator(".control-block", {
+    has: page.getByLabel("GROWTH SPEED", { exact: true }),
+  });
+  const speedGuidance = speedBlock.locator(".control-guidance");
+  await expect(speedGuidance).toBeVisible();
+  await expect(speedGuidance.locator(".control-guidance__tag")).toHaveText("RECOMMENDED");
+
+  // 2. Verify twist guidance is INACTIVE while in Cartesian mode
+  const twistBlock = page.locator(".control-block", {
+    has: page.getByLabel("SPIRAL PITCH / TWIST", { exact: true }),
+  });
+  const twistGuidance = twistBlock.locator(".control-guidance");
+  await expect(twistGuidance).toBeVisible();
+  await expect(twistGuidance.locator(".control-guidance__tag")).toHaveText("INACTIVE");
+
+  // 3. Switch coordinate geometry to Spiral
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await geometrySelect.selectOption("spiral");
+
+  // In Spiral mode: twist guidance updates reactively
+  await expect(twistGuidance.locator(".control-guidance__tag")).not.toHaveText("INACTIVE");
+
+  // 4. Disturbance mode guidance
+  const modeSelect = page.getByLabel("DISTURBANCE MODE", { exact: true });
+  await modeSelect.selectOption("noise");
+  const modeBlock = page.locator(".control-block", { has: modeSelect });
+  await expect(
+    modeBlock.locator(".control-guidance__tag"),
+  ).toHaveText("RE-SEED");
+
+  // 5. Channel inspector guidance
+  const channelSelect = page.getByLabel("CHANNEL INSPECTOR", { exact: true });
+  await channelSelect.selectOption("fast_signals");
+  const channelBlock = page.locator(".control-block", { has: channelSelect });
+  await expect(
+    channelBlock.locator(".control-guidance__tag"),
+  ).toHaveText("CH 4-6");
+
+  // Return to Phenotype
+  await channelSelect.selectOption("phenotype");
+  await expect(
+    channelBlock.locator(".control-guidance__tag"),
+  ).toHaveText("RECOMMENDED");
+
+  // 6. Dormant tap recovery:
+  // Step simulation, clear field with erase, verify dormant tap recovery
+  await modeSelect.selectOption("erase");
+  // Drag erase over center
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  expect(box).toBeTruthy();
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+
+  // Switch to ripple/shockwave
+  await modeSelect.selectOption("shockwave");
+  // Tap center on quiet/running field
+  await page.mouse.click(cx, cy);
+
+  // Runtime remains healthy and active
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
+
 
 

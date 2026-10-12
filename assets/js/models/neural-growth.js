@@ -124,6 +124,35 @@ export class NeuralGrowthModel {
         step: 1,
         default: 30,
         help: "Requested updates per second, limited to two per frame. Zero freezes growth; CLOCK pauses without resetting.",
+        getGuidance: (value) => {
+          const speed = Number(value) || 0;
+          if (speed === 0) {
+            return {
+              compute: "neutral",
+              tag: "paused",
+              text: "Zero speed freezes growth; cells retain their current state.",
+            };
+          }
+          if (speed <= 45) {
+            return {
+              compute: "balanced",
+              tag: "recommended",
+              text: "Recommended (30). Natural organic growth rate and stable pattern dynamics.",
+            };
+          }
+          if (speed <= 80) {
+            return {
+              compute: "light",
+              tag: "active",
+              text: "Fast growth. Rapid cellular evolution and dynamic wave propagation.",
+            };
+          }
+          return {
+            compute: "moderate",
+            tag: "rapid",
+            text: "Accelerated update rate. Fast visual transitions.",
+          };
+        },
       },
       {
         key: "simulationSize",
@@ -150,11 +179,41 @@ export class NeuralGrowthModel {
         type: "select",
         default: "cartesian",
         options: [
-          { value: "cartesian", label: "Cartesian · Standard 2D" },
-          { value: "vortex", label: "Vortex · Concentric Ring" },
-          { value: "spiral", label: "Spiral · Logarithmic Swirl" },
-          { value: "julia", label: "Julia · Complex Fractal" },
-          { value: "dipole", label: "Dipole · Binary Vortex" },
+          {
+            value: "cartesian",
+            label: "Cartesian · Standard 2D",
+            compute: "neutral",
+            tag: "recommended",
+            guidance: "Recommended. Standard 2D grid with stable pattern equilibrium.",
+          },
+          {
+            value: "spiral",
+            label: "Spiral · Logarithmic Swirl",
+            compute: "balanced",
+            tag: "swirl",
+            guidance: "Logarithmic swirl. Best with subtle pitch (±15° to ±35°) for fluid rotation.",
+          },
+          {
+            value: "vortex",
+            label: "Vortex · Concentric Ring",
+            compute: "balanced",
+            tag: "orbital",
+            guidance: "Concentric circular warp. Keeps cells revolving in smooth rings.",
+          },
+          {
+            value: "julia",
+            label: "Julia · Complex Fractal",
+            compute: "moderate",
+            tag: "fractal",
+            guidance: "Complex fractal coordinates. Creates dendritic fractal branches.",
+          },
+          {
+            value: "dipole",
+            label: "Dipole · Binary Vortex",
+            compute: "moderate",
+            tag: "bipolar",
+            guidance: "Dual vortex field with opposing poles generating swirling cellular streams.",
+          },
         ],
         help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, or Julia fractal dendrites.",
       },
@@ -168,6 +227,46 @@ export class NeuralGrowthModel {
         default: 0,
         format: "degrees",
         help: "Pitch and angular twist in degrees for spiral and vortex geometries. Modulates inward/outward swirl.",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          if (transform === "cartesian") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Twist has no effect in Cartesian geometry. Switch to Spiral or Vortex.",
+            };
+          }
+          const t = Math.abs(Number(value) || 0);
+          if (t <= 10) {
+            return {
+              compute: "neutral",
+              tag: "gentle",
+              text: "Subtle angular pitch. Preserves natural texture alignment.",
+            };
+          }
+          if (t <= 45) {
+            return {
+              compute: "balanced",
+              tag: "recommended",
+              text: "Recommended (±15° to ±35° for spirals). Fluid rotational drift without shearing.",
+            };
+          }
+          if (t <= 65) {
+            return {
+              compute: "moderate",
+              tag: "vivid",
+              text: "Pronounced swirl with strong rotational momentum.",
+            };
+          }
+          return {
+            compute: "high",
+            tag: "high shear",
+            text: "High angular shear near limits. May distort fine texture features.",
+          };
+        },
       },
       {
         key: "audioProfile",
@@ -247,14 +346,62 @@ export class NeuralGrowthModel {
         type: "select",
         default: "erase",
         options: [
-          { value: "erase", label: "Erase" },
-          { value: "noise", label: "Noise" },
-          { value: "dye", label: "Color" },
-          { value: "invert", label: "Invert" },
-          { value: "shockwave", label: "Ripple" },
-          { value: "freeze", label: "Freeze" },
-          { value: "thaw", label: "Unfreeze" },
-          { value: "groom", label: "Flow" },
+          {
+            value: "erase",
+            label: "Erase",
+            compute: "light",
+            tag: "clear",
+            guidance: "Carves empty space. Small clearings heal; tap with Noise or Color to re-seed.",
+          },
+          {
+            value: "noise",
+            label: "Noise",
+            compute: "balanced",
+            tag: "re-seed",
+            guidance: "Recommended for recovery. Injects organic entropy to sprout fresh growth.",
+          },
+          {
+            value: "dye",
+            label: "Color",
+            compute: "neutral",
+            tag: "color",
+            guidance: "Injects vibrant pigment into cells while preserving hidden channels.",
+          },
+          {
+            value: "invert",
+            label: "Invert",
+            compute: "neutral",
+            tag: "invert",
+            guidance: "Inverts cell polarity locally to generate high-contrast cellular blooms.",
+          },
+          {
+            value: "shockwave",
+            label: "Ripple",
+            compute: "balanced",
+            tag: "ripple",
+            guidance: "Emits expanding optical ripples and fluid disturbances from pointer taps.",
+          },
+          {
+            value: "freeze",
+            label: "Freeze",
+            compute: "neutral",
+            tag: "barrier",
+            guidance: "Locks cells in place with a frozen barrier protected from surrounding growth.",
+          },
+          {
+            value: "thaw",
+            label: "Unfreeze",
+            compute: "neutral",
+            tag: "release",
+            guidance: "Unfreezes barriers, returning frozen cells back into active growth.",
+          },
+          {
+            value: "groom",
+            label: "Flow",
+            compute: "neutral",
+            tag: "flow",
+            guidance: "Aligns directional perception filters along pointer brush drag angles.",
+          },
         ],
         help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
       },
@@ -336,12 +483,48 @@ export class NeuralGrowthModel {
         type: "select",
         default: "phenotype",
         options: [
-          { value: "phenotype", label: "Phenotype · Native RGB" },
-          { value: "vitality", label: "Vitality · Cell Mask (α)" },
-          { value: "fast_signals", label: "Hidden 1 · Fast Signals (Ch 4-6)" },
-          { value: "memory_waves", label: "Hidden 2 · Memory Waves (Ch 8-10)" },
-          { value: "energy_heat", label: "Energy · Metabolic Heatmap" },
-          { value: "xray", label: "Neural X-Ray · Phenotype + Glow" },
+          {
+            value: "phenotype",
+            label: "Phenotype · Native RGB",
+            compute: "neutral",
+            tag: "recommended",
+            guidance: "Recommended. Visible surface texture rendered in full color.",
+          },
+          {
+            value: "vitality",
+            label: "Vitality · Cell Mask (α)",
+            compute: "neutral",
+            tag: "alpha mask",
+            guidance: "Alpha mask channel. Shows living density and growth boundaries.",
+          },
+          {
+            value: "fast_signals",
+            label: "Hidden 1 · Fast Signals (Ch 4-6)",
+            compute: "neutral",
+            tag: "ch 4-6",
+            guidance: "Internal hidden channels 4-6. Choose Phenotype to see the texture.",
+          },
+          {
+            value: "memory_waves",
+            label: "Hidden 2 · Memory Waves (Ch 8-10)",
+            compute: "neutral",
+            tag: "ch 8-10",
+            guidance: "Internal hidden channels 8-10. Choose Phenotype to see the texture.",
+          },
+          {
+            value: "energy_heat",
+            label: "Energy · Metabolic Heatmap",
+            compute: "balanced",
+            tag: "heatmap",
+            guidance: "Hidden-state magnitude heatmap showing overall network activation.",
+          },
+          {
+            value: "xray",
+            label: "Neural X-Ray · Phenotype + Glow",
+            compute: "balanced",
+            tag: "composite",
+            guidance: "Composite view fusing surface colors with glowing hidden-state energy.",
+          },
         ],
         help: "Inspects hidden biochemical and electrical memory channels operating beneath the living pattern.",
       },
@@ -435,6 +618,9 @@ export class NeuralGrowthModel {
   }
   getStats() {
     return this._runtime?.getStats() || null;
+  }
+  isDormant() {
+    return Boolean(this._runtime?.isDormant?.());
   }
   get hasActiveRipples() {
     if (!this._activeRipples || this._activeRipples.length === 0) return false;

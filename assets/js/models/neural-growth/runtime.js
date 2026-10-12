@@ -1291,6 +1291,23 @@ export class TextureNcaRuntime {
     return mask;
   }
 
+  isDormant() {
+    if (this.disposed || this.lost) return false;
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.state.framebuffer);
+    const pixels = new Uint8Array(8 * 8 * 4);
+    const offset = Math.max(0, Math.floor(this.size / 2) - 4);
+    gl.readPixels(offset, offset, 8, 8, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let totalDiff = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      totalDiff +=
+        Math.abs(pixels[i] - 127) +
+        Math.abs(pixels[i + 1] - 127) +
+        Math.abs(pixels[i + 2] - 127);
+    }
+    return totalDiff < 64;
+  }
+
   getStats() {
     return {
       steps: this.steps,

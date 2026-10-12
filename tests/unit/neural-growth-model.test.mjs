@@ -916,3 +916,56 @@ test("audio frame re-arms during silence and triggers kick shockwave and kick in
   assert.equal(shockwaves.length, 2);
 });
 
+test("neural growth controls provide contextual guidance and dormant tap recovery", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  // 1. Growth speed guidance
+  const speedCtrl = controls.find((c) => c.key === "growthSpeed");
+  assert.ok(speedCtrl && typeof speedCtrl.getGuidance === "function");
+  assert.equal(speedCtrl.getGuidance(0).tag, "paused");
+  assert.equal(speedCtrl.getGuidance(30).tag, "recommended");
+  assert.equal(speedCtrl.getGuidance(60).tag, "active");
+  assert.equal(speedCtrl.getGuidance(100).tag, "rapid");
+
+  // 2. Coordinate transform options and tags
+  const transformCtrl = controls.find((c) => c.key === "coordinateTransform");
+  assert.ok(transformCtrl && Array.isArray(transformCtrl.options));
+  const cartesianOpt = transformCtrl.options.find((o) => o.value === "cartesian");
+  const spiralOpt = transformCtrl.options.find((o) => o.value === "spiral");
+  assert.equal(cartesianOpt.tag, "recommended");
+  assert.equal(spiralOpt.tag, "swirl");
+  assert.ok(spiralOpt.guidance.includes("Logarithmic swirl"));
+
+  // 3. Twist contextual guidance
+  const twistCtrl = controls.find((c) => c.key === "twist");
+  assert.ok(twistCtrl && typeof twistCtrl.getGuidance === "function");
+  // In Cartesian mode: inactive
+  assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "cartesian" }).tag, "inactive");
+  // In Spiral mode: contextual ranges
+  assert.equal(twistCtrl.getGuidance(5, { coordinateTransform: "spiral" }).tag, "gentle");
+  assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "spiral" }).tag, "recommended");
+  assert.equal(twistCtrl.getGuidance(55, { coordinateTransform: "spiral" }).tag, "vivid");
+  assert.equal(twistCtrl.getGuidance(85, { coordinateTransform: "spiral" }).tag, "high shear");
+
+  // 4. Disturbance mode guidance
+  const modeCtrl = controls.find((c) => c.key === "disturbanceMode");
+  assert.ok(modeCtrl && Array.isArray(modeCtrl.options));
+  const eraseOpt = modeCtrl.options.find((o) => o.value === "erase");
+  const noiseOpt = modeCtrl.options.find((o) => o.value === "noise");
+  assert.equal(eraseOpt.tag, "clear");
+  assert.equal(noiseOpt.tag, "re-seed");
+
+  // 5. Channel inspector guidance
+  const channelCtrl = controls.find((c) => c.key === "channelView");
+  assert.ok(channelCtrl && Array.isArray(channelCtrl.options));
+  const phenotypeOpt = channelCtrl.options.find((o) => o.value === "phenotype");
+  const signalsOpt = channelCtrl.options.find((o) => o.value === "fast_signals");
+  assert.equal(phenotypeOpt.tag, "recommended");
+  assert.equal(signalsOpt.tag, "ch 4-6");
+
+  // 6. Dormant check on model without runtime returns false
+  assert.equal(model.isDormant(), false);
+});
+
+

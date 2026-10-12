@@ -490,6 +490,19 @@ export function createGrowthController({
     lastCoord = coords;
     const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
+    const channelView = model.parameters?.channelView || "phenotype";
+    const speed = Number(model.parameters?.growthSpeed) || 0;
+    const isStandardView = channelView === "phenotype" || channelView === "xray";
+    if (
+      mode !== "erase" &&
+      model.isClockRunning &&
+      speed > 0 &&
+      isStandardView &&
+      typeof model.isDormant === "function" &&
+      model.isDormant()
+    ) {
+      model.queueDisturbance(coords.gx, coords.gy, radius, "noise");
+    }
     model.queueDisturbance(coords.gx, coords.gy, radius, mode);
     if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
       lastPointerRippleTime = performance.now();
@@ -558,6 +571,19 @@ export function createGrowthController({
     const center = Math.floor(model.simulationSize / 2);
     const radius = Number(model.parameters?.brushRadius) || 8;
     const mode = model.parameters?.disturbanceMode || "erase";
+    const channelView = model.parameters?.channelView || "phenotype";
+    const speed = Number(model.parameters?.growthSpeed) || 0;
+    const isStandardView = channelView === "phenotype" || channelView === "xray";
+    if (
+      mode !== "erase" &&
+      model.isClockRunning &&
+      speed > 0 &&
+      isStandardView &&
+      typeof model.isDormant === "function" &&
+      model.isDormant()
+    ) {
+      model.queueDisturbance(center, center, radius, "noise");
+    }
     model.queueDisturbance(center, center, radius, mode);
     if (!model.isClockRunning) {
       schedulePausedRender();
