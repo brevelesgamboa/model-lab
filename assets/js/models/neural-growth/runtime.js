@@ -373,6 +373,9 @@ uniform vec4 u_ripple2;
 uniform vec4 u_ripple3;
 uniform vec4 u_rippleAmps;
 uniform int u_channelView;
+uniform ivec2 u_viewport;
+uniform float u_zoom;
+uniform int u_displayFilter;
 
 vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int style) {
   if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return vec2(0.0);
@@ -410,11 +413,14 @@ float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
   return spatialEnv * timeFade * timeFade * amplitude;
 }
 
-vec4 sampleGroupBilinear(vec2 pos, int groupIdx) {
+vec4 sampleGroup(vec2 pos, int groupIdx) {
   vec2 clampedPos = clamp(pos, vec2(0.0), vec2(float(u_size - 1)));
   ivec2 i0 = ivec2(floor(clampedPos));
   ivec2 i1 = clamp(i0 + ivec2(1, 1), ivec2(0), ivec2(u_size - 1));
   vec2 f = fract(clampedPos);
+  if (u_displayFilter == 0) {
+    f = f * f * (3.0 - 2.0 * f);
+  }
   int xOff = groupIdx * u_size;
   vec4 s00 = decodeState(texelFetch(u_state, ivec2(i0.x + xOff, i0.y), 0));
   vec4 s10 = decodeState(texelFetch(u_state, ivec2(i1.x + xOff, i0.y), 0));
@@ -425,31 +431,57 @@ vec4 sampleGroupBilinear(vec2 pos, int groupIdx) {
   return mix(sTop, sBot, f.y);
 }
 
-vec4 sampleStateBilinear(vec2 pos) {
-  return sampleGroupBilinear(pos, 0);
+vec3 sampleRawColor(vec2 p) {
+  if (u_channelView == 0) {
+    return sampleGroup(p, 0).rgb * 0.5 + 0.5;
+  } else if (u_channelView == 1) {
+    float alpha = clamp(sampleGroup(p, 0).a * 0.5 + 0.5, 0.0, 1.0);
+    return vec3(alpha);
+  } else if (u_channelView == 2) {
+    return clamp(sampleGroup(p, 1).rgb * 0.5 + 0.5, 0.0, 1.0);
+  } else if (u_channelView == 3) {
+    return clamp(sampleGroup(p, 2).rgb * 0.5 + 0.5, 0.0, 1.0);
+  } else if (u_channelView == 4) {
+    vec4 g1 = sampleGroup(p, 1);
+    vec4 g2 = sampleGroup(p, 2);
+    float eVal = length(g1) + length(g2);
+    float normE = clamp(eVal * 0.22, 0.0, 1.0);
+    if (normE < 0.35) {
+      return mix(vec3(0.02, 0.04, 0.18), vec3(0.0, 0.92, 1.0), normE / 0.35);
+    } else if (normE < 0.70) {
+      return mix(vec3(0.0, 0.92, 1.0), vec3(1.0, 0.72, 0.0), (normE - 0.35) / 0.35);
+    } else {
+      return mix(vec3(1.0, 0.72, 0.0), vec3(1.0, 0.15, 0.75), (normE - 0.70) / 0.30);
+    }
+  } else {
+    vec3 baseRgb = sampleGroup(p, 0).rgb * 0.5 + 0.5;
+    vec4 g1 = sampleGroup(p, 1);
+    vec4 g2 = sampleGroup(p, 2);
+    float eVal = length(g1) + length(g2);
+    float glow = clamp(eVal * 0.20, 0.0, 1.0);
+    vec3 neuralGlow = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.0, 0.7), glow) * glow * 0.85;
+    return clamp(baseRgb * 0.65 + neuralGlow, 0.0, 1.0);
+  }
 }
 
-float cellLuminance(ivec2 p) {
+float continuousLuminance(vec2 pCoord) {
   if (u_channelView == 1) {
-    return clamp(decodeState(texelFetch(u_state, p, 0)).a * 0.5 + 0.5, 0.0, 1.0);
-  } else if (u_channelView == 2) {
-    vec3 c = decodeState(texelFetch(u_state, ivec2(p.x + u_size, p.y), 0)).rgb * 0.5 + 0.5;
-    return dot(clamp(c, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
-  } else if (u_channelView == 3) {
-    vec3 c = decodeState(texelFetch(u_state, ivec2(p.x + 2 * u_size, p.y), 0)).rgb * 0.5 + 0.5;
-    return dot(clamp(c, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
-  } else if (u_channelView >= 4) {
-    vec4 g1 = decodeState(texelFetch(u_state, ivec2(p.x + u_size, p.y), 0));
-    vec4 g2 = decodeState(texelFetch(u_state, ivec2(p.x + 2 * u_size, p.y), 0));
-    return clamp((length(g1) + length(g2)) * 0.22, 0.0, 1.0);
+    return clamp(sampleGroup(pCoord, 0).a * 0.5 + 0.5, 0.0, 1.0);
   }
-  vec3 c = decodeState(texelFetch(u_state, p, 0)).rgb / 2.0 + 0.5;
-  return dot(c, vec3(0.299, 0.587, 0.114));
+  return dot(sampleRawColor(pCoord), vec3(0.299, 0.587, 0.114));
 }
 
 void main() {
-  ivec2 xy = ivec2(gl_FragCoord.xy);
-  vec2 pos = vec2(xy);
+  vec2 vpSize = u_viewport.x > 0 ? vec2(u_viewport) : vec2(float(u_size));
+  vec2 uv = gl_FragCoord.xy / vpSize;
+  float z = u_zoom > 0.0 ? u_zoom : 1.0;
+  float srcExtent = float(u_size) / z;
+  float srcOffset = (float(u_size) - srcExtent) * 0.5;
+  vec2 pos = srcOffset + uv * srcExtent;
+  if (u_displayFilter == 1) {
+    pos = floor(pos) + 0.5;
+  }
+
   vec2 disp = vec2(0.0);
   float totalGlow = 0.0;
   if (u_rippleCount > 0) {
@@ -473,55 +505,17 @@ void main() {
     disp = (disp / dispLen) * 1.8;
   }
   vec3 rawRgb;
-  if (u_channelView == 0) {
-    if (dispLen > 0.001) {
-      if (u_rippleStyle == 1) {
-        float r = sampleStateBilinear(pos - disp * 1.35).r / 2.0 + 0.5;
-        float g = sampleStateBilinear(pos - disp * 1.00).g / 2.0 + 0.5;
-        float b = sampleStateBilinear(pos - disp * 0.65).b / 2.0 + 0.5;
-        rawRgb = vec3(r, g, b);
-      } else {
-        rawRgb = sampleStateBilinear(pos - disp).rgb / 2.0 + 0.5;
-      }
-    } else {
-      rawRgb = decodeState(texelFetch(u_state, xy, 0)).rgb / 2.0 + 0.5;
-    }
-  } else if (u_channelView == 1) {
-    vec4 g0 = dispLen > 0.001 ? sampleStateBilinear(pos - disp) : decodeState(texelFetch(u_state, xy, 0));
-    float alpha = clamp(g0.a * 0.5 + 0.5, 0.0, 1.0);
-    rawRgb = vec3(alpha);
-  } else if (u_channelView == 2) {
-    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
-    rawRgb = clamp(g1.rgb * 0.5 + 0.5, 0.0, 1.0);
-  } else if (u_channelView == 3) {
-    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
-    rawRgb = clamp(g2.rgb * 0.5 + 0.5, 0.0, 1.0);
-  } else if (u_channelView == 4) {
-    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
-    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
-    float eVal = length(g1) + length(g2);
-    float normE = clamp(eVal * 0.22, 0.0, 1.0);
-    vec3 heatColor;
-    if (normE < 0.35) {
-      heatColor = mix(vec3(0.02, 0.04, 0.18), vec3(0.0, 0.92, 1.0), normE / 0.35);
-    } else if (normE < 0.70) {
-      heatColor = mix(vec3(0.0, 0.92, 1.0), vec3(1.0, 0.72, 0.0), (normE - 0.35) / 0.35);
-    } else {
-      heatColor = mix(vec3(1.0, 0.72, 0.0), vec3(1.0, 0.15, 0.75), (normE - 0.70) / 0.30);
-    }
-    rawRgb = heatColor;
+  vec2 pBase = pos - disp;
+  if (u_channelView == 0 && dispLen > 0.001 && u_rippleStyle == 1) {
+    float r = sampleGroup(pos - disp * 1.35, 0).r * 0.5 + 0.5;
+    float g = sampleGroup(pos - disp * 1.00, 0).g * 0.5 + 0.5;
+    float b = sampleGroup(pos - disp * 0.65, 0).b * 0.5 + 0.5;
+    rawRgb = vec3(r, g, b);
   } else {
-    vec3 baseRgb = (dispLen > 0.001 ? sampleStateBilinear(pos - disp) : decodeState(texelFetch(u_state, xy, 0))).rgb / 2.0 + 0.5;
-    vec4 g1 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 1) : decodeState(texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0));
-    vec4 g2 = dispLen > 0.001 ? sampleGroupBilinear(pos - disp, 2) : decodeState(texelFetch(u_state, ivec2(xy.x + 2 * u_size, xy.y), 0));
-    float eVal = length(g1) + length(g2);
-    float glow = clamp(eVal * 0.20, 0.0, 1.0);
-    vec3 neuralGlow = mix(vec3(0.0, 0.95, 1.0), vec3(1.0, 0.0, 0.7), glow) * glow * 0.85;
-    rawRgb = clamp(baseRgb * 0.65 + neuralGlow, 0.0, 1.0);
+    rawRgb = sampleRawColor(pBase);
   }
 
   // Soft highlight compression: smoothly rolls off intense highlights above 0.5
-  // so bright metallic models retain texture and gradients without clipping to white.
   vec3 rgb = rawRgb / (1.0 + max(vec3(0.0), rawRgb - 0.5) * 0.85);
   rgb = clamp(rgb, 0.0, 1.0);
 
@@ -537,10 +531,11 @@ void main() {
   }
 
   if (u_shading > 0) {
-    float lumLeft = cellLuminance(wrapCell(xy + ivec2(-1, 0)));
-    float lumRight = cellLuminance(wrapCell(xy + ivec2(1, 0)));
-    float lumDown = cellLuminance(wrapCell(xy + ivec2(0, -1)));
-    float lumUp = cellLuminance(wrapCell(xy + ivec2(0, 1)));
+    float delta = max(0.2, srcExtent / vpSize.x);
+    float lumLeft = continuousLuminance(pos - vec2(delta, 0.0));
+    float lumRight = continuousLuminance(pos + vec2(delta, 0.0));
+    float lumDown = continuousLuminance(pos - vec2(0.0, delta));
+    float lumUp = continuousLuminance(pos + vec2(0.0, delta));
 
     float dx = (lumRight - lumLeft) * u_relief;
     float dy = (lumUp - lumDown) * u_relief;
@@ -550,26 +545,28 @@ void main() {
       rgb = normal * 0.5 + 0.5;
     } else {
       vec3 lightDir = normalize(vec3(cos(u_lightAngle), sin(u_lightAngle), 0.85));
+
       float diffuse = max(dot(normal, lightDir), 0.0);
       float lighting = 0.35 + 0.65 * diffuse;
       rgb = rgb * lighting;
 
       if (u_shading == 2) {
         vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
-        float specular = pow(max(dot(normal, halfVec), 0.0), 24.0);
-        rgb = mix(rgb, vec3(1.0), specular * 0.45);
+        float specular = pow(max(dot(normal, halfVec), 0.0), 32.0);
+        rgb = mix(rgb, vec3(1.0), specular * 0.5);
       }
     }
   }
 
   if (u_showBarrier == 1) {
-    float bL = texelFetch(u_barrier, wrapCell(xy + ivec2(-1, 0)), 0).r;
-    float bR = texelFetch(u_barrier, wrapCell(xy + ivec2(1, 0)), 0).r;
-    float bD = texelFetch(u_barrier, wrapCell(xy + ivec2(0, -1)), 0).r;
-    float bU = texelFetch(u_barrier, wrapCell(xy + ivec2(0, 1)), 0).r;
+    ivec2 bCoord = ivec2(floor(clamp(pos, vec2(0.0), vec2(float(u_size - 1)))));
+    float bL = texelFetch(u_barrier, wrapCell(bCoord + ivec2(-1, 0)), 0).r;
+    float bR = texelFetch(u_barrier, wrapCell(bCoord + ivec2(1, 0)), 0).r;
+    float bD = texelFetch(u_barrier, wrapCell(bCoord + ivec2(0, -1)), 0).r;
+    float bU = texelFetch(u_barrier, wrapCell(bCoord + ivec2(0, 1)), 0).r;
     float bEdge = max(abs(bR - bL), abs(bU - bD));
     if (bEdge > 0.2) {
-      bool dash = mod(float(xy.x + xy.y), 8.0) < 4.0;
+      bool dash = mod(float(bCoord.x + bCoord.y), 8.0) < 4.0;
       if (dash) {
         rgb = mix(rgb, vec3(1.0) - rgb, 0.85);
       }
@@ -775,7 +772,12 @@ export class TextureNcaRuntime {
     const gl = this.gl;
     const program = this.program[name];
     gl.bindFramebuffer(gl.FRAMEBUFFER, output?.framebuffer ?? null);
-    gl.viewport(0, 0, output?.width ?? this.size, output?.height ?? this.size);
+    gl.viewport(
+      0,
+      0,
+      output?.width ?? this.canvas.width,
+      output?.height ?? this.canvas.height,
+    );
     gl.useProgram(program.handle);
     gl.bindVertexArray(this.vao);
     const location = (key) => {
@@ -813,6 +815,7 @@ export class TextureNcaRuntime {
           "u_rippleCount",
           "u_rippleStyle",
           "u_channelView",
+          "u_displayFilter",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -1157,6 +1160,19 @@ export class TextureNcaRuntime {
       rippleUniforms.u_rippleAmps[i] = r.amplitude || 1.2;
     }
 
+    const extent = Math.max(
+      1,
+      Math.min(targetCanvas.width || this.size, targetCanvas.height || this.size),
+    );
+    if (this.canvas.width !== extent || this.canvas.height !== extent) {
+      this.canvas.width = extent;
+      this.canvas.height = extent;
+    }
+
+    const filterModes = { smooth: 0, ultra: 0, cas: 0, hybrid: 0, crisp: 1 };
+    const filterCode = filterModes[displayFilter] ?? 0;
+    const z = Math.max(1, Math.min(8, Number(zoom) || 1));
+
     this.run(
       "visualize",
       null,
@@ -1170,25 +1186,18 @@ export class TextureNcaRuntime {
         u_rippleStyle: rippleStyleCode,
         u_rippleTint: rippleTint,
         u_channelView: channelViewCode,
+        u_viewport: [extent, extent],
+        u_zoom: z,
+        u_displayFilter: filterCode,
         ...rippleUniforms,
       },
     );
 
-    const extent = Math.min(targetCanvas.width, targetCanvas.height);
     context.fillStyle = "#101218";
     context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-    const z = Math.max(1, Math.min(8, Number(zoom) || 1));
-    context.imageSmoothingEnabled = displayFilter
-      ? displayFilter === "smooth"
-      : z === 1;
-    const srcExtent = this.size / z;
-    const srcOffset = (this.size - srcExtent) / 2;
+    context.imageSmoothingEnabled = false;
     context.drawImage(
       this.canvas,
-      srcOffset,
-      srcOffset,
-      srcExtent,
-      srcExtent,
       (targetCanvas.width - extent) / 2,
       (targetCanvas.height - extent) / 2,
       extent,

@@ -905,5 +905,31 @@ test("channel inspector exposes hidden channel modes and preserves simulation st
   await expect(channelSelect).toHaveValue("phenotype");
 });
 
+test("display filter switches between Smooth Continuous and Crisp Pixel Grid cleanly", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  const filterSelect = page.getByLabel("DISPLAY FILTER", { exact: true });
+  await expect(filterSelect).toBeVisible();
+  await expect(filterSelect).toHaveValue("smooth");
+
+  // Step simulation once
+  await page.locator("#step-growth").click();
+
+  // Switch to Crisp
+  await filterSelect.selectOption("crisp");
+  await expect(filterSelect).toHaveValue("crisp");
+
+  // Return to Smooth
+  await filterSelect.selectOption("smooth");
+  await expect(filterSelect).toHaveValue("smooth");
+
+  // Context remains healthy with 0 errors
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+});
+
 
 

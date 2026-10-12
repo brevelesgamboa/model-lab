@@ -745,21 +745,26 @@ export function createGrowthController({
   function onAudioFrame(levels, timestamp) {
     const model = activeModel();
     if (!model?.ready || !levels) return;
-    if (!levels.hasSignal) return;
 
     const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
-    if (triggerKick < 0.25) {
+    if (!levels.hasSignal || triggerKick < 0.25) {
       beatArmed = true;
     }
+    if (!levels.hasSignal) return;
+
     const elapsed = timestamp - lastBeatTime;
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
       const mode = model.parameters?.beatShockwave || "off";
+      const isAudioActive = (model.parameters?.audioProfile || "off") !== "off";
       let triggered = false;
-      if (mode === "center") {
+      if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
         model.triggerBeatShockwave("center");
         triggered = true;
+        if (typeof model.triggerKickInput === "function") {
+          model.triggerKickInput(triggerKick, timestamp);
+        }
       }
       if (triggered && !model.isClockRunning) {
         schedulePausedRender();

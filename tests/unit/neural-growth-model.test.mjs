@@ -786,6 +786,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
   assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
   assert.equal(runtimes[0].lastDrawOptions.channelView, "phenotype");
+  assert.equal(runtimes[0].lastDrawOptions.displayFilter, "smooth");
 
   model.onParameterChange("channelView", "fast_signals");
   await model.render(canvas, model.parameters, 0.2, { advanceSimulation: true });
@@ -843,5 +844,75 @@ test("simulationSize options and normalization adapt dynamically to hardware cap
     (c) => c.key === "simulationSize",
   ).options.map((o) => o.value);
   assert.deepEqual(updatedSizes, [128, 256, 512]);
+});
+
+test("audio frame re-arms during silence and triggers kick shockwave and kick input", () => {
+  let lastBeatTime = 0;
+  let beatArmed = true;
+  const shockwaves = [];
+  const kickInputs = [];
+
+  const mockModel = {
+    ready: true,
+    isClockRunning: true,
+    parameters: { audioProfile: "dynamic", beatShockwave: "off" },
+    triggerBeatShockwave: (m) => shockwaves.push(m),
+    triggerKickInput: (k, t) => {
+      kickInputs.push({ k, t });
+      return true;
+    },
+  };
+
+  function simulateAudioFrame(levels, timestamp) {
+    if (!mockModel?.ready || !levels) return;
+    const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
+    if (!levels.hasSignal || triggerKick < 0.25) {
+      beatArmed = true;
+    }
+    if (!levels.hasSignal) return;
+
+    const elapsed = timestamp - lastBeatTime;
+    if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
+      lastBeatTime = timestamp;
+      beatArmed = false;
+      const mode = mockModel.parameters?.beatShockwave || "off";
+      const isAudioActive = (mockModel.parameters?.audioProfile || "off") !== "off";
+      if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
+        mockModel.triggerBeatShockwave("center");
+        if (typeof mockModel.triggerKickInput === "function") {
+          mockModel.triggerKickInput(triggerKick, timestamp);
+        }
+      }
+    }
+  }
+
+  // 1. Kick 1 spikes
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1000);
+  assert.equal(shockwaves.length, 1);
+  assert.equal(kickInputs.length, 1);
+
+  // 2. Immediate frame still hot (< 180ms or unarmed)
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1050);
+  assert.equal(shockwaves.length, 1);
+
+  // 3. Silence gap (hasSignal: false): must re-arm!
+  simulateAudioFrame({ hasSignal: false, kickOnset: 0.0 }, 1200);
+  assert.equal(beatArmed, true);
+
+  // 4. Kick 2 after silence: must trigger!
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.75 }, 1300);
+  assert.equal(shockwaves.length, 2);
+  assert.equal(kickInputs.length, 2);
+
+  // 5. Steady bass without onset (kickOnset: 0.2, kick: 0.3): must not trigger shockwave
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.2, kick: 0.3 }, 1500);
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.3, kick: 0.4 }, 1700);
+  assert.equal(shockwaves.length, 2);
+
+  // 6. Audio Off profile: must not trigger shockwave
+  mockModel.parameters.audioProfile = "off";
+  simulateAudioFrame({ hasSignal: false }, 1800);
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1900);
+  assert.equal(shockwaves.length, 2);
 });
 

@@ -385,10 +385,20 @@ export class NeuralGrowthModel {
         type: "select",
         default: "smooth",
         options: [
-          { value: "smooth", label: "Smooth · Bilinear" },
-          { value: "crisp", label: "Crisp · Nearest Cell" },
+          {
+            value: "smooth",
+            label: "Smooth · Continuous High-DPI",
+            compute: "neutral",
+            guidance: "Sub-pixel continuous lighting, sharp normals, and pin-sharp specular highlights.",
+          },
+          {
+            value: "crisp",
+            label: "Crisp · Pixel Grid",
+            compute: "efficient",
+            guidance: "Discrete nearest-neighbor cell squares.",
+          },
         ],
-        help: "Viewport sampling interpolation: smooth bilinear blending or crisp individual cell pixels.",
+        help: "Viewport rendering fidelity: Smooth continuous sub-pixel shading or crisp pixel grid.",
       },
     ];
   }
@@ -531,6 +541,10 @@ export class NeuralGrowthModel {
       if (num === 128) return 128;
       return 256;
     }
+    if (key === "displayFilter") {
+      if (value === "crisp") return "crisp";
+      return "smooth";
+    }
     return value;
   }
 
@@ -546,7 +560,8 @@ export class NeuralGrowthModel {
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
       key === "shockwaveImpact" ||
-      key === "channelView"
+      key === "channelView" ||
+      key === "displayFilter"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;
