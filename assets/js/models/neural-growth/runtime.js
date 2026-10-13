@@ -1068,7 +1068,7 @@ export class TextureNcaRuntime {
     }
     else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
-    else if (mode === "kick_hidden_perturb") modeCode = 7;
+    else if (mode === "kick_hidden_perturb" || mode === "infuse") modeCode = 7;
     this.run(
       "disturb",
       this.nextState,

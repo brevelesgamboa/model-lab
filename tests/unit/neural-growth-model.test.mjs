@@ -981,13 +981,25 @@ test("persistent kick detail infusion injects hidden channels with bounded rate 
   assert.equal(infusionCtrl.default, "off");
   assert.deepEqual(
     infusionCtrl.options.map((o) => o.value),
-    ["off", "subtle", "dynamic"],
+    ["off", "subtle", "dynamic", "vivid", "intense"],
   );
+
+  const strengthCtrl = model.controls.find((c) => c.key === "kickInfusionStrength");
+  assert.ok(strengthCtrl);
+  assert.equal(strengthCtrl.type, "range");
+  assert.equal(strengthCtrl.min, 0.2);
+  assert.equal(strengthCtrl.max, 4.0);
+  assert.equal(strengthCtrl.default, 1.0);
 
   // 2. Parameter normalization
   assert.equal(model.normalizeStoredParameter("kickInfusion", "dynamic"), "dynamic");
   assert.equal(model.normalizeStoredParameter("kickInfusion", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("kickInfusion", "vivid"), "vivid");
+  assert.equal(model.normalizeStoredParameter("kickInfusion", "intense"), "intense");
   assert.equal(model.normalizeStoredParameter("kickInfusion", "invalid"), "off");
+  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", 2.5), 2.5);
+  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", 10), 5.0);
+  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", "invalid"), 1.0);
 
   // 3. Model not ready returns false
   assert.equal(model.triggerKickInfusion(1.0, 1000), false);
@@ -1063,7 +1075,27 @@ test("persistent kick detail infusion injects hidden channels with bounded rate 
   assert.equal(primary.r, 16);
   assert.ok(satellite.r < primary.r);
 
-  // 11. Cancel resets rate limiter state and stops clock
+  // 11. Intense mode with strength multiplier scales amplitude and radius
+  model._parameters.kickInfusion = "intense";
+  model._parameters.kickInfusionStrength = 2.0;
+  assert.equal(model.triggerKickInfusion(0.9, 8000), true);
+  // Intense with norm > 0.85 injects 3 patches (primary + 2 satellites)
+  assert.equal(disturbances.length, 10);
+  const intensePatch = disturbances[7];
+  assert.equal(intensePatch.r, 24);
+  assert.ok(intensePatch.strength > 3.0);
+
+  // 12. Infuse brush mode allows manual pointer injection of hidden channels
+  model.queueDisturbance(64, 64, 20, "infuse");
+  assert.equal(model._drainDisturbances(), true);
+  assert.equal(disturbances.length, 11);
+  const brushPatch = disturbances[10];
+  assert.equal(brushPatch.x, 64);
+  assert.equal(brushPatch.y, 64);
+  assert.equal(brushPatch.mode, "infuse");
+  assert.equal(brushPatch.strength, 2.4);
+
+  // 13. Cancel resets rate limiter state and stops clock
   model.cancel();
   assert.equal(model._lastKickInfusionTime, 0);
   assert.equal(model._kickInfusionBudget, 0);

@@ -294,8 +294,49 @@ export class NeuralGrowthModel {
           { value: "off", label: "Off" },
           { value: "subtle", label: "Subtle" },
           { value: "dynamic", label: "Dynamic" },
+          { value: "vivid", label: "Vivid" },
+          { value: "intense", label: "Intense" },
         ],
         help: "Audio kick-driven detail infusion into hidden channels without shockwaves or harsh surface color splashes.",
+      },
+      {
+        key: "kickInfusionStrength",
+        label: "INFUSION STRENGTH",
+        type: "range",
+        min: 0.2,
+        max: 4.0,
+        step: 0.1,
+        default: 1.0,
+        help: "Amplitude multiplier for kick detail infusion into hidden channels.",
+        getGuidance: (value) => {
+          const v = Number(value) || 1.0;
+          if (v <= 0.6) {
+            return {
+              compute: "neutral",
+              tag: "whisper",
+              text: "Subtle amplitude. Gradual texture evolution across beats.",
+            };
+          }
+          if (v <= 1.4) {
+            return {
+              compute: "balanced",
+              tag: "recommended",
+              text: "Recommended (1.0). Natural organic detail that weaves into growth.",
+            };
+          }
+          if (v <= 2.5) {
+            return {
+              compute: "light",
+              tag: "pronounced",
+              text: "Pronounced variation. Clear cellular blooms emerging from kicks.",
+            };
+          }
+          return {
+            compute: "moderate",
+            tag: "intense",
+            text: "High intensity. Rapid morphological transformation on every beat.",
+          };
+        },
       },
       {
         key: "beatShockwave",
@@ -397,6 +438,13 @@ export class NeuralGrowthModel {
             guidance: "Emits expanding optical ripples and fluid disturbances from pointer taps.",
           },
           {
+            value: "infuse",
+            label: "Infuse",
+            compute: "balanced",
+            tag: "detail",
+            guidance: "Injects hidden-channel variation for cells to organically weave into new texture.",
+          },
+          {
             value: "freeze",
             label: "Freeze",
             compute: "neutral",
@@ -418,7 +466,7 @@ export class NeuralGrowthModel {
             guidance: "Aligns directional perception filters along pointer brush drag angles.",
           },
         ],
-        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Freeze barrier, Unfreeze barrier, or Flow direction.",
+        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Infuse detail, Freeze barrier, Unfreeze barrier, or Flow direction.",
       },
       {
         key: "dyeColor",
@@ -717,8 +765,22 @@ export class NeuralGrowthModel {
       }
     }
     if (key === "kickInfusion") {
-      if (value === "dynamic" || value === "subtle") return value;
+      if (
+        value === "dynamic" ||
+        value === "subtle" ||
+        value === "vivid" ||
+        value === "intense"
+      ) {
+        return value;
+      }
       return "off";
+    }
+    if (key === "kickInfusionStrength") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.1, Math.min(5.0, num));
+      }
+      return 1.0;
     }
     if (key === "shockwaveImpact") {
       if (value !== "none" && value !== "color") {
@@ -766,6 +828,7 @@ export class NeuralGrowthModel {
       key === "audioProfile" ||
       key === "beatShockwave" ||
       key === "kickInfusion" ||
+      key === "kickInfusionStrength" ||
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
       key === "shockwaveImpact" ||
@@ -1096,6 +1159,9 @@ export class NeuralGrowthModel {
             opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
             opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
             opts.strength = 1.0;
+          } else if (mode === "infuse") {
+            const mult = Number(this._parameters?.kickInfusionStrength) || 1.0;
+            opts.strength = 1.2 * mult;
           }
           this._runtime.disturb(x, y, radius, mode, opts);
         } else {
@@ -1296,12 +1362,24 @@ export class NeuralGrowthModel {
     this._kickInfusionBudget += 1.0;
     this._lastKickInfusionTime = now;
 
-    // Conservative strength scaling surviving RGBA8 quantization (>= 0.035 to 0.070 amplitude)
+    // Strength and radius scaling by infusion preset level
     const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
-    const injectStrength =
-      infusion === "dynamic"
-        ? 0.80 + norm * 0.35
-        : 0.60 + norm * 0.20;
+    let baseStrength = 0.60 + norm * 0.20;
+    let modeRadius = 12;
+
+    if (infusion === "intense") {
+      baseStrength = 1.40 + norm * 0.60;
+      modeRadius = 24;
+    } else if (infusion === "vivid") {
+      baseStrength = 1.10 + norm * 0.45;
+      modeRadius = 20;
+    } else if (infusion === "dynamic") {
+      baseStrength = 0.80 + norm * 0.35;
+      modeRadius = 16;
+    }
+
+    const mult = Number(this._parameters?.kickInfusionStrength) || 1.0;
+    const injectStrength = baseStrength * mult;
 
     // Deterministic low-discrepancy spatial distribution across field
     this._kickInfusionIndex = (this._kickInfusionIndex || 0) + 1;
@@ -1322,7 +1400,6 @@ export class NeuralGrowthModel {
       Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
     );
 
-    const modeRadius = infusion === "dynamic" ? 16 : 12;
     const patchRadius = Math.max(6, Math.round(modeRadius * (size / 256)));
     const lockBarrier = (this._parameters?.barrierLock || "mask") === "mask";
     const disturbMode = "kick_hidden_perturb";
@@ -1332,7 +1409,10 @@ export class NeuralGrowthModel {
       strength: injectStrength,
     });
 
-    if (infusion === "dynamic" && norm > 0.85) {
+    if (
+      (infusion === "dynamic" || infusion === "vivid" || infusion === "intense") &&
+      norm > 0.85
+    ) {
       const satTheta = theta + Math.PI + 0.35;
       const satR = maxR * 0.5 * rFrac;
       const satX = Math.max(
@@ -1348,6 +1428,29 @@ export class NeuralGrowthModel {
         lockBarrier,
         strength: injectStrength * 0.75,
       });
+
+      if (infusion === "intense") {
+        const satTheta2 = theta - Math.PI * 0.5;
+        const satR2 = maxR * 0.7 * rFrac;
+        const satX2 = Math.max(
+          12,
+          Math.min(size - 13, Math.round(center + satR2 * Math.cos(satTheta2))),
+        );
+        const satY2 = Math.max(
+          12,
+          Math.min(size - 13, Math.round(center + satR2 * Math.sin(satTheta2))),
+        );
+        this._runtime.disturb(
+          satX2,
+          satY2,
+          Math.max(4, Math.round(patchRadius * 0.5)),
+          disturbMode,
+          {
+            lockBarrier,
+            strength: injectStrength * 0.6,
+          },
+        );
+      }
     }
 
     return true;

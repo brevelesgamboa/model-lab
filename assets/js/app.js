@@ -2013,6 +2013,21 @@ function attachEvents() {
     if (event.key === " ") {
       event.preventDefault();
       setAnimation(!animationEnabled);
+      return;
+    }
+    if (event.key.toLowerCase() === "k") {
+      if (currentModel.id === "neural-growth") {
+        event.preventDefault();
+        const mode = currentParameters.kickInfusion || "off";
+        if (mode === "off") {
+          currentModel.onParameterChange("kickInfusion", "dynamic");
+          currentModel.triggerKickInfusion?.(1.0);
+          currentModel.onParameterChange("kickInfusion", "off");
+        } else {
+          currentModel.triggerKickInfusion?.(1.0);
+        }
+      }
+      return;
     }
   });
 
