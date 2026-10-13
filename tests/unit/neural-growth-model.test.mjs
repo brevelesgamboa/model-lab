@@ -646,6 +646,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     coordinateTransform: "cartesian",
     beatShockwave: "center",
     shockwaveReach: "canvas",
+    kickInfusion: "subtle",
   };
   const subtleLfos = {
     rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
@@ -694,6 +695,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     lightAngle: 180,
     shading: "relief",
     coordinateTransform: "cartesian",
+    kickInfusion: "subtle",
   };
   const continuousLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
@@ -727,6 +729,7 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     lightAngle: 180,
     shading: "relief",
     coordinateTransform: "vortex",
+    kickInfusion: "dynamic",
   };
   const dynamicLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
@@ -967,5 +970,106 @@ test("neural growth controls provide contextual guidance and dormant tap recover
   // 6. Dormant check on model without runtime returns false
   assert.equal(model.isDormant(), false);
 });
+
+test("persistent kick detail infusion injects hidden channels with bounded rate and paused safety", () => {
+  const model = new NeuralGrowthModel();
+
+  // 1. Control declaration and options
+  const infusionCtrl = model.controls.find((c) => c.key === "kickInfusion");
+  assert.ok(infusionCtrl);
+  assert.equal(infusionCtrl.type, "select");
+  assert.equal(infusionCtrl.default, "off");
+  assert.deepEqual(
+    infusionCtrl.options.map((o) => o.value),
+    ["off", "subtle", "dynamic"],
+  );
+
+  // 2. Parameter normalization
+  assert.equal(model.normalizeStoredParameter("kickInfusion", "dynamic"), "dynamic");
+  assert.equal(model.normalizeStoredParameter("kickInfusion", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("kickInfusion", "invalid"), "off");
+
+  // 3. Model not ready returns false
+  assert.equal(model.triggerKickInfusion(1.0, 1000), false);
+
+  // 4. Setup mock runtime and ready state
+  const disturbances = [];
+  model._runtime = {
+    disturb: (x, y, r, mode, opts) => {
+      disturbances.push({ x, y, r, mode, ...opts });
+    },
+  };
+  model._currentPatternId = "test";
+  model._needsRuntime = false;
+  model._loadingPattern = false;
+  model.lastError = null;
+  assert.equal(model.ready, true);
+  model._clockRunning = true;
+  model._parameters.growthSpeed = 30;
+
+  // 5. When kickInfusion is off, returns false
+  model._parameters.kickInfusion = "off";
+  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
+  assert.equal(disturbances.length, 0);
+
+  // 6. When paused (clock not running or growthSpeed 0), returns false with zero backlog
+  model._parameters.kickInfusion = "subtle";
+  model._clockRunning = false;
+  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
+  model._clockRunning = true;
+  model._parameters.growthSpeed = 0;
+  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
+  assert.equal(disturbances.length, 0);
+
+  // 7. Successful subtle injection targeting hidden channels only
+  model._parameters.growthSpeed = 30;
+  const initialSeed = model.parameters.seed;
+  assert.equal(model.triggerKickInfusion(0.7, 1000), true);
+  assert.equal(disturbances.length, 1);
+  assert.equal(disturbances[0].mode, "kick_hidden_perturb");
+  assert.equal(disturbances[0].r, 12);
+  assert.ok(disturbances[0].strength >= 0.7 && disturbances[0].strength <= 0.8);
+  assert.equal(disturbances[0].lockBarrier, true);
+  // Seed must remain unchanged
+  assert.equal(model.parameters.seed, initialSeed);
+
+  // 8. Refractory lockout (< 180 ms) rejects subsequent kick
+  assert.equal(model.triggerKickInfusion(0.9, 1100), false);
+  assert.equal(disturbances.length, 1);
+
+  // 9. Leaky bucket bounds (rapid triggers after 180ms lockout)
+  assert.equal(model.triggerKickInfusion(0.7, 1200), true);
+  assert.equal(disturbances.length, 2);
+  assert.equal(model.triggerKickInfusion(0.7, 1400), true);
+  assert.equal(disturbances.length, 3);
+  assert.equal(model.triggerKickInfusion(0.7, 1600), true);
+  assert.equal(disturbances.length, 4);
+  assert.equal(model.triggerKickInfusion(0.7, 1800), true);
+  assert.equal(disturbances.length, 5);
+  // Budget exhausted at 2000 (budget >= 3.0)
+  assert.equal(model.triggerKickInfusion(0.7, 2000), false);
+  assert.equal(disturbances.length, 5);
+
+  // 10. Dynamic mode with intense kick (> 0.85) dispatches satellite patch
+  model._parameters.kickInfusion = "dynamic";
+  // Advance time to clear leaky bucket budget
+  assert.equal(model.triggerKickInfusion(0.95, 5000), true);
+  // Dynamic with norm > 0.85 injects 2 patches: primary + satellite
+  assert.equal(disturbances.length, 7);
+  const primary = disturbances[5];
+  const satellite = disturbances[6];
+  assert.equal(primary.mode, "kick_hidden_perturb");
+  assert.equal(satellite.mode, "kick_hidden_perturb");
+  assert.equal(primary.r, 16);
+  assert.ok(satellite.r < primary.r);
+
+  // 11. Cancel resets rate limiter state and stops clock
+  model.cancel();
+  assert.equal(model._lastKickInfusionTime, 0);
+  assert.equal(model._kickInfusionBudget, 0);
+  assert.equal(model._kickInfusionIndex, 0);
+  assert.equal(model._clockRunning, false);
+});
+
 
 

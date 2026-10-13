@@ -271,7 +271,7 @@ void main() {
   delta = delta - round(delta / float(u_size)) * float(u_size);
   float dist = length(delta);
   float weight = 0.0;
-  if (u_mode == 5 || u_mode == 6) {
+  if (u_mode == 5 || u_mode == 6 || u_mode == 7) {
     float angle = atan(delta.y, delta.x);
     float rMod = u_radius * (1.0 + 0.22 * cos(3.0 * angle + 1.25) + 0.12 * sin(5.0 * angle));
     if (dist <= rMod) {
@@ -336,6 +336,18 @@ void main() {
       float sn3 = cos((sCoord.x - 2.1) * 2.7) * sin((sCoord.y - 3.4) * 1.9);
       float sn4 = sin((sCoord.x + 7.5) * 1.8 + (sCoord.y - 5.1) * 2.2);
       vec4 perturb = vec4(sn1, sn2, sn3, sn4) * 0.15;
+      out_color = clamp(current + perturb * weight, 0.0, 1.0);
+    } else {
+      out_color = current;
+    }
+  } else if (u_mode == 7) {
+    if (group >= 1) {
+      vec2 sCoord = vec2(xy) * 0.08;
+      float sn1 = sin(sCoord.x * 3.14 + sCoord.y * 1.7) * cos(sCoord.x * 1.3 - sCoord.y * 2.8);
+      float sn2 = sin((sCoord.x + 4.2) * 2.1) * cos((sCoord.y + 1.8) * 2.4);
+      float sn3 = cos((sCoord.x - 2.1) * 2.7) * sin((sCoord.y - 3.4) * 1.9);
+      float sn4 = sin((sCoord.x + 7.5) * 1.8 + (sCoord.y - 5.1) * 2.2);
+      vec4 perturb = vec4(sn1, sn2, sn3, sn4) * 0.08;
       out_color = clamp(current + perturb * weight, 0.0, 1.0);
     } else {
       out_color = current;
@@ -1056,6 +1068,7 @@ export class TextureNcaRuntime {
     }
     else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
+    else if (mode === "kick_hidden_perturb") modeCode = 7;
     this.run(
       "disturb",
       this.nextState,

@@ -782,10 +782,15 @@ export function createGrowthController({
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
+      const kickInfusion = model.parameters?.kickInfusion || "off";
       const mode = model.parameters?.beatShockwave || "off";
       const isAudioActive = (model.parameters?.audioProfile || "off") !== "off";
       let triggered = false;
-      if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
+      if (kickInfusion !== "off") {
+        if (typeof model.triggerKickInfusion === "function") {
+          triggered = model.triggerKickInfusion(triggerKick, timestamp);
+        }
+      } else if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
         model.triggerBeatShockwave("center");
         triggered = true;
         if (typeof model.triggerKickInput === "function") {

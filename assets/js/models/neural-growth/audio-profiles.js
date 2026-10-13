@@ -14,6 +14,9 @@ export const AUDIO_PROFILES = Object.freeze({
     id: "off",
     label: "Off",
     description: "No automatic audio routes. Full manual control via parameter MOD panels.",
+    base: Object.freeze({
+      kickInfusion: "off",
+    }),
     routes: Object.freeze({}),
   }),
   subtle: Object.freeze({
@@ -27,6 +30,7 @@ export const AUDIO_PROFILES = Object.freeze({
       reliefStrength: 1.8,
       lightAngle: 210,
       shading: "relief",
+      kickInfusion: "subtle",
     }),
     routes: Object.freeze({
       growthSpeed: Object.freeze({ source: "none", depth: 0.25 }),
@@ -54,6 +58,7 @@ export const AUDIO_PROFILES = Object.freeze({
       reliefStrength: 1.5,
       lightAngle: 180,
       shading: "relief",
+      kickInfusion: "subtle",
     }),
     routes: Object.freeze({
       growthSpeed: Object.freeze({ source: "none", depth: 0.25 }),
@@ -81,6 +86,7 @@ export const AUDIO_PROFILES = Object.freeze({
       reliefStrength: 1.4,
       lightAngle: 180,
       shading: "relief",
+      kickInfusion: "dynamic",
     }),
     routes: Object.freeze({
       growthSpeed: Object.freeze({ source: "none", depth: 0.25 }),

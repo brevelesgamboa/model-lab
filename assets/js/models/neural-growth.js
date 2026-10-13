@@ -59,6 +59,9 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
+    this._lastKickInfusionTime = 0;
+    this._kickInfusionBudget = 0;
+    this._kickInfusionIndex = 0;
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
@@ -281,6 +284,18 @@ export class NeuralGrowthModel {
           { value: "custom", label: "Custom" },
         ],
         help: "Audio-reactive presets configuring base parameters, modulation routes, and LFOs. Fully editable in parameter MOD panels.",
+      },
+      {
+        key: "kickInfusion",
+        label: "KICK DETAIL INFUSION",
+        type: "select",
+        default: "off",
+        options: [
+          { value: "off", label: "Off" },
+          { value: "subtle", label: "Subtle" },
+          { value: "dynamic", label: "Dynamic" },
+        ],
+        help: "Audio kick-driven detail infusion into hidden channels without shockwaves or harsh surface color splashes.",
       },
       {
         key: "beatShockwave",
@@ -662,6 +677,9 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
+    this._lastKickInfusionTime = 0;
+    this._kickInfusionBudget = 0;
+    this._kickInfusionIndex = 0;
     this.setClockRunning(false);
   }
 
@@ -697,6 +715,10 @@ export class NeuralGrowthModel {
       if (value === "ambient" || value === "rhythm") {
         return "custom";
       }
+    }
+    if (key === "kickInfusion") {
+      if (value === "dynamic" || value === "subtle") return value;
+      return "off";
     }
     if (key === "shockwaveImpact") {
       if (value !== "none" && value !== "color") {
@@ -743,6 +765,7 @@ export class NeuralGrowthModel {
       key === "barrierLock" ||
       key === "audioProfile" ||
       key === "beatShockwave" ||
+      key === "kickInfusion" ||
       key === "shockwaveReach" ||
       key === "shockwaveStyle" ||
       key === "shockwaveImpact" ||
@@ -1246,6 +1269,82 @@ export class NeuralGrowthModel {
       );
       this._runtime.disturb(satX, satY, 8, disturbMode, {
         dyeColor: rgb,
+        lockBarrier,
+        strength: injectStrength * 0.75,
+      });
+    }
+
+    return true;
+  }
+
+  triggerKickInfusion(strength = 1.0, timestamp = null) {
+    if (!this.ready) return false;
+    const infusion = this._parameters?.kickInfusion || "off";
+    if (infusion === "off") return false;
+    if (!this._clockRunning || !this._parameters?.growthSpeed) return false;
+
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    const elapsed = now - (this._lastKickInfusionTime || 0);
+
+    // Refractory lockout: at least 180 ms between kick detail infusions
+    if (elapsed < 180) return false;
+
+    // Leaky bucket cumulative rate limiter: max 3 injections per second
+    const drain = (elapsed / 1000) * 2.0;
+    this._kickInfusionBudget = Math.max(0, (this._kickInfusionBudget || 0) - drain);
+    if (this._kickInfusionBudget >= 3.0) return false;
+    this._kickInfusionBudget += 1.0;
+    this._lastKickInfusionTime = now;
+
+    // Conservative strength scaling surviving RGBA8 quantization (>= 0.035 to 0.070 amplitude)
+    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
+    const injectStrength =
+      infusion === "dynamic"
+        ? 0.80 + norm * 0.35
+        : 0.60 + norm * 0.20;
+
+    // Deterministic low-discrepancy spatial distribution across field
+    this._kickInfusionIndex = (this._kickInfusionIndex || 0) + 1;
+    const idx = this._kickInfusionIndex;
+    const phi1 = 0.618033988749895;
+    const phi2 = 0.414213562373095;
+    const rFrac = Math.sqrt((idx * phi1) % 1.0);
+    const theta = 2 * Math.PI * ((idx * phi2) % 1.0);
+    const size = this.simulationSize;
+    const center = size / 2;
+    const maxR = size * 0.35;
+    const targetX = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
+    );
+    const targetY = Math.max(
+      12,
+      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
+    );
+
+    const modeRadius = infusion === "dynamic" ? 16 : 12;
+    const patchRadius = Math.max(6, Math.round(modeRadius * (size / 256)));
+    const lockBarrier = (this._parameters?.barrierLock || "mask") === "mask";
+    const disturbMode = "kick_hidden_perturb";
+
+    this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
+      lockBarrier,
+      strength: injectStrength,
+    });
+
+    if (infusion === "dynamic" && norm > 0.85) {
+      const satTheta = theta + Math.PI + 0.35;
+      const satR = maxR * 0.5 * rFrac;
+      const satX = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.cos(satTheta))),
+      );
+      const satY = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + satR * Math.sin(satTheta))),
+      );
+      const satRadius = Math.max(4, Math.round(patchRadius * 0.65));
+      this._runtime.disturb(satX, satY, satRadius, disturbMode, {
         lockBarrier,
         strength: injectStrength * 0.75,
       });
