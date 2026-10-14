@@ -763,10 +763,21 @@ export function createGrowthController({
       event.preventDefault();
       clearBarriersAction();
     }
+    if (event.key === "j" || event.key === "J") {
+      event.preventDefault();
+      const model = activeModel();
+      if (model?.ready && typeof model.triggerKickPrune === "function") {
+        const coords = lastCoord ? { ...lastCoord } : null;
+        model.triggerKickPrune(1.0, performance.now(), coords);
+        if (!model.isClockRunning) schedulePausedRender();
+      }
+    }
   });
 
   let lastBeatTime = 0;
   let beatArmed = true;
+  let kickCounter = 0;
+  let lastQuietPruneTime = 0;
 
   function onAudioFrame(levels, timestamp) {
     const model = activeModel();
@@ -778,23 +789,59 @@ export function createGrowthController({
     }
     if (!levels.hasSignal) return;
 
+    // Quiet breakdown relaxation
+    const quietPruning = model.parameters?.quietPruning || "off";
+    if (quietPruning === "on") {
+      const activity = Number(levels.activity ?? 0);
+      const kick = Number(levels.kick ?? 0);
+      const isQuiet = activity < 0.28 && kick < 0.25 && triggerKick < 0.25;
+      const quietElapsed = timestamp - lastQuietPruneTime;
+      const sinceLastBeat = timestamp - lastBeatTime;
+      if (isQuiet && sinceLastBeat >= 450 && quietElapsed >= 500) {
+        lastQuietPruneTime = timestamp;
+        if (typeof model.triggerKickPrune === "function") {
+          model.triggerKickPrune(0.5, timestamp);
+          if (!model.isClockRunning) schedulePausedRender();
+        }
+      }
+    }
+
     const elapsed = timestamp - lastBeatTime;
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
+      kickCounter += 1;
       const kickInfusion = model.parameters?.kickInfusion || "off";
-      const mode = model.parameters?.beatShockwave || "off";
-      const isAudioActive = (model.parameters?.audioProfile || "off") !== "off";
+      const kickPruning = model.parameters?.kickPruning || "off";
+      const shockwave = model.parameters?.beatShockwave ?? "on";
       let triggered = false;
-      if (kickInfusion !== "off") {
-        if (typeof model.triggerKickInfusion === "function") {
-          triggered = model.triggerKickInfusion(triggerKick, timestamp);
+
+      // Kick detail behavior
+      if (kickPruning === "on" && kickInfusion === "off") {
+        if (typeof model.triggerKickPrune === "function") {
+          triggered = model.triggerKickPrune(triggerKick, timestamp) || triggered;
         }
-      } else if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
-        model.triggerBeatShockwave("center");
-        triggered = true;
-        if (typeof model.triggerKickInput === "function") {
-          model.triggerKickInput(triggerKick, timestamp);
+      } else if (kickPruning === "on" && kickInfusion !== "off") {
+        // Interleaved kick pruning: 1 in 4 kicks prunes, others infuse
+        if (kickCounter % 4 === 0) {
+          if (typeof model.triggerKickPrune === "function") {
+            triggered = model.triggerKickPrune(triggerKick, timestamp) || triggered;
+          }
+        } else {
+          if (typeof model.triggerKickInfusion === "function") {
+            triggered = model.triggerKickInfusion(triggerKick, timestamp) || triggered;
+          }
+        }
+      } else if (kickInfusion !== "off") {
+        if (typeof model.triggerKickInfusion === "function") {
+          triggered = model.triggerKickInfusion(triggerKick, timestamp) || triggered;
+        }
+      }
+
+      if (shockwave !== "off") {
+        if (typeof model.triggerBeatShockwave === "function") {
+          model.triggerBeatShockwave("on");
+          triggered = true;
         }
       }
       if (triggered && !model.isClockRunning) {

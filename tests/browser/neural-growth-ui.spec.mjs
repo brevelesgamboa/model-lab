@@ -164,8 +164,7 @@ test("PNG is an immutable snapshot and experiment runs save to archive", async (
   );
   const before = await state(page);
   await page.locator("#save-image").click();
-  await expect(page.locator("#export-option-2k input")).toBeDisabled();
-  await expect(page.locator("#export-option-4k input")).toBeDisabled();
+  await expect(page.locator("#export-option-2k input")).toBeEnabled();
   const download = page.waitForEvent("download");
   await page.locator("#export-modal-confirm").click();
   expect((await download).suggestedFilename()).toMatch(
@@ -401,6 +400,11 @@ test("original pattern selection loads once and refreshes committed attribution"
     "Organic Structures",
   );
   expect(requests).toBe(1);
+  await pattern.selectOption("mixed4a-391-v09");
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime?.model?.id))
+    .toBe("mixed4a-391-v09");
+  await expect(page.locator("#model-info-content")).toContainText("mixed4a");
 });
 
 test("a failed replacement preserves the current pattern without retry loops", async ({
@@ -537,7 +541,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   const dialog = page.locator("#growth-gallery-dialog");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#growth-gallery-count")).toContainText("91");
+  await expect(page.locator("#growth-gallery-count")).toContainText("105");
 
   // Filter tab: Textures (39)
   await page.locator(".growth-gallery__tab[data-filter='texture']").click();
@@ -599,8 +603,8 @@ test("continuous rotation and growth speed expose modulation controls with circu
   const rotationMod = page.locator('button.modulation-toggle[data-key="rotation"]');
   await expect(rotationMod).toBeVisible();
 
-  const lightAngleMod = page.locator('button.modulation-toggle[data-key="lightAngle"]');
-  await expect(lightAngleMod).toBeVisible();
+  const twistMod = page.locator('button.modulation-toggle[data-key="twist"]');
+  await expect(twistMod).toBeVisible();
 
   const speedMod = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
   await expect(speedMod).toBeVisible();
@@ -788,59 +792,48 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
 
   const shockwaveSelect = page.getByLabel("BEAT SHOCKWAVE", { exact: true });
   await expect(shockwaveSelect).toBeVisible();
-  await expect(shockwaveSelect).toHaveValue("off");
+  await expect(shockwaveSelect).toHaveValue("on");
 
-  const styleSelect = page.getByLabel("SHOCKWAVE STYLE", { exact: true });
-  await expect(styleSelect).toBeVisible();
-  await expect(styleSelect).toHaveValue("refract");
-
-  const impactSelect = page.getByLabel("SHOCKWAVE IMPACT", { exact: true });
-  await expect(impactSelect).toBeVisible();
-  await expect(impactSelect).toHaveValue("color");
+  const intensityInput = page.locator('input.control-slider[aria-label="SHOCKWAVE INTENSITY"]');
+  await expect(intensityInput).toBeVisible();
 
   const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
   await expect(geometrySelect).toHaveValue("cartesian");
 
   // Select Continuous preset: switches Cartesian geometry to Vortex, sets base values and LFOs
   await audioSelect.selectOption("continuous");
-  await expect(shockwaveSelect).toHaveValue("off");
+  await expect(shockwaveSelect).toHaveValue("on");
   await expect(geometrySelect).toHaveValue("vortex");
 
   // Check animation starts immediately without audio
   await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
 
-  // Check reliefStrength MOD toggle is active
-  const reliefModToggle = page.locator('button.modulation-toggle[data-key="reliefStrength"]');
-  await expect(reliefModToggle).toHaveClass(/is-active/);
+  // Check rotation MOD toggle is active
+  const rotationModToggle = page.locator('button.modulation-toggle[data-key="rotation"]');
+  await expect(rotationModToggle).toHaveClass(/is-active/);
 
-  // Open reliefStrength MOD drawer if not already open
-  const reliefSource = page.locator('select[aria-label="RELIEF DEPTH audio source"]');
-  if (await reliefSource.isHidden()) {
-    await reliefModToggle.click();
+  // Open rotation MOD drawer if not already open
+  const rotationSource = page.locator('select[aria-label="ROTATION audio source"]');
+  if (await rotationSource.isHidden()) {
+    await rotationModToggle.click();
   }
-  await expect(reliefSource).toBeVisible();
-  await expect(reliefSource).toHaveValue("kick");
+  await expect(rotationSource).toBeVisible();
+  await expect(rotationSource).toHaveValue("kick");
 
-  const reliefLfoCheckbox = page.locator('.control-block:has-text("RELIEF DEPTH") input[aria-label="Enable RELIEF DEPTH LFO"]');
-  await expect(reliefLfoCheckbox).toBeChecked();
+  const rotationLfoCheckbox = page.locator('.control-block:has-text("ROTATION") input[aria-label="Enable ROTATION LFO"]');
+  await expect(rotationLfoCheckbox).toBeChecked();
 
   // Changing shockwave mode independently preserves audio preset
-  await shockwaveSelect.selectOption("center");
-  await expect(shockwaveSelect).toHaveValue("center");
-  await styleSelect.selectOption("chromatic");
-  await expect(styleSelect).toHaveValue("chromatic");
-  await impactSelect.selectOption("none");
-  await expect(impactSelect).toHaveValue("none");
+  await shockwaveSelect.selectOption("off");
+  await expect(shockwaveSelect).toHaveValue("off");
   await expect(audioSelect).toHaveValue("continuous");
 
-  // Switch to Subtle preset: preserves shockwave selection and preserves current non-Cartesian geometry (Vortex)
+  // Switch to Subtle preset: sets shockwave to on and preserves current non-Cartesian geometry (Vortex)
   await audioSelect.selectOption("subtle");
-  await expect(shockwaveSelect).toHaveValue("center");
-  await expect(styleSelect).toHaveValue("chromatic");
-  await expect(impactSelect).toHaveValue("none");
+  await expect(shockwaveSelect).toHaveValue("on");
   await expect(geometrySelect).toHaveValue("vortex");
-  await expect(reliefSource).toHaveValue("kick");
-  await expect(reliefLfoCheckbox).not.toBeChecked();
+  await expect(rotationSource).toHaveValue("kick");
+  await expect(rotationLfoCheckbox).not.toBeChecked();
 
   // Verify twist LFO is active in Subtle
   const twistModToggle = page.locator('button.modulation-toggle[data-key="twist"]');
@@ -848,17 +841,17 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
 
   // Switch to Dynamic preset: verifies dynamic configuration and LFO activation
   await audioSelect.selectOption("dynamic");
-  await expect(shockwaveSelect).toHaveValue("center");
+  await expect(shockwaveSelect).toHaveValue("on");
   await expect(geometrySelect).toHaveValue("vortex");
-  await expect(reliefSource).toHaveValue("kick");
-  await expect(reliefLfoCheckbox).toBeChecked();
+  await expect(rotationSource).toHaveValue("kick");
+  await expect(rotationLfoCheckbox).toBeChecked();
 
   // Verify growth speed base value for dynamic is 45 (calm baseline)
   const growthSpeedInput = page.locator('.control-block:has-text("GROWTH SPEED") input.fine-input');
   await expect(growthSpeedInput).toHaveValue("45");
 
-  // Tweak audio depth to trigger custom profile detection
-  const depthInput = page.locator('.control-block:has-text("RELIEF DEPTH") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  // Tweak audio depth on rotation to trigger custom profile detection
+  const depthInput = page.locator('.control-block:has-text("ROTATION") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
   await depthInput.fill("0.85");
   await depthInput.dispatchEvent("input");
 

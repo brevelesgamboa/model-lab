@@ -17,6 +17,25 @@ async function loadCheckpoint(signal, pattern) {
   return response.json();
 }
 
+function tileState(oldData, oldSize, newSize) {
+  const CHANNELS = 12;
+  const newData = new Uint8Array(newSize * newSize * CHANNELS);
+  for (let y = 0; y < newSize; y += 1) {
+    const srcY = y % oldSize;
+    const destRow = y * newSize * CHANNELS;
+    const srcRow = srcY * oldSize * CHANNELS;
+    for (let x = 0; x < newSize; x += 1) {
+      const srcX = x % oldSize;
+      const srcOffset = srcRow + srcX * CHANNELS;
+      const destOffset = destRow + x * CHANNELS;
+      for (let c = 0; c < CHANNELS; c += 1) {
+        newData[destOffset + c] = oldData[srcOffset + c];
+      }
+    }
+  }
+  return newData;
+}
+
 // App-owned clock, persistent GPU state. A redraw is never a simulation update.
 export class NeuralGrowthModel {
   constructor({
@@ -37,7 +56,7 @@ export class NeuralGrowthModel {
     this.captureCapabilities = {
       png: true,
       gif: false,
-      highResolution: false,
+      highResolution: true,
       savedRun: true,
     };
     this._load = load;
@@ -339,51 +358,47 @@ export class NeuralGrowthModel {
         },
       },
       {
-        key: "beatShockwave",
-        label: "BEAT SHOCKWAVE",
+        key: "quietPruning",
+        label: "QUIET PRUNING",
         type: "select",
         default: "off",
         options: [
           { value: "off", label: "Off" },
-          { value: "center", label: "Center · Audio" },
-          { value: "pointer", label: "Pointer · Draw" },
+          { value: "on", label: "On" },
         ],
-        help: "Shockwave ripple mode: audio kick-triggered at center, or drawing-triggered at pointer.",
+        help: "Gently relaxes hidden-channel entropy during quiet passages and breakdowns to prevent texture saturation.",
       },
       {
-        key: "shockwaveReach",
-        label: "SHOCKWAVE REACH",
+        key: "kickPruning",
+        label: "KICK PRUNING",
         type: "select",
-        default: "canvas",
+        default: "off",
         options: [
-          { value: "canvas", label: "Whole Canvas" },
-          { value: "brush", label: "Follow Brush" },
+          { value: "off", label: "Off" },
+          { value: "on", label: "On" },
         ],
-        help: "Shockwave coverage range: expand across the entire canvas or follow current brush radius.",
+        help: "Interleaves gentle detail pruning on strong audio kicks to keep textures dynamic and balanced.",
       },
       {
-        key: "shockwaveStyle",
-        label: "SHOCKWAVE STYLE",
+        key: "beatShockwave",
+        label: "BEAT SHOCKWAVE",
         type: "select",
-        default: "refract",
+        default: "on",
         options: [
-          { value: "refract", label: "Water Ripple · Clear Refraction" },
-          { value: "chromatic", label: "Prism Split · Rainbow Aberration" },
-          { value: "glow", label: "Neon Halo · Radiant Energy Ring" },
-          { value: "harmonic", label: "Cymatic Echo · Concentric Double Wave" },
+          { value: "off", label: "Off" },
+          { value: "on", label: "On" },
         ],
-        help: "Wavefront appearance: clear water ripple, prism chromatic split, radiant neon halo, or concentric cymatic double wave.",
+        help: "Audio kick-driven optical water ripple on accepted beats.",
       },
       {
-        key: "shockwaveImpact",
-        label: "SHOCKWAVE IMPACT",
-        type: "select",
-        default: "color",
-        options: [
-          { value: "color", label: "Color Blend · Auto Standout" },
-          { value: "none", label: "Visual Only · Optical Lens" },
-        ],
-        help: "Cellular effect on shockwave: gently infuses high-contrast pigment that cells weave into the living pattern, or pure optical wave.",
+        key: "shockwaveIntensity",
+        label: "SHOCKWAVE INTENSITY",
+        type: "range",
+        min: 0.0,
+        max: 1.0,
+        step: 0.05,
+        default: 0.30,
+        help: "Optical refraction depth for kick beat shockwaves.",
       },
       {
         key: "brushRadius",
@@ -445,6 +460,13 @@ export class NeuralGrowthModel {
             guidance: "Injects hidden-channel variation for cells to organically weave into new texture.",
           },
           {
+            value: "prune",
+            label: "Prune",
+            compute: "balanced",
+            tag: "relax",
+            guidance: "Relaxes hidden-channel overgrowth toward equilibrium without erasing surface colors.",
+          },
+          {
             value: "freeze",
             label: "Freeze",
             compute: "neutral",
@@ -466,7 +488,7 @@ export class NeuralGrowthModel {
             guidance: "Aligns directional perception filters along pointer brush drag angles.",
           },
         ],
-        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Infuse detail, Freeze barrier, Unfreeze barrier, or Flow direction.",
+        help: "Interactive brush: Erase, Noise, Color, Invert, Ripple, Infuse detail, Prune overgrowth, Freeze barrier, Unfreeze barrier, or Flow direction.",
       },
       {
         key: "dyeColor",
@@ -592,40 +614,6 @@ export class NeuralGrowthModel {
         help: "Inspects hidden biochemical and electrical memory channels operating beneath the living pattern.",
       },
       {
-        key: "shading",
-        label: "3D SHADING",
-        type: "select",
-        default: "relief",
-        options: [
-          { value: "relief", label: "Relief · Diffuse 3D" },
-          { value: "gloss", label: "Gloss · Specular Sheen" },
-          { value: "flat", label: "Flat · Unshaded 2D" },
-          { value: "normals", label: "Normals · Vector Map" },
-        ],
-        help: "Real-time surface gradient shading computed from cell state differentials in WebGL2.",
-      },
-      {
-        key: "reliefStrength",
-        label: "RELIEF DEPTH",
-        type: "range",
-        min: 0,
-        max: 3,
-        step: 0.1,
-        default: 1.2,
-        help: "Height gradient multiplier for directional diffuse and specular relief shading.",
-      },
-      {
-        key: "lightAngle",
-        label: "LIGHT ANGLE",
-        type: "range",
-        min: 0,
-        max: 360,
-        step: 1,
-        default: 45,
-        wrap: true,
-        help: "Directional light source angle in degrees. Wraps circularly and supports audio/LFO modulation.",
-      },
-      {
         key: "displayFilter",
         label: "DISPLAY FILTER",
         type: "select",
@@ -633,9 +621,9 @@ export class NeuralGrowthModel {
         options: [
           {
             value: "smooth",
-            label: "Smooth · Continuous High-DPI",
+            label: "Smooth · Bicubic Catmull-Rom",
             compute: "neutral",
-            guidance: "Sub-pixel continuous lighting, sharp normals, and pin-sharp specular highlights.",
+            guidance: "C1-continuous bicubic reconstruction. Cleaner edges and high-definition detail without blur.",
           },
           {
             value: "crisp",
@@ -644,7 +632,7 @@ export class NeuralGrowthModel {
             guidance: "Discrete nearest-neighbor cell squares.",
           },
         ],
-        help: "Viewport rendering fidelity: Smooth continuous sub-pixel shading or crisp pixel grid.",
+        help: "Viewport rendering fidelity: Smooth bicubic Catmull-Rom reconstruction or crisp pixel grid.",
       },
     ];
   }
@@ -728,6 +716,9 @@ export class NeuralGrowthModel {
     this._lastKickInfusionTime = 0;
     this._kickInfusionBudget = 0;
     this._kickInfusionIndex = 0;
+    this._lastKickPruneTime = 0;
+    this._kickPruneBudget = 0;
+    this._kickPruneIndex = 0;
     this.setClockRunning(false);
   }
 
@@ -752,9 +743,6 @@ export class NeuralGrowthModel {
         return { twist: 0 };
       }
     }
-    if (key === "beatShockwave" && value === "pointer") {
-      return { disturbanceMode: "shockwave" };
-    }
     return null;
   }
 
@@ -763,6 +751,17 @@ export class NeuralGrowthModel {
       if (value === "ambient" || value === "rhythm") {
         return "custom";
       }
+    }
+    if (key === "beatShockwave") {
+      if (value === "off") return "off";
+      return "on";
+    }
+    if (key === "shockwaveIntensity") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.30;
     }
     if (key === "kickInfusion") {
       if (
@@ -782,10 +781,13 @@ export class NeuralGrowthModel {
       }
       return 1.0;
     }
-    if (key === "shockwaveImpact") {
-      if (value !== "none" && value !== "color") {
-        return "color";
-      }
+    if (key === "quietPruning") {
+      if (value === "on") return "on";
+      return "off";
+    }
+    if (key === "kickPruning") {
+      if (value === "on") return "on";
+      return "off";
     }
     if (key === "channelView") {
       const valid = [
@@ -827,11 +829,11 @@ export class NeuralGrowthModel {
       key === "barrierLock" ||
       key === "audioProfile" ||
       key === "beatShockwave" ||
+      key === "shockwaveIntensity" ||
       key === "kickInfusion" ||
       key === "kickInfusionStrength" ||
-      key === "shockwaveReach" ||
-      key === "shockwaveStyle" ||
-      key === "shockwaveImpact" ||
+      key === "quietPruning" ||
+      key === "kickPruning" ||
       key === "channelView" ||
       key === "displayFilter"
     )
@@ -916,15 +918,39 @@ export class NeuralGrowthModel {
           size: parameters.simulationSize,
           seed: parameters.seed,
         });
+        const isGridResize = Boolean(
+          this._runtime &&
+          this._activePattern === pattern.id &&
+          this._runtime.size !== parameters.simulationSize &&
+          !this._needsRuntime &&
+          (this._runtime.steps || 0) > 0,
+        );
+        if (
+          isGridResize &&
+          typeof this._runtime.readState === "function" &&
+          typeof candidate.writeState === "function"
+        ) {
+          try {
+            const oldData = this._runtime.readState();
+            if (oldData instanceof Uint8Array) {
+              const tiledData = tileState(
+                oldData,
+                this._runtime.size,
+                parameters.simulationSize,
+              );
+              candidate.writeState(tiledData);
+              candidate.steps = this._runtime.steps;
+            }
+          } catch (_) {
+            // Retain fresh seed state if state reading or writing throws
+          }
+        }
         const preview = document.createElement("canvas");
         preview.width = canvas.width;
         preview.height = canvas.height;
         candidate.draw(preview, {
           palette: parameters.palette,
           zoom: parameters.zoom,
-          shading: parameters.shading,
-          reliefStrength: parameters.reliefStrength,
-          lightAngle: parameters.lightAngle,
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
         });
@@ -992,13 +1018,9 @@ export class NeuralGrowthModel {
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         zoom: parameters.zoom,
-        shading: parameters.shading,
-        reliefStrength: parameters.reliefStrength,
-        lightAngle: parameters.lightAngle,
         displayFilter: parameters.displayFilter,
         showBarrier,
         ripples: this._activeRipples || [],
-        shockwaveStyle: parameters.shockwaveStyle,
         dyeColor: parameters.dyeColor,
         channelView: parameters.channelView,
       });
@@ -1076,6 +1098,12 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
+    this._lastKickInfusionTime = 0;
+    this._kickInfusionBudget = 0;
+    this._kickInfusionIndex = 0;
+    this._lastKickPruneTime = 0;
+    this._kickPruneBudget = 0;
+    this._kickPruneIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -1162,6 +1190,8 @@ export class NeuralGrowthModel {
           } else if (mode === "infuse") {
             const mult = Number(this._parameters?.kickInfusionStrength) || 1.0;
             opts.strength = 1.2 * mult;
+          } else if (mode === "prune") {
+            opts.strength = 0.85;
           }
           this._runtime.disturb(x, y, radius, mode, opts);
         } else {
@@ -1199,7 +1229,7 @@ export class NeuralGrowthModel {
       0,
       Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
     );
-    const reach = this._parameters?.shockwaveReach || "canvas";
+    const reach = "canvas";
     let radius = 16;
     if (reach === "canvas") {
       const d1 = Math.hypot(originX, originY);
@@ -1213,8 +1243,9 @@ export class NeuralGrowthModel {
       radius = Math.max(8, Math.min(96, Math.round(chosen)));
     }
     const amp =
-      Number(maxAmplitude) ||
-      Math.min(1.5, Math.max(0.8, radius * 0.015));
+      maxAmplitude !== null && Number.isFinite(Number(maxAmplitude))
+        ? Number(maxAmplitude)
+        : Math.min(1.5, Math.max(0.8, radius * 0.015));
     const ripple = {
       x: originX,
       y: originY,
@@ -1237,11 +1268,12 @@ export class NeuralGrowthModel {
     customRadius = null,
   ) {
     if (!this.ready || !mode || mode === "off") return false;
+    const currentEnabled = this._parameters?.beatShockwave || "on";
+    if (currentEnabled === "off" && mode !== "on" && mode !== "center") return false;
     const size = this.simulationSize;
     let x = Math.floor(size / 2);
     let y = Math.floor(size / 2);
     if (
-      mode === "pointer" &&
       coords &&
       Number.isFinite(coords.x) &&
       Number.isFinite(coords.y)
@@ -1249,24 +1281,13 @@ export class NeuralGrowthModel {
       x = coords.x;
       y = coords.y;
     }
-    const reach = this._parameters?.shockwaveReach || "canvas";
-    let radius = 16;
-    if (reach === "canvas") {
-      const d1 = Math.hypot(x, y);
-      const d2 = Math.hypot(size - x, y);
-      const d3 = Math.hypot(x, size - y);
-      const d4 = Math.hypot(size - x, size - y);
-      radius = Math.ceil(Math.max(d1, d2, d3, d4));
-    } else {
-      const chosen =
-        Number(customRadius || this._parameters?.brushRadius) ||
-        Math.round(size * 0.15);
-      radius = Math.max(
-        8,
-        Math.min(Math.floor(size / 2), Math.round(chosen)),
-      );
-    }
-    this.queueDisturbance(x, y, radius, "shockwave");
+    const d1 = Math.hypot(x, y);
+    const d2 = Math.hypot(size - x, y);
+    const d3 = Math.hypot(x, size - y);
+    const d4 = Math.hypot(size - x, size - y);
+    const radius = customRadius ? Math.round(customRadius) : Math.ceil(Math.max(d1, d2, d3, d4));
+    const intensity = Number(this._parameters?.shockwaveIntensity ?? 0.30);
+    this.triggerRipple(x, y, radius, intensity);
     return true;
   }
 
@@ -1456,24 +1477,79 @@ export class NeuralGrowthModel {
     return true;
   }
 
-  renderSnapshot(canvas) {
+  triggerKickPrune(strength = 1.0, timestamp = null, coords = null) {
+    if (!this.ready) return false;
+    if (!this._clockRunning || !this._parameters?.growthSpeed) return false;
+
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    const elapsed = now - (this._lastKickPruneTime || 0);
+
+    // Refractory lockout: at least 180 ms between prune calls
+    if (elapsed < 180) return false;
+
+    // Leaky bucket cumulative rate limiter: max 3 per second
+    const drain = (elapsed / 1000) * 2.0;
+    this._kickPruneBudget = Math.max(0, (this._kickPruneBudget || 0) - drain);
+    if (this._kickPruneBudget >= 3.0) return false;
+    this._kickPruneBudget += 1.0;
+    this._lastKickPruneTime = now;
+
+    const size = this.simulationSize;
+    let targetX;
+    let targetY;
+
+    if (
+      coords &&
+      Number.isFinite(coords.x) &&
+      Number.isFinite(coords.y)
+    ) {
+      targetX = Math.max(12, Math.min(size - 13, Math.round(coords.x)));
+      targetY = Math.max(12, Math.min(size - 13, Math.round(coords.y)));
+    } else {
+      this._kickPruneIndex = (this._kickPruneIndex || 0) + 1;
+      const idx = this._kickPruneIndex;
+      const phi1 = 0.618033988749895;
+      const phi2 = 0.414213562373095;
+      const rFrac = Math.sqrt(((idx * phi1) + 0.382) % 1.0);
+      const theta = 2 * Math.PI * (((idx * phi2) + 0.618) % 1.0);
+      const center = size / 2;
+      const maxR = size * 0.35;
+      targetX = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
+      );
+      targetY = Math.max(
+        12,
+        Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
+      );
+    }
+
+    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
+    const patchRadius = Math.max(8, Math.round(18 * (size / 256)));
+    const injectStrength = 0.65 + norm * 0.35;
+    const lockBarrier = (this._parameters?.barrierLock || "mask") === "mask";
+
+    this._runtime.disturb(targetX, targetY, patchRadius, "kick_hidden_prune", {
+      lockBarrier,
+      strength: injectStrength,
+    });
+    return true;
+  }
+
+  renderSnapshot(canvas, options = {}) {
     if (!this.ready)
       throw new Error(
         this.lastError || "Wait for Neural Growth to initialize.",
       );
     this._runRuntime(() =>
       this._runtime.draw(canvas, {
-        palette: this._parameters.palette,
-        zoom: 1,
-        shading: this._parameters.shading,
-        reliefStrength: this._parameters.reliefStrength,
-        lightAngle: this._parameters.lightAngle,
-        displayFilter: this._parameters.displayFilter,
-        showBarrier: false,
-        ripples: [],
-        shockwaveStyle: this._parameters.shockwaveStyle,
-        dyeColor: this._parameters.dyeColor,
-        channelView: this._parameters.channelView,
+        palette: options.palette ?? this._parameters.palette,
+        zoom: options.zoom ?? 1,
+        displayFilter: options.displayFilter ?? this._parameters.displayFilter,
+        showBarrier: options.showBarrier ?? false,
+        ripples: options.ripples ?? [],
+        dyeColor: options.dyeColor ?? this._parameters.dyeColor,
+        channelView: options.channelView ?? this._parameters.channelView,
       }),
     );
   }

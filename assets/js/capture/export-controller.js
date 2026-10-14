@@ -117,6 +117,10 @@ export function createExportController({
         elements.exportResCurrent.textContent = `${model.dreamCanvas.width} × ${model.dreamCanvas.height} (NATIVE PEAK)`;
         if (elements.exportNameCurrent)
           elements.exportNameCurrent.textContent = "CURRENT PEAK CANVAS";
+      } else if (model?.id === "neural-growth") {
+        elements.exportResCurrent.textContent = `${elements.canvas.width} × ${elements.canvas.height} (DISPLAY · ${model.simulationSize || 256}² GRID)`;
+        if (elements.exportNameCurrent)
+          elements.exportNameCurrent.textContent = "CURRENT SNAPSHOT";
       } else {
         elements.exportResCurrent.textContent = `${elements.canvas.width} × ${elements.canvas.height}`;
         if (elements.exportNameCurrent)
@@ -146,6 +150,26 @@ export function createExportController({
         elements.exportName4k.textContent = "100% NATIVE PHOTO";
       if (elements.exportRes4k)
         elements.exportRes4k.textContent = `${srcW} × ${srcH} (FULL RES TILED)`;
+    } else if (model?.id === "neural-growth") {
+      if (elements.exportName2k)
+        elements.exportName2k.textContent = "2K SQUARE";
+      if (elements.exportRes2k)
+        elements.exportRes2k.textContent = "2048 × 2048 (HIGH FIDELITY)";
+      const maxTex = capabilities.maxTextureSize || 2048;
+      const canDo4k = maxTex >= 4096;
+      if (elements.exportOption4k) {
+        const radio4k =
+          elements.exportOption4k.querySelector('input[type="radio"]');
+        if (radio4k) radio4k.disabled = !canDo4k;
+        elements.exportOption4k.classList.toggle("is-disabled", !canDo4k);
+      }
+      if (elements.exportName4k)
+        elements.exportName4k.textContent = "4K SQUARE";
+      if (elements.exportRes4k) {
+        elements.exportRes4k.textContent = canDo4k
+          ? "4096 × 4096 (HIGH FIDELITY)"
+          : `4096 × 4096 (MAX GPU: ${maxTex}px)`;
+      }
     } else {
       const dim2k = highQualityDimensions(2048);
       if (elements.exportName2k)
@@ -214,6 +238,11 @@ export function createExportController({
           width = Math.max(1, Math.round(2048 * aspect));
         }
       }
+    } else if (model?.id === "neural-growth") {
+      const maxTex = capabilities.maxTextureSize || 2048;
+      const targetDim = Math.min(requestedSize, maxTex);
+      width = targetDim;
+      height = targetDim;
     }
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -221,6 +250,7 @@ export function createExportController({
 
     try {
       if (getState().pending) await getState().pending;
+      await model?.waitForIdle?.();
       await nextFrame();
       if (elements.hqStatus)
         elements.hqStatus.textContent = "RENDERING " + width + " × " + height;
@@ -242,6 +272,11 @@ export function createExportController({
             setStatus(`${statusText} · ${width}×${height}`);
           },
         });
+      } else if (
+        model?.statefulSimulation &&
+        typeof model.renderSnapshot === "function"
+      ) {
+        await Promise.resolve(model.renderSnapshot(canvas));
       } else {
         await Promise.resolve(model.render(canvas, parameters, frameTime));
       }

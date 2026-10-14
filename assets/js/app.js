@@ -203,7 +203,7 @@ const growthController = createGrowthController({
     currentModel?.onParameterChange?.(key, value);
     if (key === "audioProfile") {
       applyAudioProfile(value);
-    } else if (key !== "beatShockwave" && key !== "shockwaveReach") {
+    } else if (key !== "beatShockwave" && key !== "shockwaveIntensity") {
       checkAudioProfileMatch();
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
@@ -261,7 +261,7 @@ const controlsController = createControlsController({
       if (
         definition.key !== "audioProfile" &&
         definition.key !== "beatShockwave" &&
-        definition.key !== "shockwaveReach"
+        definition.key !== "shockwaveIntensity"
       ) {
         checkAudioProfileMatch();
       }
@@ -1749,15 +1749,20 @@ function togglePanel(key) {
 
 function fullscreenLiveDimensions() {
   const bounds = elements.outputStage.getBoundingClientRect();
-  const aspect = Math.max(0.2, bounds.width / Math.max(1, bounds.height));
-  const profileEdges = {
-    economy: 960,
-    standard: 1280,
-    high: 1600,
-    ultra: 1920,
-    extreme: 2560,
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const physicalWidth = Math.round((bounds.width || 1280) * dpr);
+  const physicalHeight = Math.round((bounds.height || 720) * dpr);
+  const aspect = Math.max(0.2, (bounds.width || 1) / Math.max(1, bounds.height || 1));
+  const screenLongEdge = Math.max(physicalWidth, physicalHeight);
+  const profileScale = {
+    economy: 0.5,
+    standard: 0.75,
+    high: 1.0,
+    ultra: 1.0,
+    extreme: 1.0,
   };
-  const baseEdge = profileEdges[qualityProfile.mode] || 1280;
+  const scale = profileScale[qualityProfile.mode] ?? 1.0;
+  const baseEdge = Math.round(screenLongEdge * scale);
   const longEdge = Math.max(
     512,
     Math.min(
@@ -2026,6 +2031,13 @@ function attachEvents() {
         } else {
           currentModel.triggerKickInfusion?.(1.0);
         }
+      }
+      return;
+    }
+    if (event.key.toLowerCase() === "j") {
+      if (currentModel.id === "neural-growth") {
+        event.preventDefault();
+        currentModel.triggerKickPrune?.(1.0);
       }
       return;
     }

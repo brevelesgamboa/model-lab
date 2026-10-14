@@ -271,7 +271,7 @@ void main() {
   delta = delta - round(delta / float(u_size)) * float(u_size);
   float dist = length(delta);
   float weight = 0.0;
-  if (u_mode == 5 || u_mode == 6 || u_mode == 7) {
+  if (u_mode == 5 || u_mode == 6 || u_mode == 7 || u_mode == 8) {
     float angle = atan(delta.y, delta.x);
     float rMod = u_radius * (1.0 + 0.22 * cos(3.0 * angle + 1.25) + 0.12 * sin(5.0 * angle));
     if (dist <= rMod) {
@@ -352,6 +352,12 @@ void main() {
     } else {
       out_color = current;
     }
+  } else if (u_mode == 8) {
+    if (group >= 1) {
+      out_color = mix(current, vec4(0.5, 0.5, 0.5, 0.5), clamp(weight * 0.65, 0.0, 1.0));
+    } else {
+      out_color = current;
+    }
   } else if (u_mode == 4) {
     if (group == 0) {
       vec4 decoded = decodeState(current);
@@ -372,9 +378,6 @@ const VISUALIZE = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_barrier;
 uniform int u_palette;
-uniform int u_shading;
-uniform float u_relief;
-uniform float u_lightAngle;
 uniform int u_showBarrier;
 uniform int u_rippleCount;
 uniform int u_rippleStyle;
@@ -425,22 +428,70 @@ float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
   return spatialEnv * timeFade * timeFade * amplitude;
 }
 
-vec4 sampleGroup(vec2 pos, int groupIdx) {
-  vec2 clampedPos = clamp(pos, vec2(0.0), vec2(float(u_size - 1)));
-  ivec2 i0 = ivec2(floor(clampedPos));
-  ivec2 i1 = clamp(i0 + ivec2(1, 1), ivec2(0), ivec2(u_size - 1));
-  vec2 f = fract(clampedPos);
-  if (u_displayFilter == 0) {
-    f = f * f * (3.0 - 2.0 * f);
-  }
+vec4 sampleNearest(vec2 pos, int groupIdx) {
   int xOff = groupIdx * u_size;
-  vec4 s00 = decodeState(texelFetch(u_state, ivec2(i0.x + xOff, i0.y), 0));
-  vec4 s10 = decodeState(texelFetch(u_state, ivec2(i1.x + xOff, i0.y), 0));
-  vec4 s01 = decodeState(texelFetch(u_state, ivec2(i0.x + xOff, i1.y), 0));
-  vec4 s11 = decodeState(texelFetch(u_state, ivec2(i1.x + xOff, i1.y), 0));
-  vec4 sTop = mix(s00, s10, f.x);
-  vec4 sBot = mix(s01, s11, f.x);
-  return mix(sTop, sBot, f.y);
+  ivec2 cell = wrapCell(ivec2(floor(pos)));
+  return decodeState(texelFetch(u_state, ivec2(cell.x + xOff, cell.y), 0));
+}
+
+vec4 sampleBicubic(vec2 pos, int groupIdx) {
+  int xOff = groupIdx * u_size;
+  vec2 p = pos - 0.5;
+  ivec2 i0 = ivec2(floor(p));
+  vec2 f = fract(p);
+  vec2 f2 = f * f;
+  vec2 f3 = f2 * f;
+  vec4 wx = vec4(
+    -0.5 * f3.x + f2.x - 0.5 * f.x,
+     1.5 * f3.x - 2.5 * f2.x + 1.0,
+    -1.5 * f3.x + 2.0 * f2.x + 0.5 * f.x,
+     0.5 * f3.x - 0.5 * f2.x
+  );
+  vec4 wy = vec4(
+    -0.5 * f3.y + f2.y - 0.5 * f.y,
+     1.5 * f3.y - 2.5 * f2.y + 1.0,
+    -1.5 * f3.y + 2.0 * f2.y + 0.5 * f.y,
+     0.5 * f3.y - 0.5 * f2.y
+  );
+  int x0 = wrapCell(ivec2(i0.x - 1, 0)).x;
+  int x1 = wrapCell(ivec2(i0.x,     0)).x;
+  int x2 = wrapCell(ivec2(i0.x + 1, 0)).x;
+  int x3 = wrapCell(ivec2(i0.x + 2, 0)).x;
+
+  int y0 = wrapCell(ivec2(0, i0.y - 1)).y;
+  int y1 = wrapCell(ivec2(0, i0.y    )).y;
+  int y2 = wrapCell(ivec2(0, i0.y + 1)).y;
+  int y3 = wrapCell(ivec2(0, i0.y + 2)).y;
+
+  vec4 col0 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y0), 0)) +
+              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y0), 0)) +
+              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y0), 0)) +
+              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y0), 0));
+
+  vec4 col1 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y1), 0)) +
+              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y1), 0)) +
+              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y1), 0)) +
+              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y1), 0));
+
+  vec4 col2 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y2), 0)) +
+              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y2), 0)) +
+              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y2), 0)) +
+              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y2), 0));
+
+  vec4 col3 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y3), 0)) +
+              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y3), 0)) +
+              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y3), 0)) +
+              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y3), 0));
+
+  vec4 result = wy.x * col0 + wy.y * col1 + wy.z * col2 + wy.w * col3;
+  return clamp(result, vec4(-2.0), vec4(2.0));
+}
+
+vec4 sampleGroup(vec2 pos, int groupIdx) {
+  if (u_displayFilter == 1) {
+    return sampleNearest(pos, groupIdx);
+  }
+  return sampleBicubic(pos, groupIdx);
 }
 
 vec3 sampleRawColor(vec2 p) {
@@ -476,13 +527,6 @@ vec3 sampleRawColor(vec2 p) {
   }
 }
 
-float continuousLuminance(vec2 pCoord) {
-  if (u_channelView == 1) {
-    return clamp(sampleGroup(pCoord, 0).a * 0.5 + 0.5, 0.0, 1.0);
-  }
-  return dot(sampleRawColor(pCoord), vec3(0.299, 0.587, 0.114));
-}
-
 void main() {
   vec2 vpSize = u_viewport.x > 0 ? vec2(u_viewport) : vec2(float(u_size));
   vec2 uv = gl_FragCoord.xy / vpSize;
@@ -490,9 +534,6 @@ void main() {
   float srcExtent = float(u_size) / z;
   float srcOffset = (float(u_size) - srcExtent) * 0.5;
   vec2 pos = srcOffset + uv * srcExtent;
-  if (u_displayFilter == 1) {
-    pos = floor(pos) + 0.5;
-  }
 
   vec2 disp = vec2(0.0);
   float totalGlow = 0.0;
@@ -540,34 +581,6 @@ void main() {
   if (u_palette == 1 && u_channelView == 0) {
     vec3 spectrum = 0.5 + 0.5 * cos(6.283185307 * (vec3(0.0, 0.33, 0.67) + lum * 0.85));
     rgb = spectrum * (0.35 + lum * 0.65);
-  }
-
-  if (u_shading > 0) {
-    float delta = max(0.2, srcExtent / vpSize.x);
-    float lumLeft = continuousLuminance(pos - vec2(delta, 0.0));
-    float lumRight = continuousLuminance(pos + vec2(delta, 0.0));
-    float lumDown = continuousLuminance(pos - vec2(0.0, delta));
-    float lumUp = continuousLuminance(pos + vec2(0.0, delta));
-
-    float dx = (lumRight - lumLeft) * u_relief;
-    float dy = (lumUp - lumDown) * u_relief;
-    vec3 normal = normalize(vec3(-dx, -dy, 1.0));
-
-    if (u_shading == 3) {
-      rgb = normal * 0.5 + 0.5;
-    } else {
-      vec3 lightDir = normalize(vec3(cos(u_lightAngle), sin(u_lightAngle), 0.85));
-
-      float diffuse = max(dot(normal, lightDir), 0.0);
-      float lighting = 0.35 + 0.65 * diffuse;
-      rgb = rgb * lighting;
-
-      if (u_shading == 2) {
-        vec3 halfVec = normalize(lightDir + vec3(0.0, 0.0, 1.0));
-        float specular = pow(max(dot(normal, halfVec), 0.0), 32.0);
-        rgb = mix(rgb, vec3(1.0), specular * 0.5);
-      }
-    }
   }
 
   if (u_showBarrier == 1) {
@@ -818,7 +831,6 @@ export class TextureNcaRuntime {
           "u_palette",
           "u_topology",
           "u_mode",
-          "u_shading",
           "u_transform",
           "u_barrierMode",
           "u_orientMode",
@@ -1069,6 +1081,7 @@ export class TextureNcaRuntime {
     else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
     else if (mode === "kick_hidden_perturb" || mode === "infuse") modeCode = 7;
+    else if (mode === "kick_hidden_prune" || mode === "prune") modeCode = 8;
     this.run(
       "disturb",
       this.nextState,
@@ -1107,9 +1120,6 @@ export class TextureNcaRuntime {
     const {
       palette = "native",
       zoom = 1,
-      shading = "relief",
-      reliefStrength = 1.2,
-      lightAngle = 45,
       displayFilter = "smooth",
       showBarrier = false,
       ripples = [],
@@ -1122,11 +1132,6 @@ export class TextureNcaRuntime {
       throw new Error("Unknown display palette.");
     const context = targetCanvas.getContext("2d");
     if (!context) throw new Error("A 2D display canvas is required.");
-
-    const shadingModes = { flat: 0, relief: 1, gloss: 2, normals: 3 };
-    const shadingMode = shadingModes[shading] ?? 1;
-    const lightAngleRad = (Number(lightAngle || 0) * Math.PI) / 180;
-    const reliefVal = Math.max(0, Math.min(5, Number(reliefStrength) || 0));
 
     const channelViewModes = {
       phenotype: 0,
@@ -1182,7 +1187,7 @@ export class TextureNcaRuntime {
       this.canvas.height = extent;
     }
 
-    const filterModes = { smooth: 0, ultra: 0, cas: 0, hybrid: 0, crisp: 1 };
+    const filterModes = { smooth: 0, crisp: 1, ultra: 0, cas: 0, hybrid: 0 };
     const filterCode = filterModes[displayFilter] ?? 0;
     const z = Math.max(1, Math.min(8, Number(zoom) || 1));
 
@@ -1192,9 +1197,6 @@ export class TextureNcaRuntime {
       { u_state: this.state, u_barrier: this.barrier },
       {
         u_palette: palette === "spectral" ? 1 : 0,
-        u_shading: shadingMode,
-        u_relief: reliefVal,
-        u_lightAngle: lightAngleRad,
         u_showBarrier: showBarrier ? 1 : 0,
         u_rippleStyle: rippleStyleCode,
         u_rippleTint: rippleTint,
@@ -1209,10 +1211,12 @@ export class TextureNcaRuntime {
     context.fillStyle = "#101218";
     context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
     context.imageSmoothingEnabled = false;
+    const drawX = Math.round((targetCanvas.width - extent) * 0.5);
+    const drawY = Math.round((targetCanvas.height - extent) * 0.5);
     context.drawImage(
       this.canvas,
-      (targetCanvas.width - extent) / 2,
-      (targetCanvas.height - extent) / 2,
+      drawX,
+      drawY,
       extent,
       extent,
     );
