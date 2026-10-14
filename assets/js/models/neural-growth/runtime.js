@@ -50,10 +50,11 @@ const float HEX_SY[6] = float[6](0.0, 0.0, 1.7320508, 1.7320508, -1.7320508, -1.
 const float HEX_LP[6] = float[6](2.0, 2.0, 2.0, 2.0, 2.0, 2.0);
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
-  int group = p.x / u_size;
+  int halfSize = u_size / 2;
+  int group = (p.y / halfSize) * 6 + (p.x / u_size);
   int band = group / 3;
   int inputGroup = group % 3;
-  ivec2 packed = ivec2(p.x % u_size, p.y);
+  ivec2 packed = ivec2(p.x % u_size, p.y % halfSize);
   vec4 shuf = texelFetch(u_shuffle, packed, 0);
   ivec2 xy = wrapCell(ivec2(round(shuf.rg * 255.0 + shuf.ba * 255.0 * 256.0)) + u_offset);
   if (band == 0) {
@@ -151,11 +152,13 @@ uniform sampler2D u_weights;
 uniform float u_scale;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
-  ivec2 xy = ivec2(p.x % u_size, p.y);
-  int outputGroup = p.x / u_size;
+  int halfSize = u_size / 2;
+  ivec2 xy = ivec2(p.x % u_size, p.y % halfSize);
+  int outputGroup = ${hiddenOutput ? "(p.y / halfSize) * 6 + (p.x / u_size)" : "p.x / u_size"};
   vec4 result = vec4(0.0);
   for (int group = 0; group < ${inputs / 4}; group++) {
-    vec4 value = texelFetch(u_input, ivec2(xy.x + group * u_size, xy.y), 0);
+    ivec2 inputCoord = ivec2(xy.x + (group % 6) * u_size, xy.y + (group / 6) * halfSize);
+    vec4 value = texelFetch(u_input, inputCoord, 0);
     value = ${hiddenInput ? "value * 2.0" : "decodeState(value)"};
     int row = group * 4;
     result += value.x * (texelFetch(u_weights, ivec2(outputGroup, row), 0) - 127.0 / 255.0);
@@ -186,7 +189,13 @@ void main() {
   }
   vec4 inverse = texelFetch(u_inverse, wrapCell(xy - u_offset), 0);
   if (inverse.b < 0.5) { out_color = previous; return; }
-  ivec2 compressed = ivec2(round(inverse.rg * 255.0 + vec2(inverse.a * 255.0 * 256.0, 0.0)));
+  int high = int(round(inverse.a * 255.0));
+  int highX = high & 15;
+  int highY = high >> 4;
+  ivec2 compressed = ivec2(
+    int(round(inverse.r * 255.0)) + highX * 256,
+    int(round(inverse.g * 255.0)) + highY * 256
+  );
   vec4 delta = decodeState(texelFetch(u_delta, ivec2(compressed.x + group * u_size, compressed.y), 0));
   out_color = encodeState(decodeState(previous) + delta);
 }`;
@@ -713,8 +722,8 @@ export class TextureNcaRuntime {
       }
       this.state = this.allocate(size * 3, size, true);
       this.nextState = this.allocate(size * 3, size, true);
-      this.perception = this.allocate(size * 12, size / 2, true);
-      this.hidden = this.allocate(size * 24, size / 2, true);
+      this.perception = this.allocate(size * 6, size, true);
+      this.hidden = this.allocate(size * 6, size * 2, true);
       this.delta = this.allocate(size * 3, size / 2, true);
       this.shuffleTexture = this.allocate(size, size / 2, false);
       this.inverseTexture = this.allocate(size, size, false);

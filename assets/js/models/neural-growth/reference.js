@@ -23,8 +23,8 @@ const FILTERS = [
 ];
 
 export function validateSize(size) {
-  if (!Number.isInteger(size) || size < 8 || size > 512 || size & (size - 1)) {
-    throw new RangeError("Grid size must be a power of two between 8 and 512.");
+  if (!Number.isInteger(size) || size < 8 || size > 1024 || size & (size - 1)) {
+    throw new RangeError("Grid size must be a power of two between 8 and 1024.");
   }
   return size;
 }
@@ -171,7 +171,7 @@ export function createSparseLayout(size, seed) {
     inverse[cell * 4] = selX & 0xff;
     inverse[cell * 4 + 1] = selY & 0xff;
     inverse[cell * 4 + 2] = 255;
-    inverse[cell * 4 + 3] = (selX >>> 8) & 0xff;
+    inverse[cell * 4 + 3] = ((selX >>> 8) & 0x0f) | (((selY >>> 8) & 0x0f) << 4);
     selected += 1;
   }
   return { shuffle, inverse, random };

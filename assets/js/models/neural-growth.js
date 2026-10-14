@@ -111,6 +111,14 @@ export class NeuralGrowthModel {
         guidance: "262,144 neural cells. High-density grid for dedicated GPUs.",
       });
     }
+    if (maxTex >= 16384) {
+      options.push({
+        value: 1024,
+        label: "1024 × 1024 · 1M Cells",
+        compute: "demanding",
+        guidance: "1,048,576 neural cells. Maximum resolution simulation grid.",
+      });
+    }
     return options;
   }
 
@@ -804,6 +812,12 @@ export class NeuralGrowthModel {
     }
     if (key === "simulationSize") {
       const num = Number(value);
+      if (num === 1024) {
+        if ((this._capabilities?.maxTextureSize ?? 0) < 16384) {
+          return 256;
+        }
+        return 1024;
+      }
       if (num === 512) {
         if ((this._capabilities?.maxTextureSize ?? 0) < 12288) {
           return 256;

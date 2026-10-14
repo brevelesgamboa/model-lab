@@ -116,10 +116,10 @@ test("checkpoint validation rejects incompatible or malformed packs", () => {
 });
 
 test("simulation grids and seeds have explicit bounds", () => {
-  for (const size of [8, 16, 32, 64, 128, 256, 512]) {
+  for (const size of [8, 16, 32, 64, 128, 256, 512, 1024]) {
     assert.equal(validateSize(size), size);
   }
-  for (const size of [0, 7, 12, 129, 1024, NaN, Infinity, 8.5]) {
+  for (const size of [0, 7, 12, 129, 2048, NaN, Infinity, 8.5]) {
     assert.throws(() => validateSize(size), undefined, `size ${size}`);
   }
   for (const seed of [0, 1, 4294967295]) {
@@ -175,6 +175,45 @@ test("sparse cell layouts deterministically select exactly half the cells", () =
     assert.equal(first.inverse[inverseIndex + 1], Math.floor(index / 4 / 8));
   }
   assert.equal(selectedCells.size, (8 * 8) / 2);
+});
+
+test("sparse layout supports 1024x1024 grids with 10-bit coordinate unpacking", () => {
+  const layout = createSparseLayout(1024, 99);
+  assert.equal(layout.shuffle.length, 1024 * 512 * 4);
+  assert.equal(layout.inverse.length, 1024 * 1024 * 4);
+  let highBitSeen = false;
+  for (let index = 0; index < 2048; index += 1) {
+    const shufOffset = index * 4;
+    const x = layout.shuffle[shufOffset] + (layout.shuffle[shufOffset + 2] << 8);
+    const y = layout.shuffle[shufOffset + 1] + (layout.shuffle[shufOffset + 3] << 8);
+    assert.ok(x >= 0 && x < 1024);
+    assert.ok(y >= 0 && y < 1024);
+    const invOffset = (y * 1024 + x) * 4;
+    assert.equal(layout.inverse[invOffset + 2], 255);
+    const high = layout.inverse[invOffset + 3];
+    const highX = high & 15;
+    const highY = high >> 4;
+    const selX = layout.inverse[invOffset] + highX * 256;
+    const selY = layout.inverse[invOffset + 1] + highY * 256;
+    assert.equal(selX, index % 1024);
+    assert.equal(selY, Math.floor(index / 1024));
+    if (highY > 0 || highX > 0) highBitSeen = true;
+  }
+  const lastIndex = 524287;
+  const lastShufOffset = lastIndex * 4;
+  const lx = layout.shuffle[lastShufOffset] + (layout.shuffle[lastShufOffset + 2] << 8);
+  const ly = layout.shuffle[lastShufOffset + 1] + (layout.shuffle[lastShufOffset + 3] << 8);
+  const lastInvOffset = (ly * 1024 + lx) * 4;
+  assert.equal(layout.inverse[lastInvOffset + 2], 255);
+  const lastHigh = layout.inverse[lastInvOffset + 3];
+  const lastHighX = lastHigh & 15;
+  const lastHighY = lastHigh >> 4;
+  const lastSelX = layout.inverse[lastInvOffset] + lastHighX * 256;
+  const lastSelY = layout.inverse[lastInvOffset + 1] + lastHighY * 256;
+  assert.equal(lastSelX, lastIndex % 1024);
+  assert.equal(lastSelY, Math.floor(lastIndex / 1024));
+  assert.equal(lastHighY, 1);
+  assert.ok(highBitSeen);
 });
 
 test("an empty update mask leaves all cell channels unchanged", () => {

@@ -788,11 +788,12 @@ test("simulationSize options and normalization adapt dynamically to hardware cap
     (c) => c.key === "simulationSize",
   ).options.map((o) => o.value);
   assert.deepEqual(constrainedSizes, [128, 256]);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 1024), 256);
   assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 512), 256);
   assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 256), 256);
   assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 128), 128);
 
-  // High-DPI capable device (e.g. desktop GPU with maxTextureSize 16384 >= 12288)
+  // High-DPI capable device (e.g. desktop GPU with maxTextureSize 16384 >= 16384)
   const capableModel = new NeuralGrowthModel({
     capabilities: { maxTextureSize: 16384 },
   });
@@ -800,19 +801,24 @@ test("simulationSize options and normalization adapt dynamically to hardware cap
     (c) => c.key === "simulationSize",
   );
   const capableSizes = capableControl.options.map((o) => o.value);
-  assert.deepEqual(capableSizes, [128, 256, 512]);
+  assert.deepEqual(capableSizes, [128, 256, 512, 1024]);
+  assert.equal(capableModel.normalizeStoredParameter("simulationSize", 1024), 1024);
   assert.equal(capableModel.normalizeStoredParameter("simulationSize", 512), 512);
 
   const ultraOption = capableControl.options.find((o) => o.value === 512);
   assert.equal(ultraOption.compute, "demanding");
   assert.ok(ultraOption.guidance.includes("262,144"));
 
+  const megaOption = capableControl.options.find((o) => o.value === 1024);
+  assert.equal(megaOption.compute, "demanding");
+  assert.ok(megaOption.guidance.includes("1,048,576"));
+
   // Dynamic capabilities update
   constrainedModel.capabilities = { maxTextureSize: 16384 };
   const updatedSizes = constrainedModel.controls.find(
     (c) => c.key === "simulationSize",
   ).options.map((o) => o.value);
-  assert.deepEqual(updatedSizes, [128, 256, 512]);
+  assert.deepEqual(updatedSizes, [128, 256, 512, 1024]);
 });
 
 test("grid resizing preserves state via 2x2 tiling when runtime supports state transfer", async (context) => {
@@ -872,6 +878,16 @@ test("grid resizing preserves state via 2x2 tiling when runtime supports state t
   assert.equal(runtimes[1].data.length, 256 * 256 * 12);
   assert.equal(runtimes[1].data[0], 123);
   assert.equal(runtimes[1].data[(128 * 256 + 128) * 12], 123);
+
+  // Upgrade grid size to 1024 (tiling from 256)
+  await model.render(canvas, { ...defaultParameters(model), simulationSize: 1024 }, 0);
+  assert.equal(runtimes.length, 3);
+  assert.equal(runtimes[1].disposed, true);
+  assert.equal(runtimes[2].size, 1024);
+  assert.equal(runtimes[2].steps, 1);
+  assert.equal(runtimes[2].data.length, 1024 * 1024 * 12);
+  assert.equal(runtimes[2].data[0], 123);
+  assert.equal(runtimes[2].data[(512 * 1024 + 512) * 12], 123);
 });
 
 test("audio frame re-arms during silence and triggers kick shockwave and kick input", () => {
