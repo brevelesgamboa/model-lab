@@ -1224,5 +1224,43 @@ test("quiet detail pruning and kick pruning relax hidden channels toward equilib
   assert.equal(model._kickPruneIndex, 0);
 });
 
+test("brushRadius bounds and normalizes dynamically across simulation grid sizes", () => {
+  const model = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 16384 },
+  });
+
+  const brushControl = model.controls.find((c) => c.key === "brushRadius");
+  assert.equal(brushControl.min, 4);
+  assert.equal(brushControl.max, 256);
+  assert.equal(brushControl.default, 16);
+
+  // Normalization on default 256 grid: clamped to [4, 128]
+  assert.equal(model.normalizeStoredParameter("brushRadius", 16), 16);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 4), 4);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 2), 4);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 100), 100);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 128), 128);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 200), 128);
+  assert.equal(model.normalizeStoredParameter("brushRadius", NaN), 16);
+
+  // Normalization when grid is 128: clamped to [4, 64]
+  model._parameters.simulationSize = 128;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 100), 64);
+
+  // Normalization when grid is 512: clamped to [4, 256]
+  model._parameters.simulationSize = 512;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 200), 200);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 300), 256);
+
+  // Normalization when grid is 1024: clamped to [4, 256]
+  model._parameters.simulationSize = 1024;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 256), 256);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 400), 256);
+
+  // onParameterChange updates brushRadius without restarting
+  assert.equal(model.onParameterChange("brushRadius", 64), true);
+  assert.equal(model.parameters.brushRadius, 64);
+});
+
 
 

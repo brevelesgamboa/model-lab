@@ -413,7 +413,7 @@ export class NeuralGrowthModel {
         label: "BRUSH RADIUS",
         type: "range",
         min: 4,
-        max: 96,
+        max: 256,
         step: 1,
         default: 16,
         modulation: false,
@@ -831,6 +831,14 @@ export class NeuralGrowthModel {
       if (value === "crisp") return "crisp";
       return "smooth";
     }
+    if (key === "brushRadius") {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 16;
+      const maxSize = Math.floor(
+        (this._runtime?.size || this._parameters?.simulationSize || 256) / 2,
+      );
+      return Math.max(4, Math.min(Math.min(256, maxSize), Math.round(num)));
+    }
     return value;
   }
 
@@ -849,7 +857,8 @@ export class NeuralGrowthModel {
       key === "quietPruning" ||
       key === "kickPruning" ||
       key === "channelView" ||
-      key === "displayFilter"
+      key === "displayFilter" ||
+      key === "brushRadius"
     )
       return true;
     if (key !== "pattern" || value === this._requestedPattern) return false;

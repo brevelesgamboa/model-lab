@@ -344,10 +344,15 @@ export function createGrowthController({
           btn.setAttribute("aria-pressed", String(isActive));
         }
         if (elements.growthBrushRadius) {
-          const radius = Number(model.parameters?.brushRadius) || 8;
-          elements.growthBrushRadius.value = radius;
+          const maxRadius = Math.min(
+            256,
+            Math.max(64, Math.floor((model.simulationSize || 256) / 2)),
+          );
+          elements.growthBrushRadius.max = String(maxRadius);
+          const radius = Number(model.parameters?.brushRadius) || 16;
+          elements.growthBrushRadius.value = Math.min(maxRadius, radius);
           if (elements.growthBrushRadiusVal) {
-            elements.growthBrushRadiusVal.textContent = `${radius}px`;
+            elements.growthBrushRadiusVal.textContent = `${elements.growthBrushRadius.value}px`;
           }
         }
         if (elements.growthColorOptions) {
@@ -569,7 +574,7 @@ export function createGrowthController({
     const model = activeModel();
     if (!model?.ready) return;
     const center = Math.floor(model.simulationSize / 2);
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     const channelView = model.parameters?.channelView || "phenotype";
     const speed = Number(model.parameters?.growthSpeed) || 0;
