@@ -1,5 +1,6 @@
 // Release catalog: checkpoint provenance and validation are listed per pack.
 import { SELECTED_PATTERNS } from "./selected-patterns.js";
+import { TESTING_PATTERNS } from "./testing-patterns.js";
 const commonInfo = Object.freeze({
   architecture:
     "12 state channels → 48 fixed-filter features → 96 ReLU units → 12 state deltas",
@@ -81,6 +82,7 @@ export const PATTERNS = Object.freeze([
     }),
   }),
   ...SELECTED_PATTERNS,
+  ...TESTING_PATTERNS,
   Object.freeze({
     id: "bubbly-0101",
     technicalId: "bubbly_0101",

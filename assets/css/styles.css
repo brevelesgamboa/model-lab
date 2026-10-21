@@ -2324,3 +2324,7 @@ progress {
   background: rgba(0, 255, 150, 0.15);
   color: #55ffb0;
 }
+.growth-gallery__card-badge--testing {
+  background: rgba(255, 190, 80, 0.15);
+  color: #ffc66d;
+}
