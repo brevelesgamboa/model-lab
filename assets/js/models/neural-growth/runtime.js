@@ -126,6 +126,51 @@ void main() {
         w1 * p1.x / d1 + w2 * p2.x / d2
       );
       transTheta = atan(flow.y, flow.x) + effectiveAngle;
+    } else if (u_transform == 9) {
+      float cellScale = mix(2.2, 4.2, u_geometrySoftness);
+      vec2 gridCoord = pos * cellScale;
+      vec2 i_coord = floor(gridCoord);
+      vec2 f_coord = fract(gridCoord);
+      vec2 minDiff = vec2(0.0);
+      vec2 secondDiff = vec2(0.0);
+      float minDist = 10.0;
+      float secondMinDist = 10.0;
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 neighbor = vec2(float(x), float(y));
+          vec2 p = i_coord + neighbor;
+          vec2 seed = 0.5 + 0.38 * sin(vec2(
+            dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3))
+          ));
+          vec2 diff = neighbor + seed - f_coord;
+          float dist = dot(diff, diff);
+          if (dist < minDist) {
+            secondMinDist = minDist;
+            secondDiff = minDiff;
+            minDist = dist;
+            minDiff = diff;
+          } else if (dist < secondMinDist) {
+            secondMinDist = dist;
+            secondDiff = diff;
+          }
+        }
+      }
+      float d1 = sqrt(minDist);
+      float d2 = sqrt(secondMinDist);
+      float wallDist = max(0.0001, d2 - d1);
+      vec2 safeMinDiff = length(minDiff) < 0.0001 ? vec2(0.0001, 0.0) : minDiff;
+      float islandCircAngle = atan(safeMinDiff.y, safeMinDiff.x) + 1.5707963;
+      vec2 wallVec = vec2(-(secondDiff.y - minDiff.y), secondDiff.x - minDiff.x);
+      float wallAngle = atan(wallVec.y, wallVec.x);
+      float wallBaseWeight = smoothstep(mix(0.35, 0.6, u_geometrySoftness), 0.02, wallDist);
+      float wallWeight = clamp(wallBaseWeight * (1.0 - clamp(u_twist * 0.8, -0.6, 0.6)), 0.0, 1.0);
+      float radialBlend = clamp(u_twist * 0.7, -1.0, 1.0);
+      vec2 vIsland = vec2(cos(islandCircAngle), sin(islandCircAngle));
+      vec2 vWall = vec2(cos(wallAngle), sin(wallAngle));
+      vec2 vCell = mix(vIsland, vWall, wallWeight);
+      float baseAngle = length(vCell) > 0.0001 ? atan(vCell.y, vCell.x) : islandCircAngle;
+      transTheta = baseAngle + radialBlend * 1.5707963 + effectiveAngle;
     }
     float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
     float activeStrength = clamp(u_geometryStrength * edgeFalloff, 0.0, 1.0);
@@ -1048,7 +1093,9 @@ export class TextureNcaRuntime {
                     ? 7
                     : this.coordinateTransform === "vortex_pair"
                       ? 8
-                      : 0;
+                      : this.coordinateTransform === "voronoi"
+                        ? 9
+                        : 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
         Math.floor(this.layout.random() * this.size),

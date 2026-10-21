@@ -732,6 +732,14 @@ test("coordinate geometry selector switches modes, updates smart pitch defaults,
     "8",
   );
 
+  // Switch to voronoi
+  await geometrySelect.selectOption("voronoi");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "9",
+  );
+
   // Context is healthy with 0 errors
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),

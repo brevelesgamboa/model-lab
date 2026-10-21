@@ -135,6 +135,37 @@ export class NeuralGrowthModel {
           label: `${pack} · ${name}`,
         })),
         help: "Changing pattern loads its checkpoint and restarts once. Failed loads retain the current field; use Restart to retry.",
+        getGuidance: (value) => {
+          const pattern = PATTERNS.find((entry) => entry.id === value);
+          if (!pattern) return null;
+          const category = pattern.category;
+          if (category === "inception") {
+            return {
+              compute: "balanced",
+              tag: "inception",
+              text: "Deep feature activation. Excels with cellular Voronoi, kaleidoscopic petals, and subtle resonance.",
+            };
+          }
+          if (category === "organic") {
+            return {
+              compute: "balanced",
+              tag: "organic",
+              text: "Quantization-trained organic structure. High self-repair stability under vortex and hyperbolic fields.",
+            };
+          }
+          if (category === "texture") {
+            return {
+              compute: "balanced",
+              tag: "vgg texture",
+              text: "Pretrained VGG Gram texture. Responds smoothly to Voronoi islands, wave ribbons, and spiral geometry.",
+            };
+          }
+          return {
+            compute: "neutral",
+            tag: "experimental",
+            text: "Experimental checkpoint. Ideal for exploring perturbation resilience and boundary shear dynamics.",
+          };
+        },
       },
       {
         key: "seed",
@@ -260,6 +291,13 @@ export class NeuralGrowthModel {
             guidance: "Dual vortex field. Pitch controls same vs opposite spin and strength ratio; Softness controls spacing.",
           },
           {
+            value: "voronoi",
+            label: "Cellular · Voronoi Islands",
+            compute: "moderate",
+            tag: "islands",
+            guidance: "Multi-center cellular field. Twist shifts between circulating island whirlpools, dense nodules, and boundary stream networks.",
+          },
+          {
             value: "julia",
             label: "Julia · Complex Fractal",
             compute: "moderate",
@@ -274,7 +312,7 @@ export class NeuralGrowthModel {
             guidance: "Dual vortex field with opposing poles generating swirling cellular streams.",
           },
         ],
-        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, sinusoidal waves, hyperbolic saddles, kaleidoscopic petals, or dual vortices.",
+        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, sinusoidal waves, hyperbolic saddles, kaleidoscopic petals, dual vortices, or Voronoi cellular islands.",
       },
       {
         key: "twist",
@@ -356,6 +394,28 @@ export class NeuralGrowthModel {
               compute: "neutral",
               tag: "balanced pair",
               text: "Balanced twin vortices with equal co-rotating strengths.",
+            };
+          }
+          if (transform === "voronoi") {
+            const v = Number(value) || 0;
+            if (v > 10) {
+              return {
+                compute: "moderate",
+                tag: "island nodules",
+                text: "Inward-converging flow forming dense, isolated cellular nodules.",
+              };
+            }
+            if (v < -10) {
+              return {
+                compute: "moderate",
+                tag: "capillary maze",
+                text: "Flow directed along cell boundaries into an interconnected capillary network.",
+              };
+            }
+            return {
+              compute: "balanced",
+              tag: "cellular eddies",
+              text: "Balanced cellular whirlpools circulating inside organic island cells.",
             };
           }
           const t = Math.abs(Number(value) || 0);
@@ -530,6 +590,50 @@ export class NeuralGrowthModel {
               compute: "neutral",
               tag: "inactive",
               text: "Field softness has no effect in Cartesian geometry.",
+            };
+          }
+          if (transform === "voronoi") {
+            const v = Number(value) || 0;
+            if (v <= 0.2) {
+              return {
+                compute: "balanced",
+                tag: "macro islands",
+                text: "Broad macro islands with bold, distinct growth territories.",
+              };
+            }
+            if (v <= 0.6) {
+              return {
+                compute: "balanced",
+                tag: "organic cells",
+                text: "Balanced cellular scale with organic, regularized boundary walls.",
+              };
+            }
+            return {
+              compute: "gentle",
+              tag: "micro cells",
+              text: "Fine micro-cellular clusters with feathered boundary corridors.",
+            };
+          }
+          if (transform === "vortex_pair") {
+            const v = Number(value) || 0;
+            if (v <= 0.2) {
+              return {
+                compute: "moderate",
+                tag: "tight poles",
+                text: "Closely spaced vortex cores creating a concentrated dipole interaction.",
+              };
+            }
+            if (v <= 0.6) {
+              return {
+                compute: "balanced",
+                tag: "split pair",
+                text: "Balanced separation with distinct twin circulation zones.",
+              };
+            }
+            return {
+              compute: "gentle",
+              tag: "wide poles",
+              text: "Wide pole separation spanning across canvas edges.",
             };
           }
           const v = Number(value) || 0;
@@ -1000,6 +1104,7 @@ export class NeuralGrowthModel {
         value === "saddle" ||
         value === "kaleidoscope" ||
         value === "vortex_pair" ||
+        value === "voronoi" ||
         value === "julia" ||
         value === "dipole" ||
         value === "cartesian"
@@ -1118,6 +1223,7 @@ export class NeuralGrowthModel {
         "saddle",
         "kaleidoscope",
         "vortex_pair",
+        "voronoi",
         "julia",
         "dipole",
       ];

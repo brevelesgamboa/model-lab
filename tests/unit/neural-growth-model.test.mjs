@@ -179,6 +179,7 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "saddle"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "kaleidoscope"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex_pair"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "voronoi"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
@@ -188,9 +189,10 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "saddle"), "saddle");
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "kaleidoscope"), "kaleidoscope");
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "vortex_pair"), "vortex_pair");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "voronoi"), "voronoi");
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "unknown"), "cartesian");
 
-  // Twist guidance for wave, saddle, kaleidoscope, and vortex_pair
+  // Twist guidance for wave, saddle, kaleidoscope, vortex_pair, and voronoi
   const twistCtrl = model.controls.find((c) => c.key === "twist");
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "wave" }).tag, "horizontal");
   assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "wave" }).tag, "skewed wave");
@@ -201,6 +203,24 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "vortex_pair" }).tag, "balanced pair");
   assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "vortex_pair" }).tag, "co-rotating");
   assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "vortex_pair" }).tag, "counter-spin");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "voronoi" }).tag, "cellular eddies");
+  assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "voronoi" }).tag, "island nodules");
+  assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "voronoi" }).tag, "capillary maze");
+
+  // Softness guidance for voronoi and vortex_pair
+  const softnessCtrl = model.controls.find((c) => c.key === "geometrySoftness");
+  assert.equal(softnessCtrl.getGuidance(0.1, { coordinateTransform: "voronoi" }).tag, "macro islands");
+  assert.equal(softnessCtrl.getGuidance(0.4, { coordinateTransform: "voronoi" }).tag, "organic cells");
+  assert.equal(softnessCtrl.getGuidance(0.8, { coordinateTransform: "voronoi" }).tag, "micro cells");
+  assert.equal(softnessCtrl.getGuidance(0.1, { coordinateTransform: "vortex_pair" }).tag, "tight poles");
+  assert.equal(softnessCtrl.getGuidance(0.4, { coordinateTransform: "vortex_pair" }).tag, "split pair");
+  assert.equal(softnessCtrl.getGuidance(0.8, { coordinateTransform: "vortex_pair" }).tag, "wide poles");
+
+  // Pattern guidance across catalog categories
+  const patternCtrl = model.controls.find((c) => c.key === "pattern");
+  assert.equal(patternCtrl.getGuidance("mixed4c-439").tag, "inception");
+  assert.equal(patternCtrl.getGuidance("membrane-field").tag, "organic");
+  assert.equal(patternCtrl.getGuidance("bubbly-0101").tag, "vgg texture");
 
   assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
 
