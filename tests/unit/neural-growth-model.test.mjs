@@ -177,6 +177,8 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "wave"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "saddle"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "kaleidoscope"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex_pair"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
@@ -184,14 +186,21 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   // Normalization
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "wave"), "wave");
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "saddle"), "saddle");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "kaleidoscope"), "kaleidoscope");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "vortex_pair"), "vortex_pair");
   assert.equal(model.normalizeStoredParameter("coordinateTransform", "unknown"), "cartesian");
 
-  // Twist guidance for wave and saddle
+  // Twist guidance for wave, saddle, kaleidoscope, and vortex_pair
   const twistCtrl = model.controls.find((c) => c.key === "twist");
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "wave" }).tag, "horizontal");
   assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "wave" }).tag, "skewed wave");
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "saddle" }).tag, "orthogonal");
   assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "saddle" }).tag, "spiral saddle");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "kaleidoscope" }).tag, "6-fold petals");
+  assert.equal(twistCtrl.getGuidance(45, { coordinateTransform: "kaleidoscope" }).tag, "8-fold petals");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "vortex_pair" }).tag, "balanced pair");
+  assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "vortex_pair" }).tag, "co-rotating");
+  assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "vortex_pair" }).tag, "counter-spin");
 
   assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
 

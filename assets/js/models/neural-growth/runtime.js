@@ -102,6 +102,30 @@ void main() {
     } else if (u_transform == 6) {
       float saddleAngle = atan(-pos.y, pos.x);
       transTheta = saddleAngle + u_twist + effectiveAngle;
+    } else if (u_transform == 7) {
+      float folds = clamp(6.0 + round(u_twist * 3.8197), 3.0, 12.0);
+      float sectorAngle = 6.2831853 / folds;
+      float halfSector = sectorAngle * 0.5;
+      float phiNorm = mod(phi + 3.14159265, 6.2831853);
+      float inSector = mod(phiNorm, sectorAngle);
+      float folded = abs(inSector - halfSector);
+      float petalAngle = (phiNorm - inSector) + (folded < halfSector * 0.5 ? folded : (halfSector - folded)) * 2.0;
+      transTheta = petalAngle + 1.5707963 + effectiveAngle;
+    } else if (u_transform == 8) {
+      float spacing = mix(0.25, 0.65, clamp(u_geometrySoftness * 1.5, 0.0, 1.0));
+      vec2 p1 = pos - vec2(-spacing, 0.0);
+      vec2 p2 = pos - vec2(spacing, 0.0);
+      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
+      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
+      float twistMag = abs(u_twist);
+      float w1 = 1.0;
+      float spinSign = u_twist < -0.01 ? -1.0 : 1.0;
+      float w2 = spinSign * max(0.2, 1.0 - twistMag * 0.45);
+      vec2 flow = vec2(
+        -w1 * p1.y / d1 - w2 * p2.y / d2,
+        w1 * p1.x / d1 + w2 * p2.x / d2
+      );
+      transTheta = atan(flow.y, flow.x) + effectiveAngle;
     }
     float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
     float activeStrength = clamp(u_geometryStrength * edgeFalloff, 0.0, 1.0);
@@ -1020,7 +1044,11 @@ export class TextureNcaRuntime {
                 ? 5
                 : this.coordinateTransform === "saddle"
                   ? 6
-                  : 0;
+                  : this.coordinateTransform === "kaleidoscope"
+                    ? 7
+                    : this.coordinateTransform === "vortex_pair"
+                      ? 8
+                      : 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
         Math.floor(this.layout.random() * this.size),

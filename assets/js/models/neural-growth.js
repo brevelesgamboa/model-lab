@@ -246,6 +246,20 @@ export class NeuralGrowthModel {
             guidance: "Hyperbolic vector field with pinched center, crossing streams, and 4-way branching arms.",
           },
           {
+            value: "kaleidoscope",
+            label: "Kaleidoscope · Radial Symmetry",
+            compute: "balanced",
+            tag: "petals",
+            guidance: "N-fold radial reflection symmetry. Creates petal-like floral mandalas and radial structures.",
+          },
+          {
+            value: "vortex_pair",
+            label: "Vortex Pair · Dual Swirl",
+            compute: "moderate",
+            tag: "twin poles",
+            guidance: "Dual vortex field. Pitch controls same vs opposite spin and strength ratio; Softness controls spacing.",
+          },
+          {
             value: "julia",
             label: "Julia · Complex Fractal",
             compute: "moderate",
@@ -260,7 +274,7 @@ export class NeuralGrowthModel {
             guidance: "Dual vortex field with opposing poles generating swirling cellular streams.",
           },
         ],
-        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, sinusoidal waves, hyperbolic saddles, or Julia fractal dendrites.",
+        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, sinusoidal waves, hyperbolic saddles, kaleidoscopic petals, or dual vortices.",
       },
       {
         key: "twist",
@@ -312,6 +326,36 @@ export class NeuralGrowthModel {
               compute: "moderate",
               tag: "spiral saddle",
               text: "Rotated hyperbolic arms with asymmetrical spiral shear.",
+            };
+          }
+          if (transform === "kaleidoscope") {
+            const folds = Math.min(12, Math.max(3, Math.round(6 + (Number(value) || 0) / 22.5)));
+            return {
+              compute: "balanced",
+              tag: `${folds}-fold petals`,
+              text: `${folds}-fold radial reflection symmetry. Modulates flower petal count.`,
+            };
+          }
+          if (transform === "vortex_pair") {
+            const v = Number(value) || 0;
+            if (v < -5) {
+              return {
+                compute: "moderate",
+                tag: "counter-spin",
+                text: "Opposite spin (counter-rotating). Drives a central jet stream between poles.",
+              };
+            }
+            if (v > 5) {
+              return {
+                compute: "moderate",
+                tag: "co-rotating",
+                text: "Same spin (co-rotating) with asymmetric strength ratio.",
+              };
+            }
+            return {
+              compute: "neutral",
+              tag: "balanced pair",
+              text: "Balanced twin vortices with equal co-rotating strengths.",
             };
           }
           const t = Math.abs(Number(value) || 0);
@@ -954,6 +998,8 @@ export class NeuralGrowthModel {
         value === "vortex" ||
         value === "wave" ||
         value === "saddle" ||
+        value === "kaleidoscope" ||
+        value === "vortex_pair" ||
         value === "julia" ||
         value === "dipole" ||
         value === "cartesian"
@@ -1070,6 +1116,8 @@ export class NeuralGrowthModel {
         "vortex",
         "wave",
         "saddle",
+        "kaleidoscope",
+        "vortex_pair",
         "julia",
         "dipole",
       ];

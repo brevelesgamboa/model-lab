@@ -716,6 +716,22 @@ test("coordinate geometry selector switches modes, updates smart pitch defaults,
     "6",
   );
 
+  // Switch to kaleidoscope
+  await geometrySelect.selectOption("kaleidoscope");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "7",
+  );
+
+  // Switch to vortex pair
+  await geometrySelect.selectOption("vortex_pair");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "8",
+  );
+
   // Context is healthy with 0 errors
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
