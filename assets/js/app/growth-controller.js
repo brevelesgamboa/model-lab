@@ -485,10 +485,27 @@ export function createGrowthController({
     return {
       gx: Math.max(0, Math.min(size - 1, Math.floor(x * size))),
       gy: Math.max(0, Math.min(size - 1, size - 1 - Math.floor(y * size))),
+      nx: Math.max(0, Math.min(1, x)),
+      ny: Math.max(0, Math.min(1, 1 - y)),
     };
   }
 
   let lastPointerRippleTime = 0;
+  let isCentering = false;
+
+  function updateCenterFromPointer(coords, model) {
+    if (!coords) return;
+    const cx = Math.max(-1, Math.min(1, (coords.nx - 0.5) * 2));
+    const cy = Math.max(-1, Math.min(1, (coords.ny - 0.5) * 2));
+    const roundX = Math.round(cx * 100) / 100;
+    const roundY = Math.round(cy * 100) / 100;
+    onParameterChange?.("geometryCenterX", roundX);
+    onParameterChange?.("geometryCenterY", roundY);
+    model.triggerRipple?.(coords.gx, coords.gy, 16);
+    if (!model.isClockRunning) {
+      schedulePausedRender();
+    }
+  }
 
   function handlePointerDown(event) {
     const model = activeModel();
@@ -497,6 +514,12 @@ export function createGrowthController({
     try {
       elements.canvas.setPointerCapture(pointerId);
     } catch (_) {}
+    if (event.shiftKey) {
+      isCentering = true;
+      const coords = getGridCoords(event, model);
+      if (coords) updateCenterFromPointer(coords, model);
+      return;
+    }
     const coords = getGridCoords(event, model);
     if (!coords) return;
     lastCoord = coords;
@@ -528,6 +551,11 @@ export function createGrowthController({
   function handlePointerMove(event) {
     const model = activeModel();
     if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1) return;
+    if (isCentering) {
+      const coords = getGridCoords(event, model);
+      if (coords) updateCenterFromPointer(coords, model);
+      return;
+    }
     const coords = getGridCoords(event, model);
     if (!coords) return;
     const radius = Number(model.parameters?.brushRadius) || 16;
@@ -562,6 +590,7 @@ export function createGrowthController({
       } catch (_) {}
       pointerId = null;
       lastCoord = null;
+      isCentering = false;
     }
   };
 
@@ -808,6 +837,30 @@ export function createGrowthController({
       }
     }
   }
+
+  listen(document, "keydown", (e) => {
+    if (e.key === "Shift" && canvasFocused && elements.canvas) {
+      elements.canvas.style.cursor = "crosshair";
+    }
+  });
+  listen(document, "keyup", (e) => {
+    if (e.key === "Shift" && elements.canvas) {
+      elements.canvas.style.cursor = "";
+    }
+  });
+  listen(elements.canvas, "dblclick", (event) => {
+    const model = activeModel();
+    if (!model?.ready) return;
+    if (event.shiftKey) {
+      onParameterChange?.("geometryCenterX", 0);
+      onParameterChange?.("geometryCenterY", 0);
+      const mid = Math.floor(model.simulationSize / 2);
+      model.triggerRipple?.(mid, mid, 24);
+      if (!model.isClockRunning) {
+        schedulePausedRender();
+      }
+    }
+  });
 
   listen(elements.canvas, "pointerdown", handlePointerDown);
   listen(elements.canvas, "pointermove", handlePointerMove);

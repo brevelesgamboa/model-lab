@@ -1017,6 +1017,37 @@ test("contextual guidance pills render beneath key controls and tap recovery spr
   ).toBe(false);
 });
 
+test("Shift+Click on canvas repositions geometry center and Shift+dblclick resets", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const canvas = page.locator("#output-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const rect = await canvas.boundingBox();
+  const side = Math.min(rect.width, rect.height);
+
+  // Shift+Click at 75% horizontal, 25% vertical
+  await page.keyboard.down("Shift");
+  await page.mouse.click(
+    rect.x + (rect.width - side) / 2 + side * 0.75,
+    rect.y + (rect.height - side) / 2 + side * 0.25,
+  );
+  await page.keyboard.up("Shift");
+
+  // Center X should be approx +0.5, Center Y should be approx +0.5 (bottom-up: 1 - 0.25 = 0.75 -> (0.75 - 0.5) * 2 = 0.5)
+  const centerXInput = page.getByLabel("CENTER X", { exact: true });
+  const centerYInput = page.getByLabel("CENTER Y", { exact: true });
+  await expect.poll(async () => Number(await centerXInput.inputValue())).toBeCloseTo(0.5, 1);
+  await expect.poll(async () => Number(await centerYInput.inputValue())).toBeCloseTo(0.5, 1);
+
+  // Shift+dblclick resets center to 0, 0
+  await page.keyboard.down("Shift");
+  await page.mouse.dblclick(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.keyboard.up("Shift");
+  await expect.poll(async () => Number(await centerXInput.inputValue())).toBe(0);
+  await expect.poll(async () => Number(await centerYInput.inputValue())).toBe(0);
+});
+
 
 
 

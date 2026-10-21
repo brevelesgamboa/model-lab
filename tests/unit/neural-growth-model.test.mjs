@@ -1348,6 +1348,15 @@ test("NeuralGrowthModel integrates coordinate geometry controls (strength, cente
   assert.equal(model.parameters.geometryCenterY, -0.4);
   assert.equal(model.onParameterChange("geometrySoftness", 0.5), true);
   assert.equal(model.parameters.geometrySoftness, 0.5);
+
+  // setGeometryCenter and resetGeometryCenter convenience helpers
+  model.setGeometryCenter(0.42, -0.85);
+  assert.equal(model.parameters.geometryCenterX, 0.42);
+  assert.equal(model.parameters.geometryCenterY, -0.85);
+
+  model.resetGeometryCenter();
+  assert.equal(model.parameters.geometryCenterX, 0);
+  assert.equal(model.parameters.geometryCenterY, 0);
 });
 
 

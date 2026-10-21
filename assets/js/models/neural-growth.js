@@ -1401,6 +1401,17 @@ export class NeuralGrowthModel {
     this._accumulator = 0;
   }
 
+  setGeometryCenter(cx, cy) {
+    const normX = Math.max(-1.0, Math.min(1.0, Number(cx) || 0));
+    const normY = Math.max(-1.0, Math.min(1.0, Number(cy) || 0));
+    this.onParameterChange("geometryCenterX", Math.round(normX * 100) / 100);
+    this.onParameterChange("geometryCenterY", Math.round(normY * 100) / 100);
+  }
+
+  resetGeometryCenter() {
+    this.setGeometryCenter(0, 0);
+  }
+
   queueDisturbance(
     x,
     y,
