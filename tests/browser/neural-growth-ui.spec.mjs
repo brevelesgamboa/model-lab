@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(5);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(8);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -541,7 +541,28 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   const dialog = page.locator("#growth-gallery-dialog");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#growth-gallery-count")).toContainText("105");
+  await expect(page.locator("#growth-gallery-count")).toContainText("159");
+
+  // Testing models show their bundled previews and load from gallery selection.
+  await page.locator(".growth-gallery__tab[data-filter='testing']").click();
+  await expect(page.locator("#growth-gallery-count")).toHaveText("54 patterns");
+  const testingCard = page.locator(
+    '.growth-gallery__card[data-pattern-id="mixed4a-391-guidance-r02-s02"]',
+  );
+  await expect(testingCard.locator(".growth-gallery__card-badge")).toHaveText(
+    "Testing / WIP",
+  );
+  await expect
+    .poll(() =>
+      testingCard.locator("img").evaluate((img) => img.complete && img.naturalWidth > 0),
+    )
+    .toBe(true);
+  await testingCard.click();
+  await expect(dialog).not.toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+    .toBe("mixed4a-391-guidance-r02-s02");
+  await galleryBtn.click();
 
   // Filter tab: Textures (39)
   await page.locator(".growth-gallery__tab[data-filter='texture']").click();

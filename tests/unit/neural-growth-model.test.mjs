@@ -531,23 +531,11 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
   assert.equal(intensityControl.min, 0.0);
   assert.equal(intensityControl.max, 1.0);
 
-  const quietPruningControl = model.controls.find((c) => c.key === "quietPruning");
-  assert.ok(quietPruningControl);
-  assert.equal(quietPruningControl.default, "off");
-  assert.deepEqual(
-    quietPruningControl.options.map((o) => o.value),
-    ["off", "on"],
-  );
-
-  const kickPruningControl = model.controls.find((c) => c.key === "kickPruning");
-  assert.ok(kickPruningControl);
-  assert.equal(kickPruningControl.default, "off");
-  assert.deepEqual(
-    kickPruningControl.options.map((o) => o.value),
-    ["off", "on"],
-  );
-
-  // Removed legacy controls
+  // Removed legacy controls and discrete kick pruning/infusion
+  assert.equal(model.controls.find((c) => c.key === "quietPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusion"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusionStrength"), undefined);
   assert.equal(model.controls.find((c) => c.key === "shockwaveReach"), undefined);
   assert.equal(model.controls.find((c) => c.key === "shockwaveStyle"), undefined);
   assert.equal(model.controls.find((c) => c.key === "shockwaveImpact"), undefined);
@@ -586,10 +574,6 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
   assert.equal(model.normalizeStoredParameter("beatShockwave", "center"), "on");
   assert.equal(model.normalizeStoredParameter("beatShockwave", "off"), "off");
   assert.equal(model.normalizeStoredParameter("shockwaveIntensity", 0.45), 0.45);
-  assert.equal(model.normalizeStoredParameter("quietPruning", "on"), "on");
-  assert.equal(model.normalizeStoredParameter("quietPruning", "invalid"), "off");
-  assert.equal(model.normalizeStoredParameter("kickPruning", "on"), "on");
-  assert.equal(model.normalizeStoredParameter("kickPruning", "invalid"), "off");
   assert.equal(model.normalizeStoredParameter("channelView", "invalid"), "phenotype");
   assert.equal(model.normalizeStoredParameter("channelView", "fast_signals"), "fast_signals");
 
@@ -630,11 +614,9 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
     rotation: 185,
     twist: 0,
     coordinateTransform: "cartesian",
+    resonanceMode: "subtle",
     beatShockwave: "on",
     shockwaveIntensity: 0.25,
-    kickInfusion: "subtle",
-    quietPruning: "on",
-    kickPruning: "off",
   };
   const subtleLfos = {
     rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
@@ -678,11 +660,9 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
     rotation: 180,
     twist: 0,
     coordinateTransform: "cartesian",
+    resonanceMode: "subtle",
     beatShockwave: "on",
     shockwaveIntensity: 0.35,
-    kickInfusion: "subtle",
-    quietPruning: "on",
-    kickPruning: "off",
   };
   const continuousLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
@@ -711,11 +691,9 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
     rotation: 180,
     twist: 0,
     coordinateTransform: "vortex",
+    resonanceMode: "full",
     beatShockwave: "on",
     shockwaveIntensity: 0.50,
-    kickInfusion: "dynamic",
-    quietPruning: "on",
-    kickPruning: "on",
   };
   const dynamicLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
@@ -1016,216 +994,65 @@ test("neural growth controls provide contextual guidance and dormant tap recover
   assert.equal(model.isDormant(), false);
 });
 
-test("persistent kick detail infusion injects hidden channels with bounded rate and paused safety", () => {
+test("manual infuse and prune brushes dispatch without kick infusion dependency", () => {
   const model = new NeuralGrowthModel();
-
-  // 1. Control declaration and options
-  const infusionCtrl = model.controls.find((c) => c.key === "kickInfusion");
-  assert.ok(infusionCtrl);
-  assert.equal(infusionCtrl.type, "select");
-  assert.equal(infusionCtrl.default, "off");
-  assert.deepEqual(
-    infusionCtrl.options.map((o) => o.value),
-    ["off", "subtle", "dynamic", "vivid", "intense"],
-  );
-
-  const strengthCtrl = model.controls.find((c) => c.key === "kickInfusionStrength");
-  assert.ok(strengthCtrl);
-  assert.equal(strengthCtrl.type, "range");
-  assert.equal(strengthCtrl.min, 0.2);
-  assert.equal(strengthCtrl.max, 4.0);
-  assert.equal(strengthCtrl.default, 1.0);
-
-  // 2. Parameter normalization
-  assert.equal(model.normalizeStoredParameter("kickInfusion", "dynamic"), "dynamic");
-  assert.equal(model.normalizeStoredParameter("kickInfusion", "subtle"), "subtle");
-  assert.equal(model.normalizeStoredParameter("kickInfusion", "vivid"), "vivid");
-  assert.equal(model.normalizeStoredParameter("kickInfusion", "intense"), "intense");
-  assert.equal(model.normalizeStoredParameter("kickInfusion", "invalid"), "off");
-  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", 2.5), 2.5);
-  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", 10), 5.0);
-  assert.equal(model.normalizeStoredParameter("kickInfusionStrength", "invalid"), 1.0);
-
-  // 3. Model not ready returns false
-  assert.equal(model.triggerKickInfusion(1.0, 1000), false);
-
-  // 4. Setup mock runtime and ready state
   const disturbances = [];
   model._runtime = {
     disturb: (x, y, r, mode, opts) => {
       disturbances.push({ x, y, r, mode, ...opts });
     },
   };
-  model._currentPatternId = "test";
   model._needsRuntime = false;
   model._loadingPattern = false;
   model.lastError = null;
-  assert.equal(model.ready, true);
-  model._clockRunning = true;
-  model._parameters.growthSpeed = 30;
 
-  // 5. When kickInfusion is off, returns false
-  model._parameters.kickInfusion = "off";
-  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
-  assert.equal(disturbances.length, 0);
-
-  // 6. When paused (clock not running or growthSpeed 0), returns false with zero backlog
-  model._parameters.kickInfusion = "subtle";
-  model._clockRunning = false;
-  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
-  model._clockRunning = true;
-  model._parameters.growthSpeed = 0;
-  assert.equal(model.triggerKickInfusion(0.8, 1000), false);
-  assert.equal(disturbances.length, 0);
-
-  // 7. Successful subtle injection targeting hidden channels only
-  model._parameters.growthSpeed = 30;
-  const initialSeed = model.parameters.seed;
-  assert.equal(model.triggerKickInfusion(0.7, 1000), true);
-  assert.equal(disturbances.length, 1);
-  assert.equal(disturbances[0].mode, "kick_hidden_perturb");
-  assert.equal(disturbances[0].r, 12);
-  assert.ok(disturbances[0].strength >= 0.7 && disturbances[0].strength <= 0.8);
-  assert.equal(disturbances[0].lockBarrier, true);
-  // Seed must remain unchanged
-  assert.equal(model.parameters.seed, initialSeed);
-
-  // 8. Refractory lockout (< 180 ms) rejects subsequent kick
-  assert.equal(model.triggerKickInfusion(0.9, 1100), false);
-  assert.equal(disturbances.length, 1);
-
-  // 9. Leaky bucket bounds (rapid triggers after 180ms lockout)
-  assert.equal(model.triggerKickInfusion(0.7, 1200), true);
-  assert.equal(disturbances.length, 2);
-  assert.equal(model.triggerKickInfusion(0.7, 1400), true);
-  assert.equal(disturbances.length, 3);
-  assert.equal(model.triggerKickInfusion(0.7, 1600), true);
-  assert.equal(disturbances.length, 4);
-  assert.equal(model.triggerKickInfusion(0.7, 1800), true);
-  assert.equal(disturbances.length, 5);
-  // Budget exhausted at 2000 (budget >= 3.0)
-  assert.equal(model.triggerKickInfusion(0.7, 2000), false);
-  assert.equal(disturbances.length, 5);
-
-  // 10. Dynamic mode with intense kick (> 0.85) dispatches satellite patch
-  model._parameters.kickInfusion = "dynamic";
-  // Advance time to clear leaky bucket budget
-  assert.equal(model.triggerKickInfusion(0.95, 5000), true);
-  // Dynamic with norm > 0.85 injects 2 patches: primary + satellite
-  assert.equal(disturbances.length, 7);
-  const primary = disturbances[5];
-  const satellite = disturbances[6];
-  assert.equal(primary.mode, "kick_hidden_perturb");
-  assert.equal(satellite.mode, "kick_hidden_perturb");
-  assert.equal(primary.r, 16);
-  assert.ok(satellite.r < primary.r);
-
-  // 11. Intense mode with strength multiplier scales amplitude and radius
-  model._parameters.kickInfusion = "intense";
-  model._parameters.kickInfusionStrength = 2.0;
-  assert.equal(model.triggerKickInfusion(0.9, 8000), true);
-  // Intense with norm > 0.85 injects 3 patches (primary + 2 satellites)
-  assert.equal(disturbances.length, 10);
-  const intensePatch = disturbances[7];
-  assert.equal(intensePatch.r, 24);
-  assert.ok(intensePatch.strength > 3.0);
-
-  // 12. Infuse brush mode allows manual pointer injection of hidden channels
-  model.queueDisturbance(64, 64, 20, "infuse");
+  // 1. Infuse brush queuing and draining
+  model.queueDisturbance(64, 64, 16, "infuse");
   assert.equal(model._drainDisturbances(), true);
-  assert.equal(disturbances.length, 11);
-  const brushPatch = disturbances[10];
-  assert.equal(brushPatch.x, 64);
-  assert.equal(brushPatch.y, 64);
-  assert.equal(brushPatch.mode, "infuse");
-  assert.equal(brushPatch.strength, 2.4);
+  assert.equal(disturbances.length, 1);
+  assert.equal(disturbances[0].mode, "infuse");
+  assert.equal(disturbances[0].strength, 1.2);
 
-  // 13. Cancel resets rate limiter state and stops clock
-  model.cancel();
-  assert.equal(model._lastKickInfusionTime, 0);
-  assert.equal(model._kickInfusionBudget, 0);
-  assert.equal(model._kickInfusionIndex, 0);
-  assert.equal(model._clockRunning, false);
+  // 2. Prune brush queuing and draining
+  model.queueDisturbance(80, 90, 20, "prune");
+  assert.equal(model._drainDisturbances(), true);
+  assert.equal(disturbances.length, 2);
+  assert.equal(disturbances[1].mode, "prune");
+  assert.equal(disturbances[1].strength, 0.85);
+
+  // 3. Removed automatic kick infusion and prune controls
+  assert.equal(model.controls.find((c) => c.key === "kickInfusion"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusionStrength"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "quietPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickPruning"), undefined);
 });
 
-test("quiet detail pruning and kick pruning relax hidden channels toward equilibrium", () => {
+test("resonance controls support modulation matrix routing and parameter bounds", () => {
   const model = new NeuralGrowthModel();
 
-  // 1. Controls declaration and options
-  const quietCtrl = model.controls.find((c) => c.key === "quietPruning");
-  assert.ok(quietCtrl);
-  assert.equal(quietCtrl.default, "off");
+  for (const key of ["resonanceDrift", "resonanceFeedback", "resonanceNoise", "resonanceWarp"]) {
+    const ctrl = model.controls.find((c) => c.key === key);
+    assert.ok(ctrl, `Control ${key} must exist`);
+    assert.equal(ctrl.type, "range");
+    assert.notEqual(ctrl.modulation, false, `${key} must support modulation`);
+  }
 
-  const kickPruneCtrl = model.controls.find((c) => c.key === "kickPruning");
-  assert.ok(kickPruneCtrl);
-  assert.equal(kickPruneCtrl.default, "off");
+  // Bounds checks
+  const driftCtrl = model.controls.find((c) => c.key === "resonanceDrift");
+  assert.equal(driftCtrl.min, -0.1);
+  assert.equal(driftCtrl.max, 0.1);
 
-  const pruneBrush = model.controls
-    .find((c) => c.key === "disturbanceMode")
-    .options.find((o) => o.value === "prune");
-  assert.ok(pruneBrush);
-  assert.equal(pruneBrush.tag, "relax");
+  const feedbackCtrl = model.controls.find((c) => c.key === "resonanceFeedback");
+  assert.equal(feedbackCtrl.min, 0.0);
+  assert.equal(feedbackCtrl.max, 0.8);
 
-  // 2. Setup mock runtime and ready state
-  const disturbances = [];
-  model._runtime = {
-    disturb: (x, y, r, mode, opts) => {
-      disturbances.push({ x, y, r, mode, ...opts });
-    },
-  };
-  model._currentPatternId = "test";
-  model._needsRuntime = false;
-  model._loadingPattern = false;
-  model.lastError = null;
-  assert.equal(model.ready, true);
-  model._clockRunning = true;
-  model._parameters.growthSpeed = 30;
+  const noiseCtrl = model.controls.find((c) => c.key === "resonanceNoise");
+  assert.equal(noiseCtrl.min, 0.0);
+  assert.equal(noiseCtrl.max, 0.3);
 
-  // 3. Paused or speed 0 prevents prune
-  model._clockRunning = false;
-  assert.equal(model.triggerKickPrune(1.0, 1000), false);
-  model._clockRunning = true;
-  model._parameters.growthSpeed = 0;
-  assert.equal(model.triggerKickPrune(1.0, 1000), false);
-  assert.equal(disturbances.length, 0);
-
-  // 4. Successful prune call
-  model._parameters.growthSpeed = 45;
-  assert.equal(model.triggerKickPrune(0.8, 1000), true);
-  assert.equal(disturbances.length, 1);
-  const p1 = disturbances[0];
-  assert.equal(p1.mode, "kick_hidden_prune");
-  assert.equal(p1.r, 18);
-  assert.ok(p1.strength >= 0.8 && p1.strength <= 1.0);
-  assert.equal(p1.lockBarrier, true);
-
-  // 5. Refractory lockout (< 180 ms)
-  assert.equal(model.triggerKickPrune(0.8, 1100), false);
-  assert.equal(disturbances.length, 1);
-
-  // 6. Custom coordinates support (e.g. pointer tap)
-  assert.equal(model.triggerKickPrune(1.0, 1300, { x: 50, y: 70 }), true);
-  assert.equal(disturbances.length, 2);
-  const p2 = disturbances[1];
-  assert.equal(p2.x, 50);
-  assert.equal(p2.y, 70);
-  assert.equal(p2.mode, "kick_hidden_prune");
-
-  // 7. Manual prune brush in disturbance queue
-  model.queueDisturbance(100, 120, 16, "prune");
-  assert.equal(model._drainDisturbances(), true);
-  assert.equal(disturbances.length, 3);
-  const p3 = disturbances[2];
-  assert.equal(p3.x, 100);
-  assert.equal(p3.y, 120);
-  assert.equal(p3.mode, "prune");
-  assert.equal(p3.strength, 0.85);
-
-  // 8. Cancel resets prune state
-  model.cancel();
-  assert.equal(model._lastKickPruneTime, 0);
-  assert.equal(model._kickPruneBudget, 0);
-  assert.equal(model._kickPruneIndex, 0);
+  const warpCtrl = model.controls.find((c) => c.key === "resonanceWarp");
+  assert.equal(warpCtrl.min, 0.0);
+  assert.equal(warpCtrl.max, 1.0);
 });
 
 test("brushRadius bounds and normalizes dynamically across simulation grid sizes", () => {
@@ -1327,7 +1154,7 @@ test("RESONANCE_PRESETS are defined and within valid configuration bounds", () =
   assert.ok(RESONANCE_PRESETS.off);
   assert.equal(RESONANCE_PRESETS.off.enabled, false);
 
-  for (const key of ["drift", "feedback", "mutation", "crystal"]) {
+  for (const key of ["subtle", "full"]) {
     const preset = RESONANCE_PRESETS[key];
     assert.ok(preset, `Preset ${key} must exist`);
     assert.equal(preset.enabled, true);
@@ -1349,7 +1176,8 @@ test("NeuralGrowthModel integrates perturbation resonance controls and forwards 
   assert.equal(modeControl.default, "off");
 
   // Normalization
-  assert.equal(model.normalizeStoredParameter("resonanceMode", "drift"), "drift");
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "full"), "full");
   assert.equal(model.normalizeStoredParameter("resonanceMode", "invalid"), "off");
   assert.equal(model.normalizeStoredParameter("resonanceDrift", 0.05), 0.05);
   assert.equal(model.normalizeStoredParameter("resonanceFeedback", 0.5), 0.5);
@@ -1357,15 +1185,21 @@ test("NeuralGrowthModel integrates perturbation resonance controls and forwards 
   assert.equal(model.normalizeStoredParameter("resonanceWarp", 0.7), 0.7);
 
   // parameterDefaultsForChange maps preset values
-  const driftDefaults = model.parameterDefaultsForChange("resonanceMode", "drift");
-  assert.ok(driftDefaults);
-  assert.equal(driftDefaults.resonanceDrift, 0.025);
-  assert.equal(driftDefaults.resonanceFeedback, 0.10);
+  const subtleDefaults = model.parameterDefaultsForChange("resonanceMode", "subtle");
+  assert.ok(subtleDefaults);
+  assert.equal(subtleDefaults.resonanceDrift, 0.01);
+  assert.equal(subtleDefaults.resonanceFeedback, 0.20);
+
+  const fullDefaults = model.parameterDefaultsForChange("resonanceMode", "full");
+  assert.ok(fullDefaults);
+  assert.equal(fullDefaults.resonanceDrift, 0.03);
+  assert.equal(fullDefaults.resonanceFeedback, 0.45);
+  assert.equal(fullDefaults.resonanceWarp, 0.25);
 
   // Switching preset via onParameterChange updates slider values
-  model.onParameterChange("resonanceMode", "crystal");
-  assert.equal(model.parameters.resonanceMode, "crystal");
-  assert.equal(model.parameters.resonanceWarp, 0.35);
+  model.onParameterChange("resonanceMode", "full");
+  assert.equal(model.parameters.resonanceMode, "full");
+  assert.equal(model.parameters.resonanceWarp, 0.25);
 
   // Modifying slider shifts mode to custom
   model.onParameterChange("resonanceDrift", 0.08);

@@ -85,6 +85,7 @@ export function createGrowthController({
     const textureCount = PATTERNS.filter((p) => p.category === "texture").length;
     const inceptionCount = PATTERNS.filter((p) => p.category === "inception").length;
     const organicCount = PATTERNS.filter((p) => p.category === "organic").length;
+    const testingCount = PATTERNS.filter((p) => p.category === "testing").length;
 
     const allBtn = elements.growthGalleryTabs.querySelector('[data-filter="all"]');
     if (allBtn) allBtn.textContent = `All (${allCount})`;
@@ -97,6 +98,9 @@ export function createGrowthController({
 
     const orgBtn = elements.growthGalleryTabs.querySelector('[data-filter="organic"]');
     if (orgBtn) orgBtn.textContent = `Originals (${organicCount})`;
+
+    const testingBtn = elements.growthGalleryTabs.querySelector('[data-filter="testing"]');
+    if (testingBtn) testingBtn.textContent = `Testing / WIP (${testingCount})`;
   }
 
   function addRecent(patternId) {
@@ -129,6 +133,7 @@ export function createGrowthController({
       if (currentTab === "texture" && pattern.category !== "texture") return false;
       if (currentTab === "inception" && pattern.category !== "inception") return false;
       if (currentTab === "organic" && pattern.category !== "organic") return false;
+      if (currentTab === "testing" && pattern.category !== "testing") return false;
       if (currentTab === "favorites" && !favorites.has(pattern.id)) return false;
       if (q) {
         const matchName = pattern.name.toLowerCase().includes(q);
@@ -319,7 +324,9 @@ export function createGrowthController({
           ? "Texture"
           : pattern.category === "inception"
             ? "Inception"
-            : "Original";
+            : pattern.category === "testing"
+              ? "Testing / WIP"
+              : "Original";
 
       card.append(thumbWrapper, nameEl, idEl, badge);
 
@@ -768,21 +775,10 @@ export function createGrowthController({
       event.preventDefault();
       clearBarriersAction();
     }
-    if (event.key === "j" || event.key === "J") {
-      event.preventDefault();
-      const model = activeModel();
-      if (model?.ready && typeof model.triggerKickPrune === "function") {
-        const coords = lastCoord ? { ...lastCoord } : null;
-        model.triggerKickPrune(1.0, performance.now(), coords);
-        if (!model.isClockRunning) schedulePausedRender();
-      }
-    }
   });
 
   let lastBeatTime = 0;
   let beatArmed = true;
-  let kickCounter = 0;
-  let lastQuietPruneTime = 0;
 
   function onAudioFrame(levels, timestamp) {
     const model = activeModel();
@@ -794,54 +790,12 @@ export function createGrowthController({
     }
     if (!levels.hasSignal) return;
 
-    // Quiet breakdown relaxation
-    const quietPruning = model.parameters?.quietPruning || "off";
-    if (quietPruning === "on") {
-      const activity = Number(levels.activity ?? 0);
-      const kick = Number(levels.kick ?? 0);
-      const isQuiet = activity < 0.28 && kick < 0.25 && triggerKick < 0.25;
-      const quietElapsed = timestamp - lastQuietPruneTime;
-      const sinceLastBeat = timestamp - lastBeatTime;
-      if (isQuiet && sinceLastBeat >= 450 && quietElapsed >= 500) {
-        lastQuietPruneTime = timestamp;
-        if (typeof model.triggerKickPrune === "function") {
-          model.triggerKickPrune(0.5, timestamp);
-          if (!model.isClockRunning) schedulePausedRender();
-        }
-      }
-    }
-
     const elapsed = timestamp - lastBeatTime;
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
-      kickCounter += 1;
-      const kickInfusion = model.parameters?.kickInfusion || "off";
-      const kickPruning = model.parameters?.kickPruning || "off";
       const shockwave = model.parameters?.beatShockwave ?? "on";
       let triggered = false;
-
-      // Kick detail behavior
-      if (kickPruning === "on" && kickInfusion === "off") {
-        if (typeof model.triggerKickPrune === "function") {
-          triggered = model.triggerKickPrune(triggerKick, timestamp) || triggered;
-        }
-      } else if (kickPruning === "on" && kickInfusion !== "off") {
-        // Interleaved kick pruning: 1 in 4 kicks prunes, others infuse
-        if (kickCounter % 4 === 0) {
-          if (typeof model.triggerKickPrune === "function") {
-            triggered = model.triggerKickPrune(triggerKick, timestamp) || triggered;
-          }
-        } else {
-          if (typeof model.triggerKickInfusion === "function") {
-            triggered = model.triggerKickInfusion(triggerKick, timestamp) || triggered;
-          }
-        }
-      } else if (kickInfusion !== "off") {
-        if (typeof model.triggerKickInfusion === "function") {
-          triggered = model.triggerKickInfusion(triggerKick, timestamp) || triggered;
-        }
-      }
 
       if (shockwave !== "off") {
         if (typeof model.triggerBeatShockwave === "function") {

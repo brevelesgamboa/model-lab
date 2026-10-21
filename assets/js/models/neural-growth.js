@@ -82,9 +82,6 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
-    this._lastKickInfusionTime = 0;
-    this._kickInfusionBudget = 0;
-    this._kickInfusionIndex = 0;
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
@@ -316,36 +313,22 @@ export class NeuralGrowthModel {
             guidance: "Standard inference loop without perturbation.",
           },
           {
-            value: "drift",
-            label: "Drift · Phase Gradient",
+            value: "subtle",
+            label: "Subtle · Organic Drift",
             compute: "balanced",
             tag: "drift",
-            guidance: "Continuous angular phase drift driving directional cellular migration.",
+            guidance: "Gentle phase drift, light latent memory, and micro-noise to breathe organic life into patterns.",
           },
           {
-            value: "feedback",
-            label: "Feedback · Latent Memory",
-            compute: "balanced",
-            tag: "momentum",
-            guidance: "Temporal blending on internal channels creating trailing memory ripples.",
-          },
-          {
-            value: "mutation",
-            label: "Mutation · Stochastic Drift",
+            value: "full",
+            label: "Full · Dynamic Resonance",
             compute: "moderate",
-            tag: "stochastic",
-            guidance: "Bounded Gaussian perturbation of hidden states to test self-healing resilience.",
-          },
-          {
-            value: "crystal",
-            label: "Crystal · Harmonic Warp",
-            compute: "moderate",
-            tag: "crystal",
-            guidance: "Periodic sine activation warping inducing geometric and crystalline lattice convergence.",
+            tag: "resonance",
+            guidance: "Dynamic phase drift, rich temporal momentum, harmonic activation warping, and bounded mutation.",
           },
           {
             value: "custom",
-            label: "Custom · Tunable",
+            label: "Custom · User Defined",
             compute: "moderate",
             tag: "custom",
             guidance: "User-defined dynamic drift, latent feedback, noise, and warp parameters.",
@@ -361,7 +344,6 @@ export class NeuralGrowthModel {
         max: 0.1,
         step: 0.005,
         default: 0.0,
-        modulation: false,
         help: "Dynamic angular drift rate injected into perception filter kernels across spatial gradients.",
       },
       {
@@ -370,9 +352,8 @@ export class NeuralGrowthModel {
         type: "range",
         min: 0.0,
         max: 0.8,
-        step: 0.05,
+        step: 0.02,
         default: 0.0,
-        modulation: false,
         help: "Temporal momentum and blending weight applied to non-RGB hidden channels (channels 4-11).",
       },
       {
@@ -381,9 +362,8 @@ export class NeuralGrowthModel {
         type: "range",
         min: 0.0,
         max: 0.3,
-        step: 0.01,
+        step: 0.005,
         default: 0.0,
-        modulation: false,
         help: "Bounded pseudo-random perturbation strength targeted strictly at hidden channels to test resilience.",
       },
       {
@@ -392,9 +372,8 @@ export class NeuralGrowthModel {
         type: "range",
         min: 0.0,
         max: 1.0,
-        step: 0.05,
+        step: 0.02,
         default: 0.0,
-        modulation: false,
         help: "Periodic harmonic sine blend in update activations to alter symmetry and palette convergence.",
       },
       {
@@ -410,81 +389,6 @@ export class NeuralGrowthModel {
           { value: "custom", label: "Custom" },
         ],
         help: "Audio-reactive presets configuring base parameters, modulation routes, and LFOs. Fully editable in parameter MOD panels.",
-      },
-      {
-        key: "kickInfusion",
-        label: "KICK DETAIL INFUSION",
-        type: "select",
-        default: "off",
-        options: [
-          { value: "off", label: "Off" },
-          { value: "subtle", label: "Subtle" },
-          { value: "dynamic", label: "Dynamic" },
-          { value: "vivid", label: "Vivid" },
-          { value: "intense", label: "Intense" },
-        ],
-        help: "Audio kick-driven detail infusion into hidden channels without shockwaves or harsh surface color splashes.",
-      },
-      {
-        key: "kickInfusionStrength",
-        label: "INFUSION STRENGTH",
-        type: "range",
-        min: 0.2,
-        max: 4.0,
-        step: 0.1,
-        default: 1.0,
-        help: "Amplitude multiplier for kick detail infusion into hidden channels.",
-        getGuidance: (value) => {
-          const v = Number(value) || 1.0;
-          if (v <= 0.6) {
-            return {
-              compute: "neutral",
-              tag: "whisper",
-              text: "Subtle amplitude. Gradual texture evolution across beats.",
-            };
-          }
-          if (v <= 1.4) {
-            return {
-              compute: "balanced",
-              tag: "recommended",
-              text: "Recommended (1.0). Natural organic detail that weaves into growth.",
-            };
-          }
-          if (v <= 2.5) {
-            return {
-              compute: "light",
-              tag: "pronounced",
-              text: "Pronounced variation. Clear cellular blooms emerging from kicks.",
-            };
-          }
-          return {
-            compute: "moderate",
-            tag: "intense",
-            text: "High intensity. Rapid morphological transformation on every beat.",
-          };
-        },
-      },
-      {
-        key: "quietPruning",
-        label: "QUIET PRUNING",
-        type: "select",
-        default: "off",
-        options: [
-          { value: "off", label: "Off" },
-          { value: "on", label: "On" },
-        ],
-        help: "Gently relaxes hidden-channel entropy during quiet passages and breakdowns to prevent texture saturation.",
-      },
-      {
-        key: "kickPruning",
-        label: "KICK PRUNING",
-        type: "select",
-        default: "off",
-        options: [
-          { value: "off", label: "Off" },
-          { value: "on", label: "On" },
-        ],
-        help: "Interleaves gentle detail pruning on strong audio kicks to keep textures dynamic and balanced.",
       },
       {
         key: "beatShockwave",
@@ -820,12 +724,6 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
-    this._lastKickInfusionTime = 0;
-    this._kickInfusionBudget = 0;
-    this._kickInfusionIndex = 0;
-    this._lastKickPruneTime = 0;
-    this._kickPruneBudget = 0;
-    this._kickPruneIndex = 0;
     this.setClockRunning(false);
   }
 
@@ -870,15 +768,26 @@ export class NeuralGrowthModel {
       return new ResonanceConfig({ enabled: false });
     }
     const preset = RESONANCE_PRESETS[mode];
-    if (preset && mode !== "custom") {
-      return new ResonanceConfig(preset);
-    }
+    const drift = this._parameters?.resonanceDrift !== undefined
+      ? Number(this._parameters.resonanceDrift)
+      : (preset?.perceptionDrift ?? 0.0);
+    const feedback = this._parameters?.resonanceFeedback !== undefined
+      ? Number(this._parameters.resonanceFeedback)
+      : (preset?.latentFeedback ?? 0.0);
+    const noise = this._parameters?.resonanceNoise !== undefined
+      ? Number(this._parameters.resonanceNoise)
+      : (preset?.noiseStrength ?? 0.0);
+    const warp = this._parameters?.resonanceWarp !== undefined
+      ? Number(this._parameters.resonanceWarp)
+      : (preset?.activationWarp ?? 0.0);
+
     return new ResonanceConfig({
       enabled: true,
-      perceptionDrift: Number(this._parameters?.resonanceDrift) || 0.0,
-      latentFeedback: Number(this._parameters?.resonanceFeedback) || 0.0,
-      noiseStrength: Number(this._parameters?.resonanceNoise) || 0.0,
-      activationWarp: Number(this._parameters?.resonanceWarp) || 0.0,
+      perceptionDrift: drift,
+      latentFeedback: feedback,
+      latentDecay: preset?.latentDecay ?? 0.98,
+      noiseStrength: noise,
+      activationWarp: warp,
     });
   }
 
@@ -898,32 +807,6 @@ export class NeuralGrowthModel {
         return Math.max(0.0, Math.min(1.0, num));
       }
       return 0.30;
-    }
-    if (key === "kickInfusion") {
-      if (
-        value === "dynamic" ||
-        value === "subtle" ||
-        value === "vivid" ||
-        value === "intense"
-      ) {
-        return value;
-      }
-      return "off";
-    }
-    if (key === "kickInfusionStrength") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.1, Math.min(5.0, num));
-      }
-      return 1.0;
-    }
-    if (key === "quietPruning") {
-      if (value === "on") return "on";
-      return "off";
-    }
-    if (key === "kickPruning") {
-      if (value === "on") return "on";
-      return "off";
     }
     if (key === "channelView") {
       const valid = [
@@ -968,7 +851,7 @@ export class NeuralGrowthModel {
       return Math.max(4, Math.min(Math.min(256, maxSize), Math.round(num)));
     }
     if (key === "resonanceMode") {
-      const valid = ["off", "drift", "feedback", "mutation", "crystal", "custom"];
+      const valid = ["off", "subtle", "full", "custom"];
       if (valid.includes(value)) return value;
       return "off";
     }
@@ -1013,10 +896,6 @@ export class NeuralGrowthModel {
       key === "audioProfile" ||
       key === "beatShockwave" ||
       key === "shockwaveIntensity" ||
-      key === "kickInfusion" ||
-      key === "kickInfusionStrength" ||
-      key === "quietPruning" ||
-      key === "kickPruning" ||
       key === "channelView" ||
       key === "displayFilter" ||
       key === "brushRadius" ||
@@ -1311,12 +1190,6 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
-    this._lastKickInfusionTime = 0;
-    this._kickInfusionBudget = 0;
-    this._kickInfusionIndex = 0;
-    this._lastKickPruneTime = 0;
-    this._kickPruneBudget = 0;
-    this._kickPruneIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -1401,8 +1274,7 @@ export class NeuralGrowthModel {
             opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
             opts.strength = 1.0;
           } else if (mode === "infuse") {
-            const mult = Number(this._parameters?.kickInfusionStrength) || 1.0;
-            opts.strength = 1.2 * mult;
+            opts.strength = 1.2;
           } else if (mode === "prune") {
             opts.strength = 0.85;
           }
@@ -1574,178 +1446,6 @@ export class NeuralGrowthModel {
       });
     }
 
-    return true;
-  }
-
-  triggerKickInfusion(strength = 1.0, timestamp = null) {
-    if (!this.ready) return false;
-    const infusion = this._parameters?.kickInfusion || "off";
-    if (infusion === "off") return false;
-    if (!this._clockRunning || !this._parameters?.growthSpeed) return false;
-
-    const now = typeof timestamp === "number" ? timestamp : performance.now();
-    const elapsed = now - (this._lastKickInfusionTime || 0);
-
-    // Refractory lockout: at least 180 ms between kick detail infusions
-    if (elapsed < 180) return false;
-
-    // Leaky bucket cumulative rate limiter: max 3 injections per second
-    const drain = (elapsed / 1000) * 2.0;
-    this._kickInfusionBudget = Math.max(0, (this._kickInfusionBudget || 0) - drain);
-    if (this._kickInfusionBudget >= 3.0) return false;
-    this._kickInfusionBudget += 1.0;
-    this._lastKickInfusionTime = now;
-
-    // Strength and radius scaling by infusion preset level
-    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
-    let baseStrength = 0.60 + norm * 0.20;
-    let modeRadius = 12;
-
-    if (infusion === "intense") {
-      baseStrength = 1.40 + norm * 0.60;
-      modeRadius = 24;
-    } else if (infusion === "vivid") {
-      baseStrength = 1.10 + norm * 0.45;
-      modeRadius = 20;
-    } else if (infusion === "dynamic") {
-      baseStrength = 0.80 + norm * 0.35;
-      modeRadius = 16;
-    }
-
-    const mult = Number(this._parameters?.kickInfusionStrength) || 1.0;
-    const injectStrength = baseStrength * mult;
-
-    // Deterministic low-discrepancy spatial distribution across field
-    this._kickInfusionIndex = (this._kickInfusionIndex || 0) + 1;
-    const idx = this._kickInfusionIndex;
-    const phi1 = 0.618033988749895;
-    const phi2 = 0.414213562373095;
-    const rFrac = Math.sqrt((idx * phi1) % 1.0);
-    const theta = 2 * Math.PI * ((idx * phi2) % 1.0);
-    const size = this.simulationSize;
-    const center = size / 2;
-    const maxR = size * 0.35;
-    const targetX = Math.max(
-      12,
-      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
-    );
-    const targetY = Math.max(
-      12,
-      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
-    );
-
-    const patchRadius = Math.max(6, Math.round(modeRadius * (size / 256)));
-    const lockBarrier = (this._parameters?.barrierLock || "mask") === "mask";
-    const disturbMode = "kick_hidden_perturb";
-
-    this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
-      lockBarrier,
-      strength: injectStrength,
-    });
-
-    if (
-      (infusion === "dynamic" || infusion === "vivid" || infusion === "intense") &&
-      norm > 0.85
-    ) {
-      const satTheta = theta + Math.PI + 0.35;
-      const satR = maxR * 0.5 * rFrac;
-      const satX = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + satR * Math.cos(satTheta))),
-      );
-      const satY = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + satR * Math.sin(satTheta))),
-      );
-      const satRadius = Math.max(4, Math.round(patchRadius * 0.65));
-      this._runtime.disturb(satX, satY, satRadius, disturbMode, {
-        lockBarrier,
-        strength: injectStrength * 0.75,
-      });
-
-      if (infusion === "intense") {
-        const satTheta2 = theta - Math.PI * 0.5;
-        const satR2 = maxR * 0.7 * rFrac;
-        const satX2 = Math.max(
-          12,
-          Math.min(size - 13, Math.round(center + satR2 * Math.cos(satTheta2))),
-        );
-        const satY2 = Math.max(
-          12,
-          Math.min(size - 13, Math.round(center + satR2 * Math.sin(satTheta2))),
-        );
-        this._runtime.disturb(
-          satX2,
-          satY2,
-          Math.max(4, Math.round(patchRadius * 0.5)),
-          disturbMode,
-          {
-            lockBarrier,
-            strength: injectStrength * 0.6,
-          },
-        );
-      }
-    }
-
-    return true;
-  }
-
-  triggerKickPrune(strength = 1.0, timestamp = null, coords = null) {
-    if (!this.ready) return false;
-    if (!this._clockRunning || !this._parameters?.growthSpeed) return false;
-
-    const now = typeof timestamp === "number" ? timestamp : performance.now();
-    const elapsed = now - (this._lastKickPruneTime || 0);
-
-    // Refractory lockout: at least 180 ms between prune calls
-    if (elapsed < 180) return false;
-
-    // Leaky bucket cumulative rate limiter: max 3 per second
-    const drain = (elapsed / 1000) * 2.0;
-    this._kickPruneBudget = Math.max(0, (this._kickPruneBudget || 0) - drain);
-    if (this._kickPruneBudget >= 3.0) return false;
-    this._kickPruneBudget += 1.0;
-    this._lastKickPruneTime = now;
-
-    const size = this.simulationSize;
-    let targetX;
-    let targetY;
-
-    if (
-      coords &&
-      Number.isFinite(coords.x) &&
-      Number.isFinite(coords.y)
-    ) {
-      targetX = Math.max(12, Math.min(size - 13, Math.round(coords.x)));
-      targetY = Math.max(12, Math.min(size - 13, Math.round(coords.y)));
-    } else {
-      this._kickPruneIndex = (this._kickPruneIndex || 0) + 1;
-      const idx = this._kickPruneIndex;
-      const phi1 = 0.618033988749895;
-      const phi2 = 0.414213562373095;
-      const rFrac = Math.sqrt(((idx * phi1) + 0.382) % 1.0);
-      const theta = 2 * Math.PI * (((idx * phi2) + 0.618) % 1.0);
-      const center = size / 2;
-      const maxR = size * 0.35;
-      targetX = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
-      );
-      targetY = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
-      );
-    }
-
-    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
-    const patchRadius = Math.max(8, Math.round(18 * (size / 256)));
-    const injectStrength = 0.65 + norm * 0.35;
-    const lockBarrier = (this._parameters?.barrierLock || "mask") === "mask";
-
-    this._runtime.disturb(targetX, targetY, patchRadius, "kick_hidden_prune", {
-      lockBarrier,
-      strength: injectStrength,
-    });
     return true;
   }
 
