@@ -94,6 +94,14 @@ void main() {
       float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
       vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
       transTheta = atan(flow.y, flow.x) + u_twist + effectiveAngle;
+    } else if (u_transform == 5) {
+      float waveFreq = 6.2831853;
+      float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + effectiveAngle;
+      float waveOffset = sin(wavePhase) * (0.85 + abs(u_twist) * 0.5);
+      transTheta = effectiveAngle + waveOffset + u_twist;
+    } else if (u_transform == 6) {
+      float saddleAngle = atan(-pos.y, pos.x);
+      transTheta = saddleAngle + u_twist + effectiveAngle;
     }
     float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
     float activeStrength = clamp(u_geometryStrength * edgeFalloff, 0.0, 1.0);
@@ -1008,7 +1016,11 @@ export class TextureNcaRuntime {
             ? 3
             : this.coordinateTransform === "dipole"
               ? 4
-              : 0;
+              : this.coordinateTransform === "wave"
+                ? 5
+                : this.coordinateTransform === "saddle"
+                  ? 6
+                  : 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
         Math.floor(this.layout.random() * this.size),

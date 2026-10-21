@@ -232,6 +232,20 @@ export class NeuralGrowthModel {
             guidance: "Concentric circular warp. Keeps cells revolving in smooth rings.",
           },
           {
+            value: "wave",
+            label: "Wave · Flowing Ribbons",
+            compute: "balanced",
+            tag: "undulating",
+            guidance: "Sinusoidal vector field. Shapes cells into smoothly bending ribbons and flowing bands.",
+          },
+          {
+            value: "saddle",
+            label: "Saddle · Branching Streams",
+            compute: "moderate",
+            tag: "hyperbolic",
+            guidance: "Hyperbolic vector field with pinched center, crossing streams, and 4-way branching arms.",
+          },
+          {
             value: "julia",
             label: "Julia · Complex Fractal",
             compute: "moderate",
@@ -246,7 +260,7 @@ export class NeuralGrowthModel {
             guidance: "Dual vortex field with opposing poles generating swirling cellular streams.",
           },
         ],
-        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, or Julia fractal dendrites.",
+        help: "Transforms local perception vector fields: concentric rings, logarithmic spirals, sinusoidal waves, hyperbolic saddles, or Julia fractal dendrites.",
       },
       {
         key: "twist",
@@ -268,6 +282,36 @@ export class NeuralGrowthModel {
               compute: "neutral",
               tag: "inactive",
               text: "Twist has no effect in Cartesian geometry. Switch to Spiral or Vortex.",
+            };
+          }
+          if (transform === "wave") {
+            const t = Math.abs(Number(value) || 0);
+            if (t <= 5) {
+              return {
+                compute: "neutral",
+                tag: "horizontal",
+                text: "Parallel undulating bands with pure sinusoidal curvature.",
+              };
+            }
+            return {
+              compute: "gentle",
+              tag: "skewed wave",
+              text: "Diagonal wave propagation with sheared ribbon curvature.",
+            };
+          }
+          if (transform === "saddle") {
+            const t = Math.abs(Number(value) || 0);
+            if (t <= 5) {
+              return {
+                compute: "neutral",
+                tag: "orthogonal",
+                text: "Orthogonal hyperbolic axes with 4 symmetrical branching arms.",
+              };
+            }
+            return {
+              compute: "moderate",
+              tag: "spiral saddle",
+              text: "Rotated hyperbolic arms with asymmetrical spiral shear.",
             };
           }
           const t = Math.abs(Number(value) || 0);
@@ -908,6 +952,8 @@ export class NeuralGrowthModel {
       if (value === "spiral") return { twist: 35 };
       if (
         value === "vortex" ||
+        value === "wave" ||
+        value === "saddle" ||
         value === "julia" ||
         value === "dipole" ||
         value === "cartesian"
@@ -1016,6 +1062,19 @@ export class NeuralGrowthModel {
         (this._runtime?.size || this._parameters?.simulationSize || 256) / 2,
       );
       return Math.max(4, Math.min(Math.min(256, maxSize), Math.round(num)));
+    }
+    if (key === "coordinateTransform") {
+      const valid = [
+        "cartesian",
+        "spiral",
+        "vortex",
+        "wave",
+        "saddle",
+        "julia",
+        "dipole",
+      ];
+      if (valid.includes(value)) return value;
+      return "cartesian";
     }
     if (key === "resonanceMode") {
       const valid = ["off", "subtle", "full", "custom"];

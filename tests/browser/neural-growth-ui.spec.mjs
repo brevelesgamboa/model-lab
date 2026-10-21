@@ -700,6 +700,22 @@ test("coordinate geometry selector switches modes, updates smart pitch defaults,
     "4",
   );
 
+  // Switch to wave
+  await geometrySelect.selectOption("wave");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "5",
+  );
+
+  // Switch to saddle
+  await geometrySelect.selectOption("saddle");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "6",
+  );
+
   // Context is healthy with 0 errors
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),

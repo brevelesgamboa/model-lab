@@ -175,9 +175,24 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   const model = new NeuralGrowthModel();
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "spiral"), { twist: 35 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "wave"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "saddle"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "wave"), "wave");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "saddle"), "saddle");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "unknown"), "cartesian");
+
+  // Twist guidance for wave and saddle
+  const twistCtrl = model.controls.find((c) => c.key === "twist");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "wave" }).tag, "horizontal");
+  assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "wave" }).tag, "skewed wave");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "saddle" }).tag, "orthogonal");
+  assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "saddle" }).tag, "spiral saddle");
+
   assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
 
   const { model: runModel, params, canvas, runtimes } = setup(context);
