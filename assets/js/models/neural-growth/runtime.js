@@ -44,6 +44,10 @@ uniform float u_perceptionPhase;
 uniform int u_topology;
 uniform int u_transform;
 uniform float u_twist;
+uniform float u_geometryStrength;
+uniform float u_geometryCenterX;
+uniform float u_geometryCenterY;
+uniform float u_geometrySoftness;
 const int SX[9] = int[9](-1, 0, 1, -2, 0, 2, -1, 0, 1);
 const int SY[9] = int[9](-1, -2, -1, 0, 0, 0, 1, 2, 1);
 const int LP[9] = int[9](1, 2, 1, 2, -12, 2, 1, 2, 1);
@@ -65,29 +69,41 @@ void main() {
   }
   float effectiveAngle = u_angle + u_perceptionPhase;
   float theta = effectiveAngle;
-  if (u_transform != 0) {
-    vec2 center = vec2(float(u_size) * 0.5);
-    vec2 pos = (vec2(xy) + 0.5 - center) / (float(u_size) * 0.5);
+  if (u_transform != 0 && u_geometryStrength > 0.0001) {
+    vec2 centerOffset = vec2(u_geometryCenterX, u_geometryCenterY);
+    vec2 pos = ((vec2(xy) + 0.5) / (float(u_size) * 0.5) - 1.0) - centerOffset;
+    float r = length(pos);
+    float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
     float phi = atan(pos.y, pos.x);
+    float transTheta = effectiveAngle;
     if (u_transform == 1) {
-      theta = phi + 1.5707963 + u_twist + effectiveAngle;
+      transTheta = phi + 1.5707963 + u_twist + effectiveAngle;
     } else if (u_transform == 2) {
-      float r = max(length(pos), 0.01);
-      theta = phi + 1.5707963 + log(r) * tan(u_twist) + effectiveAngle;
+      transTheta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(u_twist) + effectiveAngle;
     } else if (u_transform == 3) {
       vec2 z = pos * 1.25;
       vec2 c = vec2(-0.8, 0.156);
       for (int i = 0; i < 5; i++) {
         z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
       }
-      theta = atan(z.y, z.x) + u_twist + effectiveAngle;
+      transTheta = atan(z.y, z.x) + u_twist + effectiveAngle;
     } else if (u_transform == 4) {
       vec2 p1 = pos - vec2(-0.45, 0.0);
       vec2 p2 = pos - vec2(0.45, 0.0);
-      float d1 = dot(p1, p1) + 0.01;
-      float d2 = dot(p2, p2) + 0.01;
+      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
+      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
       vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
-      theta = atan(flow.y, flow.x) + u_twist + effectiveAngle;
+      transTheta = atan(flow.y, flow.x) + u_twist + effectiveAngle;
+    }
+    float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
+    float activeStrength = clamp(u_geometryStrength * edgeFalloff, 0.0, 1.0);
+    vec2 vBase = vec2(cos(effectiveAngle), sin(effectiveAngle));
+    vec2 vTrans = vec2(cos(transTheta), sin(transTheta));
+    vec2 vBlend = mix(vBase, vTrans, activeStrength);
+    if (length(vBlend) > 0.0001) {
+      theta = atan(vBlend.y, vBlend.x);
+    } else {
+      theta = transTheta;
     }
   }
   vec4 orient = texelFetch(u_orientation, xy, 0);
@@ -772,6 +788,10 @@ export class TextureNcaRuntime {
       this.topology = "square";
       this.coordinateTransform = "cartesian";
       this.twist = 0;
+      this.geometryStrength = 1.0;
+      this.geometryCenterX = 0.0;
+      this.geometryCenterY = 0.0;
+      this.geometrySoftness = 0.25;
       this.resonance = null;
       this.restart(seed);
       if (gl.getError() !== gl.NO_ERROR)
@@ -945,6 +965,10 @@ export class TextureNcaRuntime {
       topology = this.topology,
       coordinateTransform = this.coordinateTransform,
       twist = this.twist,
+      geometryStrength = this.geometryStrength,
+      geometryCenterX = this.geometryCenterX,
+      geometryCenterY = this.geometryCenterY,
+      geometrySoftness = this.geometrySoftness,
       resonance = this.resonance,
     } = {},
   ) {
@@ -953,6 +977,18 @@ export class TextureNcaRuntime {
     this.topology = topology === "hexagonal" ? "hexagonal" : "square";
     this.coordinateTransform = coordinateTransform || "cartesian";
     this.twist = Number(twist) || 0;
+    this.geometryStrength = Number.isFinite(Number(geometryStrength))
+      ? Math.max(0.0, Math.min(1.0, Number(geometryStrength)))
+      : 1.0;
+    this.geometryCenterX = Number.isFinite(Number(geometryCenterX))
+      ? Math.max(-1.0, Math.min(1.0, Number(geometryCenterX)))
+      : 0.0;
+    this.geometryCenterY = Number.isFinite(Number(geometryCenterY))
+      ? Math.max(-1.0, Math.min(1.0, Number(geometryCenterY)))
+      : 0.0;
+    this.geometrySoftness = Number.isFinite(Number(geometrySoftness))
+      ? Math.max(0.0, Math.min(1.0, Number(geometrySoftness)))
+      : 0.25;
     if (resonance !== undefined) {
       this.resonance =
         resonance instanceof ResonanceConfig
@@ -994,6 +1030,10 @@ export class TextureNcaRuntime {
           u_topology: this.topology === "hexagonal" ? 1 : 0,
           u_transform: transformCode,
           u_twist: this.twist,
+          u_geometryStrength: this.geometryStrength,
+          u_geometryCenterX: this.geometryCenterX,
+          u_geometryCenterY: this.geometryCenterY,
+          u_geometrySoftness: this.geometrySoftness,
         },
       );
       this.run(

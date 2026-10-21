@@ -181,12 +181,29 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
 
   const { model: runModel, params, canvas, runtimes } = setup(context);
-  await runModel.render(canvas, { ...params, coordinateTransform: "julia", twist: 30, rotation: 90 }, 0);
+  await runModel.render(
+    canvas,
+    {
+      ...params,
+      coordinateTransform: "julia",
+      twist: 30,
+      rotation: 90,
+      geometryStrength: 0.8,
+      geometryCenterX: 0.25,
+      geometryCenterY: -0.15,
+      geometrySoftness: 0.4,
+    },
+    0,
+  );
   runModel.step();
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].lastStepOptions.coordinateTransform, "julia");
   assert.ok(Math.abs(runtimes[0].lastStepOptions.twist - (30 * Math.PI) / 180) < 1e-6);
   assert.ok(Math.abs(runtimes[0].lastStepOptions.rotation - (90 * Math.PI) / 180) < 1e-6);
+  assert.equal(runtimes[0].lastStepOptions.geometryStrength, 0.8);
+  assert.equal(runtimes[0].lastStepOptions.geometryCenterX, 0.25);
+  assert.equal(runtimes[0].lastStepOptions.geometryCenterY, -0.15);
+  assert.equal(runtimes[0].lastStepOptions.geometrySoftness, 0.4);
 });
 
 test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {
@@ -1232,6 +1249,105 @@ test("NeuralGrowthModel integrates perturbation resonance controls and forwards 
   model.onParameterChange("resonanceMode", "off");
   const offConfig = model._getResonanceConfig();
   assert.equal(offConfig.enabled, false);
+});
+
+test("NeuralGrowthModel integrates coordinate geometry controls (strength, center, softness)", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const strengthCtrl = controls.find((c) => c.key === "geometryStrength");
+  assert.ok(strengthCtrl);
+  assert.equal(strengthCtrl.default, 1.0);
+  assert.equal(strengthCtrl.min, 0);
+  assert.equal(strengthCtrl.max, 1);
+
+  const centerXCtrl = controls.find((c) => c.key === "geometryCenterX");
+  assert.ok(centerXCtrl);
+  assert.equal(centerXCtrl.default, 0);
+  assert.equal(centerXCtrl.min, -1);
+  assert.equal(centerXCtrl.max, 1);
+
+  const centerYCtrl = controls.find((c) => c.key === "geometryCenterY");
+  assert.ok(centerYCtrl);
+  assert.equal(centerYCtrl.default, 0);
+
+  const softnessCtrl = controls.find((c) => c.key === "geometrySoftness");
+  assert.ok(softnessCtrl);
+  assert.equal(softnessCtrl.default, 0.25);
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("geometryStrength", 0.5), 0.5);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", 2.5), 1.0);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", "invalid"), 1.0);
+
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", -0.75), -0.75);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", 2.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", -2.0), -1.0);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", "invalid"), 0.0);
+
+  assert.equal(model.normalizeStoredParameter("geometryCenterY", 0.35), 0.35);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", 0.8), 0.8);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", -0.1), 0.0);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", "invalid"), 0.25);
+
+  // Guidance checks
+  assert.equal(
+    strengthCtrl.getGuidance(0.5, { coordinateTransform: "cartesian" }).tag,
+    "inactive",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.02, { coordinateTransform: "vortex" }).tag,
+    "subtle",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.3, { coordinateTransform: "vortex" }).tag,
+    "balanced",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.7, { coordinateTransform: "vortex" }).tag,
+    "orbital",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.95, { coordinateTransform: "vortex" }).tag,
+    "full warp",
+  );
+
+  assert.equal(
+    centerXCtrl.getGuidance(0.0, { coordinateTransform: "spiral" }).tag,
+    "centered",
+  );
+  assert.equal(
+    centerXCtrl.getGuidance(0.5, { coordinateTransform: "spiral" }).tag,
+    "right",
+  );
+  assert.equal(
+    centerXCtrl.getGuidance(-0.5, { coordinateTransform: "spiral" }).tag,
+    "left",
+  );
+
+  assert.equal(
+    softnessCtrl.getGuidance(0.02, { coordinateTransform: "dipole" }).tag,
+    "sharp",
+  );
+  assert.equal(
+    softnessCtrl.getGuidance(0.3, { coordinateTransform: "dipole" }).tag,
+    "regularized",
+  );
+  assert.equal(
+    softnessCtrl.getGuidance(0.7, { coordinateTransform: "dipole" }).tag,
+    "feathered",
+  );
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("geometryStrength", 0.7), true);
+  assert.equal(model.parameters.geometryStrength, 0.7);
+  assert.equal(model.onParameterChange("geometryCenterX", 0.3), true);
+  assert.equal(model.parameters.geometryCenterX, 0.3);
+  assert.equal(model.onParameterChange("geometryCenterY", -0.4), true);
+  assert.equal(model.parameters.geometryCenterY, -0.4);
+  assert.equal(model.onParameterChange("geometrySoftness", 0.5), true);
+  assert.equal(model.parameters.geometrySoftness, 0.5);
 });
 
 

@@ -300,6 +300,173 @@ export class NeuralGrowthModel {
         },
       },
       {
+        key: "geometryStrength",
+        label: "GEOMETRY STRENGTH",
+        type: "range",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        default: 1.0,
+        format: "percent",
+        help: "Blends between standard Cartesian baseline (0%) and curvilinear transform (100%).",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          if (transform === "cartesian") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Geometry strength has no effect in Cartesian geometry.",
+            };
+          }
+          const v = Number(value) || 0;
+          if (v <= 0.05) {
+            return {
+              compute: "neutral",
+              tag: "subtle",
+              text: "Cartesian baseline. Texture maintains standard grid equilibrium.",
+            };
+          }
+          if (v <= 0.45) {
+            return {
+              compute: "gentle",
+              tag: "balanced",
+              text: "Gentle directional bias. Safe for delicate and high-frequency textures.",
+            };
+          }
+          if (v <= 0.85) {
+            return {
+              compute: "balanced",
+              tag: "orbital",
+              text: "Rich curvilinear swirl while preserving structural pattern fidelity.",
+            };
+          }
+          return {
+            compute: "moderate",
+            tag: "full warp",
+            text: "Full curvilinear transformation. Dominant rotational field.",
+          };
+        },
+      },
+      {
+        key: "geometryCenterX",
+        label: "CENTER X",
+        type: "range",
+        min: -1,
+        max: 1,
+        step: 0.02,
+        default: 0,
+        help: "Horizontal offset of the geometry focal center (-1 = left, +1 = right).",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          if (transform === "cartesian") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Center offset has no effect in Cartesian geometry.",
+            };
+          }
+          const v = Number(value) || 0;
+          if (Math.abs(v) <= 0.05) {
+            return {
+              compute: "neutral",
+              tag: "centered",
+              text: "Focal center aligned at horizontal midpoint.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: v < 0 ? "left" : "right",
+            text: `Offset ${Math.round(v * 100)}% from center.`,
+          };
+        },
+      },
+      {
+        key: "geometryCenterY",
+        label: "CENTER Y",
+        type: "range",
+        min: -1,
+        max: 1,
+        step: 0.02,
+        default: 0,
+        help: "Vertical offset of the geometry focal center (-1 = bottom, +1 = top).",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          if (transform === "cartesian") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Center offset has no effect in Cartesian geometry.",
+            };
+          }
+          const v = Number(value) || 0;
+          if (Math.abs(v) <= 0.05) {
+            return {
+              compute: "neutral",
+              tag: "centered",
+              text: "Focal center aligned at vertical midpoint.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: v < 0 ? "bottom" : "top",
+            text: `Offset ${Math.round(v * 100)}% from center.`,
+          };
+        },
+      },
+      {
+        key: "geometrySoftness",
+        label: "FIELD SOFTNESS",
+        type: "range",
+        min: 0,
+        max: 1,
+        step: 0.02,
+        default: 0.25,
+        format: "percent",
+        help: "Regularizes the center singularity and feathers edge falloff to prevent pattern tearing.",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          if (transform === "cartesian") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Field softness has no effect in Cartesian geometry.",
+            };
+          }
+          const v = Number(value) || 0;
+          if (v <= 0.05) {
+            return {
+              compute: "moderate",
+              tag: "sharp",
+              text: "Sharp singularity. May cause center shearing on sensitive textures.",
+            };
+          }
+          if (v <= 0.45) {
+            return {
+              compute: "neutral",
+              tag: "regularized",
+              text: "Smooth regularized core. Prevents center pinch while maintaining rotation.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: "feathered",
+            text: "Feathered edge falloff. Smoothly transitions into undisturbed borders.",
+          };
+        },
+      },
+      {
         key: "resonanceMode",
         label: "RESONANCE MODE",
         type: "select",
@@ -883,6 +1050,34 @@ export class NeuralGrowthModel {
       }
       return 0.0;
     }
+    if (key === "geometryStrength") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 1.0;
+    }
+    if (key === "geometryCenterX") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(-1.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
+    if (key === "geometryCenterY") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(-1.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
+    if (key === "geometrySoftness") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.25;
+    }
     return value;
   }
 
@@ -892,6 +1087,10 @@ export class NeuralGrowthModel {
     }
     if (
       key === "coordinateTransform" ||
+      key === "geometryStrength" ||
+      key === "geometryCenterX" ||
+      key === "geometryCenterY" ||
+      key === "geometrySoftness" ||
       key === "barrierLock" ||
       key === "audioProfile" ||
       key === "beatShockwave" ||
@@ -1087,6 +1286,10 @@ export class NeuralGrowthModel {
               topology: parameters.topology,
               coordinateTransform: parameters.coordinateTransform,
               twist: twistRad,
+              geometryStrength: parameters.geometryStrength,
+              geometryCenterX: parameters.geometryCenterX,
+              geometryCenterY: parameters.geometryCenterY,
+              geometrySoftness: parameters.geometrySoftness,
               resonance: this._getResonanceConfig(),
             });
           }
@@ -1171,6 +1374,10 @@ export class NeuralGrowthModel {
         topology: this._parameters.topology,
         coordinateTransform: this._parameters.coordinateTransform,
         twist: twistRad,
+        geometryStrength: this._parameters.geometryStrength,
+        geometryCenterX: this._parameters.geometryCenterX,
+        geometryCenterY: this._parameters.geometryCenterY,
+        geometrySoftness: this._parameters.geometrySoftness,
         resonance: this._getResonanceConfig(),
       }),
     );

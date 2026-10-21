@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(8);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(12);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
