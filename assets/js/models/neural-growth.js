@@ -9,6 +9,10 @@ import {
   getPattern,
 } from "./neural-growth/patterns.js";
 import { AUDIO_PROFILES } from "./neural-growth/audio-profiles.js";
+import {
+  ResonanceConfig,
+  RESONANCE_PRESETS,
+} from "./neural-growth/resonance-config.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -297,6 +301,101 @@ export class NeuralGrowthModel {
             text: "High angular shear near limits. May distort fine texture features.",
           };
         },
+      },
+      {
+        key: "resonanceMode",
+        label: "RESONANCE MODE",
+        type: "select",
+        default: "off",
+        options: [
+          {
+            value: "off",
+            label: "Off · Baseline",
+            compute: "neutral",
+            tag: "baseline",
+            guidance: "Standard inference loop without perturbation.",
+          },
+          {
+            value: "drift",
+            label: "Drift · Phase Gradient",
+            compute: "balanced",
+            tag: "drift",
+            guidance: "Continuous angular phase drift driving directional cellular migration.",
+          },
+          {
+            value: "feedback",
+            label: "Feedback · Latent Memory",
+            compute: "balanced",
+            tag: "momentum",
+            guidance: "Temporal blending on internal channels creating trailing memory ripples.",
+          },
+          {
+            value: "mutation",
+            label: "Mutation · Stochastic Drift",
+            compute: "moderate",
+            tag: "stochastic",
+            guidance: "Bounded Gaussian perturbation of hidden states to test self-healing resilience.",
+          },
+          {
+            value: "crystal",
+            label: "Crystal · Harmonic Warp",
+            compute: "moderate",
+            tag: "crystal",
+            guidance: "Periodic sine activation warping inducing geometric and crystalline lattice convergence.",
+          },
+          {
+            value: "custom",
+            label: "Custom · Tunable",
+            compute: "moderate",
+            tag: "custom",
+            guidance: "User-defined dynamic drift, latent feedback, noise, and warp parameters.",
+          },
+        ],
+        help: "Non-linear resonance and perturbation modes modulating perception, latent feedback, noise, and activation warping.",
+      },
+      {
+        key: "resonanceDrift",
+        label: "PERCEPTION DRIFT",
+        type: "range",
+        min: -0.1,
+        max: 0.1,
+        step: 0.005,
+        default: 0.0,
+        modulation: false,
+        help: "Dynamic angular drift rate injected into perception filter kernels across spatial gradients.",
+      },
+      {
+        key: "resonanceFeedback",
+        label: "LATENT FEEDBACK",
+        type: "range",
+        min: 0.0,
+        max: 0.8,
+        step: 0.05,
+        default: 0.0,
+        modulation: false,
+        help: "Temporal momentum and blending weight applied to non-RGB hidden channels (channels 4-11).",
+      },
+      {
+        key: "resonanceNoise",
+        label: "STOCHASTIC NOISE",
+        type: "range",
+        min: 0.0,
+        max: 0.3,
+        step: 0.01,
+        default: 0.0,
+        modulation: false,
+        help: "Bounded pseudo-random perturbation strength targeted strictly at hidden channels to test resilience.",
+      },
+      {
+        key: "resonanceWarp",
+        label: "ACTIVATION WARP",
+        type: "range",
+        min: 0.0,
+        max: 1.0,
+        step: 0.05,
+        default: 0.0,
+        modulation: false,
+        help: "Periodic harmonic sine blend in update activations to alter symmetry and palette convergence.",
       },
       {
         key: "audioProfile",
@@ -751,7 +850,36 @@ export class NeuralGrowthModel {
         return { twist: 0 };
       }
     }
+    if (key === "resonanceMode") {
+      const preset = RESONANCE_PRESETS[value];
+      if (preset && value !== "custom") {
+        return {
+          resonanceDrift: preset.perceptionDrift ?? 0.0,
+          resonanceFeedback: preset.latentFeedback ?? 0.0,
+          resonanceNoise: preset.noiseStrength ?? 0.0,
+          resonanceWarp: preset.activationWarp ?? 0.0,
+        };
+      }
+    }
     return null;
+  }
+
+  _getResonanceConfig() {
+    const mode = this._parameters?.resonanceMode || "off";
+    if (mode === "off") {
+      return new ResonanceConfig({ enabled: false });
+    }
+    const preset = RESONANCE_PRESETS[mode];
+    if (preset && mode !== "custom") {
+      return new ResonanceConfig(preset);
+    }
+    return new ResonanceConfig({
+      enabled: true,
+      perceptionDrift: Number(this._parameters?.resonanceDrift) || 0.0,
+      latentFeedback: Number(this._parameters?.resonanceFeedback) || 0.0,
+      noiseStrength: Number(this._parameters?.resonanceNoise) || 0.0,
+      activationWarp: Number(this._parameters?.resonanceWarp) || 0.0,
+    });
   }
 
   normalizeStoredParameter(key, value) {
@@ -839,6 +967,39 @@ export class NeuralGrowthModel {
       );
       return Math.max(4, Math.min(Math.min(256, maxSize), Math.round(num)));
     }
+    if (key === "resonanceMode") {
+      const valid = ["off", "drift", "feedback", "mutation", "crystal", "custom"];
+      if (valid.includes(value)) return value;
+      return "off";
+    }
+    if (key === "resonanceDrift") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(-0.2, Math.min(0.2, num));
+      }
+      return 0.0;
+    }
+    if (key === "resonanceFeedback") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(0.95, num));
+      }
+      return 0.0;
+    }
+    if (key === "resonanceNoise") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(0.5, num));
+      }
+      return 0.0;
+    }
+    if (key === "resonanceWarp") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
     return value;
   }
 
@@ -858,9 +1019,36 @@ export class NeuralGrowthModel {
       key === "kickPruning" ||
       key === "channelView" ||
       key === "displayFilter" ||
-      key === "brushRadius"
-    )
+      key === "brushRadius" ||
+      key === "resonanceMode" ||
+      key === "resonanceDrift" ||
+      key === "resonanceFeedback" ||
+      key === "resonanceNoise" ||
+      key === "resonanceWarp"
+    ) {
+      if (key === "resonanceMode") {
+        const preset = RESONANCE_PRESETS[value];
+        if (preset && value !== "off" && value !== "custom") {
+          this._parameters.resonanceDrift = preset.perceptionDrift ?? 0.0;
+          this._parameters.resonanceFeedback = preset.latentFeedback ?? 0.0;
+          this._parameters.resonanceNoise = preset.noiseStrength ?? 0.0;
+          this._parameters.resonanceWarp = preset.activationWarp ?? 0.0;
+        }
+      } else if (
+        key === "resonanceDrift" ||
+        key === "resonanceFeedback" ||
+        key === "resonanceNoise" ||
+        key === "resonanceWarp"
+      ) {
+        if (
+          this._parameters.resonanceMode !== "off" &&
+          this._parameters.resonanceMode !== "custom"
+        ) {
+          this._parameters.resonanceMode = "custom";
+        }
+      }
       return true;
+    }
     if (key !== "pattern" || value === this._requestedPattern) return false;
     getPattern(value);
     this._requestedPattern = value;
@@ -1020,6 +1208,7 @@ export class NeuralGrowthModel {
               topology: parameters.topology,
               coordinateTransform: parameters.coordinateTransform,
               twist: twistRad,
+              resonance: this._getResonanceConfig(),
             });
           }
           this._accumulator -= count;
@@ -1103,6 +1292,7 @@ export class NeuralGrowthModel {
         topology: this._parameters.topology,
         coordinateTransform: this._parameters.coordinateTransform,
         twist: twistRad,
+        resonance: this._getResonanceConfig(),
       }),
     );
     this._lastTick = null;

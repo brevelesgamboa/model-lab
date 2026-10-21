@@ -15,6 +15,10 @@ import {
 import {
   detectAudioProfile,
 } from "../../assets/js/models/neural-growth/audio-profiles.js";
+import {
+  ResonanceConfig,
+  RESONANCE_PRESETS,
+} from "../../assets/js/models/neural-growth/resonance-config.js";
 
 const checkpoint = JSON.parse(
   await readFile(
@@ -1260,6 +1264,140 @@ test("brushRadius bounds and normalizes dynamically across simulation grid sizes
   // onParameterChange updates brushRadius without restarting
   assert.equal(model.onParameterChange("brushRadius", 64), true);
   assert.equal(model.parameters.brushRadius, 64);
+});
+
+test("ResonanceConfig validates bounds and generates step uniforms", () => {
+  const defaultConfig = new ResonanceConfig();
+  assert.equal(defaultConfig.enabled, false);
+  assert.equal(defaultConfig.perceptionDrift, 0.0);
+  assert.equal(defaultConfig.latentFeedback, 0.0);
+  assert.equal(defaultConfig.latentDecay, 1.0);
+  assert.equal(defaultConfig.noiseStrength, 0.0);
+  assert.equal(defaultConfig.activationWarp, 0.0);
+
+  // Disabled config returns zeroed/neutral uniforms
+  const disabledUniforms = defaultConfig.toUniforms(150);
+  assert.equal(disabledUniforms.perceptionPhase, 0.0);
+  assert.equal(disabledUniforms.latentFeedback, 0.0);
+  assert.equal(disabledUniforms.latentDecay, 1.0);
+  assert.equal(disabledUniforms.noiseStrength, 0.0);
+  assert.equal(disabledUniforms.activationWarp, 0.0);
+  assert.equal(disabledUniforms.stepSeed, 0);
+
+  // Clamping of extreme values
+  const clampedConfig = new ResonanceConfig({
+    enabled: true,
+    perceptionDrift: 0.99,
+    latentFeedback: 1.5,
+    latentDecay: 0.1,
+    noiseStrength: 0.99,
+    activationWarp: 2.0,
+    warpFrequency: 50.0,
+  });
+  assert.equal(clampedConfig.perceptionDrift, 0.2);
+  assert.equal(clampedConfig.latentFeedback, 0.95);
+  assert.equal(clampedConfig.latentDecay, 0.5);
+  assert.equal(clampedConfig.noiseStrength, 0.5);
+  assert.equal(clampedConfig.activationWarp, 1.0);
+  assert.equal(clampedConfig.warpFrequency, 12.0);
+
+  // Active uniform computation with dynamic drift and step seeds
+  const activeConfig = new ResonanceConfig({
+    enabled: true,
+    perceptionDrift: 0.01,
+    perceptionPhase: 0.1,
+    latentFeedback: 0.25,
+    latentDecay: 0.98,
+    noiseStrength: 0.04,
+    activationWarp: 0.3,
+  });
+  const u0 = activeConfig.toUniforms(0);
+  assert.equal(u0.perceptionPhase, 0.1);
+  assert.equal(u0.latentFeedback, 0.25);
+  assert.equal(u0.noiseStrength, 0.04);
+  assert.equal(u0.activationWarp, 0.3);
+  assert.equal(u0.stepSeed, 1013904223);
+
+  const u50 = activeConfig.toUniforms(50);
+  assert.ok(Math.abs(u50.perceptionPhase - (0.1 + 0.01 * 50)) < 1e-6);
+  assert.notEqual(u50.stepSeed, u0.stepSeed);
+});
+
+test("RESONANCE_PRESETS are defined and within valid configuration bounds", () => {
+  assert.ok(RESONANCE_PRESETS.off);
+  assert.equal(RESONANCE_PRESETS.off.enabled, false);
+
+  for (const key of ["drift", "feedback", "mutation", "crystal"]) {
+    const preset = RESONANCE_PRESETS[key];
+    assert.ok(preset, `Preset ${key} must exist`);
+    assert.equal(preset.enabled, true);
+    const config = new ResonanceConfig(preset);
+    assert.equal(config.enabled, true);
+    assert.ok(config.perceptionDrift >= -0.2 && config.perceptionDrift <= 0.2);
+    assert.ok(config.latentFeedback >= 0.0 && config.latentFeedback <= 0.95);
+    assert.ok(config.latentDecay >= 0.5 && config.latentDecay <= 1.0);
+    assert.ok(config.noiseStrength >= 0.0 && config.noiseStrength <= 0.5);
+    assert.ok(config.activationWarp >= 0.0 && config.activationWarp <= 1.0);
+  }
+});
+
+test("NeuralGrowthModel integrates perturbation resonance controls and forwards configuration to steps", async (t) => {
+  const { model, params, canvas, runtimes } = setup(t);
+
+  const modeControl = model.controls.find((c) => c.key === "resonanceMode");
+  assert.ok(modeControl);
+  assert.equal(modeControl.default, "off");
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "drift"), "drift");
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "invalid"), "off");
+  assert.equal(model.normalizeStoredParameter("resonanceDrift", 0.05), 0.05);
+  assert.equal(model.normalizeStoredParameter("resonanceFeedback", 0.5), 0.5);
+  assert.equal(model.normalizeStoredParameter("resonanceNoise", 0.1), 0.1);
+  assert.equal(model.normalizeStoredParameter("resonanceWarp", 0.7), 0.7);
+
+  // parameterDefaultsForChange maps preset values
+  const driftDefaults = model.parameterDefaultsForChange("resonanceMode", "drift");
+  assert.ok(driftDefaults);
+  assert.equal(driftDefaults.resonanceDrift, 0.025);
+  assert.equal(driftDefaults.resonanceFeedback, 0.10);
+
+  // Switching preset via onParameterChange updates slider values
+  model.onParameterChange("resonanceMode", "crystal");
+  assert.equal(model.parameters.resonanceMode, "crystal");
+  assert.equal(model.parameters.resonanceWarp, 0.35);
+
+  // Modifying slider shifts mode to custom
+  model.onParameterChange("resonanceDrift", 0.08);
+  assert.equal(model.parameters.resonanceMode, "custom");
+  assert.equal(model.parameters.resonanceDrift, 0.08);
+
+  // _getResonanceConfig produces valid ResonanceConfig
+  const customConfig = model._getResonanceConfig();
+  assert.ok(customConfig instanceof ResonanceConfig);
+  assert.equal(customConfig.enabled, true);
+  assert.equal(customConfig.perceptionDrift, 0.08);
+
+  // Initialize runtime via render
+  await model.render(canvas, params, 0);
+  const runtime = runtimes[0];
+  assert.ok(runtime);
+
+  // Manual step passes resonance configuration
+  model.step();
+  assert.ok(runtime.lastStepOptions);
+  assert.ok(runtime.lastStepOptions.resonance instanceof ResonanceConfig);
+
+  // Live simulation tick forwards resonance configuration
+  model.setClockRunning(true);
+  await model.render(canvas, { ...params, growthSpeed: 30 }, 0.0);
+  await model.render(canvas, { ...params, growthSpeed: 30 }, 0.04, { advanceSimulation: true });
+  assert.ok(runtime.lastStepOptions.resonance instanceof ResonanceConfig);
+
+  // Reset to off returns disabled config
+  model.onParameterChange("resonanceMode", "off");
+  const offConfig = model._getResonanceConfig();
+  assert.equal(offConfig.enabled, false);
 });
 
 

@@ -13,6 +13,7 @@ import {
   validateSize,
 } from "./reference.js";
 import { hexToRgb } from "../../core/utils.js";
+import { ResonanceConfig } from "./resonance-config.js";
 
 const VERTEX = `#version 300 es
 precision highp float;
@@ -39,6 +40,7 @@ uniform sampler2D u_shuffle;
 uniform sampler2D u_orientation;
 uniform ivec2 u_offset;
 uniform float u_angle;
+uniform float u_perceptionPhase;
 uniform int u_topology;
 uniform int u_transform;
 uniform float u_twist;
@@ -61,30 +63,31 @@ void main() {
     out_color = texelFetch(u_state, ivec2(xy.x + inputGroup * u_size, xy.y), 0);
     return;
   }
-  float theta = u_angle;
+  float effectiveAngle = u_angle + u_perceptionPhase;
+  float theta = effectiveAngle;
   if (u_transform != 0) {
     vec2 center = vec2(float(u_size) * 0.5);
     vec2 pos = (vec2(xy) + 0.5 - center) / (float(u_size) * 0.5);
     float phi = atan(pos.y, pos.x);
     if (u_transform == 1) {
-      theta = phi + 1.5707963 + u_twist + u_angle;
+      theta = phi + 1.5707963 + u_twist + effectiveAngle;
     } else if (u_transform == 2) {
       float r = max(length(pos), 0.01);
-      theta = phi + 1.5707963 + log(r) * tan(u_twist) + u_angle;
+      theta = phi + 1.5707963 + log(r) * tan(u_twist) + effectiveAngle;
     } else if (u_transform == 3) {
       vec2 z = pos * 1.25;
       vec2 c = vec2(-0.8, 0.156);
       for (int i = 0; i < 5; i++) {
         z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
       }
-      theta = atan(z.y, z.x) + u_twist + u_angle;
+      theta = atan(z.y, z.x) + u_twist + effectiveAngle;
     } else if (u_transform == 4) {
       vec2 p1 = pos - vec2(-0.45, 0.0);
       vec2 p2 = pos - vec2(0.45, 0.0);
       float d1 = dot(p1, p1) + 0.01;
       float d2 = dot(p2, p2) + 0.01;
       vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
-      theta = atan(flow.y, flow.x) + u_twist + u_angle;
+      theta = atan(flow.y, flow.x) + u_twist + effectiveAngle;
     }
   }
   vec4 orient = texelFetch(u_orientation, xy, 0);
@@ -150,6 +153,8 @@ function denseShader(inputs, hiddenInput, hiddenOutput) {
 uniform sampler2D u_input;
 uniform sampler2D u_weights;
 uniform float u_scale;
+uniform float u_activationWarp;
+uniform float u_warpFrequency;
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int halfSize = u_size / 2;
@@ -168,6 +173,10 @@ void main() {
   }
   result += texelFetch(u_weights, ivec2(outputGroup, ${inputs}), 0) - 127.0 / 255.0;
   result *= u_scale;
+  if (u_activationWarp > 0.0001) {
+    vec4 periodic = sin(result * u_warpFrequency);
+    result = mix(result, periodic, u_activationWarp);
+  }
   out_color = ${hiddenOutput ? "result / 2.0" : "encodeState(result)"};
 }`;
 }
@@ -178,6 +187,23 @@ uniform sampler2D u_delta;
 uniform sampler2D u_inverse;
 uniform sampler2D u_barrier;
 uniform ivec2 u_offset;
+uniform float u_latentFeedback;
+uniform float u_latentDecay;
+uniform float u_noiseStrength;
+uniform int u_stepSeed;
+
+vec4 hashNoise(ivec2 p, int group, int seed) {
+  uint h = uint(p.x * 374761393 + p.y * 668265263 + group * 381201580 + seed);
+  h = (h ^ (h >> 13u)) * 1274126177u;
+  uint h2 = h * 1597334673u + 3812015801u;
+  return vec4(
+    float(h & 0xffu) / 127.5 - 1.0,
+    float((h >> 8u) & 0xffu) / 127.5 - 1.0,
+    float((h >> 16u) & 0xffu) / 127.5 - 1.0,
+    float((h2 >> 8u) & 0xffu) / 127.5 - 1.0
+  );
+}
+
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int group = p.x / u_size;
@@ -197,7 +223,15 @@ void main() {
     int(round(inverse.g * 255.0)) + highY * 256
   );
   vec4 delta = decodeState(texelFetch(u_delta, ivec2(compressed.x + group * u_size, compressed.y), 0));
-  out_color = encodeState(decodeState(previous) + delta);
+  if (group > 0 && u_noiseStrength > 0.0001) {
+    delta += hashNoise(xy, group, u_stepSeed) * u_noiseStrength;
+  }
+  vec4 prevDecoded = decodeState(previous);
+  vec4 targetState = prevDecoded + delta;
+  if (group > 0 && u_latentFeedback > 0.0001) {
+    targetState = mix(targetState, prevDecoded * u_latentDecay, u_latentFeedback);
+  }
+  out_color = encodeState(clamp(targetState, -2.0, 2.0));
 }`;
 
 const BARRIER_PASS = `${PREFIX}
@@ -738,6 +772,7 @@ export class TextureNcaRuntime {
       this.topology = "square";
       this.coordinateTransform = "cartesian";
       this.twist = 0;
+      this.resonance = null;
       this.restart(seed);
       if (gl.getError() !== gl.NO_ERROR)
         throw new Error("WebGL initialization failed.");
@@ -849,6 +884,7 @@ export class TextureNcaRuntime {
           "u_rippleStyle",
           "u_channelView",
           "u_displayFilter",
+          "u_stepSeed",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -909,6 +945,7 @@ export class TextureNcaRuntime {
       topology = this.topology,
       coordinateTransform = this.coordinateTransform,
       twist = this.twist,
+      resonance = this.resonance,
     } = {},
   ) {
     this.assertActive();
@@ -916,6 +953,14 @@ export class TextureNcaRuntime {
     this.topology = topology === "hexagonal" ? "hexagonal" : "square";
     this.coordinateTransform = coordinateTransform || "cartesian";
     this.twist = Number(twist) || 0;
+    if (resonance !== undefined) {
+      this.resonance =
+        resonance instanceof ResonanceConfig
+          ? resonance
+          : resonance
+            ? new ResonanceConfig(resonance)
+            : null;
+    }
     if (!Number.isInteger(count) || count < 0 || count > 128)
       throw new RangeError("Step count must be between zero and 128.");
     const transformCode =
@@ -933,6 +978,7 @@ export class TextureNcaRuntime {
         Math.floor(this.layout.random() * this.size),
         Math.floor(this.layout.random() * this.size),
       ];
+      const resUniforms = this.resonance?.toUniforms(this.steps);
       this.run(
         "perception",
         this.perception,
@@ -944,6 +990,7 @@ export class TextureNcaRuntime {
         {
           u_offset: this.lastOffset,
           u_angle: this.rotation,
+          u_perceptionPhase: resUniforms?.perceptionPhase ?? 0.0,
           u_topology: this.topology === "hexagonal" ? 1 : 0,
           u_transform: transformCode,
           u_twist: this.twist,
@@ -953,13 +1000,21 @@ export class TextureNcaRuntime {
         "hidden",
         this.hidden,
         { u_input: this.perception, u_weights: this.weights[0] },
-        { u_scale: this.model.layers[0].scale },
+        {
+          u_scale: this.model.layers[0].scale,
+          u_activationWarp: resUniforms?.activationWarp ?? 0.0,
+          u_warpFrequency: resUniforms?.warpFrequency ?? 3.14159,
+        },
       );
       this.run(
         "delta",
         this.delta,
         { u_input: this.hidden, u_weights: this.weights[1] },
-        { u_scale: this.model.layers[1].scale },
+        {
+          u_scale: this.model.layers[1].scale,
+          u_activationWarp: resUniforms?.activationWarp ?? 0.0,
+          u_warpFrequency: resUniforms?.warpFrequency ?? 3.14159,
+        },
       );
       this.run(
         "update",
@@ -970,7 +1025,13 @@ export class TextureNcaRuntime {
           u_inverse: this.inverseTexture,
           u_barrier: this.barrier,
         },
-        { u_offset: this.lastOffset },
+        {
+          u_offset: this.lastOffset,
+          u_latentFeedback: resUniforms?.latentFeedback ?? 0.0,
+          u_latentDecay: resUniforms?.latentDecay ?? 1.0,
+          u_noiseStrength: resUniforms?.noiseStrength ?? 0.0,
+          u_stepSeed: resUniforms?.stepSeed ?? 0,
+        },
       );
       [this.state, this.nextState] = [this.nextState, this.state];
       this.steps += 1;
