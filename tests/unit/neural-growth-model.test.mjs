@@ -1482,5 +1482,90 @@ test("palette cycling with slow phase drift configures controls, normalizes valu
   );
 });
 
+test("temporal echoes configure controls, normalize values, and update dynamics", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const decayCtrl = controls.find((c) => c.key === "echoDecay");
+  assert.ok(decayCtrl);
+  assert.equal(decayCtrl.min, 0);
+  assert.equal(decayCtrl.max, 0.98);
+  assert.equal(decayCtrl.step, 0.02);
+  assert.equal(decayCtrl.default, 0.0);
+  assert.equal(decayCtrl.format, "percent");
+  assert.equal(decayCtrl.getGuidance(0).tag, "disabled");
+  assert.equal(decayCtrl.getGuidance(0.2).tag, "subtle wake");
+  assert.equal(decayCtrl.getGuidance(0.6).tag, "comet wake");
+  assert.equal(decayCtrl.getGuidance(0.9).tag, "phosphor dream");
+
+  const driftCtrl = controls.find((c) => c.key === "echoDrift");
+  assert.ok(driftCtrl);
+  assert.equal(driftCtrl.min, -1);
+  assert.equal(driftCtrl.max, 1);
+  assert.equal(driftCtrl.step, 0.05);
+  assert.equal(driftCtrl.default, 0.25);
+  assert.equal(driftCtrl.getGuidance(0).tag, "stationary");
+  assert.equal(driftCtrl.getGuidance(0.5).tag, "downstream");
+  assert.equal(driftCtrl.getGuidance(-0.5).tag, "counter-stream");
+
+  const modeCtrl = controls.find((c) => c.key === "echoMode");
+  assert.ok(modeCtrl);
+  assert.deepEqual(
+    modeCtrl.options.map((o) => o.value),
+    ["field_advection", "radial_bloom", "linear_drift"],
+  );
+
+  const styleCtrl = controls.find((c) => c.key === "echoStyle");
+  assert.ok(styleCtrl);
+  assert.deepEqual(
+    styleCtrl.options.map((o) => o.value),
+    ["phosphor", "mist"],
+  );
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("echoDecay", 0.7), 0.7);
+  assert.equal(model.normalizeStoredParameter("echoDecay", 1.5), 0.98);
+  assert.equal(model.normalizeStoredParameter("echoDecay", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("echoDecay", "invalid"), 0.0);
+
+  assert.equal(model.normalizeStoredParameter("echoDrift", 0.4), 0.4);
+  assert.equal(model.normalizeStoredParameter("echoDrift", 2.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("echoDrift", -2.0), -1.0);
+  assert.equal(model.normalizeStoredParameter("echoDrift", "invalid"), 0.25);
+
+  assert.equal(model.normalizeStoredParameter("echoMode", "radial_bloom"), "radial_bloom");
+  assert.equal(model.normalizeStoredParameter("echoMode", "linear_drift"), "linear_drift");
+  assert.equal(model.normalizeStoredParameter("echoMode", "invalid"), "field_advection");
+
+  assert.equal(model.normalizeStoredParameter("echoStyle", "mist"), "mist");
+  assert.equal(model.normalizeStoredParameter("echoStyle", "invalid"), "phosphor");
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("echoDecay", 0.8), true);
+  assert.equal(model.parameters.echoDecay, 0.8);
+  assert.equal(model.onParameterChange("echoDrift", -0.3), true);
+  assert.equal(model.parameters.echoDrift, -0.3);
+  assert.equal(model.onParameterChange("echoMode", "radial_bloom"), true);
+  assert.equal(model.parameters.echoMode, "radial_bloom");
+  assert.equal(model.onParameterChange("echoStyle", "mist"), true);
+  assert.equal(model.parameters.echoStyle, "mist");
+
+  // isDynamic activation via echoDecay
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      echoDecay: 0.5,
+    }),
+    true,
+  );
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      echoDecay: 0,
+    }),
+    false,
+  );
+});
+
 
 

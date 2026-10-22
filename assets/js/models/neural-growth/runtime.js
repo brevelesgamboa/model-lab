@@ -768,6 +768,142 @@ void main() {
   out_color = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }`;
 
+const ECHO_PASS = `${PREFIX}
+in vec2 v_uv;
+uniform sampler2D u_current;
+uniform sampler2D u_history;
+uniform float u_decay;
+uniform float u_drift;
+uniform int u_mode;
+uniform int u_style;
+uniform int u_transform;
+uniform float u_twist;
+uniform float u_angle;
+uniform float u_geometryStrength;
+uniform float u_geometryCenterX;
+uniform float u_geometryCenterY;
+uniform float u_geometrySoftness;
+
+void main() {
+  vec2 pos = (v_uv - 0.5 - vec2(u_geometryCenterX, u_geometryCenterY)) * 2.0;
+  float r = length(pos);
+  float phi = atan(pos.y, pos.x);
+
+  vec2 driftDir = vec2(cos(u_angle), sin(u_angle));
+  if (u_mode == 0) {
+    float theta = u_angle;
+    if (u_transform == 1) {
+      theta = phi + 1.5707963 + u_twist + u_angle;
+    } else if (u_transform == 2) {
+      float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
+      theta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(u_twist) + u_angle;
+    } else if (u_transform == 5) {
+      float waveFreq = 6.2831853;
+      float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + u_angle;
+      float waveOffset = sin(wavePhase) * (0.85 + abs(u_twist) * 0.5);
+      theta = u_angle + waveOffset + u_twist;
+    } else if (u_transform == 6) {
+      float saddleAngle = atan(-pos.y, pos.x);
+      theta = saddleAngle + u_twist + u_angle;
+    } else if (u_transform == 7) {
+      float folds = clamp(6.0 + round(u_twist * 3.8197), 3.0, 12.0);
+      float sectorAngle = 6.2831853 / folds;
+      float halfSector = sectorAngle * 0.5;
+      float phiNorm = mod(phi + 3.14159265, 6.2831853);
+      float inSector = mod(phiNorm, sectorAngle);
+      float folded = abs(inSector - halfSector);
+      float petalAngle = (phiNorm - inSector) + (folded < halfSector * 0.5 ? folded : (halfSector - folded)) * 2.0;
+      theta = petalAngle + 1.5707963 + u_angle;
+    } else if (u_transform == 8) {
+      float spacing = mix(0.25, 0.65, clamp(u_geometrySoftness * 1.5, 0.0, 1.0));
+      vec2 p1 = pos - vec2(-spacing, 0.0);
+      vec2 p2 = pos - vec2(spacing, 0.0);
+      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
+      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
+      float twistMag = abs(u_twist);
+      float w1 = 1.0;
+      float spinSign = u_twist < -0.01 ? -1.0 : 1.0;
+      float w2 = spinSign * max(0.2, 1.0 - twistMag * 0.45);
+      vec2 flow = vec2(-w1 * p1.y / d1 - w2 * p2.y / d2, w1 * p1.x / d1 + w2 * p2.x / d2);
+      theta = atan(flow.y, flow.x) + u_angle;
+    } else if (u_transform == 9) {
+      float cellScale = mix(2.2, 4.2, u_geometrySoftness);
+      vec2 gridCoord = pos * cellScale;
+      vec2 i_coord = floor(gridCoord);
+      vec2 f_coord = fract(gridCoord);
+      vec2 minDiff = vec2(0.0);
+      vec2 secondDiff = vec2(0.0);
+      float minDist = 10.0;
+      float secondMinDist = 10.0;
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 neighbor = vec2(float(x), float(y));
+          vec2 p = i_coord + neighbor;
+          vec2 seed = 0.5 + 0.38 * sin(vec2(
+            dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3))
+          ));
+          vec2 diff = neighbor + seed - f_coord;
+          float dist = dot(diff, diff);
+          if (dist < minDist) {
+            secondMinDist = minDist;
+            secondDiff = minDiff;
+            minDist = dist;
+            minDiff = diff;
+          } else if (dist < secondMinDist) {
+            secondMinDist = dist;
+            secondDiff = diff;
+          }
+        }
+      }
+      float d1 = sqrt(minDist);
+      float d2 = sqrt(secondMinDist);
+      float wallDist = max(0.0001, d2 - d1);
+      vec2 safeMinDiff = length(minDiff) < 0.0001 ? vec2(0.0001, 0.0) : minDiff;
+      float islandCircAngle = atan(safeMinDiff.y, safeMinDiff.x) + 1.5707963;
+      vec2 wallVec = vec2(-(secondDiff.y - minDiff.y), secondDiff.x - minDiff.x);
+      float wallAngle = atan(wallVec.y, wallVec.x);
+      float wallBaseWeight = smoothstep(mix(0.35, 0.6, u_geometrySoftness), 0.02, wallDist);
+      float wallWeight = clamp(wallBaseWeight * (1.0 - clamp(u_twist * 0.8, -0.6, 0.6)), 0.0, 1.0);
+      float radialBlend = clamp(u_twist * 0.7, -1.0, 1.0);
+      vec2 vIsland = vec2(cos(islandCircAngle), sin(islandCircAngle));
+      vec2 vWall = vec2(cos(wallAngle), sin(wallAngle));
+      vec2 vCell = mix(vIsland, vWall, wallWeight);
+      float baseAngle = length(vCell) > 0.0001 ? atan(vCell.y, vCell.x) : islandCircAngle;
+      theta = baseAngle + radialBlend * 1.5707963 + u_angle;
+    }
+    vec2 vBase = vec2(cos(u_angle), sin(u_angle));
+    vec2 vTrans = vec2(cos(theta), sin(theta));
+    vec2 vBlend = mix(vBase, vTrans, clamp(u_geometryStrength, 0.0, 1.0));
+    driftDir = length(vBlend) > 0.0001 ? normalize(vBlend) : vBase;
+  } else if (u_mode == 1) {
+    driftDir = r > 0.001 ? normalize(pos) : vec2(0.0);
+  } else {
+    driftDir = vec2(cos(u_angle), sin(u_angle));
+  }
+
+  float stepLen = u_drift * 0.006;
+  vec2 uv_r = fract(v_uv - driftDir * (stepLen * 1.05));
+  vec2 uv_g = fract(v_uv - driftDir * stepLen);
+  vec2 uv_b = fract(v_uv - driftDir * (stepLen * 0.95));
+
+  vec4 curr = texture(u_current, v_uv);
+  vec3 prevRgb = vec3(
+    texture(u_history, uv_r).r,
+    texture(u_history, uv_g).g,
+    texture(u_history, uv_b).b
+  );
+
+  vec3 blendedRgb = curr.rgb;
+  if (u_style == 0) {
+    blendedRgb = max(curr.rgb, prevRgb * u_decay);
+  } else {
+    blendedRgb = mix(prevRgb * u_decay, curr.rgb, max(0.05, 1.0 - u_decay));
+  }
+
+  out_color = vec4(clamp(blendedRgb, 0.0, 1.0), 1.0);
+}`;
+
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
   if (!shader) throw new Error("Could not allocate shader.");
@@ -873,11 +1009,15 @@ export class TextureNcaRuntime {
         barrier: BARRIER_PASS,
         orientation: ORIENTATION_PASS,
         visualize: VISUALIZE,
+        echo: ECHO_PASS,
       })) {
         const handle = link(gl, source);
         this.programs.push(handle);
         this.program[name] = { handle, locations: new Map() };
       }
+      this.echoTargets = null;
+      this.currentFrameTarget = null;
+      this.echoIndex = 0;
       this.state = this.allocate(size * 3, size, true);
       this.nextState = this.allocate(size * 3, size, true);
       this.perception = this.allocate(size * 6, size, true);
@@ -965,6 +1105,44 @@ export class TextureNcaRuntime {
     return { texture, framebuffer, width, height };
   }
 
+  allocateEchoTarget(width, height) {
+    const gl = this.gl;
+    const texture = gl.createTexture();
+    if (!texture) throw new Error("Could not allocate echo texture.");
+    this.textures.push(texture);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA8,
+      width,
+      height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      null,
+    );
+    const framebuffer = gl.createFramebuffer();
+    if (!framebuffer) throw new Error("Could not allocate echo framebuffer.");
+    this.framebuffers.push(framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      texture,
+      0,
+    );
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    this.textureBytes += width * height * 4;
+    return { texture, framebuffer, width, height };
+  }
+
   run(name, output, inputs = {}, uniforms = {}) {
     const gl = this.gl;
     const program = this.program[name];
@@ -1003,6 +1181,7 @@ export class TextureNcaRuntime {
           "u_palette",
           "u_topology",
           "u_mode",
+          "u_style",
           "u_transform",
           "u_barrierMode",
           "u_orientMode",
@@ -1027,6 +1206,14 @@ export class TextureNcaRuntime {
     this.layout = createSparseLayout(this.size, seed);
     this.lastOffset = [0, 0];
     const gl = this.gl;
+    if (this.echoTargets) {
+      for (const target of this.echoTargets) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
     for (const [buffer, data] of [
       [this.shuffleTexture, this.layout.shuffle],
       [this.inverseTexture, this.layout.inverse],
@@ -1355,7 +1542,18 @@ export class TextureNcaRuntime {
       shockwaveStyle = "refract",
       dyeColor = "#00f0ff",
       channelView = "phenotype",
+      echoDecay = 0.0,
+      echoDrift = 0.25,
+      echoMode = "field_advection",
+      echoStyle = "phosphor",
     } = options;
+
+    const decay = Math.max(0.0, Math.min(0.98, Number(echoDecay) || 0.0));
+    const drift = Math.max(-1.0, Math.min(1.0, Number(echoDrift) || 0.0));
+    const echoModes = { field_advection: 0, radial_bloom: 1, linear_drift: 2 };
+    const echoModeCode = echoModes[echoMode] ?? 0;
+    const echoStyles = { phosphor: 0, mist: 1 };
+    const echoStyleCode = echoStyles[echoStyle] ?? 0;
 
     const paletteModes = {
       native: 0,
@@ -1430,23 +1628,102 @@ export class TextureNcaRuntime {
     const filterCode = filterModes[displayFilter] ?? 0;
     const z = Math.max(1, Math.min(8, Number(zoom) || 1));
 
-    this.run(
-      "visualize",
-      null,
-      { u_state: this.state, u_barrier: this.barrier },
-      {
-        u_palette: paletteCode,
-        u_palettePhase: palettePhaseRad,
-        u_showBarrier: showBarrier ? 1 : 0,
-        u_rippleStyle: rippleStyleCode,
-        u_rippleTint: rippleTint,
-        u_channelView: channelViewCode,
-        u_viewport: [extent, extent],
-        u_zoom: z,
-        u_displayFilter: filterCode,
-        ...rippleUniforms,
-      },
-    );
+    const visualizeUniforms = {
+      u_palette: paletteCode,
+      u_palettePhase: palettePhaseRad,
+      u_showBarrier: showBarrier ? 1 : 0,
+      u_rippleStyle: rippleStyleCode,
+      u_rippleTint: rippleTint,
+      u_channelView: channelViewCode,
+      u_viewport: [extent, extent],
+      u_zoom: z,
+      u_displayFilter: filterCode,
+      ...rippleUniforms,
+    };
+
+    if (decay > 0.001) {
+      if (
+        !this.echoTargets ||
+        this.echoTargets[0].width !== extent ||
+        this.echoTargets[0].height !== extent
+      ) {
+        this.echoTargets = [
+          this.allocateEchoTarget(extent, extent),
+          this.allocateEchoTarget(extent, extent),
+        ];
+        this.currentFrameTarget = this.allocate(extent, extent, true);
+        this.echoIndex = 0;
+      }
+
+      this.run(
+        "visualize",
+        this.currentFrameTarget,
+        { u_state: this.state, u_barrier: this.barrier },
+        visualizeUniforms,
+      );
+
+      const readTarget = this.echoTargets[this.echoIndex];
+      const writeTarget = this.echoTargets[1 - this.echoIndex];
+      const transformCode =
+        this.coordinateTransform === "ring"
+          ? 1
+          : this.coordinateTransform === "spiral"
+            ? 2
+            : this.coordinateTransform === "wave"
+              ? 5
+              : this.coordinateTransform === "saddle"
+                ? 6
+                : this.coordinateTransform === "kaleidoscope"
+                  ? 7
+                  : this.coordinateTransform === "vortex_pair"
+                    ? 8
+                    : this.coordinateTransform === "voronoi"
+                      ? 9
+                      : 0;
+      this.run(
+        "echo",
+        writeTarget,
+        { u_current: this.currentFrameTarget, u_history: readTarget },
+        {
+          u_decay: decay,
+          u_drift: drift,
+          u_mode: echoModeCode,
+          u_style: echoStyleCode,
+          u_transform: transformCode,
+          u_twist: this.twist,
+          u_angle: this.rotation,
+          u_geometryStrength: this.geometryStrength,
+          u_geometryCenterX: this.geometryCenterX,
+          u_geometryCenterY: this.geometryCenterY,
+          u_geometrySoftness: this.geometrySoftness,
+        },
+      );
+      this.echoIndex = 1 - this.echoIndex;
+
+      const gl = this.gl;
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, writeTarget.framebuffer);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.blitFramebuffer(
+        0,
+        0,
+        extent,
+        extent,
+        0,
+        0,
+        extent,
+        extent,
+        gl.COLOR_BUFFER_BIT,
+        gl.NEAREST,
+      );
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    } else {
+      this.run(
+        "visualize",
+        null,
+        { u_state: this.state, u_barrier: this.barrier },
+        visualizeUniforms,
+      );
+    }
 
     context.fillStyle = "#101218";
     context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);

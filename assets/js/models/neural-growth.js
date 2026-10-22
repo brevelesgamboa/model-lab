@@ -1113,6 +1113,131 @@ export class NeuralGrowthModel {
         ],
         help: "Viewport rendering fidelity: Smooth bicubic Catmull-Rom reconstruction or crisp pixel grid.",
       },
+      {
+        key: "echoDecay",
+        label: "TEMPORAL ECHO DECAY",
+        type: "range",
+        min: 0,
+        max: 0.98,
+        step: 0.02,
+        default: 0.0,
+        format: "percent",
+        help: "Persistence of previous frames as fading impressions. 0% disables echoes; 75% creates fluid comet wakes; 95% gives long phosphor dreams.",
+        getGuidance: (value) => {
+          const v = Number(value) || 0;
+          if (v <= 0.01) {
+            return {
+              compute: "neutral",
+              tag: "disabled",
+              text: "Instantaneous display. Zero temporal echo persistence.",
+            };
+          }
+          if (v <= 0.40) {
+            return {
+              compute: "gentle",
+              tag: "subtle wake",
+              text: "Subtle motion trail behind moving fronts.",
+            };
+          }
+          if (v <= 0.75) {
+            return {
+              compute: "balanced",
+              tag: "comet wake",
+              text: "Fluid luminous trails and drifting wake impressions.",
+            };
+          }
+          return {
+            compute: "moderate",
+            tag: "phosphor dream",
+            text: "Long-lasting phosphor persistence with slow dissolution.",
+          };
+        },
+      },
+      {
+        key: "echoDrift",
+        label: "TEMPORAL ECHO DRIFT",
+        type: "range",
+        min: -1,
+        max: 1,
+        step: 0.05,
+        default: 0.25,
+        help: "Drift velocity and direction of fading impressions along vector flow streamlines.",
+        getGuidance: (value) => {
+          const v = Number(value) || 0;
+          if (Math.abs(v) <= 0.05) {
+            return {
+              compute: "neutral",
+              tag: "stationary",
+              text: "Impressions fade in place without spatial drift.",
+            };
+          }
+          if (v > 0.05) {
+            return {
+              compute: "balanced",
+              tag: "downstream",
+              text: `Drifts downstream along flow streamlines (${Math.round(v * 100)}%).`,
+            };
+          }
+          return {
+            compute: "balanced",
+            tag: "counter-stream",
+            text: `Drifts upstream against flow currents (${Math.round(v * 100)}%).`,
+          };
+        },
+      },
+      {
+        key: "echoMode",
+        label: "ECHO FLOW DYNAMICS",
+        type: "select",
+        default: "field_advection",
+        options: [
+          {
+            value: "field_advection",
+            label: "Vector Flow · Advection",
+            compute: "balanced",
+            tag: "flow field",
+            guidance: "Echoes advect along the active coordinate geometry currents (spirals, waves, saddles, Voronoi).",
+          },
+          {
+            value: "radial_bloom",
+            label: "Radial Bloom · Outward Expansion",
+            compute: "gentle",
+            tag: "radial",
+            guidance: "Echoes expand radially outward from the focal center as they fade.",
+          },
+          {
+            value: "linear_drift",
+            label: "Directional · Lateral Stream",
+            compute: "gentle",
+            tag: "linear",
+            guidance: "Echoes stream uniformly along the global perception rotation angle.",
+          },
+        ],
+        help: "Determines the spatial trajectory that fading impressions follow across display frames.",
+      },
+      {
+        key: "echoStyle",
+        label: "ECHO BLEND STYLE",
+        type: "select",
+        default: "phosphor",
+        options: [
+          {
+            value: "phosphor",
+            label: "Phosphor · Luminous Hold",
+            compute: "balanced",
+            tag: "phosphor",
+            guidance: "Maximum-intensity hold. Retains glowing highlights like classic CRT phosphors.",
+          },
+          {
+            value: "mist",
+            label: "Mist · Ethereal Smoke",
+            compute: "gentle",
+            tag: "diffuse",
+            guidance: "Soft-light linear blending. Yields silky motion blur and ethereal smoke trails.",
+          },
+        ],
+        help: "Blending operator used to combine current frames with fading historical impressions.",
+      },
     ];
   }
 
@@ -1168,7 +1293,8 @@ export class NeuralGrowthModel {
       !this._disposed &&
       ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
         this.hasActiveRipples ||
-        Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001)
+        Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001 ||
+        Number(parameters?.echoDecay || 0) > 0.01)
     );
   }
 
@@ -1420,6 +1546,30 @@ export class NeuralGrowthModel {
       }
       return 0.0;
     }
+    if (key === "echoDecay") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(0.98, num));
+      }
+      return 0.0;
+    }
+    if (key === "echoDrift") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(-1.0, Math.min(1.0, num));
+      }
+      return 0.25;
+    }
+    if (key === "echoMode") {
+      const valid = ["field_advection", "radial_bloom", "linear_drift"];
+      if (valid.includes(value)) return value;
+      return "field_advection";
+    }
+    if (key === "echoStyle") {
+      const valid = ["phosphor", "mist"];
+      if (valid.includes(value)) return value;
+      return "phosphor";
+    }
     return value;
   }
 
@@ -1428,6 +1578,10 @@ export class NeuralGrowthModel {
       this._parameters[key] = value;
     }
     if (
+      key === "echoDecay" ||
+      key === "echoDrift" ||
+      key === "echoMode" ||
+      key === "echoStyle" ||
       key === "palette" ||
       key === "palettePhase" ||
       key === "paletteCycleSpeed" ||
@@ -1679,6 +1833,10 @@ export class NeuralGrowthModel {
         ripples: this._activeRipples || [],
         dyeColor: parameters.dyeColor,
         channelView: parameters.channelView,
+        echoDecay: parameters.echoDecay,
+        echoDrift: parameters.echoDrift,
+        echoMode: parameters.echoMode,
+        echoStyle: parameters.echoStyle,
       });
       return this._result();
     } catch (error) {
@@ -2052,6 +2210,10 @@ export class NeuralGrowthModel {
         ripples: options.ripples ?? [],
         dyeColor: options.dyeColor ?? this._parameters.dyeColor,
         channelView: options.channelView ?? this._parameters.channelView,
+        echoDecay: options.echoDecay ?? this._parameters.echoDecay,
+        echoDrift: options.echoDrift ?? this._parameters.echoDrift,
+        echoMode: options.echoMode ?? this._parameters.echoMode,
+        echoStyle: options.echoStyle ?? this._parameters.echoStyle,
       }),
     );
   }

@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(14);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(16);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -1086,6 +1086,48 @@ test("Shift+Click on canvas repositions geometry center and Shift+dblclick reset
   await page.keyboard.up("Shift");
   await expect.poll(async () => Number(await centerXInput.inputValue())).toBe(0);
   await expect.poll(async () => Number(await centerYInput.inputValue())).toBe(0);
+});
+
+test("temporal echoes configure decay, drift and flow dynamics cleanly", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+
+  const decayInput = page.getByLabel("TEMPORAL ECHO DECAY exact value", { exact: true });
+  await expect(decayInput).toBeVisible();
+  await decayInput.fill("70");
+
+  const driftInput = page.getByLabel("TEMPORAL ECHO DRIFT exact value", { exact: true });
+  await expect(driftInput).toBeVisible();
+  await driftInput.fill("0.5");
+
+  const modeSelect = page.getByLabel("ECHO FLOW DYNAMICS", { exact: true });
+  await modeSelect.selectOption("radial_bloom");
+
+  const styleSelect = page.getByLabel("ECHO BLEND STYLE", { exact: true });
+  await styleSelect.selectOption("mist");
+
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "1",
+  );
+
+  // WebGL context is healthy with zero loss
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+
+  // Restore to 0 decay
+  await decayInput.fill("0");
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "2",
+  );
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
 });
 
 
