@@ -82,6 +82,8 @@ export class NeuralGrowthModel {
     this._lastKickInputTime = 0;
     this._kickInputBudget = 0;
     this._kickInputIndex = 0;
+    this._palettePhaseAccumulator = 0.0;
+    this._lastPaletteTime = null;
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
@@ -927,10 +929,117 @@ export class NeuralGrowthModel {
         type: "select",
         default: "native",
         options: [
-          { value: "native", label: "Native RGB" },
-          { value: "spectral", label: "Spectral" },
+          {
+            value: "native",
+            label: "Native RGB · Original Hue",
+            compute: "neutral",
+            tag: "original",
+            guidance: "Learned checkpoint colors. Phase drift smoothly rotates hue wheel.",
+          },
+          {
+            value: "spectral",
+            label: "Spectral · Rainbow Prism",
+            compute: "balanced",
+            tag: "rainbow",
+            guidance: "Balanced full-spectrum prism. Phase drift flows through all rainbow hues.",
+          },
+          {
+            value: "thermal",
+            label: "Thermal · Inferno Heat",
+            compute: "balanced",
+            tag: "inferno",
+            guidance: "High-contrast heat gradient from deep violet through flame amber to white.",
+          },
+          {
+            value: "neon",
+            label: "Neon · Synthwave Glow",
+            compute: "balanced",
+            tag: "synthwave",
+            guidance: "Vibrant retro-futurist glow through cyan, magenta, and electric violet.",
+          },
+          {
+            value: "ocean",
+            label: "Ocean · Bioluminescence",
+            compute: "balanced",
+            tag: "deep sea",
+            guidance: "Abyssal marine depth through midnight blue, aqua, and emerald bioluminescence.",
+          },
+          {
+            value: "verdant",
+            label: "Verdant · Forest Flora",
+            compute: "balanced",
+            tag: "botanical",
+            guidance: "Organic botanical flora through deep moss, jade, and golden pollen.",
+          },
         ],
-        help: "Display mapping only; does not alter the learned state or update rule.",
+        help: "Display color mapping and cosine spectrum projection. Does not alter underlying cell state or update rules.",
+      },
+      {
+        key: "palettePhase",
+        label: "PALETTE PHASE",
+        type: "range",
+        min: 0,
+        max: 360,
+        step: 1,
+        default: 0,
+        wrap: true,
+        format: "degrees",
+        help: "Manual phase offset in degrees across the color spectrum. Modulate via LFO or audio beat.",
+        getGuidance: (value) => {
+          const v = Math.round(Number(value) || 0) % 360;
+          if (v === 0) {
+            return {
+              compute: "neutral",
+              tag: "aligned",
+              text: "Default palette phase alignment.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: `${v}° shift`,
+            text: `Phase shifted ${v}° across the color spectrum.`,
+          };
+        },
+      },
+      {
+        key: "paletteCycleSpeed",
+        label: "PALETTE DRIFT SPEED",
+        type: "range",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        default: 0,
+        format: "percent",
+        help: "Speed of continuous automatic phase drift across palette colors. Zero holds phase stationary.",
+        getGuidance: (value) => {
+          const v = Number(value) || 0;
+          if (v <= 0.001) {
+            return {
+              compute: "neutral",
+              tag: "stationary",
+              text: "Stationary palette. No automatic phase drift.",
+            };
+          }
+          if (v <= 0.15) {
+            return {
+              compute: "balanced",
+              tag: "slow drift",
+              text: "Recommended. Slow, hypnotic color cycling that complements pattern evolution.",
+            };
+          }
+          if (v <= 0.50) {
+            return {
+              compute: "gentle",
+              tag: "flowing",
+              text: "Gentle rhythmic color stream across cell boundaries.",
+            };
+          }
+          return {
+            compute: "moderate",
+            tag: "rapid",
+            text: "Accelerated psychedelic color cycling.",
+          };
+        },
       },
       {
         key: "channelView",
@@ -1058,7 +1167,8 @@ export class NeuralGrowthModel {
       !this._loadingPattern &&
       !this._disposed &&
       ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
-        this.hasActiveRipples)
+        this.hasActiveRipples ||
+        Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001)
     );
   }
 
@@ -1291,6 +1401,25 @@ export class NeuralGrowthModel {
       }
       return 0.25;
     }
+    if (key === "palette") {
+      const valid = ["native", "spectral", "thermal", "neon", "ocean", "verdant"];
+      if (valid.includes(value)) return value;
+      return "native";
+    }
+    if (key === "palettePhase") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return ((Math.round(num) % 360) + 360) % 360;
+      }
+      return 0;
+    }
+    if (key === "paletteCycleSpeed") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
     return value;
   }
 
@@ -1299,6 +1428,9 @@ export class NeuralGrowthModel {
       this._parameters[key] = value;
     }
     if (
+      key === "palette" ||
+      key === "palettePhase" ||
+      key === "paletteCycleSpeed" ||
       key === "coordinateTransform" ||
       key === "geometryStrength" ||
       key === "geometryCenterX" ||
@@ -1407,6 +1539,21 @@ export class NeuralGrowthModel {
         }
       }
       if (epoch !== this._epoch || this._disposed) return null;
+      if (Number.isFinite(timeSeconds)) {
+        if (this._lastPaletteTime !== null) {
+          const dt = Math.max(0, Math.min(0.1, timeSeconds - this._lastPaletteTime));
+          const driftSpeed = Number(parameters.paletteCycleSpeed || 0);
+          if (Math.abs(driftSpeed) > 0.0001) {
+            this._palettePhaseAccumulator =
+              (this._palettePhaseAccumulator + dt * driftSpeed * Math.PI) % (Math.PI * 2);
+          }
+        }
+        this._lastPaletteTime = timeSeconds;
+      }
+      const manualPhaseRad = ((Number(parameters.palettePhase || 0) % 360) * Math.PI) / 180;
+      const effectivePhaseRad =
+        (manualPhaseRad + (this._palettePhaseAccumulator || 0)) % (Math.PI * 2);
+
       if (
         !this._runtime ||
         this._activePattern !== pattern.id ||
@@ -1452,6 +1599,7 @@ export class NeuralGrowthModel {
         preview.height = canvas.height;
         candidate.draw(preview, {
           palette: parameters.palette,
+          palettePhase: effectivePhaseRad,
           zoom: parameters.zoom,
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
@@ -1524,6 +1672,7 @@ export class NeuralGrowthModel {
       }
       this._runtime.draw(canvas, {
         palette: parameters.palette,
+        palettePhase: effectivePhaseRad,
         zoom: parameters.zoom,
         displayFilter: parameters.displayFilter,
         showBarrier,
@@ -1885,9 +2034,18 @@ export class NeuralGrowthModel {
       throw new Error(
         this.lastError || "Wait for Neural Growth to initialize.",
       );
+    const manualPhaseRad =
+      ((Number(this._parameters.palettePhase || 0) % 360) * Math.PI) / 180;
+    const effectivePhaseRad =
+      (manualPhaseRad + (this._palettePhaseAccumulator || 0)) % (Math.PI * 2);
+
     this._runRuntime(() =>
       this._runtime.draw(canvas, {
         palette: options.palette ?? this._parameters.palette,
+        palettePhase:
+          options.palettePhase !== undefined
+            ? options.palettePhase
+            : effectivePhaseRad,
         zoom: options.zoom ?? 1,
         displayFilter: options.displayFilter ?? this._parameters.displayFilter,
         showBarrier: options.showBarrier ?? false,

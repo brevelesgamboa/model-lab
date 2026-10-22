@@ -1403,5 +1403,84 @@ test("NeuralGrowthModel integrates coordinate geometry controls (strength, cente
   assert.equal(model.parameters.geometryCenterY, 0);
 });
 
+test("palette cycling with slow phase drift configures controls, normalizes values and updates dynamics", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const paletteCtrl = controls.find((c) => c.key === "palette");
+  assert.ok(paletteCtrl);
+  const paletteValues = paletteCtrl.options.map((o) => o.value);
+  assert.deepEqual(paletteValues, [
+    "native",
+    "spectral",
+    "thermal",
+    "neon",
+    "ocean",
+    "verdant",
+  ]);
+
+  const phaseCtrl = controls.find((c) => c.key === "palettePhase");
+  assert.ok(phaseCtrl);
+  assert.equal(phaseCtrl.min, 0);
+  assert.equal(phaseCtrl.max, 360);
+  assert.equal(phaseCtrl.default, 0);
+  assert.equal(phaseCtrl.wrap, true);
+  assert.equal(phaseCtrl.format, "degrees");
+  assert.equal(phaseCtrl.getGuidance(0).tag, "aligned");
+  assert.equal(phaseCtrl.getGuidance(45).tag, "45° shift");
+
+  const speedCtrl = controls.find((c) => c.key === "paletteCycleSpeed");
+  assert.ok(speedCtrl);
+  assert.equal(speedCtrl.min, 0);
+  assert.equal(speedCtrl.max, 1);
+  assert.equal(speedCtrl.default, 0);
+  assert.equal(speedCtrl.format, "percent");
+  assert.equal(speedCtrl.getGuidance(0).tag, "stationary");
+  assert.equal(speedCtrl.getGuidance(0.08).tag, "slow drift");
+  assert.equal(speedCtrl.getGuidance(0.3).tag, "flowing");
+  assert.equal(speedCtrl.getGuidance(0.8).tag, "rapid");
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("palette", "thermal"), "thermal");
+  assert.equal(model.normalizeStoredParameter("palette", "neon"), "neon");
+  assert.equal(model.normalizeStoredParameter("palette", "ocean"), "ocean");
+  assert.equal(model.normalizeStoredParameter("palette", "verdant"), "verdant");
+  assert.equal(model.normalizeStoredParameter("palette", "invalid"), "native");
+
+  assert.equal(model.normalizeStoredParameter("palettePhase", 180), 180);
+  assert.equal(model.normalizeStoredParameter("palettePhase", 450), 90);
+  assert.equal(model.normalizeStoredParameter("palettePhase", -90), 270);
+  assert.equal(model.normalizeStoredParameter("palettePhase", "invalid"), 0);
+
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", 0.05), 0.05);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", 1.5), 1.0);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", "invalid"), 0.0);
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("palette", "thermal"), true);
+  assert.equal(model.parameters.palette, "thermal");
+  assert.equal(model.onParameterChange("palettePhase", 120), true);
+  assert.equal(model.parameters.palettePhase, 120);
+  assert.equal(model.onParameterChange("paletteCycleSpeed", 0.1), true);
+  assert.equal(model.parameters.paletteCycleSpeed, 0.1);
+
+  // isDynamic activation via paletteCycleSpeed
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      paletteCycleSpeed: 0.05,
+    }),
+    true,
+  );
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      paletteCycleSpeed: 0,
+    }),
+    false,
+  );
+});
+
 
 

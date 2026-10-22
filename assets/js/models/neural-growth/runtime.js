@@ -514,6 +514,7 @@ const VISUALIZE = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_barrier;
 uniform int u_palette;
+uniform float u_palettePhase;
 uniform int u_showBarrier;
 uniform int u_rippleCount;
 uniform int u_rippleStyle;
@@ -562,6 +563,13 @@ float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
   float spatialEnv = exp(-(diff * diff) / (2.0 * waveWidth * waveWidth));
   float timeFade = 1.0 - progress;
   return spatialEnv * timeFade * timeFade * amplitude;
+}
+
+vec3 hueShift(vec3 color, float angle) {
+  if (abs(angle) < 0.0001) return color;
+  const vec3 k = vec3(0.577350269);
+  float cosA = cos(angle);
+  return color * cosA + cross(k, color) * sin(angle) + k * dot(k, color) * (1.0 - cosA);
 }
 
 vec4 sampleNearest(vec2 pos, int groupIdx) {
@@ -714,9 +722,32 @@ void main() {
 
   float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
 
-  if (u_palette == 1 && u_channelView == 0) {
-    vec3 spectrum = 0.5 + 0.5 * cos(6.283185307 * (vec3(0.0, 0.33, 0.67) + lum * 0.85));
-    rgb = spectrum * (0.35 + lum * 0.65);
+  if (u_channelView == 0) {
+    if (u_palette == 0) {
+      rgb = hueShift(rgb, u_palettePhase);
+    } else {
+      float phaseNorm = mod(u_palettePhase, 6.283185307) / 6.283185307;
+      vec3 a = vec3(0.5);
+      vec3 b = vec3(0.5);
+      vec3 c = vec3(1.0);
+      vec3 d = vec3(0.0, 0.33, 0.67);
+      if (u_palette == 2) {
+        c = vec3(2.0, 1.0, 0.5);
+        d = vec3(0.5, 0.20, 0.25);
+      } else if (u_palette == 3) {
+        a = vec3(0.8, 0.5, 0.4);
+        b = vec3(0.2, 0.4, 0.2);
+        c = vec3(2.0, 1.0, 1.0);
+        d = vec3(0.0, 0.25, 0.25);
+      } else if (u_palette == 4) {
+        d = vec3(0.3, 0.20, 0.80);
+      } else if (u_palette == 5) {
+        c = vec3(1.0, 1.0, 0.5);
+        d = vec3(0.8, 0.90, 0.30);
+      }
+      vec3 spectrum = a + b * cos(6.283185307 * (c * (lum * 0.85) + d + phaseNorm));
+      rgb = spectrum * (0.35 + lum * 0.65);
+    }
   }
 
   if (u_showBarrier == 1) {
@@ -1316,6 +1347,7 @@ export class TextureNcaRuntime {
 
     const {
       palette = "native",
+      palettePhase = 0,
       zoom = 1,
       displayFilter = "smooth",
       showBarrier = false,
@@ -1325,8 +1357,18 @@ export class TextureNcaRuntime {
       channelView = "phenotype",
     } = options;
 
-    if (!["native", "spectral"].includes(palette))
+    const paletteModes = {
+      native: 0,
+      spectral: 1,
+      thermal: 2,
+      neon: 3,
+      ocean: 4,
+      verdant: 5,
+    };
+    if (!Object.prototype.hasOwnProperty.call(paletteModes, palette))
       throw new Error("Unknown display palette.");
+    const paletteCode = paletteModes[palette];
+    const palettePhaseRad = Number(palettePhase) || 0.0;
     const context = targetCanvas.getContext("2d");
     if (!context) throw new Error("A 2D display canvas is required.");
 
@@ -1393,7 +1435,8 @@ export class TextureNcaRuntime {
       null,
       { u_state: this.state, u_barrier: this.barrier },
       {
-        u_palette: palette === "spectral" ? 1 : 0,
+        u_palette: paletteCode,
+        u_palettePhase: palettePhaseRad,
         u_showBarrier: showBarrier ? 1 : 0,
         u_rippleStyle: rippleStyleCode,
         u_rippleTint: rippleTint,
