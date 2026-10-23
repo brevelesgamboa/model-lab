@@ -633,6 +633,7 @@ export function initVisualizerUi(
   elements,
   terminal = () => {},
   setStatus = () => {},
+  onAcousticInjectionChange = () => {},
 ) {
   if (!visualizer || !elements?.toggleAudioVisualizer) return;
 
@@ -744,6 +745,10 @@ export function initVisualizerUi(
 
   elements.visualizerStyleSelect?.addEventListener("change", (e) => {
     visualizer.setOption("style", e.target.value);
+  });
+
+  elements.visualizerInjectionSelect?.addEventListener("change", (e) => {
+    onAcousticInjectionChange(e.target.value);
   });
 
   elements.visualizerHeightRange?.addEventListener("input", (e) => {

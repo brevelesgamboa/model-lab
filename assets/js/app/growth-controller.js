@@ -809,9 +809,22 @@ export function createGrowthController({
   let lastBeatTime = 0;
   let beatArmed = true;
 
-  function onAudioFrame(levels, timestamp) {
+  function onAudioFrame(levels, timestamp, rhythmController = null) {
     const model = activeModel();
     if (!model?.ready || !levels) return;
+
+    const spectrum = rhythmController?.getFrequencyData();
+    if (spectrum && typeof model.processAcousticInjection === "function") {
+      const injected = model.processAcousticInjection(
+        spectrum,
+        levels,
+        timestamp,
+        rhythmController,
+      );
+      if (injected > 0 && !model.isClockRunning) {
+        schedulePausedRender();
+      }
+    }
 
     const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
     if (!levels.hasSignal || triggerKick < 0.25) {

@@ -121,6 +121,7 @@ export function collectElements() {
     visualizerSettingsPopover: document.getElementById("visualizer-settings-popover"),
     visualizerModeSelect: document.getElementById("visualizer-mode-select"),
     visualizerStyleSelect: document.getElementById("visualizer-style-select"),
+    visualizerInjectionSelect: document.getElementById("visualizer-injection-select"),
     visualizerHeightRange: document.getElementById("visualizer-height-range"),
     visualizerHeightVal: document.getElementById("visualizer-height-val"),
     visualizerPositionRange: document.getElementById("visualizer-position-range"),

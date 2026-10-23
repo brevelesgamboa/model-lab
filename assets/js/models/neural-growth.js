@@ -13,6 +13,11 @@ import {
   ResonanceConfig,
   RESONANCE_PRESETS,
 } from "./neural-growth/resonance-config.js";
+import {
+  AcousticEmitter,
+  ACOUSTIC_INJECTION_MODES,
+  ACOUSTIC_POSITION_MODES,
+} from "./neural-growth/acoustic-emitter.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -84,6 +89,7 @@ export class NeuralGrowthModel {
     this._kickInputIndex = 0;
     this._palettePhaseAccumulator = 0.0;
     this._lastPaletteTime = null;
+    this._acousticEmitter = null;
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
@@ -773,6 +779,75 @@ export class NeuralGrowthModel {
         help: "Optical refraction depth for kick beat shockwaves.",
       },
       {
+        key: "acousticInjection",
+        label: "ACOUSTIC INJECTION",
+        type: "select",
+        default: "off",
+        options: [
+          {
+            value: "off",
+            label: "Off",
+            guidance: "Acoustic field coupling disabled. Visualizer acts as display overlay.",
+          },
+          {
+            value: "dye",
+            label: "Chromophore Dye",
+            guidance: "Frequencies inject spectral pigment pulses (cyan bass, emerald mids, magenta treble).",
+          },
+          {
+            value: "shockwave",
+            label: "Acoustic Shockwave",
+            guidance: "Transients emit expanding physical wavefronts that ripple through the cellular texture.",
+          },
+          {
+            value: "sprout",
+            label: "Acoustic Sprout",
+            guidance: "Transients inject entropy to sprout fresh growth or heal damaged regions.",
+          },
+          {
+            value: "flow",
+            label: "Spectral Flow",
+            guidance: "Frequency energy pushes directional currents into cell hidden channels.",
+          },
+        ],
+        help: "Audio spectrum injects frequency-mapped physical disturbances directly into the cellular automata grid.",
+      },
+      {
+        key: "acousticThreshold",
+        label: "INJECTION THRESHOLD",
+        type: "range",
+        min: 0.20,
+        max: 0.80,
+        step: 0.05,
+        default: 0.45,
+        modulatable: true,
+        help: "Audio transient onset sensitivity required to trigger an acoustic injection.",
+      },
+      {
+        key: "acousticPosition",
+        label: "INJECTION POSITION",
+        type: "select",
+        default: "curve_peaks",
+        options: [
+          {
+            value: "curve_peaks",
+            label: "Curve Peaks",
+            guidance: "Injections originate directly from the dynamic peaks of the visualizer line.",
+          },
+          {
+            value: "baseline",
+            label: "Bottom Baseline",
+            guidance: "Injections originate along the bottom edge, growing upward like acoustic flora.",
+          },
+          {
+            value: "center",
+            label: "Geometry Center",
+            guidance: "Injections radiate outward from the active focal center.",
+          },
+        ],
+        help: "Spatial origin of acoustic disturbances across the simulation canvas.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
@@ -1408,6 +1483,21 @@ export class NeuralGrowthModel {
       }
       return 0.30;
     }
+    if (key === "acousticInjection") {
+      if (ACOUSTIC_INJECTION_MODES.includes(value)) return value;
+      return "off";
+    }
+    if (key === "acousticThreshold") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.20, Math.min(0.80, num));
+      }
+      return 0.45;
+    }
+    if (key === "acousticPosition") {
+      if (ACOUSTIC_POSITION_MODES.includes(value)) return value;
+      return "curve_peaks";
+    }
     if (key === "channelView") {
       const valid = [
         "phenotype",
@@ -1594,6 +1684,9 @@ export class NeuralGrowthModel {
       key === "audioProfile" ||
       key === "beatShockwave" ||
       key === "shockwaveIntensity" ||
+      key === "acousticInjection" ||
+      key === "acousticThreshold" ||
+      key === "acousticPosition" ||
       key === "channelView" ||
       key === "displayFilter" ||
       key === "brushRadius" ||
@@ -2112,6 +2205,39 @@ export class NeuralGrowthModel {
     const intensity = Number(this._parameters?.shockwaveIntensity ?? 0.30);
     this.triggerRipple(x, y, radius, intensity);
     return true;
+  }
+
+  processAcousticInjection(
+    spectrum,
+    levels,
+    timestamp,
+    rhythmController = null,
+  ) {
+    if (!this.ready || !this._parameters) return 0;
+    const mode = this._parameters.acousticInjection || "off";
+    if (mode === "off" || !levels?.hasSignal) return 0;
+
+    if (!this._acousticEmitter) {
+      this._acousticEmitter = new AcousticEmitter();
+    }
+
+    const count = this._acousticEmitter.process(spectrum, levels, timestamp, {
+      mode,
+      threshold: Number(this._parameters.acousticThreshold ?? 0.45),
+      position: this._parameters.acousticPosition || "curve_peaks",
+      simulationSize: this.simulationSize,
+      geometryCenter: [
+        Number(this._parameters.geometryCenterX) || 0,
+        Number(this._parameters.geometryCenterY) || 0,
+      ],
+      brushRadius: Number(this._parameters.brushRadius) || 16,
+      rhythmController,
+      queueDisturbance: (x, y, radius, distMode, opts) => {
+        this.queueDisturbance(x, y, radius, distMode, opts);
+      },
+    });
+
+    return count;
   }
 
   triggerKickInput(strength = 1.0, timestamp = null) {

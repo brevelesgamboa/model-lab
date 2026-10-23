@@ -1352,6 +1352,16 @@
                   </select>
                 </div>
                 <div class="visualizer-control-row">
+                  <label for="visualizer-injection-select">COUPLING</label>
+                  <select id="visualizer-injection-select" aria-label="Acoustic field coupling">
+                    <option value="off">Off (Overlay)</option>
+                    <option value="dye">Chromophore Dye</option>
+                    <option value="shockwave">Acoustic Shockwave</option>
+                    <option value="sprout">Acoustic Sprout</option>
+                    <option value="flow">Spectral Flow</option>
+                  </select>
+                </div>
+                <div class="visualizer-control-row">
                   <label for="visualizer-height-range">HEIGHT</label>
                   <input id="visualizer-height-range" type="range" min="0.3" max="2.0" step="0.05" value="0.85" aria-label="Line height" />
                   <span id="visualizer-height-val" class="visualizer-val-readout">85%</span>

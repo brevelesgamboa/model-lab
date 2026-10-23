@@ -1567,5 +1567,72 @@ test("temporal echoes configure controls, normalize values, and update dynamics"
   );
 });
 
+test("acoustic field injection configures controls, normalizes values and dispatches disturbances", () => {
+  const model = new NeuralGrowthModel();
+
+  // Control definitions
+  const injectCtrl = model.controls.find((c) => c.key === "acousticInjection");
+  assert.ok(injectCtrl && Array.isArray(injectCtrl.options));
+  assert.equal(injectCtrl.default, "off");
+
+  const threshCtrl = model.controls.find((c) => c.key === "acousticThreshold");
+  assert.ok(threshCtrl && threshCtrl.modulatable);
+  assert.equal(threshCtrl.default, 0.45);
+
+  const posCtrl = model.controls.find((c) => c.key === "acousticPosition");
+  assert.ok(posCtrl && Array.isArray(posCtrl.options));
+  assert.equal(posCtrl.default, "curve_peaks");
+
+  // Normalization
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "dye"),
+    "dye",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "shockwave"),
+    "shockwave",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "invalid"),
+    "off",
+  );
+  assert.equal(model.normalizeStoredParameter("acousticThreshold", 0.65), 0.65);
+  assert.equal(model.normalizeStoredParameter("acousticThreshold", 10.0), 0.8);
+  assert.equal(
+    model.normalizeStoredParameter("acousticPosition", "baseline"),
+    "baseline",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticPosition", "invalid"),
+    "curve_peaks",
+  );
+
+  // Parameter changes
+  assert.equal(model.onParameterChange("acousticInjection", "dye"), true);
+  assert.equal(model.parameters.acousticInjection, "dye");
+  assert.equal(model.onParameterChange("acousticThreshold", 0.3), true);
+  assert.equal(model.parameters.acousticThreshold, 0.3);
+  assert.equal(model.onParameterChange("acousticPosition", "baseline"), true);
+  assert.equal(model.parameters.acousticPosition, "baseline");
+
+  const rhythm = {
+    analyser: { fftSize: 2048 },
+    context: { sampleRate: 48000 },
+  };
+  const spectrum = new Uint8Array(1024).fill(0);
+  for (let i = 0; i < 30; i += 1) spectrum[i] = 250;
+
+  // With ready = false (initial uninitialized state): returns 0 cleanly
+  assert.equal(
+    model.processAcousticInjection(
+      spectrum,
+      { hasSignal: true },
+      1000,
+      rhythm,
+    ),
+    0,
+  );
+});
+
 
 

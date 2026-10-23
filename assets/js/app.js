@@ -210,6 +210,9 @@ const growthController = createGrowthController({
     } else if (key !== "beatShockwave" && key !== "shockwaveIntensity") {
       checkAudioProfileMatch();
     }
+    if (key === "acousticInjection" && elements.visualizerInjectionSelect) {
+      elements.visualizerInjectionSelect.value = value;
+    }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     controlsController.render();
@@ -233,6 +236,12 @@ const controlsController = createControlsController({
   onRange: syncRangeControl,
   onValue(definition, value) {
     currentParameters[definition.key] = value;
+    if (
+      definition.key === "acousticInjection" &&
+      elements.visualizerInjectionSelect
+    ) {
+      elements.visualizerInjectionSelect.value = value;
+    }
     if (
       definition.key === "audioProfile" &&
       currentModel.id === "neural-growth"
@@ -1175,6 +1184,10 @@ function setFractalProcessStep(step) {
 
 function renderParameterControls() {
   controlsController.render();
+  if (elements.visualizerInjectionSelect) {
+    elements.visualizerInjectionSelect.value =
+      currentParameters?.acousticInjection || "off";
+  }
   updateLfoCount();
   updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds));
 }
@@ -1538,7 +1551,11 @@ function animationLoop(timestamp) {
     visualizerOverlay.canvas.hidden = true;
   }
   if (currentView === "lab" && currentModel.id === "neural-growth") {
-    growthController.onAudioFrame(rhythmController.getLevels(), timestamp);
+    growthController.onAudioFrame(
+      rhythmController.getLevels(),
+      timestamp,
+      rhythmController,
+    );
   }
   const siteActive = elements.site.classList.contains("is-visible");
   const canRender =
@@ -1952,7 +1969,30 @@ function attachEvents() {
   elements.toggleAudioInput.addEventListener("click", () =>
     toggleAudioInput(setAnimation, terminal, setStatus, renderCurrentFrame),
   );
-  initVisualizerUi(visualizerOverlay, elements, terminal, setStatus);
+  initVisualizerUi(
+    visualizerOverlay,
+    elements,
+    terminal,
+    setStatus,
+    (mode) => {
+      if (currentModel?.id === "neural-growth") {
+        currentParameters.acousticInjection = mode;
+        currentModel.onParameterChange?.("acousticInjection", mode);
+        controlsController.render();
+        terminal("ACOUSTIC", `field coupling set to ${mode}`);
+        setStatus(`ACOUSTIC INJECTION: ${mode.toUpperCase()}`);
+      }
+    },
+  );
+  elements.openVisualizerSettings?.addEventListener("click", () => {
+    if (
+      elements.visualizerInjectionSelect &&
+      currentModel?.id === "neural-growth"
+    ) {
+      elements.visualizerInjectionSelect.value =
+        currentParameters?.acousticInjection || "off";
+    }
+  });
   elements.neuralDreamImage.addEventListener(
     "change",
     dreamController.sourceChanged,

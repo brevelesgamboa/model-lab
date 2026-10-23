@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(16);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(17);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -1128,6 +1128,35 @@ test("temporal echoes configure decay, drift and flow dynamics cleanly", async (
   expect(
     await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
   ).toBe(false);
+});
+
+test("acoustic field injection configures coupling modes and synchronizes with popover", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await selectGrowth(page);
+
+  // In Neural Growth model controls:
+  const injectSelect = page.locator('select[aria-label="ACOUSTIC INJECTION"]');
+  await expect(injectSelect).toHaveValue("off");
+  await injectSelect.selectOption("dye");
+  await expect(injectSelect).toHaveValue("dye");
+
+  // Open visualizer settings popover and verify coupling select syncs
+  await page.locator("#open-visualizer-settings").click();
+  const popoverInjection = page.locator("#visualizer-injection-select");
+  await expect(popoverInjection).toBeVisible();
+  await expect(popoverInjection).toHaveValue("dye");
+
+  // Change from popover and verify model control syncs
+  await popoverInjection.selectOption("shockwave");
+  await expect(injectSelect).toHaveValue("shockwave");
+
+  // Close popover
+  await page.locator("#close-visualizer-settings").click();
+
+  expect(errors).toEqual([]);
 });
 
 
