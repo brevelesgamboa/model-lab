@@ -19,6 +19,7 @@ export function createExportController({
   selectedLoopPreset,
   updateFractalTools,
   setStatus,
+  getVisualizerOverlay = () => null,
 }) {
   function outputFilename(
     extension,
@@ -280,6 +281,7 @@ export function createExportController({
       } else {
         await Promise.resolve(model.render(canvas, parameters, frameTime));
       }
+      getVisualizerOverlay()?.compositeOnto(canvas);
       await nextFrame();
       if (elements.hqStatus) elements.hqStatus.textContent = "ENCODING PNG";
       const blob = await canvasToPngBlob(canvas);
@@ -364,6 +366,7 @@ export function createExportController({
           canvas.width = elements.canvas.width;
           canvas.height = elements.canvas.height;
           model.renderSnapshot(canvas);
+          getVisualizerOverlay()?.compositeOnto(canvas);
           const blob = await canvasToPngBlob(canvas);
           downloadBlob(blob, outputFilename("png", canvas.width, canvas.height));
           setStatus(`PNG SNAPSHOT EXPORTED (${canvas.width} × ${canvas.height})`);
@@ -395,6 +398,7 @@ export function createExportController({
         } else {
           ctx.drawImage(dreamCanvas, 0, 0);
         }
+        getVisualizerOverlay()?.compositeOnto(canvas);
         const blob = await canvasToPngBlob(canvas);
         const filename = outputFilename(
           "png",
@@ -417,7 +421,13 @@ export function createExportController({
         timeSeconds: getState().time,
         exact: true,
       });
-      elements.canvas.toBlob((blob) => {
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = elements.canvas.width;
+      exportCanvas.height = elements.canvas.height;
+      const exportCtx = exportCanvas.getContext("2d");
+      exportCtx.drawImage(elements.canvas, 0, 0);
+      getVisualizerOverlay()?.compositeOnto(exportCanvas);
+      exportCanvas.toBlob((blob) => {
         if (!blob) return;
         const filename = outputFilename("png");
         downloadBlob(blob, filename);

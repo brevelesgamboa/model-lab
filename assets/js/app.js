@@ -40,6 +40,10 @@ import {
   toggleAudioInput,
   drawAudioMeter,
 } from "./audio/monitor.js";
+import {
+  AudioVisualizerOverlay,
+  initVisualizerUi,
+} from "./audio/visualizer-overlay.js";
 import { createStudioController } from "./studio/studio-controller.js";
 import { collectElements } from "./app/dom-elements.js";
 import {
@@ -371,6 +375,10 @@ const hqGallery = createHqGallery({
   setStatus,
 });
 
+const visualizerOverlay = new AudioVisualizerOverlay(
+  elements.audioVisualizerCanvas,
+);
+
 const { savePng, saveGif } = createExportController({
   elements,
   capabilities,
@@ -394,6 +402,7 @@ const { savePng, saveGif } = createExportController({
   selectedLoopPreset,
   updateFractalTools,
   setStatus,
+  getVisualizerOverlay: () => visualizerOverlay,
 });
 
 function readPanelVisibility() {
@@ -1519,6 +1528,15 @@ function modelNeedsAnimation() {
 function animationLoop(timestamp) {
   rhythmController.update(timestamp);
   drawAudioMeter();
+  if (currentView === "lab") {
+    visualizerOverlay.update(timestamp, rhythmController, elements.canvas);
+  } else if (
+    visualizerOverlay.enabled &&
+    visualizerOverlay.canvas &&
+    !visualizerOverlay.canvas.hidden
+  ) {
+    visualizerOverlay.canvas.hidden = true;
+  }
   if (currentView === "lab" && currentModel.id === "neural-growth") {
     growthController.onAudioFrame(rhythmController.getLevels(), timestamp);
   }
@@ -1934,6 +1952,7 @@ function attachEvents() {
   elements.toggleAudioInput.addEventListener("click", () =>
     toggleAudioInput(setAnimation, terminal, setStatus, renderCurrentFrame),
   );
+  initVisualizerUi(visualizerOverlay, elements, terminal, setStatus);
   elements.neuralDreamImage.addEventListener(
     "change",
     dreamController.sourceChanged,
