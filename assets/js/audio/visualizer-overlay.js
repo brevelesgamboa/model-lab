@@ -1,13 +1,12 @@
 const STORAGE_KEY = "latent-field:audio-visualizer-config";
-const SPECTRUM_POINTS = 48;
-const BASS_HISTORY_LEN = 128;
-const MIN_AUDIBLE_LEVEL = 0.002;
+const NUM_POINTS = 32;
+const BASS_HISTORY_LEN = 64;
+const MIN_AUDIBLE_LEVEL = 0.003;
 
 export const VISUALIZER_COLOR_PRESETS = Object.freeze([
   { id: "cyan", hex: "#54ddff", label: "Cyan" },
   { id: "magenta", hex: "#ff00a0", label: "Magenta" },
   { id: "gold", hex: "#ffb800", label: "Gold" },
-  { id: "violet", hex: "#9d4edd", label: "Violet" },
   { id: "white", hex: "#ffffff", label: "White" },
 ]);
 
@@ -15,14 +14,9 @@ export const DEFAULT_VISUALIZER_CONFIG = Object.freeze({
   enabled: false,
   mode: "spectrum", // "spectrum", "bass_history", "waveform"
   style: "single", // "single", "mirrored"
-  fill: "stroke", // "stroke", "fill"
-  height: 0.85, // 0.2 to 2.0
+  height: 0.85, // 0.3 to 2.0
   position: 0.15, // 0.05 (near bottom) to 0.95 (near top)
   color: "#54ddff",
-  opacity: 0.85, // 0.1 to 1.0
-  smoothing: 0.65, // 0.1 to 0.95
-  sensitivity: 1.2, // 0.5 to 3.0
-  bassEmphasis: 0.6, // 0.0 to 2.0
 });
 
 function clampNumber(value, min, max, fallback) {
@@ -31,33 +25,95 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, num));
 }
 
-function hexToRgba(hex, alpha = 1) {
+function hexToRgb(hex) {
   const clean = String(hex || "#54ddff").replace("#", "");
-  const num = parseInt(clean.length === 3
-    ? clean.split("").map((c) => c + c).join("")
-    : clean, 16);
-  if (Number.isNaN(num)) return `rgba(84, 221, 255, ${alpha})`;
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const num = parseInt(
+    clean.length === 3
+      ? clean.split("").map((c) => c + c).join("")
+      : clean,
+    16,
+  );
+  if (Number.isNaN(num)) return [0.33, 0.87, 1.0];
+  return [
+    ((num >> 16) & 255) / 255,
+    ((num >> 8) & 255) / 255,
+    (num & 255) / 255,
+  ];
 }
+
+const VS_SOURCE = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
+
+const FS_SOURCE = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 fragColor;
+
+const int NUM_POINTS = 32;
+uniform float u_levels[NUM_POINTS];
+uniform vec3 u_color;
+uniform float u_baseY;
+uniform float u_height;
+uniform int u_style;
+
+float sampleCurve(float u) {
+  float t = clamp(u, 0.0, 1.0) * float(NUM_POINTS - 1);
+  int i0 = int(floor(t));
+  int i1 = min(i0 + 1, NUM_POINTS - 1);
+  float f = fract(t);
+  float w = f * f * (3.0 - 2.0 * f);
+  return mix(u_levels[i0], u_levels[i1], w);
+}
+
+void main() {
+  float amp = sampleCurve(v_uv.x);
+  float targetY = u_baseY + amp * u_height;
+  float dist = abs(v_uv.y - targetY);
+
+  if (u_style == 1) {
+    float mirrorY = u_baseY - amp * u_height;
+    dist = min(dist, abs(v_uv.y - mirrorY));
+  }
+
+  float coreThick = 0.005;
+  float casingThick = 0.014;
+
+  float core = smoothstep(coreThick, 0.0, dist);
+  float glow = exp(-dist * 42.0) * 0.45;
+  float casing = smoothstep(casingThick, coreThick, dist) * 0.75;
+
+  vec4 casingColor = vec4(0.03, 0.02, 0.05, casing);
+  vec4 lineColor = vec4(u_color, 1.0) * (core + glow);
+
+  fragColor = mix(casingColor, lineColor, clamp(core + glow, 0.0, 1.0));
+}
+`;
 
 export class AudioVisualizerOverlay {
   constructor(canvasElement = null) {
     this.canvas = canvasElement;
-    this.context = canvasElement ? canvasElement.getContext("2d") : null;
-    this.config = { ...DEFAULT_VISUALIZER_CONFIG };
+    this.gl = null;
+    this.context2d = null;
 
-    this.spectrumLevels = new Float32Array(SPECTRUM_POINTS);
-    this.spectrumTargets = new Float32Array(SPECTRUM_POINTS);
+    this.config = { ...DEFAULT_VISUALIZER_CONFIG };
+    this.spectrumLevels = new Float32Array(NUM_POINTS);
+    this.spectrumTargets = new Float32Array(NUM_POINTS);
     this.bassHistory = new Float32Array(BASS_HISTORY_LEN);
     this.bassHead = 0;
+    this.uniformData = new Float32Array(NUM_POINTS);
 
+    this.frequencyLut = null;
     this.isIdle = true;
     this.lastTimestamp = -1;
     this.listeners = new Set();
 
+    this.initRenderer();
     this.loadConfig();
   }
 
@@ -67,6 +123,82 @@ export class AudioVisualizerOverlay {
 
   set enabled(value) {
     this.setOption("enabled", Boolean(value));
+  }
+
+  initRenderer() {
+    if (!this.canvas) return;
+
+    // Prefer WebGL2 for native GPU shader execution; fallback to WebGL1 or 2D
+    const glOptions = {
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: false,
+      depth: false,
+      stencil: false,
+    };
+
+    try {
+      this.gl =
+        this.canvas.getContext("webgl2", glOptions) ||
+        this.canvas.getContext("webgl", glOptions);
+    } catch {
+      this.gl = null;
+    }
+
+    if (this.gl) {
+      this.initGlProgram();
+    } else {
+      try {
+        this.context2d = this.canvas.getContext("2d");
+      } catch {
+        this.context2d = null;
+      }
+    }
+  }
+
+  initGlProgram() {
+    const gl = this.gl;
+    if (!gl) return;
+
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, VS_SOURCE);
+    gl.compileShader(vs);
+
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, FS_SOURCE);
+    gl.compileShader(fs);
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      gl.deleteProgram(program);
+      this.gl = null;
+      this.context2d = this.canvas.getContext("2d");
+      return;
+    }
+
+    this.program = program;
+    gl.useProgram(program);
+
+    // Quad geometry: full-screen triangle strip
+    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+    const posLoc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform locations
+    this.uLevelsLoc = gl.getUniformLocation(program, "u_levels");
+    this.uColorLoc = gl.getUniformLocation(program, "u_color");
+    this.uBaseYLoc = gl.getUniformLocation(program, "u_baseY");
+    this.uHeightLoc = gl.getUniformLocation(program, "u_height");
+    this.uStyleLoc = gl.getUniformLocation(program, "u_style");
   }
 
   loadConfig() {
@@ -92,22 +224,31 @@ export class AudioVisualizerOverlay {
   normalizeConfig(input = {}) {
     const validModes = new Set(["spectrum", "bass_history", "waveform"]);
     const validStyles = new Set(["single", "mirrored"]);
-    const validFills = new Set(["stroke", "fill"]);
 
     return {
       enabled: Boolean(input.enabled),
-      mode: validModes.has(input.mode) ? input.mode : DEFAULT_VISUALIZER_CONFIG.mode,
-      style: validStyles.has(input.style) ? input.style : DEFAULT_VISUALIZER_CONFIG.style,
-      fill: validFills.has(input.fill) ? input.fill : DEFAULT_VISUALIZER_CONFIG.fill,
-      height: clampNumber(input.height, 0.2, 2.0, DEFAULT_VISUALIZER_CONFIG.height),
-      position: clampNumber(input.position, 0.05, 0.95, DEFAULT_VISUALIZER_CONFIG.position),
-      color: typeof input.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(input.color)
-        ? input.color
-        : DEFAULT_VISUALIZER_CONFIG.color,
-      opacity: clampNumber(input.opacity, 0.1, 1.0, DEFAULT_VISUALIZER_CONFIG.opacity),
-      smoothing: clampNumber(input.smoothing, 0.1, 0.95, DEFAULT_VISUALIZER_CONFIG.smoothing),
-      sensitivity: clampNumber(input.sensitivity, 0.5, 3.0, DEFAULT_VISUALIZER_CONFIG.sensitivity),
-      bassEmphasis: clampNumber(input.bassEmphasis, 0.0, 2.0, DEFAULT_VISUALIZER_CONFIG.bassEmphasis),
+      mode: validModes.has(input.mode)
+        ? input.mode
+        : DEFAULT_VISUALIZER_CONFIG.mode,
+      style: validStyles.has(input.style)
+        ? input.style
+        : DEFAULT_VISUALIZER_CONFIG.style,
+      height: clampNumber(
+        input.height,
+        0.3,
+        2.0,
+        DEFAULT_VISUALIZER_CONFIG.height,
+      ),
+      position: clampNumber(
+        input.position,
+        0.05,
+        0.95,
+        DEFAULT_VISUALIZER_CONFIG.position,
+      ),
+      color:
+        typeof input.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(input.color)
+          ? input.color
+          : DEFAULT_VISUALIZER_CONFIG.color,
     };
   }
 
@@ -118,8 +259,8 @@ export class AudioVisualizerOverlay {
     this.saveConfig();
     this.notify();
 
-    if (!this.config.enabled && this.canvas && this.context) {
-      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (!this.config.enabled && this.canvas) {
+      this.clear();
       this.canvas.hidden = true;
       this.isIdle = true;
     } else if (this.config.enabled && this.canvas) {
@@ -133,8 +274,8 @@ export class AudioVisualizerOverlay {
     this.saveConfig();
     this.notify();
 
-    if (!this.config.enabled && this.canvas && this.context) {
-      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (!this.config.enabled && this.canvas) {
+      this.clear();
       this.canvas.hidden = true;
       this.isIdle = true;
     } else if (this.config.enabled && this.canvas) {
@@ -161,19 +302,60 @@ export class AudioVisualizerOverlay {
 
   syncDimensions(targetCanvas) {
     if (!this.canvas || !targetCanvas) return;
-    if (this.canvas.width !== targetCanvas.width || this.canvas.height !== targetCanvas.height) {
-      this.canvas.width = targetCanvas.width;
-      this.canvas.height = targetCanvas.height;
-      if (this.context) {
-        this.context.imageSmoothingEnabled = true;
+    const targetAspect = (targetCanvas.height || 1) / (targetCanvas.width || 1);
+    const fixedWidth = 640;
+    const fixedHeight = Math.max(
+      180,
+      Math.min(640, Math.round(fixedWidth * targetAspect)),
+    );
+
+    if (
+      this.canvas.width !== fixedWidth ||
+      this.canvas.height !== fixedHeight
+    ) {
+      this.canvas.width = fixedWidth;
+      this.canvas.height = fixedHeight;
+      if (this.gl) {
+        this.gl.viewport(0, 0, fixedWidth, fixedHeight);
       }
     }
+  }
+
+  clear() {
+    if (this.gl) {
+      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      this.gl.clearColor(0, 0, 0, 0);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    } else if (this.context2d) {
+      this.context2d.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  buildFrequencyLut(sampleRate = 48000, fftSize = 2048) {
+    const binWidth = sampleRate / fftSize;
+    const minHz = 30;
+    const maxHz = 12000;
+    const ratio = maxHz / minHz;
+    const lut = [];
+
+    for (let i = 0; i < NUM_POINTS; i += 1) {
+      const f0 = minHz * ratio ** (i / NUM_POINTS);
+      const f1 = minHz * ratio ** ((i + 1) / NUM_POINTS);
+      const first = Math.max(0, Math.ceil(f0 / binWidth));
+      const last = Math.min(1023, Math.max(first, Math.floor(f1 / binWidth)));
+      const count = Math.max(1, last - first + 1);
+      // Quadratic bass emphasis weighting
+      const weight =
+        1.0 + 0.6 * ((NUM_POINTS - 1 - i) / (NUM_POINTS - 1)) ** 2;
+      lut.push({ first, last, count, weight });
+    }
+    this.frequencyLut = lut;
   }
 
   update(timestamp, rhythmController, targetCanvas = null) {
     if (!this.config.enabled) {
       if (this.canvas && !this.canvas.hidden) {
-        this.context?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.clear();
         this.canvas.hidden = true;
         this.isIdle = true;
       }
@@ -188,12 +370,7 @@ export class AudioVisualizerOverlay {
       this.syncDimensions(targetCanvas);
     }
 
-    if (!this.canvas || !this.context) return;
-
-    const elapsed = this.lastTimestamp < 0
-      ? 1 / 60
-      : Math.min(0.1, Math.max(0.001, (timestamp - this.lastTimestamp) / 1000));
-    this.lastTimestamp = timestamp;
+    if (!this.canvas) return;
 
     const isActive = rhythmController && rhythmController.status === "active";
     const spectrum = isActive ? rhythmController.getFrequencyData() : null;
@@ -205,58 +382,46 @@ export class AudioVisualizerOverlay {
         this.renderBassHistory(hasSignal ? levels : null);
         break;
       case "waveform":
-        this.renderWaveform(isActive ? rhythmController.getTimeDomainData() : null);
+        this.renderWaveform(
+          isActive ? rhythmController.getTimeDomainData() : null,
+        );
         break;
       case "spectrum":
       default:
-        this.renderSpectrum(hasSignal ? spectrum : null, rhythmController, elapsed);
+        this.renderSpectrum(hasSignal ? spectrum : null, rhythmController);
         break;
     }
   }
 
-  renderSpectrum(spectrum, rhythmController, elapsed) {
-    const ctx = this.context;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const points = SPECTRUM_POINTS;
+  renderSpectrum(spectrum, rhythmController) {
+    const points = NUM_POINTS;
     const levels = this.spectrumLevels;
     const targets = this.spectrumTargets;
 
-    const analyser = rhythmController?.analyser;
-    const audioContext = rhythmController?.context;
-    const binWidth = analyser && audioContext
-      ? audioContext.sampleRate / analyser.fftSize
-      : 23.4375; // Default for 48000 / 2048
+    if (!this.frequencyLut && rhythmController) {
+      const sampleRate = rhythmController.context?.sampleRate || 48000;
+      const fftSize = rhythmController.analyser?.fftSize || 2048;
+      this.buildFrequencyLut(sampleRate, fftSize);
+    }
 
-    if (spectrum && spectrum.length > 0) {
-      const minHz = 30;
-      const maxHz = 12000;
-      const ratio = maxHz / minHz;
-
+    if (spectrum && spectrum.length > 0 && this.frequencyLut) {
+      const lut = this.frequencyLut;
       for (let i = 0; i < points; i += 1) {
-        const f0 = minHz * ratio ** (i / points);
-        const f1 = minHz * ratio ** ((i + 1) / points);
-        const first = Math.max(0, Math.ceil(f0 / binWidth));
-        const last = Math.min(spectrum.length - 1, Math.max(first, Math.floor(f1 / binWidth)));
-
+        const entry = lut[i];
         let sum = 0;
-        const count = last - first + 1;
-        for (let b = first; b <= last; b += 1) {
+        for (let b = entry.first; b <= entry.last; b += 1) {
           sum += spectrum[b];
         }
-        const raw = sum / (count * 255);
-        // Bass emphasis weighting: boost lower frequencies quadratically
-        const lowOctaveWeight = 1.0 + this.config.bassEmphasis * ((points - 1 - i) / (points - 1)) ** 2;
-        targets[i] = Math.max(0, Math.min(1.0, raw * this.config.sensitivity * lowOctaveWeight));
+        const raw = (sum / (entry.count * 255)) * entry.weight * 1.35;
+        targets[i] = Math.max(0, Math.min(1.0, raw));
       }
     } else {
       targets.fill(0);
     }
 
-    // Ballistics: fast attack, smooth exponential release
-    const attackRate = 0.72;
-    const releaseTimeConstant = 0.05 + this.config.smoothing * 0.35;
-    const releaseRate = 1 - Math.exp(-elapsed / releaseTimeConstant);
+    // Ballistics: fast rise, smooth natural fall
+    const attackRate = 0.75;
+    const releaseRate = 0.14;
 
     let maxLevel = 0;
     for (let i = 0; i < points; i += 1) {
@@ -279,37 +444,25 @@ export class AudioVisualizerOverlay {
       return;
     }
 
-    ctx.clearRect(0, 0, width, height);
-
     if (maxLevel <= 0) {
+      this.clear();
       this.isIdle = true;
       return;
     }
     this.isIdle = false;
 
-    const baseY = height * (1.0 - this.config.position);
-    const ampMax = height * 0.42 * this.config.height;
-
-    const curvePoints = [];
-    const stepX = width / (points - 1);
-    for (let i = 0; i < points; i += 1) {
-      const x = i * stepX;
-      const y = baseY - levels[i] * ampMax;
-      curvePoints.push({ x, y, val: levels[i] });
-    }
-
-    this.drawCurve(ctx, curvePoints, baseY, ampMax);
+    this.drawData(levels);
   }
 
   renderBassHistory(levels) {
-    const ctx = this.context;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
     const history = this.bassHistory;
     const len = BASS_HISTORY_LEN;
 
     const bassVal = levels
-      ? Math.max(0, Math.min(1.0, (levels.kick * 0.65 + levels.bass * 0.35) * this.config.sensitivity))
+      ? Math.max(
+          0,
+          Math.min(1.0, (levels.kick * 0.7 + levels.bass * 0.3) * 1.35),
+        )
       : 0;
 
     history[this.bassHead] = bassVal;
@@ -324,167 +477,138 @@ export class AudioVisualizerOverlay {
       return;
     }
 
-    ctx.clearRect(0, 0, width, height);
-
     if (maxLevel <= 0) {
+      this.clear();
       this.isIdle = true;
       return;
     }
     this.isIdle = false;
 
-    const baseY = height * (1.0 - this.config.position);
-    const ampMax = height * 0.35 * this.config.height;
-
-    const curvePoints = [];
-    const stepX = width / (len - 1);
-    for (let i = 0; i < len; i += 1) {
-      const index = (this.bassHead + i) % len;
-      const x = i * stepX;
-      const y = baseY - history[index] * ampMax;
-      curvePoints.push({ x, y, val: history[index] });
+    // Resample 64 history values down to 32 uniform data points
+    const step = len / NUM_POINTS;
+    for (let i = 0; i < NUM_POINTS; i += 1) {
+      const srcIdx = (this.bassHead + Math.floor(i * step)) % len;
+      this.uniformData[i] = history[srcIdx];
     }
 
-    this.drawCurve(ctx, curvePoints, baseY, ampMax);
+    this.drawData(this.uniformData);
   }
 
   renderWaveform(timeDomainData) {
-    const ctx = this.context;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const points = 128;
-
-    ctx.clearRect(0, 0, width, height);
-
     if (!timeDomainData || timeDomainData.length === 0) {
-      this.isIdle = true;
+      if (!this.isIdle) {
+        this.clear();
+        this.isIdle = true;
+      }
       return;
     }
 
-    // Trigger search: find upward zero-crossing near start to stabilize oscilloscope display
+    // Trigger alignment: find upward zero crossing near start
     let startIdx = 0;
-    for (let i = 0; i < Math.min(256, timeDomainData.length - points); i += 1) {
+    for (
+      let i = 0;
+      i < Math.min(256, timeDomainData.length - NUM_POINTS);
+      i += 1
+    ) {
       if (timeDomainData[i] < 128 && timeDomainData[i + 1] >= 128) {
         startIdx = i;
         break;
       }
     }
 
-    const baseY = height * (1.0 - this.config.position);
-    const ampMax = height * 0.28 * this.config.height;
-    const stride = Math.max(1, Math.floor((timeDomainData.length - startIdx) / points));
-
-    const curvePoints = [];
-    const stepX = width / (points - 1);
+    const stride = Math.max(
+      1,
+      Math.floor((timeDomainData.length - startIdx) / NUM_POINTS),
+    );
     let maxDev = 0;
 
-    for (let i = 0; i < points; i += 1) {
+    for (let i = 0; i < NUM_POINTS; i += 1) {
       const sample = timeDomainData[startIdx + i * stride] ?? 128;
-      const dev = ((sample - 128) / 128) * this.config.sensitivity;
+      const dev = ((sample - 128) / 128) * 1.25;
       if (Math.abs(dev) > maxDev) maxDev = Math.abs(dev);
-      const x = i * stepX;
-      const y = baseY - dev * ampMax;
-      curvePoints.push({ x, y, val: Math.abs(dev) });
+      this.uniformData[i] = dev;
     }
 
     if (maxDev < 0.01) {
-      this.isIdle = true;
+      if (!this.isIdle) {
+        this.clear();
+        this.isIdle = true;
+      }
       return;
     }
     this.isIdle = false;
 
-    this.drawCurve(ctx, curvePoints, baseY, ampMax);
+    this.drawData(this.uniformData);
   }
 
-  drawCurve(ctx, points, baseY, ampMax) {
-    if (points.length < 2) return;
-
+  drawData(data) {
+    const baseY = this.config.position; // 0.05 (bottom) to 0.95 (top)
+    const ampHeight = 0.38 * this.config.height;
+    const [r, g, b] = hexToRgb(this.config.color);
     const isMirrored = this.config.style === "mirrored";
-    const isFill = this.config.fill === "fill";
-    const color = this.config.color;
-    const opacity = this.config.opacity;
 
-    const traceCurve = (reflect = false) => {
-      const firstY = reflect ? baseY + (baseY - points[0].y) : points[0].y;
-      ctx.moveTo(points[0].x, firstY);
+    if (this.gl && this.program) {
+      const gl = this.gl;
+      gl.useProgram(this.program);
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-      for (let i = 0; i < points.length - 1; i += 1) {
-        const p0 = points[Math.max(0, i - 1)];
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = points[Math.min(points.length - 1, i + 2)];
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
 
-        const y0 = reflect ? baseY + (baseY - p0.y) : p0.y;
-        const y1 = reflect ? baseY + (baseY - p1.y) : p1.y;
-        const y2 = reflect ? baseY + (baseY - p2.y) : p2.y;
-        const y3 = reflect ? baseY + (baseY - p3.y) : p3.y;
+      gl.uniform1fv(this.uLevelsLoc, data);
+      gl.uniform3f(this.uColorLoc, r, g, b);
+      gl.uniform1f(this.uBaseYLoc, baseY);
+      gl.uniform1f(this.uHeightLoc, ampHeight);
+      gl.uniform1i(this.uStyleLoc, isMirrored ? 1 : 0);
 
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = y1 + (y2 - y0) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = y2 - (y3 - y1) / 6;
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    } else if (this.context2d) {
+      // Clean 2D fallback without shadowBlur
+      const ctx = this.context2d;
+      const w = this.canvas.width;
+      const h = this.canvas.height;
+      const y0 = h * (1.0 - baseY);
+      const ampPx = h * ampHeight;
 
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, y2);
-      }
-    };
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
 
-    ctx.save();
-
-    // 1. Optional Fill Pass
-    if (isFill) {
-      ctx.beginPath();
-      traceCurve(false);
-      ctx.lineTo(points[points.length - 1].x, baseY);
-      ctx.lineTo(points[0].x, baseY);
-      ctx.closePath();
-
-      const topGrad = ctx.createLinearGradient(0, baseY - ampMax, 0, baseY);
-      topGrad.addColorStop(0, hexToRgba(color, opacity * 0.4));
-      topGrad.addColorStop(1, hexToRgba(color, 0.0));
-      ctx.fillStyle = topGrad;
-      ctx.fill();
-
-      if (isMirrored) {
+      const stepX = w / (NUM_POINTS - 1);
+      const drawPath = (reflect = false) => {
         ctx.beginPath();
-        traceCurve(true);
-        ctx.lineTo(points[points.length - 1].x, baseY);
-        ctx.lineTo(points[0].x, baseY);
-        ctx.closePath();
+        for (let i = 0; i < NUM_POINTS; i += 1) {
+          const x = i * stepX;
+          const val = data[i];
+          const y = reflect ? y0 + val * ampPx : y0 - val * ampPx;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      };
 
-        const botGrad = ctx.createLinearGradient(0, baseY + ampMax, 0, baseY);
-        botGrad.addColorStop(0, hexToRgba(color, opacity * 0.4));
-        botGrad.addColorStop(1, hexToRgba(color, 0.0));
-        ctx.fillStyle = botGrad;
-        ctx.fill();
+      // Casing
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(10, 8, 16, 0.75)";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      drawPath(false);
+      ctx.stroke();
+      if (isMirrored) {
+        drawPath(true);
+        ctx.stroke();
       }
+
+      // Foreground stroke
+      ctx.lineWidth = 1.75;
+      ctx.strokeStyle = this.config.color;
+      drawPath(false);
+      ctx.stroke();
+      if (isMirrored) {
+        drawPath(true);
+        ctx.stroke();
+      }
+
+      ctx.restore();
     }
-
-    // 2. Subtle Dark Outline / Casing Pass (ensures visibility over bright/busy visuals)
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "rgba(8, 6, 12, 0.75)";
-
-    ctx.beginPath();
-    traceCurve(false);
-    if (isMirrored) {
-      traceCurve(true);
-    }
-    ctx.stroke();
-
-    // 3. Foreground Glowing Stroke Pass
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = hexToRgba(color, opacity);
-    ctx.shadowColor = hexToRgba(color, 0.6);
-    ctx.shadowBlur = 6;
-
-    ctx.beginPath();
-    traceCurve(false);
-    if (isMirrored) {
-      traceCurve(true);
-    }
-    ctx.stroke();
-
-    ctx.restore();
   }
 
   compositeOnto(targetCanvas) {
@@ -514,7 +638,10 @@ export function initVisualizerUi(
 
   function syncUi(config) {
     elements.toggleAudioVisualizer.textContent = `LINE: ${config.enabled ? "ON" : "OFF"}`;
-    elements.toggleAudioVisualizer.classList.toggle("is-active", config.enabled);
+    elements.toggleAudioVisualizer.classList.toggle(
+      "is-active",
+      config.enabled,
+    );
     elements.toggleAudioVisualizer.setAttribute(
       "aria-pressed",
       String(config.enabled),
@@ -524,8 +651,6 @@ export function initVisualizerUi(
       elements.visualizerModeSelect.value = config.mode;
     if (elements.visualizerStyleSelect)
       elements.visualizerStyleSelect.value = config.style;
-    if (elements.visualizerFillSelect)
-      elements.visualizerFillSelect.value = config.fill;
     if (elements.visualizerHeightRange) {
       elements.visualizerHeightRange.value = String(config.height);
       if (elements.visualizerHeightVal)
@@ -536,30 +661,6 @@ export function initVisualizerUi(
       if (elements.visualizerPositionVal)
         elements.visualizerPositionVal.textContent = `${Math.round(config.position * 100)}%`;
     }
-    if (elements.visualizerSmoothingRange) {
-      elements.visualizerSmoothingRange.value = String(config.smoothing);
-      if (elements.visualizerSmoothingVal)
-        elements.visualizerSmoothingVal.textContent = `${Math.round(config.smoothing * 100)}%`;
-    }
-    if (elements.visualizerSensitivityRange) {
-      elements.visualizerSensitivityRange.value = String(config.sensitivity);
-      if (elements.visualizerSensitivityVal)
-        elements.visualizerSensitivityVal.textContent = `${Number(config.sensitivity).toFixed(1)}×`;
-    }
-    if (elements.visualizerBassRange) {
-      elements.visualizerBassRange.value = String(config.bassEmphasis);
-      if (elements.visualizerBassVal)
-        elements.visualizerBassVal.textContent = Number(
-          config.bassEmphasis,
-        ).toFixed(1);
-    }
-    if (elements.visualizerOpacityRange) {
-      elements.visualizerOpacityRange.value = String(config.opacity);
-      if (elements.visualizerOpacityVal)
-        elements.visualizerOpacityVal.textContent = `${Math.round(config.opacity * 100)}%`;
-    }
-    if (elements.visualizerColorPicker)
-      elements.visualizerColorPicker.value = config.color;
 
     if (elements.visualizerColorPills) {
       const pills = elements.visualizerColorPills.querySelectorAll(
@@ -645,10 +746,6 @@ export function initVisualizerUi(
     visualizer.setOption("style", e.target.value);
   });
 
-  elements.visualizerFillSelect?.addEventListener("change", (e) => {
-    visualizer.setOption("fill", e.target.value);
-  });
-
   elements.visualizerHeightRange?.addEventListener("input", (e) => {
     const val = Number(e.target.value);
     visualizer.setOption("height", val);
@@ -657,30 +754,6 @@ export function initVisualizerUi(
   elements.visualizerPositionRange?.addEventListener("input", (e) => {
     const val = Number(e.target.value);
     visualizer.setOption("position", val);
-  });
-
-  elements.visualizerSmoothingRange?.addEventListener("input", (e) => {
-    const val = Number(e.target.value);
-    visualizer.setOption("smoothing", val);
-  });
-
-  elements.visualizerSensitivityRange?.addEventListener("input", (e) => {
-    const val = Number(e.target.value);
-    visualizer.setOption("sensitivity", val);
-  });
-
-  elements.visualizerBassRange?.addEventListener("input", (e) => {
-    const val = Number(e.target.value);
-    visualizer.setOption("bassEmphasis", val);
-  });
-
-  elements.visualizerOpacityRange?.addEventListener("input", (e) => {
-    const val = Number(e.target.value);
-    visualizer.setOption("opacity", val);
-  });
-
-  elements.visualizerColorPicker?.addEventListener("input", (e) => {
-    visualizer.setOption("color", e.target.value);
   });
 
   elements.visualizerColorPills?.addEventListener("click", (e) => {

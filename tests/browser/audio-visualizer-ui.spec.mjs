@@ -51,9 +51,9 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
   await styleSelect.selectOption("mirrored");
   await expect(styleSelect).toHaveValue("mirrored");
 
-  const fillSelect = page.locator("#visualizer-fill-select");
-  await fillSelect.selectOption("fill");
-  await expect(fillSelect).toHaveValue("fill");
+  const heightRange = page.locator("#visualizer-height-range");
+  await heightRange.fill("1.2");
+  await expect(page.locator("#visualizer-height-val")).toHaveText("120%");
 
   // Test color pill selection
   const magentaPill = page.locator('#visualizer-color-pills [data-color="#ff00a0"]');

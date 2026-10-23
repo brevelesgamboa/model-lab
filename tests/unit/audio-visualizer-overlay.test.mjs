@@ -6,7 +6,7 @@ import {
   VISUALIZER_COLOR_PRESETS,
 } from "../../assets/js/audio/visualizer-overlay.js";
 
-function createMockCanvas(width = 512, height = 512) {
+function createMockCanvas(width = 640, height = 360) {
   const drawnOperations = [];
   const context = {
     imageSmoothingEnabled: false,
@@ -14,15 +14,11 @@ function createMockCanvas(width = 512, height = 512) {
     beginPath: () => drawnOperations.push(["beginPath"]),
     moveTo: (x, y) => drawnOperations.push(["moveTo", x, y]),
     lineTo: (x, y) => drawnOperations.push(["lineTo", x, y]),
-    bezierCurveTo: (...args) => drawnOperations.push(["bezierCurveTo", ...args]),
     closePath: () => drawnOperations.push(["closePath"]),
     stroke: (...args) => drawnOperations.push(["stroke", ...args]),
     fill: (...args) => drawnOperations.push(["fill", ...args]),
     save: () => drawnOperations.push(["save"]),
     restore: () => drawnOperations.push(["restore"]),
-    createLinearGradient: () => ({
-      addColorStop: () => {},
-    }),
     drawImage: (...args) => drawnOperations.push(["drawImage", ...args]),
   };
 
@@ -30,7 +26,7 @@ function createMockCanvas(width = 512, height = 512) {
     width,
     height,
     hidden: true,
-    getContext: () => context,
+    getContext: (type) => (type === "2d" ? context : null),
     drawnOperations,
   };
 }
@@ -70,15 +66,11 @@ test("audio visualizer overlay initializes with valid defaults and color presets
   assert.equal(visualizer.enabled, false);
   assert.equal(visualizer.config.mode, DEFAULT_VISUALIZER_CONFIG.mode);
   assert.equal(visualizer.config.style, "single");
-  assert.equal(visualizer.config.fill, "stroke");
   assert.equal(visualizer.config.height, 0.85);
   assert.equal(visualizer.config.position, 0.15);
-  assert.equal(visualizer.config.smoothing, 0.65);
-  assert.equal(visualizer.config.sensitivity, 1.2);
-  assert.equal(visualizer.config.bassEmphasis, 0.6);
 
   assert.ok(Array.isArray(VISUALIZER_COLOR_PRESETS));
-  assert.equal(VISUALIZER_COLOR_PRESETS.length, 5);
+  assert.equal(VISUALIZER_COLOR_PRESETS.length, 4);
   assert.equal(VISUALIZER_COLOR_PRESETS[0].id, "cyan");
 });
 
@@ -89,37 +81,28 @@ test("audio visualizer overlay normalizes and clamps configuration parameters", 
     enabled: true,
     mode: "invalid_mode",
     style: "unknown_style",
-    fill: "unsupported_fill",
     height: 99.0, // should clamp to 2.0
     position: -5.0, // should clamp to 0.05
-    smoothing: 2.5, // should clamp to 0.95
-    sensitivity: 0.1, // should clamp to 0.5
-    bassEmphasis: -1.0, // should clamp to 0.0
-    opacity: 5.0, // should clamp to 1.0
     color: "not-a-color", // should fallback to default
   });
 
   assert.equal(normalized.enabled, true);
   assert.equal(normalized.mode, "spectrum");
   assert.equal(normalized.style, "single");
-  assert.equal(normalized.fill, "stroke");
   assert.equal(normalized.height, 2.0);
   assert.equal(normalized.position, 0.05);
-  assert.equal(normalized.smoothing, 0.95);
-  assert.equal(normalized.sensitivity, 0.5);
-  assert.equal(normalized.bassEmphasis, 0.0);
-  assert.equal(normalized.opacity, 1.0);
   assert.equal(normalized.color, DEFAULT_VISUALIZER_CONFIG.color);
 });
 
-test("audio visualizer overlay synchronizes dimensions with target simulation canvas", () => {
-  const mockCanvas = createMockCanvas(256, 256);
-  const targetCanvas = { width: 1024, height: 1024 };
+test("audio visualizer overlay maintains fixed lean buffer resolution", () => {
+  const mockCanvas = createMockCanvas(640, 360);
+  const targetCanvas = { width: 1440, height: 1000 };
   const visualizer = new AudioVisualizerOverlay(mockCanvas);
 
   visualizer.syncDimensions(targetCanvas);
-  assert.equal(mockCanvas.width, 1024);
-  assert.equal(mockCanvas.height, 1024);
+  // Fixed width 640 capped to lean buffer size
+  assert.equal(mockCanvas.width, 640);
+  assert.equal(mockCanvas.height, Math.round(640 * (1000 / 1440)));
 });
 
 test("audio visualizer overlay updates options and notifies subscribers", () => {
@@ -138,11 +121,9 @@ test("audio visualizer overlay updates options and notifies subscribers", () => 
 
   visualizer.setOptions({
     style: "mirrored",
-    fill: "fill",
     color: "#ff00a0",
   });
   assert.equal(visualizer.config.style, "mirrored");
-  assert.equal(visualizer.config.fill, "fill");
   assert.equal(visualizer.config.color, "#ff00a0");
 
   unsubscribe();
@@ -178,12 +159,12 @@ test("audio visualizer overlay renders bass history mode with circular buffer wr
   visualizer.setOptions({ enabled: true, mode: "bass_history" });
 
   const activeRhythm = createMockRhythm("active", true);
-  for (let frame = 0; frame < 150; frame += 1) {
+  for (let frame = 0; frame < 100; frame += 1) {
     visualizer.update(2000 + frame * 16, activeRhythm, mockCanvas);
   }
 
-  // Wrapped past 128 elements cleanly
-  assert.ok(visualizer.bassHead >= 0 && visualizer.bassHead < 128);
+  // Wrapped past 64 elements cleanly
+  assert.ok(visualizer.bassHead >= 0 && visualizer.bassHead < 64);
   assert.equal(visualizer.isIdle, false);
 });
 
@@ -201,10 +182,10 @@ test("audio visualizer overlay renders waveform mode with zero-crossing alignmen
 });
 
 test("audio visualizer overlay composites onto target canvas only when active", () => {
-  const mockCanvas = createMockCanvas(512, 512);
+  const mockCanvas = createMockCanvas(640, 360);
   const visualizer = new AudioVisualizerOverlay(mockCanvas);
 
-  const targetCanvas = createMockCanvas(512, 512);
+  const targetCanvas = createMockCanvas(1024, 1024);
 
   // Disabled: should not draw
   visualizer.compositeOnto(targetCanvas);
@@ -217,4 +198,3 @@ test("audio visualizer overlay composites onto target canvas only when active", 
 
   assert.ok(targetCanvas.drawnOperations.some((op) => op[0] === "drawImage"));
 });
-
