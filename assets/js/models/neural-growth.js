@@ -18,6 +18,10 @@ import {
   ACOUSTIC_INJECTION_MODES,
   ACOUSTIC_POSITION_MODES,
 } from "./neural-growth/acoustic-emitter.js";
+import {
+  CameraMotionEngine,
+  CAMERA_BREATHING_MODES,
+} from "./neural-growth/camera-motion.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -90,10 +94,25 @@ export class NeuralGrowthModel {
     this._palettePhaseAccumulator = 0.0;
     this._lastPaletteTime = null;
     this._acousticEmitter = null;
+    this._cameraMotion = new CameraMotionEngine();
+    this._effectiveZoom = 1.0;
+    this._effectivePan = [0.0, 0.0];
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
+  }
+
+  get effectiveZoom() {
+    return this._effectiveZoom;
+  }
+
+  get effectivePan() {
+    return this._effectivePan;
+  }
+
+  get cameraMotion() {
+    return this._cameraMotion;
   }
 
   _simulationSizeOptions() {
@@ -848,6 +867,46 @@ export class NeuralGrowthModel {
         help: "Spatial origin of audio disturbances across the simulation canvas.",
       },
       {
+        key: "cameraBreathing",
+        label: "CAMERA BREATH",
+        type: "select",
+        default: "off",
+        options: [
+          {
+            value: "off",
+            label: "Off",
+            guidance: "Camera stays fixed at manual zoom.",
+          },
+          {
+            value: "subtle",
+            label: "Subtle",
+            guidance: "Gentle kick accents with smooth recovery.",
+          },
+          {
+            value: "punchy",
+            label: "Punchy",
+            guidance: "Rhythmic zoom bounces and beat pulses.",
+          },
+          {
+            value: "drift",
+            label: "Drift & Breathe",
+            guidance: "Deep bass breathing combined with slow harmonic drift.",
+          },
+        ],
+        help: "Couples live audio to the camera viewport via optical zoom pulses and harmonic drift.",
+      },
+      {
+        key: "cameraReactivity",
+        label: "BREATH STRENGTH",
+        type: "range",
+        min: 0.10,
+        max: 1.00,
+        step: 0.05,
+        default: 0.50,
+        modulatable: true,
+        help: "Sensitivity scaling for audio-reactive camera zoom pulses and breathing.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
@@ -1369,7 +1428,9 @@ export class NeuralGrowthModel {
       ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
         this.hasActiveRipples ||
         Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001 ||
-        Number(parameters?.echoDecay || 0) > 0.01)
+        Number(parameters?.echoDecay || 0) > 0.01 ||
+        (parameters?.cameraBreathing !== "off" &&
+          Boolean(this._cameraMotion?.isMoving)))
     );
   }
 
@@ -1497,6 +1558,17 @@ export class NeuralGrowthModel {
     if (key === "acousticPosition") {
       if (ACOUSTIC_POSITION_MODES.includes(value)) return value;
       return "curve_peaks";
+    }
+    if (key === "cameraBreathing") {
+      if (CAMERA_BREATHING_MODES.includes(value)) return value;
+      return "off";
+    }
+    if (key === "cameraReactivity") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.10, Math.min(1.00, num));
+      }
+      return 0.50;
     }
     if (key === "channelView") {
       const valid = [
@@ -1687,6 +1759,8 @@ export class NeuralGrowthModel {
       key === "acousticInjection" ||
       key === "acousticThreshold" ||
       key === "acousticPosition" ||
+      key === "cameraBreathing" ||
+      key === "cameraReactivity" ||
       key === "channelView" ||
       key === "displayFilter" ||
       key === "brushRadius" ||
@@ -1917,10 +1991,13 @@ export class NeuralGrowthModel {
           (r) => now - r.startTime < r.duration * 1000,
         );
       }
+      const effectiveZoom =
+        this._effectiveZoom > 0 ? this._effectiveZoom : parameters.zoom;
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         palettePhase: effectivePhaseRad,
-        zoom: parameters.zoom,
+        zoom: effectiveZoom,
+        pan: this._effectivePan || [0, 0],
         displayFilter: parameters.displayFilter,
         showBarrier,
         ripples: this._activeRipples || [],
@@ -2255,6 +2332,21 @@ export class NeuralGrowthModel {
     });
 
     return count;
+  }
+
+  processCameraMotion(levels, timestamp) {
+    if (!this.ready || !this._parameters) return false;
+    if (!this._cameraMotion) {
+      this._cameraMotion = new CameraMotionEngine();
+    }
+    const motion = this._cameraMotion.update(levels, timestamp, this._parameters);
+    const baseZoom = Number(this._parameters.zoom) || 1;
+    this._effectiveZoom = Math.max(
+      1,
+      Math.min(8, baseZoom * (1.0 + motion.zoomOffset)),
+    );
+    this._effectivePan = [motion.panX, motion.panY];
+    return motion.isMoving;
   }
 
   triggerKickInput(strength = 1.0, timestamp = null) {

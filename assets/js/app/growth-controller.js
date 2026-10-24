@@ -476,7 +476,15 @@ export function createGrowthController({
     let x = (event.clientX - rect.left - (rect.width - side) / 2) / side;
     let y = (event.clientY - rect.top - (rect.height - side) / 2) / side;
     if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
-    const zoom = Math.max(1, Math.min(8, Number(model.parameters?.zoom) || 1));
+    const zoom = Math.max(
+      1,
+      Math.min(8, Number(model.effectiveZoom ?? model.parameters?.zoom) || 1),
+    );
+    const pan = model.effectivePan;
+    if (Array.isArray(pan) && (pan[0] !== 0 || pan[1] !== 0)) {
+      x -= pan[0];
+      y += pan[1];
+    }
     if (zoom > 1) {
       x = 0.5 + (x - 0.5) / zoom;
       y = 0.5 + (y - 0.5) / zoom;
@@ -813,6 +821,15 @@ export function createGrowthController({
     const model = activeModel();
     if (!model?.ready || !levels) return;
 
+    let needsRender = false;
+
+    if (typeof model.processCameraMotion === "function") {
+      const cameraMoving = model.processCameraMotion(levels, timestamp);
+      if (cameraMoving) {
+        needsRender = true;
+      }
+    }
+
     const spectrum = rhythmController?.getFrequencyData();
     if (spectrum && typeof model.processAcousticInjection === "function") {
       const injected = model.processAcousticInjection(
@@ -821,8 +838,8 @@ export function createGrowthController({
         timestamp,
         rhythmController,
       );
-      if (injected > 0 && !model.isClockRunning) {
-        schedulePausedRender();
+      if (injected > 0) {
+        needsRender = true;
       }
     }
 
@@ -830,24 +847,28 @@ export function createGrowthController({
     if (!levels.hasSignal || triggerKick < 0.25) {
       beatArmed = true;
     }
-    if (!levels.hasSignal) return;
+    if (!levels.hasSignal) {
+      if (needsRender && !model.isClockRunning) {
+        schedulePausedRender();
+      }
+      return;
+    }
 
     const elapsed = timestamp - lastBeatTime;
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
       const shockwave = model.parameters?.beatShockwave ?? "on";
-      let triggered = false;
-
       if (shockwave !== "off") {
         if (typeof model.triggerBeatShockwave === "function") {
           model.triggerBeatShockwave("on");
-          triggered = true;
+          needsRender = true;
         }
       }
-      if (triggered && !model.isClockRunning) {
-        schedulePausedRender();
-      }
+    }
+
+    if (needsRender && !model.isClockRunning) {
+      schedulePausedRender();
     }
   }
 

@@ -116,7 +116,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(17);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(18);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -1155,6 +1155,24 @@ test("acoustic field injection configures coupling modes and synchronizes with p
 
   // Close popover
   await page.locator("#close-visualizer-settings").click();
+
+  expect(errors).toEqual([]);
+});
+
+test("camera breathing configures modes and updates viewport cleanly", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await selectGrowth(page);
+
+  const breathSelect = page.locator('select[aria-label="CAMERA BREATH"]');
+  await expect(breathSelect).toHaveValue("off");
+  await breathSelect.selectOption("punchy");
+  await expect(breathSelect).toHaveValue("punchy");
+
+  await breathSelect.selectOption("drift");
+  await expect(breathSelect).toHaveValue("drift");
 
   expect(errors).toEqual([]);
 });

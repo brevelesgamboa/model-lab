@@ -1634,5 +1634,39 @@ test("acoustic field injection configures controls, normalizes values and dispat
   );
 });
 
+test("audio-reactive camera breathing configures controls, normalizes values and updates viewport", () => {
+  const model = new NeuralGrowthModel();
+
+  // Controls
+  const breathCtrl = model.controls.find((c) => c.key === "cameraBreathing");
+  assert.ok(breathCtrl && Array.isArray(breathCtrl.options));
+  assert.equal(breathCtrl.default, "off");
+
+  const reactCtrl = model.controls.find((c) => c.key === "cameraReactivity");
+  assert.ok(reactCtrl && reactCtrl.modulatable);
+  assert.equal(reactCtrl.default, 0.50);
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("cameraBreathing", "punchy"), "punchy");
+  assert.equal(model.normalizeStoredParameter("cameraBreathing", "invalid"), "off");
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", 0.75), 0.75);
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", 5.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", -1.0), 0.1);
+
+  // Parameter change
+  assert.equal(model.onParameterChange("cameraBreathing", "punchy"), true);
+  assert.equal(model.parameters.cameraBreathing, "punchy");
+  assert.equal(model.onParameterChange("cameraReactivity", 0.8), true);
+  assert.equal(model.parameters.cameraReactivity, 0.8);
+
+  // Camera motion update
+  model._parameters = { ...model.parameters, zoom: 2 };
+  Object.defineProperty(model, "ready", { value: true, configurable: true });
+  const moving = model.processCameraMotion({ hasSignal: true, kickOnset: 0.9, bass: 0.5 }, 1000);
+  assert.equal(moving, true);
+  assert.ok(model.effectiveZoom > 2.0);
+  assert.ok(Array.isArray(model.effectivePan));
+});
+
 
 

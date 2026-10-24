@@ -527,6 +527,7 @@ uniform vec4 u_rippleAmps;
 uniform int u_channelView;
 uniform ivec2 u_viewport;
 uniform float u_zoom;
+uniform vec2 u_pan;
 uniform int u_displayFilter;
 
 vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int style) {
@@ -677,7 +678,7 @@ void main() {
   float z = u_zoom > 0.0 ? u_zoom : 1.0;
   float srcExtent = float(u_size) / z;
   float srcOffset = (float(u_size) - srcExtent) * 0.5;
-  vec2 pos = srcOffset + uv * srcExtent;
+  vec2 pos = srcOffset + u_pan * float(u_size) + uv * srcExtent;
 
   vec2 disp = vec2(0.0);
   float totalGlow = 0.0;
@@ -1536,6 +1537,7 @@ export class TextureNcaRuntime {
       palette = "native",
       palettePhase = 0,
       zoom = 1,
+      pan = [0, 0],
       displayFilter = "smooth",
       showBarrier = false,
       ripples = [],
@@ -1637,6 +1639,7 @@ export class TextureNcaRuntime {
       u_channelView: channelViewCode,
       u_viewport: [extent, extent],
       u_zoom: z,
+      u_pan: Array.isArray(pan) ? pan : [0, 0],
       u_displayFilter: filterCode,
       ...rippleUniforms,
     };
