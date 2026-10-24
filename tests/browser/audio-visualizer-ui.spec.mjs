@@ -21,7 +21,7 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
   const overlayCanvas = page.locator("#audio-visualizer-canvas");
 
   await expect(toggleBtn).toBeVisible();
-  await expect(toggleBtn).toHaveText("LINE: OFF");
+  await expect(toggleBtn).toHaveText("WAVE: OFF");
   await expect(overlayCanvas).toBeHidden();
 
   // Pointer events must pass through to output canvas
@@ -32,7 +32,7 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
 
   // Toggle visualizer on
   await toggleBtn.click();
-  await expect(toggleBtn).toHaveText("LINE: ON");
+  await expect(toggleBtn).toHaveText("WAVE: ON");
   await expect(toggleBtn).toHaveClass(/is-active/);
   await expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
   await expect(overlayCanvas).toBeVisible();
@@ -52,8 +52,17 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
   await expect(styleSelect).toHaveValue("mirrored");
 
   const heightRange = page.locator("#visualizer-height-range");
-  await heightRange.fill("1.2");
-  await expect(page.locator("#visualizer-height-val")).toHaveText("120%");
+  await heightRange.fill("0.35");
+  await expect(page.locator("#visualizer-height-val")).toHaveText("35%");
+
+  const opacityRange = page.locator("#visualizer-opacity-range");
+  await opacityRange.fill("0.65");
+  await expect(page.locator("#visualizer-opacity-val")).toHaveText("65%");
+
+  // Test custom color picker
+  const colorPicker = page.locator("#visualizer-color-picker");
+  await colorPicker.fill("#33aaff");
+  await expect(colorPicker).toHaveValue("#33aaff");
 
   // Test color pill selection
   const magentaPill = page.locator('#visualizer-color-pills [data-color="#ff00a0"]');
@@ -79,7 +88,7 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
 
   // Toggle visualizer off
   await toggleBtn.click();
-  await expect(toggleBtn).toHaveText("LINE: OFF");
+  await expect(toggleBtn).toHaveText("WAVE: OFF");
   await expect(toggleBtn).not.toHaveClass(/is-active/);
   await expect(overlayCanvas).toBeHidden();
 

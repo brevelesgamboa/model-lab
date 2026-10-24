@@ -34,13 +34,13 @@ test("calculateGridCoordinates respects position modes across simulation sizes",
   const emitter = new AcousticEmitter();
   const size = 256;
 
-  // Baseline mode: y fixed at 15%
+  // Baseline mode: y fixed at 50%
   const baselineCoords = emitter.calculateGridCoordinates(0, 0.9, "baseline", size);
-  assert.equal(baselineCoords.y, Math.round(0.15 * (size - 1)));
+  assert.equal(baselineCoords.y, Math.round(0.50 * (size - 1)));
 
-  // Curve peaks mode: y tracks level
+  // Curve peaks mode: y tracks level centered at 50%
   const peakCoords = emitter.calculateGridCoordinates(0, 0.8, "curve_peaks", size);
-  const expectedY = Math.round((0.15 + 0.8 * 0.38) * (size - 1));
+  const expectedY = Math.round((0.50 + (0.8 - 0.5) * 0.25) * (size - 1));
   assert.equal(peakCoords.y, expectedY);
 
   // Center mode: radial offset from center

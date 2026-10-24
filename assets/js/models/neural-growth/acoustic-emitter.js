@@ -78,13 +78,13 @@ export class AcousticEmitter {
     }
 
     if (positionMode === "baseline") {
-      // Bottom baseline position (15% from bottom in bottom-up coordinates)
-      const gy = Math.round(0.15 * (size - 1));
+      // Center line position (50% vertically)
+      const gy = Math.round(0.50 * (size - 1));
       return { x: gx, y: gy };
     }
 
-    // Default "curve_peaks": vertical position traces line height
-    const v = 0.15 + level * 0.38;
+    // Default "curve_peaks": vertical position traces line height centered around 50%
+    const v = 0.50 + (level - 0.5) * 0.25;
     const gy = Math.max(0, Math.min(size - 1, Math.round(v * (size - 1))));
     return { x: gx, y: gy };
   }
@@ -167,13 +167,16 @@ export class AcousticEmitter {
         case "dye":
           queueDisturbance(coords.x, coords.y, dynRadius, "dye", {
             dyeColor: colorForFrequencyBand(b, this.numBands),
+            watercolor: true,
           });
           break;
         case "shockwave":
           queueDisturbance(coords.x, coords.y, dynRadius, "shockwave");
           break;
         case "sprout":
-          queueDisturbance(coords.x, coords.y, Math.max(2, Math.round(dynRadius * 0.7)), "noise");
+          queueDisturbance(coords.x, coords.y, Math.max(2, Math.round(dynRadius * 0.7)), "sprout", {
+            organicSprout: true,
+          });
           break;
         case "flow": {
           const angle = b < this.numBands / 2 ? -Math.PI * 0.35 : Math.PI * 0.35;

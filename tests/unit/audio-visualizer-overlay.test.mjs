@@ -64,10 +64,11 @@ test("audio visualizer overlay initializes with valid defaults and color presets
   const visualizer = new AudioVisualizerOverlay(mockCanvas);
 
   assert.equal(visualizer.enabled, false);
-  assert.equal(visualizer.config.mode, DEFAULT_VISUALIZER_CONFIG.mode);
+  assert.equal(visualizer.config.mode, "waveform");
   assert.equal(visualizer.config.style, "single");
-  assert.equal(visualizer.config.height, 0.85);
-  assert.equal(visualizer.config.position, 0.15);
+  assert.equal(visualizer.config.height, 0.25);
+  assert.equal(visualizer.config.position, 0.50);
+  assert.equal(visualizer.config.opacity, 0.80);
 
   assert.ok(Array.isArray(VISUALIZER_COLOR_PRESETS));
   assert.equal(VISUALIZER_COLOR_PRESETS.length, 4);
@@ -81,17 +82,23 @@ test("audio visualizer overlay normalizes and clamps configuration parameters", 
     enabled: true,
     mode: "invalid_mode",
     style: "unknown_style",
-    height: 99.0, // should clamp to 2.0
+    height: 99.0, // should clamp to 0.50
     position: -5.0, // should clamp to 0.05
+    opacity: 10.0, // should clamp to 1.00
     color: "not-a-color", // should fallback to default
   });
 
   assert.equal(normalized.enabled, true);
-  assert.equal(normalized.mode, "spectrum");
+  assert.equal(normalized.mode, "waveform");
   assert.equal(normalized.style, "single");
-  assert.equal(normalized.height, 2.0);
+  assert.equal(normalized.height, 0.50);
   assert.equal(normalized.position, 0.05);
+  assert.equal(normalized.opacity, 1.00);
   assert.equal(normalized.color, DEFAULT_VISUALIZER_CONFIG.color);
+
+  // Accepts arbitrary custom hex colors
+  const customColor = visualizer.normalizeConfig({ color: "#e0115f" });
+  assert.equal(customColor.color, "#e0115f");
 });
 
 test("audio visualizer overlay maintains fixed lean buffer resolution", () => {

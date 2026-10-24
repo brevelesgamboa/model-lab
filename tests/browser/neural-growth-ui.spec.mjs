@@ -1138,7 +1138,7 @@ test("acoustic field injection configures coupling modes and synchronizes with p
   await selectGrowth(page);
 
   // In Neural Growth model controls:
-  const injectSelect = page.locator('select[aria-label="ACOUSTIC INJECTION"]');
+  const injectSelect = page.locator('select[aria-label="AUDIO COUPLING"]');
   await expect(injectSelect).toHaveValue("off");
   await injectSelect.selectOption("dye");
   await expect(injectSelect).toHaveValue("dye");

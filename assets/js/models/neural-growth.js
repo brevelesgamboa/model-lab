@@ -780,72 +780,72 @@ export class NeuralGrowthModel {
       },
       {
         key: "acousticInjection",
-        label: "ACOUSTIC INJECTION",
+        label: "AUDIO COUPLING",
         type: "select",
         default: "off",
         options: [
           {
             value: "off",
             label: "Off",
-            guidance: "Acoustic field coupling disabled. Visualizer acts as display overlay.",
+            guidance: "Audio coupling disabled. Visualizer acts as display overlay.",
           },
           {
             value: "dye",
-            label: "Chromophore Dye",
-            guidance: "Frequencies inject spectral pigment pulses (cyan bass, emerald mids, magenta treble).",
+            label: "Dye (Color)",
+            guidance: "Frequencies inject soft watercolor pigments (cyan bass, emerald mids, magenta treble).",
           },
           {
             value: "shockwave",
-            label: "Acoustic Shockwave",
+            label: "Ripple",
             guidance: "Transients emit expanding physical wavefronts that ripple through the cellular texture.",
           },
           {
             value: "sprout",
-            label: "Acoustic Sprout",
-            guidance: "Transients inject entropy to sprout fresh growth or heal damaged regions.",
+            label: "Sprout (Growth)",
+            guidance: "Transients awaken dormant cells and gently sprout fresh growth branches.",
           },
           {
             value: "flow",
-            label: "Spectral Flow",
+            label: "Flow",
             guidance: "Frequency energy pushes directional currents into cell hidden channels.",
           },
         ],
-        help: "Audio spectrum injects frequency-mapped physical disturbances directly into the cellular automata grid.",
+        help: "Audio wave injects frequency-mapped physical disturbances directly into the cellular automata grid.",
       },
       {
         key: "acousticThreshold",
-        label: "INJECTION THRESHOLD",
+        label: "AUDIO SENSITIVITY",
         type: "range",
         min: 0.20,
         max: 0.80,
         step: 0.05,
         default: 0.45,
         modulatable: true,
-        help: "Audio transient onset sensitivity required to trigger an acoustic injection.",
+        help: "Audio transient onset sensitivity required to trigger an injection.",
       },
       {
         key: "acousticPosition",
-        label: "INJECTION POSITION",
+        label: "AUDIO ORIGIN",
         type: "select",
         default: "curve_peaks",
         options: [
           {
             value: "curve_peaks",
-            label: "Curve Peaks",
-            guidance: "Injections originate directly from the dynamic peaks of the visualizer line.",
+            label: "Wave Peaks",
+            guidance: "Injections originate directly from the dynamic crests of the waveform.",
           },
           {
             value: "baseline",
-            label: "Bottom Baseline",
-            guidance: "Injections originate along the bottom edge, growing upward like acoustic flora.",
+            label: "Center Line",
+            guidance: "Injections originate along the horizontal center line.",
           },
           {
             value: "center",
-            label: "Geometry Center",
+            label: "Focal Center",
             guidance: "Injections radiate outward from the active focal center.",
           },
         ],
-        help: "Spatial origin of acoustic disturbances across the simulation canvas.",
+        help: "Spatial origin of audio disturbances across the simulation canvas.",
       },
       {
         key: "brushRadius",
@@ -2055,6 +2055,8 @@ export class NeuralGrowthModel {
       mode,
       dyeColor: options.dyeColor || this._parameters.dyeColor || "#00f0ff",
       strokeAngle: options.strokeAngle || 0,
+      watercolor: Boolean(options.watercolor),
+      organicSprout: Boolean(options.organicSprout),
     });
   }
 
@@ -2089,8 +2091,16 @@ export class NeuralGrowthModel {
     let applied = false;
     const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
     while (this._queuedDisturbances.length > 0) {
-      const { x, y, radius, mode, dyeColor, strokeAngle } =
-        this._queuedDisturbances.shift();
+      const {
+        x,
+        y,
+        radius,
+        mode,
+        dyeColor,
+        strokeAngle,
+        watercolor,
+        organicSprout,
+      } = this._queuedDisturbances.shift();
       try {
         const rgb = hexToRgb(dyeColor || this._parameters.dyeColor || "#00f0ff");
         if (mode && mode !== "erase") {
@@ -2099,7 +2109,14 @@ export class NeuralGrowthModel {
             strokeAngle: strokeAngle || 0,
             lockBarrier,
           };
-          if (mode === "shockwave") {
+          let effectiveMode = mode;
+          if (watercolor && mode === "dye") {
+            effectiveMode = "kick_color";
+            opts.strength = 0.85;
+          } else if (organicSprout && (mode === "sprout" || mode === "noise")) {
+            effectiveMode = "infuse";
+            opts.strength = 1.0;
+          } else if (mode === "shockwave") {
             opts.shockwaveImpact = this._parameters.shockwaveImpact || "color";
             opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
             opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
@@ -2109,7 +2126,7 @@ export class NeuralGrowthModel {
           } else if (mode === "prune") {
             opts.strength = 0.85;
           }
-          this._runtime.disturb(x, y, radius, mode, opts);
+          this._runtime.disturb(x, y, radius, effectiveMode, opts);
         } else {
           this._runtime.disturb(x, y, radius);
         }

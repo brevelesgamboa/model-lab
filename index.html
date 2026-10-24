@@ -1306,16 +1306,16 @@
               class="audio-monitor__toggle visualizer-toggle"
               type="button"
               aria-pressed="false"
-              title="Toggle audio visualizer line overlay"
+              title="Toggle audio waveform overlay"
             >
-              LINE: OFF
+              WAVE: OFF
             </button>
             <button
               id="open-visualizer-settings"
               class="audio-monitor__cfg-btn"
               type="button"
-              aria-label="Visualizer line settings"
-              title="Visualizer line settings"
+              aria-label="Visualizer wave settings"
+              title="Visualizer wave settings"
             >
               CFG
             </button>
@@ -1327,7 +1327,7 @@
               aria-label="Audio visualizer settings"
             >
               <div class="visualizer-popover-header">
-                <span class="visualizer-popover-title">AUDIO LINE VISUALIZER</span>
+                <span class="visualizer-popover-title">AUDIO WAVE</span>
                 <button
                   id="close-visualizer-settings"
                   class="visualizer-popover-close"
@@ -1339,9 +1339,9 @@
                 <div class="visualizer-control-row">
                   <label for="visualizer-mode-select">MODE</label>
                   <select id="visualizer-mode-select" aria-label="Visualizer mode">
+                    <option value="waveform" selected>Waveform</option>
                     <option value="spectrum">Spectrum Line</option>
                     <option value="bass_history">Bass History</option>
-                    <option value="waveform">Waveform</option>
                   </select>
                 </div>
                 <div class="visualizer-control-row">
@@ -1355,29 +1355,37 @@
                   <label for="visualizer-injection-select">COUPLING</label>
                   <select id="visualizer-injection-select" aria-label="Acoustic field coupling">
                     <option value="off">Off (Overlay)</option>
-                    <option value="dye">Chromophore Dye</option>
-                    <option value="shockwave">Acoustic Shockwave</option>
-                    <option value="sprout">Acoustic Sprout</option>
-                    <option value="flow">Spectral Flow</option>
+                    <option value="dye">Dye (Color)</option>
+                    <option value="sprout">Sprout (Growth)</option>
+                    <option value="shockwave">Ripple</option>
+                    <option value="flow">Flow</option>
                   </select>
                 </div>
                 <div class="visualizer-control-row">
                   <label for="visualizer-height-range">HEIGHT</label>
-                  <input id="visualizer-height-range" type="range" min="0.3" max="2.0" step="0.05" value="0.85" aria-label="Line height" />
-                  <span id="visualizer-height-val" class="visualizer-val-readout">85%</span>
+                  <input id="visualizer-height-range" type="range" min="0.05" max="0.50" step="0.01" value="0.25" aria-label="Line height" />
+                  <span id="visualizer-height-val" class="visualizer-val-readout">25%</span>
                 </div>
                 <div class="visualizer-control-row">
                   <label for="visualizer-position-range">POSITION</label>
-                  <input id="visualizer-position-range" type="range" min="0.05" max="0.95" step="0.05" value="0.15" aria-label="Vertical position" />
-                  <span id="visualizer-position-val" class="visualizer-val-readout">15%</span>
+                  <input id="visualizer-position-range" type="range" min="0.05" max="0.95" step="0.01" value="0.50" aria-label="Vertical position" />
+                  <span id="visualizer-position-val" class="visualizer-val-readout">50%</span>
                 </div>
                 <div class="visualizer-control-row">
-                  <span>COLOR</span>
-                  <div class="visualizer-color-pills" id="visualizer-color-pills">
-                    <button class="color-preset-pill is-active" type="button" data-color="#54ddff" style="--pill-color: #54ddff" title="Cyan"></button>
-                    <button class="color-preset-pill" type="button" data-color="#ff00a0" style="--pill-color: #ff00a0" title="Magenta"></button>
-                    <button class="color-preset-pill" type="button" data-color="#ffb800" style="--pill-color: #ffb800" title="Gold"></button>
-                    <button class="color-preset-pill" type="button" data-color="#ffffff" style="--pill-color: #ffffff" title="White"></button>
+                  <label for="visualizer-opacity-range">OPACITY</label>
+                  <input id="visualizer-opacity-range" type="range" min="0.10" max="1.00" step="0.05" value="0.80" aria-label="Wave opacity" />
+                  <span id="visualizer-opacity-val" class="visualizer-val-readout">80%</span>
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-color-picker">COLOR</label>
+                  <div class="visualizer-color-tools" style="display: flex; align-items: center; gap: 6px;">
+                    <input id="visualizer-color-picker" type="color" value="#00f0ff" aria-label="Custom wave color" />
+                    <div class="visualizer-color-pills" id="visualizer-color-pills">
+                      <button class="color-preset-pill is-active" type="button" data-color="#00f0ff" style="--pill-color: #00f0ff" title="Cyan"></button>
+                      <button class="color-preset-pill" type="button" data-color="#00ff66" style="--pill-color: #00ff66" title="Emerald"></button>
+                      <button class="color-preset-pill" type="button" data-color="#ff00a0" style="--pill-color: #ff00a0" title="Magenta"></button>
+                      <button class="color-preset-pill" type="button" data-color="#ffffff" style="--pill-color: #ffffff" title="White"></button>
+                    </div>
                   </div>
                 </div>
               </div>
