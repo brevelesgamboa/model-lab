@@ -37,6 +37,8 @@ export class RhythmController {
     this.captureStream = null;
     this.frequencyData = null;
     this.floatFrequencyData = null;
+    this.timeDomainData = null;
+    this.timeDomainData = null;
     this.status = "idle";
     this.error = null;
     this.levels = SILENT_LEVELS;
@@ -73,6 +75,18 @@ export class RhythmController {
 
   getFrequencyData() {
     return this.frequencyData;
+  }
+
+  getTimeDomainData() {
+    if (!this.analyser) return null;
+    if (
+      !this.timeDomainData ||
+      this.timeDomainData.length !== this.analyser.fftSize
+    ) {
+      this.timeDomainData = new Uint8Array(this.analyser.fftSize);
+    }
+    this.analyser.getByteTimeDomainData(this.timeDomainData);
+    return this.timeDomainData;
   }
 
   getLevels() {
@@ -262,6 +276,7 @@ export class RhythmController {
     this.captureStream = null;
     this.frequencyData = null;
     this.floatFrequencyData = null;
+    this.timeDomainData = null;
 
     if (this.mediaElement) {
       this.mediaElement.pause();

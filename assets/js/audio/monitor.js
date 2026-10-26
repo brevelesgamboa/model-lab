@@ -27,7 +27,7 @@ export function drawAudioMeter() {
   const gap = 1;
   const barWidth = (width - gap * (barCount + 1)) / barCount;
 
-  context.fillStyle = "#17131b";
+  context.fillStyle = "#101216";
   context.fillRect(0, 0, width, height);
   for (let bar = 0; bar < barCount; bar += 1) {
     let level = 0;
@@ -51,7 +51,7 @@ export function drawAudioMeter() {
     const barHeight = active
       ? Math.max(1, Math.round(level * (height - 3)))
       : 1;
-    context.fillStyle = bar < 7 ? "#7254f4" : bar < 14 ? "#54ddff" : "#f4f0f7";
+    context.fillStyle = bar < 7 ? "#7a808e" : bar < 14 ? "#a4a9b4" : "#f4f4f6";
     context.globalAlpha = active ? 0.38 + level * 0.62 : 0.14;
     context.fillRect(
       gap + bar * (barWidth + gap),

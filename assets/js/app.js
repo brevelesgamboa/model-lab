@@ -1,4 +1,8 @@
 import {
+  initializeWorkbenchShell,
+  updateRangeProgress,
+} from "./ui/workbench-shell.js";
+import {
   defaultParameters,
   sanitizeParameters as sanitizedStoredParameters,
   supportsModulation,
@@ -40,6 +44,10 @@ import {
   toggleAudioInput,
   drawAudioMeter,
 } from "./audio/monitor.js";
+import {
+  AudioVisualizerOverlay,
+  initVisualizerUi,
+} from "./audio/visualizer-overlay.js";
 import { createStudioController } from "./studio/studio-controller.js";
 import { collectElements } from "./app/dom-elements.js";
 import {
@@ -139,8 +147,11 @@ const renderer = createRenderController({
     };
   },
   onStart() {
-    elements.renderState.textContent = "RENDERING";
-    elements.renderState.classList.add("is-processing");
+    if (!playback.isActive()) {
+      resizeLiveCanvas({ render: false });
+      elements.renderState.textContent = "RENDERING";
+      elements.renderState.classList.add("is-processing");
+    }
   },
   onFrame: acceptRenderedFrame,
   onError(error) {
@@ -165,7 +176,7 @@ const navigation = createNavigationController({
     if (currentView !== view) renderer.invalidate();
     currentView = view;
     playback.sync();
-    if (view === "archive") archiveController.render();
+    if (view === "saved") archiveController.render();
     if (view === "experiments") studioController.refreshPanels();
     if (view === "lab") renderCurrentFrame({ forceAnalysis: true });
     setStatus(`${view.toUpperCase()} VIEW`);
@@ -203,8 +214,11 @@ const growthController = createGrowthController({
     currentModel?.onParameterChange?.(key, value);
     if (key === "audioProfile") {
       applyAudioProfile(value);
-    } else if (key !== "beatShockwave" && key !== "shockwaveReach") {
+    } else if (key !== "beatShockwave" && key !== "shockwaveIntensity") {
       checkAudioProfileMatch();
+    }
+    if (key === "acousticInjection" && elements.visualizerInjectionSelect) {
+      elements.visualizerInjectionSelect.value = value;
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
@@ -229,6 +243,12 @@ const controlsController = createControlsController({
   onRange: syncRangeControl,
   onValue(definition, value) {
     currentParameters[definition.key] = value;
+    if (
+      definition.key === "acousticInjection" &&
+      elements.visualizerInjectionSelect
+    ) {
+      elements.visualizerInjectionSelect.value = value;
+    }
     if (
       definition.key === "audioProfile" &&
       currentModel.id === "neural-growth"
@@ -261,7 +281,7 @@ const controlsController = createControlsController({
       if (
         definition.key !== "audioProfile" &&
         definition.key !== "beatShockwave" &&
-        definition.key !== "shockwaveReach"
+        definition.key !== "shockwaveIntensity"
       ) {
         checkAudioProfileMatch();
       }
@@ -329,7 +349,7 @@ function acceptRenderedFrame({
           ? "LIVE"
           : "FRAME READY";
   elements.renderState.classList.toggle("is-processing", processing);
-  elements.modelBackend.textContent = `BACKEND: ${latestRender.backend}`;
+  elements.modelBackend.textContent = `ARCHITECTURE: ${latestRender.backend}`;
   dreamController.update();
   growthController.update();
   if (failed) setStatus(`${model.name} ERROR`);
@@ -371,6 +391,10 @@ const hqGallery = createHqGallery({
   setStatus,
 });
 
+const visualizerOverlay = new AudioVisualizerOverlay(
+  elements.audioVisualizerCanvas,
+);
+
 const { savePng, saveGif } = createExportController({
   elements,
   capabilities,
@@ -394,6 +418,7 @@ const { savePng, saveGif } = createExportController({
   selectedLoopPreset,
   updateFractalTools,
   setStatus,
+  getVisualizerOverlay: () => visualizerOverlay,
 });
 
 function readPanelVisibility() {
@@ -789,12 +814,7 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
       const oscillatorValue =
         loopActive || !canModulate
           ? effectiveBase
-          : applyLfo(
-              definition,
-              effectiveBase,
-              lfoConfig,
-              timeSeconds,
-            );
+          : applyLfo(definition, effectiveBase, lfoConfig, timeSeconds);
       const audioRoute = canModulate
         ? getAudioRoute(currentModel.id, definition.key)
         : { source: "none", depth: 0 };
@@ -857,6 +877,7 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   if (control) {
     control.slider.value = String(next);
     control.fine.value = String(next);
+    updateRangeProgress(control.slider);
   }
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
   markPresetCustom();
@@ -939,7 +960,10 @@ function applyAudioProfile(profileKey) {
       currentParameters[key] = val;
       const control = controlElements.get(key);
       if (control) {
-        if (control.slider) control.slider.value = String(val);
+        if (control.slider) {
+          control.slider.value = String(val);
+          updateRangeProgress(control.slider);
+        }
         if (control.fine) control.fine.value = String(val);
         if (control.select) control.select.value = String(val);
         control.guidance?.update(val);
@@ -1001,7 +1025,9 @@ function applyAudioProfile(profileKey) {
   if (profileKey !== "off" && rhythmController.status !== "active") {
     terminal(
       "AUDIO",
-      "Loaded " + profile.label + ". Connect audio input (click EQ in status bar) to activate kick modulation.",
+      "Loaded " +
+        profile.label +
+        ". Connect audio input (click EQ in status bar) to activate kick modulation.",
     );
   }
 }
@@ -1078,11 +1104,13 @@ function applyParameterSet(
     if (definition.type === "range") {
       control.slider.value = String(value);
       control.fine.value = String(value);
+      updateRangeProgress(control.slider);
     } else if (definition.type === "select") {
       control.select.value = String(value);
     } else if (definition.type === "color") {
       if (control.pickerInput) control.pickerInput.value = String(value);
-      if (control.hexInput) control.hexInput.value = String(value).toUpperCase();
+      if (control.hexInput)
+        control.hexInput.value = String(value).toUpperCase();
       control.updateActivePreset?.(value);
     } else if (control.input) {
       control.input.value = String(value);
@@ -1166,6 +1194,10 @@ function setFractalProcessStep(step) {
 
 function renderParameterControls() {
   controlsController.render();
+  if (elements.visualizerInjectionSelect) {
+    elements.visualizerInjectionSelect.value =
+      currentParameters?.acousticInjection || "off";
+  }
   updateLfoCount();
   updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds));
 }
@@ -1174,6 +1206,14 @@ function updateEffectiveControlReadouts(
   effectiveParameters,
   timeSeconds = lastTimeSeconds,
 ) {
+  // Measure visible charts together before changing labels and marker styles.
+  // Interleaving these reads and writes forces one layout per control in Firefox.
+  const visualizerWidths = new Map();
+  controlElements.forEach((control) => {
+    const canvas = control.modulationVisualizer;
+    if (canvas && !canvas.closest("[hidden], details:not([open])"))
+      visualizerWidths.set(canvas, canvas.clientWidth);
+  });
   currentModel.controls.forEach((definition) => {
     if (definition.type !== "range") return;
     const control = controlElements.get(definition.key);
@@ -1237,6 +1277,7 @@ function updateEffectiveControlReadouts(
       control.modulationVisualizer,
       frame,
       formatControlValue,
+      visualizerWidths.get(control.modulationVisualizer),
     );
   });
 }
@@ -1248,7 +1289,7 @@ function refreshModelOptions(preferredId = currentModel?.id) {
     option.value = model.id;
     option.textContent = model.available
       ? model.name
-      : `${model.name} [BUILD IN EXPERIMENTS]`;
+      : `${model.name} [UNAVAILABLE]`;
     option.disabled = !model.available;
     elements.modelSelect.append(option);
   });
@@ -1320,7 +1361,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   elements.saveImage.disabled = !capture.png;
   elements.toggleAnimation.disabled = false;
   elements.modelFamily.textContent = `MODEL FAMILY: ${currentModel.family}`;
-  elements.modelBackend.textContent = `BACKEND: ${currentModel.backend}`;
+  elements.modelBackend.textContent = `ARCHITECTURE: ${currentModel.backend}`;
   elements.modelDescription.textContent = currentModel.description;
   renderModelTechnicalInfo(elements, currentModel);
   elements.canvas.style.imageRendering = currentModel.pixelated
@@ -1332,6 +1373,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   dreamController.update();
   growthController.update();
   updateAudioUi();
+  resizeLiveCanvas({ render: false });
 
   if (currentModel.id === "digiface-vae") {
     setStatus(`${currentModel.name} CHECKING`);
@@ -1474,8 +1516,8 @@ function updateLivePerformance(now, renderMilliseconds) {
   }
 
   const performanceText = reportedFps
-    ? "LIVE " + reportedFps + " FPS · " + smoothedRenderMs.toFixed(1) + " MS"
-    : "RENDER " + smoothedRenderMs.toFixed(1) + " MS";
+    ? reportedFps + " FPS · " + smoothedRenderMs.toFixed(1) + " MS"
+    : "0 FPS · " + smoothedRenderMs.toFixed(1) + " MS";
   elements.liveFps.textContent = performanceText;
   elements.liveFps.title = "Approximate display rate and renderer time";
 
@@ -1519,8 +1561,21 @@ function modelNeedsAnimation() {
 function animationLoop(timestamp) {
   rhythmController.update(timestamp);
   drawAudioMeter();
+  if (currentView === "lab") {
+    visualizerOverlay.update(timestamp, rhythmController, elements.canvas);
+  } else if (
+    visualizerOverlay.enabled &&
+    visualizerOverlay.canvas &&
+    !visualizerOverlay.canvas.hidden
+  ) {
+    visualizerOverlay.canvas.hidden = true;
+  }
   if (currentView === "lab" && currentModel.id === "neural-growth") {
-    growthController.onAudioFrame(rhythmController.getLevels(), timestamp);
+    growthController.onAudioFrame(
+      rhythmController.getLevels(),
+      timestamp,
+      rhythmController,
+    );
   }
   const siteActive = elements.site.classList.contains("is-visible");
   const canRender =
@@ -1538,7 +1593,7 @@ function animationLoop(timestamp) {
     qualityProfile.frameInterval + fallbackPenalty,
     adaptiveCost,
   );
-  if (canRender && timestamp - lastRenderedAt >= frameInterval) {
+  if (canRender && !renderer.getPending() && timestamp - lastRenderedAt >= frameInterval) {
     lastRenderedAt = timestamp;
     lastTimeSeconds = (timestamp - animationEpoch) / 1000;
     renderCurrentFrame({
@@ -1566,6 +1621,7 @@ function setAnimation(enabled, { log = true } = {}) {
   }
   animationEnabled = next;
   playback.sync();
+  resizeLiveCanvas({ render: false });
   if (animationEnabled) {
     animationEpoch = performance.now() - lastTimeSeconds * 1000;
   }
@@ -1603,13 +1659,8 @@ function applyQuality(mode, { render = true, log = true } = {}) {
     !hqGallery.isActive()
   ) {
     liveResolutionScale = 1;
-    resizeLiveFullscreenCanvas({ render: false });
-  } else {
-    elements.canvas.width = qualityProfile.size;
-    elements.canvas.height = qualityProfile.size;
-    elements.outputResolution.textContent =
-      qualityProfile.size + " x " + qualityProfile.size;
   }
+  resizeLiveCanvas({ render: false });
   updateResourceStatus();
   invalidateCurrentRun("QUALITY CHANGED - SAVE WHEN READY");
   if (render) renderCurrentFrame({ forceAnalysis: true });
@@ -1749,20 +1800,32 @@ function togglePanel(key) {
 
 function fullscreenLiveDimensions() {
   const bounds = elements.outputStage.getBoundingClientRect();
-  const aspect = Math.max(0.2, bounds.width / Math.max(1, bounds.height));
-  const profileEdges = {
-    economy: 960,
-    standard: 1280,
-    high: 1600,
-    ultra: 1920,
-    extreme: 2560,
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const physicalWidth = Math.round((bounds.width || 1280) * dpr);
+  const physicalHeight = Math.round((bounds.height || 720) * dpr);
+  const aspect = Math.max(
+    0.2,
+    (bounds.width || 1) / Math.max(1, bounds.height || 1),
+  );
+  const screenLongEdge = Math.max(physicalWidth, physicalHeight);
+  const profileScale = {
+    economy: 0.5,
+    standard: 0.75,
+    high: 1.0,
+    ultra: 1.0,
+    extreme: 1.0,
   };
-  const baseEdge = profileEdges[qualityProfile.mode] || 1280;
+  const scale = profileScale[qualityProfile.mode] ?? 1.0;
+  const baseEdge = Math.round(screenLongEdge * scale);
+  const resolutionScale =
+    currentModel.id === "neural-growth" && !playback.isActive()
+      ? 1
+      : liveResolutionScale;
   const longEdge = Math.max(
     512,
     Math.min(
       capabilities.maxTextureSize || 2048,
-      Math.round(baseEdge * liveResolutionScale),
+      Math.round(baseEdge * resolutionScale),
     ),
   );
   if (aspect >= 1)
@@ -1782,20 +1845,34 @@ function resizeLiveFullscreenCanvas({ render = true } = {}) {
     hqGallery.isActive()
   )
     return;
-  const { width, height } = fullscreenLiveDimensions();
-  if (elements.canvas.width === width && elements.canvas.height === height)
-    return;
-  elements.canvas.width = width;
-  elements.canvas.height = height;
-  elements.outputResolution.textContent = width + " × " + height;
-  if (render) renderCurrentFrame({ forceAnalysis: true });
+  resizeLiveCanvas({ render });
 }
 
-function restoreLiveCanvasSize({ render = true } = {}) {
-  elements.canvas.width = qualityProfile.size;
-  elements.canvas.height = qualityProfile.size;
-  elements.outputResolution.textContent =
-    qualityProfile.size + " × " + qualityProfile.size;
+function resizeLiveCanvas({ render = true } = {}) {
+  // Export and exclusive-compute suspensions must retain the captured viewport.
+  if (
+    hqGallery.isActive() ||
+    hqRendering ||
+    gifEncoding ||
+    playback.isSuspended()
+  )
+    return;
+  let { width, height } =
+    document.fullscreenElement === elements.outputPanel
+      ? fullscreenLiveDimensions()
+      : { width: qualityProfile.size, height: qualityProfile.size };
+  if (currentModel.id === "neural-growth" && playback.isActive()) {
+    // Display pixels are independent of the simulation grid and private exports.
+    const maxEdge = Math.min(768, qualityProfile.size);
+    const scale = Math.min(1, maxEdge / Math.max(width, height));
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+  }
+  if (elements.canvas.width === width && elements.canvas.height === height)
+    return;
+  elements.outputResolution.textContent = width + " × " + height;
+  elements.canvas.width = width;
+  elements.canvas.height = height;
   if (render) renderCurrentFrame({ forceAnalysis: true });
 }
 
@@ -1819,16 +1896,14 @@ async function toggleFullscreen() {
 function updateFullscreenUi() {
   const active = document.fullscreenElement === elements.outputPanel;
   elements.toggleFullscreen.classList.toggle("is-active", active);
-  elements.toggleFullscreen.textContent = active
-    ? "EXIT FULLSCREEN"
-    : "FULLSCREEN";
+  elements.toggleFullscreen.textContent = active ? "EXIT" : "FULL";
   elements.toggleFullscreen.setAttribute("aria-pressed", String(active));
   if (active) {
     window.setTimeout(() => resizeLiveFullscreenCanvas(), 40);
   } else {
     if (hqGallery.isActive()) hqGallery.closeViewer({ exitFullscreen: false });
     liveResolutionScale = 1;
-    restoreLiveCanvasSize();
+    resizeLiveCanvas();
   }
   setStatus(
     active
@@ -1915,6 +1990,17 @@ function isTypingTarget(target) {
 
 function attachEvents() {
   elements.brandHome.addEventListener("click", () => navigate("lab"));
+  document.getElementById("reset-parameters").addEventListener("click", () => {
+    if (gifEncoding || hqRendering || playback.isSuspended()) return;
+    currentParameters = defaultParameters(currentModel);
+    currentLfoState = defaultLfoState(currentModel);
+    modelParameterState.set(currentModel.id, deepClone(currentParameters));
+    modelLfoState.set(currentModel.id, deepClone(currentLfoState));
+    restoreAudioMatrix(currentModel.id, {});
+    // selectModel uses the original state application and render path.
+    selectModel(currentModel.id, { log: false, preserveTime: true });
+    setStatus("PARAMETERS RESET");
+  });
   elements.navItems.forEach((button) =>
     button.addEventListener("click", () => navigate(button.dataset.view)),
   );
@@ -1929,6 +2015,24 @@ function attachEvents() {
   elements.toggleAudioInput.addEventListener("click", () =>
     toggleAudioInput(setAnimation, terminal, setStatus, renderCurrentFrame),
   );
+  initVisualizerUi(visualizerOverlay, elements, terminal, setStatus, (mode) => {
+    if (currentModel?.id === "neural-growth") {
+      currentParameters.acousticInjection = mode;
+      currentModel.onParameterChange?.("acousticInjection", mode);
+      controlsController.render();
+      terminal("ACOUSTIC", `field coupling set to ${mode}`);
+      setStatus(`ACOUSTIC INJECTION: ${mode.toUpperCase()}`);
+    }
+  });
+  elements.openVisualizerSettings?.addEventListener("click", () => {
+    if (
+      elements.visualizerInjectionSelect &&
+      currentModel?.id === "neural-growth"
+    ) {
+      elements.visualizerInjectionSelect.value =
+        currentParameters?.acousticInjection || "off";
+    }
+  });
   elements.neuralDreamImage.addEventListener(
     "change",
     dreamController.sourceChanged,
@@ -2013,6 +2117,17 @@ function attachEvents() {
     if (event.key === " ") {
       event.preventDefault();
       setAnimation(!animationEnabled);
+      return;
+    }
+    if (event.key.toLowerCase() === "k") {
+      if (currentModel.id === "neural-growth") {
+        event.preventDefault();
+        currentModel.triggerRipple?.(
+          currentModel.simulationSize / 2,
+          currentModel.simulationSize / 2,
+        );
+      }
+      return;
     }
   });
 
@@ -2026,13 +2141,23 @@ function initializeQualityControls() {
   qualityOptions().forEach((entry) => {
     const option = document.createElement("option");
     option.value = entry.value;
-    option.textContent = entry.label;
+    option.textContent =
+      {
+        auto: "Auto",
+        economy: "384px",
+        standard: "512px",
+        high: "768px",
+        ultra: "1024px",
+        extreme: "Full",
+      }[entry.value] || entry.label;
+    option.title = entry.label;
     elements.qualitySelect.append(option);
   });
   applyQuality(qualityMode, { render: false, log: false });
 }
 
 function initialize() {
+  initializeWorkbenchShell(elements);
   initializeQualityControls();
   initializeFractalToolOptions();
   setFractalProcessStep("fold");
@@ -2048,6 +2173,8 @@ function initialize() {
   archiveController.initialize();
   hqGallery.render();
   updateAnimationButton();
+  if (window.matchMedia("(max-width: 800px)").matches)
+    panelVisibility.input = false;
   applyPanelVisibility({ render: false });
   updateResourceStatus();
   rhythmController.subscribe(() => {
@@ -2055,7 +2182,7 @@ function initialize() {
   });
   updateAudioUi();
 
-  terminal("BOOT", "LATENT FIELD full-screen local model lab");
+  terminal("BOOT", "gl-bench local WebGL2 workbench");
   terminal(
     "QUALITY",
     `${qualityMode.toUpperCase()} -> ${qualityProfile.mode.toUpperCase()} / ${qualityProfile.size}px`,
@@ -2068,10 +2195,7 @@ function initialize() {
     "MODEL ROUTES",
     `${registry.getAll().length} registered / ${registry.getAll().filter((model) => model.available).length} available`,
   );
-  terminal(
-    "READY",
-    "save frames, modulate parameters, or build a local image basis in Experiments",
-  );
+  terminal("READY", "save frames and modulate model parameters in the Lab");
   attachEvents();
   animationHandle = requestAnimationFrame(animationLoop);
 }

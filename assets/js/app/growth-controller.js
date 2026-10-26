@@ -1,4 +1,8 @@
 // Route-local interactions only. Playback remains owned by the app controller.
+import {
+  setBrushRailVisible,
+  updateBrushPreview,
+} from "../ui/workbench-shell.js";
 import { renderModelTechnicalInfo } from "./controls-controller.js";
 import { PATTERNS } from "../models/neural-growth/patterns.js";
 
@@ -73,7 +77,7 @@ export function createGrowthController({
       };
     }
     return {
-      source: "Latent Field Baseline",
+      source: "gl-bench Baseline",
       details: "Multiscale Gram and RGB Moments",
       license: "Project MIT terms",
     };
@@ -82,25 +86,50 @@ export function createGrowthController({
   function updateTabCounts() {
     if (!elements.growthGalleryTabs) return;
     const allCount = PATTERNS.length;
-    const textureCount = PATTERNS.filter((p) => p.category === "texture").length;
-    const inceptionCount = PATTERNS.filter((p) => p.category === "inception").length;
-    const organicCount = PATTERNS.filter((p) => p.category === "organic").length;
+    const textureCount = PATTERNS.filter(
+      (p) => p.category === "texture",
+    ).length;
+    const inceptionCount = PATTERNS.filter(
+      (p) => p.category === "inception",
+    ).length;
+    const organicCount = PATTERNS.filter(
+      (p) => p.category === "organic",
+    ).length;
+    const testingCount = PATTERNS.filter(
+      (p) => p.category === "testing",
+    ).length;
 
-    const allBtn = elements.growthGalleryTabs.querySelector('[data-filter="all"]');
+    const allBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="all"]',
+    );
     if (allBtn) allBtn.textContent = `All (${allCount})`;
 
-    const texBtn = elements.growthGalleryTabs.querySelector('[data-filter="texture"]');
+    const texBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="texture"]',
+    );
     if (texBtn) texBtn.textContent = `Textures (${textureCount})`;
 
-    const incBtn = elements.growthGalleryTabs.querySelector('[data-filter="inception"]');
+    const incBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="inception"]',
+    );
     if (incBtn) incBtn.textContent = `Inception (${inceptionCount})`;
 
-    const orgBtn = elements.growthGalleryTabs.querySelector('[data-filter="organic"]');
+    const orgBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="organic"]',
+    );
     if (orgBtn) orgBtn.textContent = `Originals (${organicCount})`;
+
+    const testingBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="testing"]',
+    );
+    if (testingBtn) testingBtn.textContent = `Testing / WIP (${testingCount})`;
   }
 
   function addRecent(patternId) {
-    recents = [patternId, ...recents.filter((id) => id !== patternId)].slice(0, 8);
+    recents = [patternId, ...recents.filter((id) => id !== patternId)].slice(
+      0,
+      8,
+    );
     saveStorageJson(RECENTS_KEY, recents);
     renderRecents();
   }
@@ -126,10 +155,16 @@ export function createGrowthController({
   function getFilteredPatterns() {
     const q = searchQuery.trim().toLowerCase();
     return PATTERNS.filter((pattern) => {
-      if (currentTab === "texture" && pattern.category !== "texture") return false;
-      if (currentTab === "inception" && pattern.category !== "inception") return false;
-      if (currentTab === "organic" && pattern.category !== "organic") return false;
-      if (currentTab === "favorites" && !favorites.has(pattern.id)) return false;
+      if (currentTab === "texture" && pattern.category !== "texture")
+        return false;
+      if (currentTab === "inception" && pattern.category !== "inception")
+        return false;
+      if (currentTab === "organic" && pattern.category !== "organic")
+        return false;
+      if (currentTab === "testing" && pattern.category !== "testing")
+        return false;
+      if (currentTab === "favorites" && !favorites.has(pattern.id))
+        return false;
       if (q) {
         const matchName = pattern.name.toLowerCase().includes(q);
         const matchId = pattern.id.toLowerCase().includes(q);
@@ -251,7 +286,9 @@ export function createGrowthController({
 
       infoBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const existingOverlay = thumbWrapper.querySelector(".growth-gallery__info-overlay");
+        const existingOverlay = thumbWrapper.querySelector(
+          ".growth-gallery__info-overlay",
+        );
         if (existingOverlay) {
           existingOverlay.remove();
           infoBtn.classList.remove("is-active");
@@ -319,7 +356,9 @@ export function createGrowthController({
           ? "Texture"
           : pattern.category === "inception"
             ? "Inception"
-            : "Original";
+            : pattern.category === "testing"
+              ? "Testing / WIP"
+              : "Original";
 
       card.append(thumbWrapper, nameEl, idEl, badge);
 
@@ -335,7 +374,7 @@ export function createGrowthController({
     const model = activeModel();
     elements.growthTools.hidden = !model;
     if (elements.growthCanvasTools) {
-      elements.growthCanvasTools.hidden = !model;
+      setBrushRailVisible(elements.growthCanvasTools, Boolean(model));
       if (model) {
         const currentMode = model.parameters?.disturbanceMode || "erase";
         for (const btn of elements.growthBrushBtns) {
@@ -344,19 +383,29 @@ export function createGrowthController({
           btn.setAttribute("aria-pressed", String(isActive));
         }
         if (elements.growthBrushRadius) {
-          const radius = Number(model.parameters?.brushRadius) || 8;
-          elements.growthBrushRadius.value = radius;
+          const maxRadius = Math.min(
+            256,
+            Math.max(64, Math.floor((model.simulationSize || 256) / 2)),
+          );
+          elements.growthBrushRadius.max = String(maxRadius);
+          const radius = Number(model.parameters?.brushRadius) || 16;
+          elements.growthBrushRadius.value = Math.min(maxRadius, radius);
+          updateBrushPreview(elements.growthBrushRadius);
           if (elements.growthBrushRadiusVal) {
-            elements.growthBrushRadiusVal.textContent = `${radius}px`;
+            elements.growthBrushRadiusVal.textContent = `${elements.growthBrushRadius.value}px`;
           }
         }
         if (elements.growthColorOptions) {
           elements.growthColorOptions.hidden = currentMode !== "dye";
           const color = model.parameters?.dyeColor || "#00f0ff";
-          if (elements.growthColorPicker) elements.growthColorPicker.value = color;
-          if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+          if (elements.growthColorPicker)
+            elements.growthColorPicker.value = color;
+          if (elements.growthColorHex)
+            elements.growthColorHex.value = color.toUpperCase();
           if (elements.growthColorPills) {
-            for (const pill of elements.growthColorPills.querySelectorAll(".color-preset-pill")) {
+            for (const pill of elements.growthColorPills.querySelectorAll(
+              ".color-preset-pill",
+            )) {
               pill.classList.toggle(
                 "is-active",
                 pill.dataset.color.toLowerCase() === color.toLowerCase(),
@@ -464,7 +513,15 @@ export function createGrowthController({
     let x = (event.clientX - rect.left - (rect.width - side) / 2) / side;
     let y = (event.clientY - rect.top - (rect.height - side) / 2) / side;
     if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
-    const zoom = Math.max(1, Math.min(8, Number(model.parameters?.zoom) || 1));
+    const zoom = Math.max(
+      1,
+      Math.min(8, Number(model.effectiveZoom ?? model.parameters?.zoom) || 1),
+    );
+    const pan = model.effectivePan;
+    if (Array.isArray(pan) && (pan[0] !== 0 || pan[1] !== 0)) {
+      x -= pan[0];
+      y += pan[1];
+    }
     if (zoom > 1) {
       x = 0.5 + (x - 0.5) / zoom;
       y = 0.5 + (y - 0.5) / zoom;
@@ -473,10 +530,27 @@ export function createGrowthController({
     return {
       gx: Math.max(0, Math.min(size - 1, Math.floor(x * size))),
       gy: Math.max(0, Math.min(size - 1, size - 1 - Math.floor(y * size))),
+      nx: Math.max(0, Math.min(1, x)),
+      ny: Math.max(0, Math.min(1, 1 - y)),
     };
   }
 
   let lastPointerRippleTime = 0;
+  let isCentering = false;
+
+  function updateCenterFromPointer(coords, model) {
+    if (!coords) return;
+    const cx = Math.max(-1, Math.min(1, (coords.nx - 0.5) * 2));
+    const cy = Math.max(-1, Math.min(1, (coords.ny - 0.5) * 2));
+    const roundX = Math.round(cx * 100) / 100;
+    const roundY = Math.round(cy * 100) / 100;
+    onParameterChange?.("geometryCenterX", roundX);
+    onParameterChange?.("geometryCenterY", roundY);
+    model.triggerRipple?.(coords.gx, coords.gy, 16);
+    if (!model.isClockRunning) {
+      schedulePausedRender();
+    }
+  }
 
   function handlePointerDown(event) {
     const model = activeModel();
@@ -485,11 +559,31 @@ export function createGrowthController({
     try {
       elements.canvas.setPointerCapture(pointerId);
     } catch (_) {}
+    if (event.shiftKey) {
+      isCentering = true;
+      const coords = getGridCoords(event, model);
+      if (coords) updateCenterFromPointer(coords, model);
+      return;
+    }
     const coords = getGridCoords(event, model);
     if (!coords) return;
     lastCoord = coords;
     const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
+    const channelView = model.parameters?.channelView || "phenotype";
+    const speed = Number(model.parameters?.growthSpeed) || 0;
+    const isStandardView =
+      channelView === "phenotype" || channelView === "xray";
+    if (
+      mode !== "erase" &&
+      model.isClockRunning &&
+      speed > 0 &&
+      isStandardView &&
+      typeof model.isDormant === "function" &&
+      model.isDormant()
+    ) {
+      model.queueDisturbance(coords.gx, coords.gy, radius, "noise");
+    }
     model.queueDisturbance(coords.gx, coords.gy, radius, mode);
     if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
       lastPointerRippleTime = performance.now();
@@ -502,13 +596,26 @@ export function createGrowthController({
 
   function handlePointerMove(event) {
     const model = activeModel();
-    if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1) return;
+    if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1)
+      return;
+    if (isCentering) {
+      const coords = getGridCoords(event, model);
+      if (coords) updateCenterFromPointer(coords, model);
+      return;
+    }
     const coords = getGridCoords(event, model);
     if (!coords) return;
     const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     if (lastCoord) {
-      model.queueDisturbanceStroke(lastCoord.gx, lastCoord.gy, coords.gx, coords.gy, radius, mode);
+      model.queueDisturbanceStroke(
+        lastCoord.gx,
+        lastCoord.gy,
+        coords.gx,
+        coords.gy,
+        radius,
+        mode,
+      );
     } else {
       model.queueDisturbance(coords.gx, coords.gy, radius, mode);
     }
@@ -537,6 +644,7 @@ export function createGrowthController({
       } catch (_) {}
       pointerId = null;
       lastCoord = null;
+      isCentering = false;
     }
   };
 
@@ -556,8 +664,22 @@ export function createGrowthController({
     const model = activeModel();
     if (!model?.ready) return;
     const center = Math.floor(model.simulationSize / 2);
-    const radius = Number(model.parameters?.brushRadius) || 8;
+    const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
+    const channelView = model.parameters?.channelView || "phenotype";
+    const speed = Number(model.parameters?.growthSpeed) || 0;
+    const isStandardView =
+      channelView === "phenotype" || channelView === "xray";
+    if (
+      mode !== "erase" &&
+      model.isClockRunning &&
+      speed > 0 &&
+      isStandardView &&
+      typeof model.isDormant === "function" &&
+      model.isDormant()
+    ) {
+      model.queueDisturbance(center, center, radius, "noise");
+    }
     model.queueDisturbance(center, center, radius, mode);
     if (!model.isClockRunning) {
       schedulePausedRender();
@@ -630,7 +752,8 @@ export function createGrowthController({
   if (elements.growthColorPicker) {
     listen(elements.growthColorPicker, "input", (e) => {
       const hex = e.target.value;
-      if (elements.growthColorHex) elements.growthColorHex.value = hex.toUpperCase();
+      if (elements.growthColorHex)
+        elements.growthColorHex.value = hex.toUpperCase();
       onParameterChange?.("dyeColor", hex);
       update();
     });
@@ -657,7 +780,8 @@ export function createGrowthController({
       if (!pill || !pill.dataset.color) return;
       const color = pill.dataset.color;
       if (elements.growthColorPicker) elements.growthColorPicker.value = color;
-      if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+      if (elements.growthColorHex)
+        elements.growthColorHex.value = color.toUpperCase();
       onParameterChange?.("dyeColor", color);
       update();
     });
@@ -718,7 +842,8 @@ export function createGrowthController({
   listen(document, "pointerdown", (event) => {
     const isCanvas =
       elements.canvas &&
-      (elements.canvas === event.target || elements.canvas.contains(event.target));
+      (elements.canvas === event.target ||
+        elements.canvas.contains(event.target));
     const isToolbar =
       elements.growthCanvasTools &&
       elements.growthCanvasTools.contains(event.target);
@@ -742,30 +867,84 @@ export function createGrowthController({
   let lastBeatTime = 0;
   let beatArmed = true;
 
-  function onAudioFrame(levels, timestamp) {
+  function onAudioFrame(levels, timestamp, rhythmController = null) {
     const model = activeModel();
     if (!model?.ready || !levels) return;
-    if (!levels.hasSignal) return;
+
+    let needsRender = false;
+
+    if (typeof model.processCameraMotion === "function") {
+      const cameraMoving = model.processCameraMotion(levels, timestamp);
+      if (cameraMoving) {
+        needsRender = true;
+      }
+    }
+
+    const spectrum = rhythmController?.getFrequencyData();
+    if (spectrum && typeof model.processAcousticInjection === "function") {
+      const injected = model.processAcousticInjection(
+        spectrum,
+        levels,
+        timestamp,
+        rhythmController,
+      );
+      if (injected > 0) {
+        needsRender = true;
+      }
+    }
 
     const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
-    if (triggerKick < 0.25) {
+    if (!levels.hasSignal || triggerKick < 0.25) {
       beatArmed = true;
     }
+    if (!levels.hasSignal) {
+      if (needsRender && !model.isClockRunning) {
+        schedulePausedRender();
+      }
+      return;
+    }
+
     const elapsed = timestamp - lastBeatTime;
     if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
       lastBeatTime = timestamp;
       beatArmed = false;
-      const mode = model.parameters?.beatShockwave || "off";
-      let triggered = false;
-      if (mode === "center") {
-        model.triggerBeatShockwave("center");
-        triggered = true;
+      const shockwave = model.parameters?.beatShockwave ?? "on";
+      if (shockwave !== "off") {
+        if (typeof model.triggerBeatShockwave === "function") {
+          model.triggerBeatShockwave("on");
+          needsRender = true;
+        }
       }
-      if (triggered && !model.isClockRunning) {
+    }
+
+    if (needsRender && !model.isClockRunning) {
+      schedulePausedRender();
+    }
+  }
+
+  listen(document, "keydown", (e) => {
+    if (e.key === "Shift" && canvasFocused && elements.canvas) {
+      elements.canvas.style.cursor = "crosshair";
+    }
+  });
+  listen(document, "keyup", (e) => {
+    if (e.key === "Shift" && elements.canvas) {
+      elements.canvas.style.cursor = "";
+    }
+  });
+  listen(elements.canvas, "dblclick", (event) => {
+    const model = activeModel();
+    if (!model?.ready) return;
+    if (event.shiftKey) {
+      onParameterChange?.("geometryCenterX", 0);
+      onParameterChange?.("geometryCenterY", 0);
+      const mid = Math.floor(model.simulationSize / 2);
+      model.triggerRipple?.(mid, mid, 24);
+      if (!model.isClockRunning) {
         schedulePausedRender();
       }
     }
-  }
+  });
 
   listen(elements.canvas, "pointerdown", handlePointerDown);
   listen(elements.canvas, "pointermove", handlePointerMove);

@@ -164,7 +164,7 @@ function matchSourceColor(tf, dreamTensor, sourceTensor, blend = 0.85) {
   });
 }
 
-function calcTvLoss(tf, image) {
+export function calcTvLoss(tf, image) {
   const [, h, w, c] = image.shape;
   const diffY = tf.sub(
     tf.slice(image, [0, 1, 0, 0], [1, h - 1, w, c]),
@@ -894,19 +894,19 @@ export class InceptionDreamModel {
         min: 10,
         max: 50,
         step: 5,
-        default: 50,
+        default: 25,
         getGuidance: (value) => {
-          const steps = Number(value) || 50;
-          if (steps <= 25) {
+          const steps = Number(value) || 25;
+          if (steps <= 20) {
             return {
               compute: "light",
-              text: `Quick pass (~${steps * 5} total steps). Subtle feature imprint, rapid completion.`,
+              text: `Fast pass (~${steps * 5} total steps). Rapid completion, smooth responsive preview.`,
             };
           }
-          if (steps <= 40) {
+          if (steps <= 35) {
             return {
               compute: "balanced",
-              text: `Recommended (~${steps * 5} total steps). Well-defined motifs, steady ascent.`,
+              text: `Recommended (~${steps * 5} total steps). Balanced synthesis speed and detailed feature emergence.`,
             };
           }
           return {
@@ -1503,6 +1503,55 @@ export class InceptionDreamModel {
       mixed_7c: ["mixed_7c", "mixed7c"],
     };
 
+    const KNOWN_NODES = {
+      mixed_5b: "module_apply_default/InceptionV3/InceptionV3/Mixed_5b/concat",
+      mixed_5c: "module_apply_default/InceptionV3/InceptionV3/Mixed_5c/concat",
+      mixed_5d: "module_apply_default/InceptionV3/InceptionV3/Mixed_5d/concat",
+      mixed_6a: "module_apply_default/InceptionV3/InceptionV3/Mixed_6a/concat",
+      mixed_6b: "module_apply_default/InceptionV3/InceptionV3/Mixed_6b/concat",
+      mixed_6c: "module_apply_default/InceptionV3/InceptionV3/Mixed_6c/concat",
+      mixed_6d: "module_apply_default/InceptionV3/InceptionV3/Mixed_6d/concat",
+      mixed_6e: "module_apply_default/InceptionV3/InceptionV3/Mixed_6e/concat",
+      mixed_7a: "module_apply_default/InceptionV3/InceptionV3/Mixed_7a/concat",
+      mixed_7b: "module_apply_default/InceptionV3/InceptionV3/Mixed_7b/concat",
+      mixed_7c: "module_apply_default/InceptionV3/InceptionV3/Mixed_7c/concat",
+    };
+
+    const graphNodes = model.executor?.graph?.nodes || {};
+    const hasKnownLayout = Object.values(KNOWN_NODES).every((n) => n in graphNodes);
+
+    if (hasKnownLayout) {
+      const probe = tf.zeros([1, 192, 192, 3]);
+      let isDifferentiable = false;
+      try {
+        isDifferentiable = tf.tidy(() => {
+          const probeLoss = (x) => {
+            const out = model.execute(x, KNOWN_NODES.mixed_6c);
+            const t = Array.isArray(out) ? out[0] : out;
+            return t.mean();
+          };
+          const { grad } = tf.valueAndGrad(probeLoss)(probe);
+          if (!grad || grad.shape.length !== 4) return false;
+          const meanAbs = grad.abs().mean().dataSync()[0];
+          return Number.isFinite(meanAbs) && meanAbs > 1e-12;
+        });
+      } catch (_) {
+        isDifferentiable = false;
+      } finally {
+        probe.dispose();
+      }
+
+      if (isDifferentiable) {
+        for (const [key, nodeName] of Object.entries(KNOWN_NODES)) {
+          this.verifiedNodeMap.set(key, nodeName);
+        }
+        console.info(
+          `[Inception Dream] Fast-verified ${this.verifiedNodeMap.size} dream target layers via single probe.`,
+        );
+        return;
+      }
+    }
+
     const probe = tf.zeros([1, 192, 192, 3]);
 
     for (const key of layerKeys) {
@@ -1971,7 +2020,7 @@ export class InceptionDreamModel {
       5,
     );
     const requestedSteps = clamp(
-      parseInt(parameters?.stepsPerOctave || "50", 10),
+      parseInt(parameters?.stepsPerOctave || "25", 10),
       10,
       50,
     );
@@ -1989,7 +2038,7 @@ export class InceptionDreamModel {
     const smoothness = clamp(Number(parameters?.smoothness ?? 0.15), 0, 0.5);
     const colorMode = parameters?.colorMode === "vivid" ? "vivid" : "natural";
     const frequencyBand = parameters?.frequencyBand || "high_freq_texture";
-    const previewInterval = reducedCompute ? 4 : 10;
+    const previewInterval = reducedCompute ? 5 : 10;
     const stepSize =
       clamp(Number(parameters?.dreamStrength ?? 1), 0.2, 2.0) * 0.01;
     const targetNodes = this.resolveTargetNodes();

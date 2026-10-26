@@ -2,7 +2,7 @@ export const DATAMOSH_PROFILE = {
   id: "datamosh",
   name: "DATAMOSH",
   description:
-    "General image compression for square pixel displacement and latent interpolation.",
+    "General image compression for square pixel displacement and encoded feature blending.",
   inputSize: 128,
   minSamples: 16,
   recommendedSamples: [32, 64],

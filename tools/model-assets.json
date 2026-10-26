@@ -1038,5 +1038,685 @@
     "path": "models/neural-growth/previews/wrinkled-surface.png",
     "bytes": 30473,
     "sha256": "f814d0c102b9f57450423b8a54bf27ddff705dec70155e63585e08e4a2d812c5"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-391-v09.json",
+    "bytes": 25814,
+    "sha256": "c56378f595ed76130274ec76e41aa7bfb35b4ff99b97df3984df6e4358c77ee4"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-391-v09.png",
+    "bytes": 28384,
+    "sha256": "89799a7d2ebd865b9e356f6e075d7cf96c10969e06c56961e5672581d54ceb9a"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-489-v06.json",
+    "bytes": 24387,
+    "sha256": "131c20e4a65aab1bf14423c3ed1eecc1a49df50439d710a96f384fb44ebb4185"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-489-v06.png",
+    "bytes": 32731,
+    "sha256": "4a4e85aff3590f8e5adf5a28753723723d8c125c57a0bcca6c9fb353e517721b"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-489-v10.json",
+    "bytes": 26304,
+    "sha256": "cc4fc366d1459b6e8af2ef4196860a95d48ac9962aff7d5a300a74d8a3c99a90"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-489-v10.png",
+    "bytes": 29900,
+    "sha256": "99a613ffb4a369cbb731956cb3c7589b37fc34d8f4a5b2f55e10d16eea3f1245"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-411-v04.json",
+    "bytes": 25814,
+    "sha256": "bbb65e62a3682f5e1a0390786c25e8b07799f5bc63215f684e77bce079364036"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-411-v04.png",
+    "bytes": 34520,
+    "sha256": "40155f5a1a604dea3cc806be179e97b571c803fe893fd7c8a7fd8fca989dee3c"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-434-v07.json",
+    "bytes": 25806,
+    "sha256": "83bf245177bb834883c7040c1b8782167bb94028a01e2b26909170724263bcb2"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-434-v07.png",
+    "bytes": 30171,
+    "sha256": "47351802526843ec4eaf3e5aaa9151b681c5b9d1db9143134ace3d4c16187d5f"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-475-v02.json",
+    "bytes": 24429,
+    "sha256": "d262ed3822f71121e82e33eaf057daddbe258a40e397e29253f89f77437b9f67"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-475-v02.png",
+    "bytes": 36018,
+    "sha256": "c37a04a7b898f0911b473179b1e5e19b0e46d1c576181db7874c1c34d6769995"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-475-v05.json",
+    "bytes": 25785,
+    "sha256": "2f290ba5ca2aa31ab1b07c9778bcae05b63611fc7cccbb0be639a3925a1eba96"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-475-v05.png",
+    "bytes": 33323,
+    "sha256": "264db50ead1d4e426a0d1012aff3f944017f2513f30f8314664c1fcc05788e02"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-139-v04.json",
+    "bytes": 25795,
+    "sha256": "ef08ce6ba9ca308018ac18bc015388625d46a9e5aecd7212ce4d53dae342091f"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-139-v04.png",
+    "bytes": 35573,
+    "sha256": "e7803de651ff98f3524f0303d3656792ce397b090f22d665cf83afea49b812fd"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-333-v07.json",
+    "bytes": 25796,
+    "sha256": "ed2b53a0ddfb7dda2c6ff001af155b97975d2b7962748ad3568c58cd155d6b4d"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-333-v07.png",
+    "bytes": 30474,
+    "sha256": "28b0e1a40aec4dbe920e5d888a3e44f2af1cece43d858012e48ecae292f3d370"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-78-v08.json",
+    "bytes": 25791,
+    "sha256": "d33d3ea7a2798f017f286275a8719a01057c1b18354cf051b0cd180b85b1d859"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-78-v08.png",
+    "bytes": 30037,
+    "sha256": "abf0be61437d33a6df2eab6812a86f2326af9357abf31afc7573f7deae2082e7"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-88-v05.json",
+    "bytes": 25784,
+    "sha256": "5b9a3f51ee96d6ef83c55fd2c2c55183f42532f40bf2a3d8b4d1179dedecefcf"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-88-v05.png",
+    "bytes": 31591,
+    "sha256": "ff2edccd020f638e5f156ce2ffb86290b40e38803ce9d3af99ab33dc0f18d39e"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-313-v04.json",
+    "bytes": 25801,
+    "sha256": "6a6b05ab8d1f8aa31d2d9c3a2657658dd85d0f97e2db2292d3582ca17969e280"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-313-v04.png",
+    "bytes": 33221,
+    "sha256": "7b30f2bac1dcf6d1c9d18bab9289d3605c5274ad5615a70dff71ef0bbddde105"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-313-v05.json",
+    "bytes": 25796,
+    "sha256": "0f27ea98ce4d5cb5aec5bf9dad1a63bcc6d0a0ddb7966826b5dcb867b8e21fac"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-313-v05.png",
+    "bytes": 32547,
+    "sha256": "229908e9408dd7c63731bd14e700914a4b4ce5d92fdadaf1162760db463e0568"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed5b-69-v01.json",
+    "bytes": 25804,
+    "sha256": "d456d2e282288a469dd8e04329dcbc7abfbf6cefabdcb8a3ec31053b1c55fd81"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed5b-69-v01.png",
+    "bytes": 24351,
+    "sha256": "b4ecfd3f530b46cc9833132d94271476b4d491594e46bcb9ed85db9619ff55bb"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-391-guidance-r02-s02.json",
+    "bytes": 89187,
+    "sha256": "122886ed72a63e54a20472139134af3018d0e0c497fa8c81bf4cf309c896dc9a"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-391-guidance-r02-s02.png",
+    "bytes": 176310,
+    "sha256": "e6631c93fcef42b8ada55c41dd97346d09964097b39cfba9e36d1cf9ed8c21cb"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-391-guidance-r07-s02.json",
+    "bytes": 89175,
+    "sha256": "89ab9f2e596f2ee28246d92f0ee1e3f22a50f28908623bebf59cac20373d8b4f"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-391-guidance-r07-s02.png",
+    "bytes": 176395,
+    "sha256": "9b6041e9599cc4dbe9fa2e496282274b1e1d926c1b7488905cc5abae0c1d0af1"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-391-guidance-r08-s01.json",
+    "bytes": 89307,
+    "sha256": "1ce8f7f8f10921ade73d60f12f69e1ce5c425003ca1efaa877858ef93e0dad64"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-391-guidance-r08-s01.png",
+    "bytes": 176867,
+    "sha256": "ab3dd153d602e8cad8369939f95561232ab9f001fcd10a91435868fab7f07ba4"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-489-guidance-r02-s02.json",
+    "bytes": 89977,
+    "sha256": "56be9c0d80d1f59d644c191af3f4750c333082fad7ed0a60c3c00a8a52e6c0a9"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-489-guidance-r02-s02.png",
+    "bytes": 162871,
+    "sha256": "23ab2feb3831382bbad9f39b3724120e4525b0dee20d8b58c84c913debca80e8"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-489-guidance-r07-s01.json",
+    "bytes": 89969,
+    "sha256": "f1014a810e12fdfc423b2431d60e4971189970adfd50e2f675de5b3883ba94cd"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-489-guidance-r07-s01.png",
+    "bytes": 164289,
+    "sha256": "b54d824b664dc4ac80eaeb36162a4c3612570b46a4e421c11fd1d818a9ed81fe"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4a-489-guidance-r08-s01.json",
+    "bytes": 90101,
+    "sha256": "5bf2ffdf50217e1fa20abfb417947b13df979728d1e940498698a193fe2a8a4e"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4a-489-guidance-r08-s01.png",
+    "bytes": 163978,
+    "sha256": "762acafd1cf653a51f943811a4c28b7f3a714ae31dbd437d73b9298cc17483db"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-411-guidance-r02-s01.json",
+    "bytes": 90609,
+    "sha256": "8cd6d9f019935f5a60fb4b411e5b6987f10a2a4c318b04cd4525fc8f31764799"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-411-guidance-r02-s01.png",
+    "bytes": 172906,
+    "sha256": "eb7db0167c686f715a30ea90a97c591bdc31f96fb3a7a13ebb5a4370d019863f"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-411-guidance-r07-s02.json",
+    "bytes": 90598,
+    "sha256": "e0d0c27403c29268d1af09cc9839ad49004ffb5cc76652468f85e043f53d4a04"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-411-guidance-r07-s02.png",
+    "bytes": 172065,
+    "sha256": "2c95197d82c8bcbac06342c74a406be968b2b669d14a0437cbab25f16375578a"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-411-guidance-r08-s01.json",
+    "bytes": 90730,
+    "sha256": "b2a8d898bb930225a940c35e046465b221b172c745b2c71c86dfff7be94def6a"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-411-guidance-r08-s01.png",
+    "bytes": 173947,
+    "sha256": "d4c4481c34bbb5e03c7206117c6b557059d7c91dcce5bfcb5e599fa0359fb293"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-434-guidance-r02-s02.json",
+    "bytes": 90623,
+    "sha256": "3c9d65989c57864274f83a7c2f9d32d2b3bbbfe58b10eedd77f417fbef7bb693"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-434-guidance-r02-s02.png",
+    "bytes": 173771,
+    "sha256": "337b2b9096345270ef701880af8aedd2284807958889f51b82307e15a4ca1d8b"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-434-guidance-r07-s02.json",
+    "bytes": 90610,
+    "sha256": "2d2cd9ff6f22d957cf75a4724303538b3c99196d16611cba37e9c48ec5640d1e"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-434-guidance-r07-s02.png",
+    "bytes": 173822,
+    "sha256": "f83822fa8690d9ce7ab7a307c7f66f1425803996f5f51579dcc96fd0a7f243be"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-434-guidance-r08-s01.json",
+    "bytes": 90746,
+    "sha256": "c67fffb5703095ec25079f9d5c8e471d647d1cf00ee801e12c1bea4ca7e2f150"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-434-guidance-r08-s01.png",
+    "bytes": 172984,
+    "sha256": "04cdd92799a7414cb2cb35eef9b607737b1b523197e69b678803844e2fe84390"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-467-guidance-r02-s02.json",
+    "bytes": 94849,
+    "sha256": "60246c8c0b65366ef02e3e9253c951020bf289f02d86c5804d019bb99cbab73d"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-467-guidance-r02-s02.png",
+    "bytes": 173776,
+    "sha256": "061bfe689cd7489a6a8c5dbd3f274143d3dc8bab5e66085201aba6c496502236"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-467-guidance-r07-s01.json",
+    "bytes": 94836,
+    "sha256": "040416690954fa60d90d684e731f35416508205fd26899b185198b0d4f6ef77c"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-467-guidance-r07-s01.png",
+    "bytes": 174185,
+    "sha256": "18155e6eae46b08efe7081d13739208bbcb5e614237acf53765d0dd4ccb2a30f"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-467-guidance-r08-s01.json",
+    "bytes": 94970,
+    "sha256": "3f4a8d2c13eb4ccca21c5abeb3fedfc0fa894e69f472ddf76a5de0f78c6abd2d"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-467-guidance-r08-s01.png",
+    "bytes": 173587,
+    "sha256": "d81c18fc43549098d9305342b99b90161ff8e47722c729fbb537b95143b74314"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-475-guidance-r02-s02.json",
+    "bytes": 87405,
+    "sha256": "b71a9cc0c7cbef34c52985b1ecf79d109b46e5d81d78bbf95b65b067e7a63241"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-475-guidance-r02-s02.png",
+    "bytes": 178444,
+    "sha256": "28555ca61499d6e130ff22d9555058fa501b32ae250f371544300711459b9a09"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-475-guidance-r07-s02.json",
+    "bytes": 87396,
+    "sha256": "e47e1ef55f0c17ac781870016a1644d2f4606105edcf3583c3b4b42261ba0bea"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-475-guidance-r07-s02.png",
+    "bytes": 176886,
+    "sha256": "dc189d2c3bfe64bda4ef9b0e213ff9160a0dcc44cec844c9cbccef6a82e86b4f"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4b-475-guidance-r08-s01.json",
+    "bytes": 87528,
+    "sha256": "631760b585e2d40743bd615777d5e27964642161a4436ae6c273683a788f2c71"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4b-475-guidance-r08-s01.png",
+    "bytes": 177576,
+    "sha256": "d8658074e68065eb8593ff8d3cc09de2dd60e596e947db4d0f267641c8182340"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-139-guidance-r02-s01.json",
+    "bytes": 89797,
+    "sha256": "4612a856725a56d774287d5e6753c64d6c2fa0f26f6e94ac7b517a0b39fb7255"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-139-guidance-r02-s01.png",
+    "bytes": 188892,
+    "sha256": "c434581f50c4d301a5b6ac9be3c4a089f135c0a6346438f438d922d158c87801"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-139-guidance-r07-s01.json",
+    "bytes": 89787,
+    "sha256": "79b57a511cf50bd41ccb34bacdc3f84442a5c9865495bd15eadde7cc560c8941"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-139-guidance-r07-s01.png",
+    "bytes": 189213,
+    "sha256": "2b75b7a322c432fe79d9fc16be1d44f1f2462fb2216d719778fe61eb97538477"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-139-guidance-r08-s02.json",
+    "bytes": 89923,
+    "sha256": "13d6bbd94dfc7c105cb67b9267b9bed3f742af23b39892647646b595ae04694e"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-139-guidance-r08-s02.png",
+    "bytes": 189015,
+    "sha256": "a1e48f294fc0d308ebde4c5d889e94ec240669e116c71685049b6c2a80624769"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-253-guidance-r02-s01.json",
+    "bytes": 90602,
+    "sha256": "701505e48a32456847488edd30ca8712e2e399cdc99682fdbc65048066c4b063"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-253-guidance-r02-s01.png",
+    "bytes": 180465,
+    "sha256": "b342706e3bed398dacceb7d933b652602493231f341e6aa036cd229615b1a315"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-253-guidance-r07-s02.json",
+    "bytes": 90591,
+    "sha256": "9097fe6a06f65e8fbb40935248848d7e1321190141d1c535b48585d9e1424304"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-253-guidance-r07-s02.png",
+    "bytes": 182045,
+    "sha256": "2cd75fe95fec35a0024a3170953d10876a158ed20d3c9e697f4965c7820b0124"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-253-guidance-r08-s01.json",
+    "bytes": 90726,
+    "sha256": "1a80f8a511d73b48862f70656afcaa949c0045ab00b9efdd20d5bcb5b8d1b062"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-253-guidance-r08-s01.png",
+    "bytes": 181099,
+    "sha256": "3c28de49a9e9a34b10650b66fe2c9ffe5450386652c53a0de54cf6e64b077bf4"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-333-guidance-r02-s01.json",
+    "bytes": 89826,
+    "sha256": "52d752a8852fd0547736c8b5de210685c8cc28389e39d3c3eb254843f790ec08"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-333-guidance-r02-s01.png",
+    "bytes": 178127,
+    "sha256": "a6332110aa53be7ddc1792ae98a016866ea9f945cbc494e226854f5355f15279"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-333-guidance-r07-s02.json",
+    "bytes": 89815,
+    "sha256": "06155f4e926719681c71ee43240000bf7fd69738a5c6a8f14dc2954b52b9047c"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-333-guidance-r07-s02.png",
+    "bytes": 178561,
+    "sha256": "e1561e6189309589e6ec8e37225679c17a9b67c7de6fc4e862d25be4b85c6d36"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-333-guidance-r08-s02.json",
+    "bytes": 89948,
+    "sha256": "2d15a0e56493fd7466cff6e55e55d51d09c081bee6a6b3beec5480d72a971132"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-333-guidance-r08-s02.png",
+    "bytes": 178164,
+    "sha256": "91c7363e4bbf50bd13b5f0ccb89ade26067f70a2d7e7dadcbec8c57e3baf6120"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-447-guidance-r02-s01.json",
+    "bytes": 89827,
+    "sha256": "9d066494eccb4240df19d868b337028917e406a8ecc8401394ff7494e62899da"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-447-guidance-r02-s01.png",
+    "bytes": 171853,
+    "sha256": "1fd8c3afd93b7b80e382ccdab8861fef97153d17f1a30ff13ac2afed403224e8"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-447-guidance-r07-s02.json",
+    "bytes": 89819,
+    "sha256": "4ce25f41e32770cc61cd8eae479255f8f1aa48167a8848dc1353030388624c30"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-447-guidance-r07-s02.png",
+    "bytes": 171999,
+    "sha256": "3fcb40718ec2b82408f1743ee06bb1a30516345ac50335962cf83a6ab1eae04a"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-447-guidance-r08-s01.json",
+    "bytes": 89952,
+    "sha256": "7d184c739bc32c1e489a3eb9398aaf33200fd1861a4bdfd430e2c9902469ff19"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-447-guidance-r08-s01.png",
+    "bytes": 172888,
+    "sha256": "d9713e498b3d55250017c4706abc611eb58c44c12d69ed04cea9f4c49672230e"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-78-guidance-r02-s02.json",
+    "bytes": 90596,
+    "sha256": "de7dfcef86ea9700a8eedad61399f34618c61e4467d4fff1ec3f6b95087a74fd"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-78-guidance-r02-s02.png",
+    "bytes": 171494,
+    "sha256": "6205da7ec74bab1608ea97ea6ad8823d063ae767ec8f825f99228c5dcc44e49a"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-78-guidance-r07-s02.json",
+    "bytes": 90588,
+    "sha256": "6094b91f7218638b3ef4735c80f498bc53e0bacaf75aaa6ca3104ac5f13ba367"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-78-guidance-r07-s02.png",
+    "bytes": 171075,
+    "sha256": "a980d621d7536b6e410b23b295f45f37890cd54f18938ee65a1531b2f89d9e58"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-78-guidance-r08-s01.json",
+    "bytes": 90720,
+    "sha256": "5bee6103f1b31c2be2ae7e507b9ebf06aebcbb1d7cdfbdf157d85e05119b9d7e"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-78-guidance-r08-s01.png",
+    "bytes": 171024,
+    "sha256": "f413ef877dfe7f10f3a9f5240f021c22ada1c6167241d1da47d0190ec6420d37"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-88-guidance-r02-s02.json",
+    "bytes": 89788,
+    "sha256": "7061532315933a0d70f818476ac32152c1725c6c11c00e4309f64e894fd3b9ec"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-88-guidance-r02-s02.png",
+    "bytes": 173364,
+    "sha256": "60498e2faa072c61f8ffabf4e13537fcd4ab88b50203f669633b43a2a3e8bec7"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-88-guidance-r07-s02.json",
+    "bytes": 89774,
+    "sha256": "31a0c6437043bcc89b715151f357a64bafd65dc6743787b04eee7644ed4843c1"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-88-guidance-r07-s02.png",
+    "bytes": 173089,
+    "sha256": "9fad0f02e8fc8216acc18ff41970b5a1bd99dc1660f1d33ef3e9341e0a66ba65"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4c-88-guidance-r08-s01.json",
+    "bytes": 89911,
+    "sha256": "fb798d47b41c0b6b3085d969250991c5091ad20a7af66cac53b42b5b66a5082c"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4c-88-guidance-r08-s01.png",
+    "bytes": 174030,
+    "sha256": "b3aa804509aaf7da03d60574b707eec6ef0600f934b90a2f66a7c844613f9e84"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-177-guidance-r02-s01.json",
+    "bytes": 89829,
+    "sha256": "7f587b85ff43f02e0909cf561b09a5a8af7ce5c312396bd9515e336034f4a618"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-177-guidance-r02-s01.png",
+    "bytes": 175836,
+    "sha256": "52d9e8b606f528ab0a93514ee4ad7ea965b6d50b7fb45f855371026e27d8f3d8"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-177-guidance-r07-s01.json",
+    "bytes": 89818,
+    "sha256": "8590cf44a2462bc052f1fcdc4482d9844f4b1bb36307a9dd594e13facfdf706f"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-177-guidance-r07-s01.png",
+    "bytes": 175571,
+    "sha256": "d444a23753e5543e8d7723128ffea302559750c53cb37b610547bc1dd04ee0c0"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-177-guidance-r08-s02.json",
+    "bytes": 89949,
+    "sha256": "cdb8a2be004f1839e9b77956b9c165d198a774eb5f3c2a654951499eb8052139"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-177-guidance-r08-s02.png",
+    "bytes": 176252,
+    "sha256": "15aef34f130238006359f1786af2e9ed765db5b69ab49c03c735a8795e224c9b"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-200-guidance-r02-s02.json",
+    "bytes": 89789,
+    "sha256": "084f5e9e48af9a4b283a9d4cfb28e5a259e779a2208e34459b0d6a141ad19f28"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-200-guidance-r02-s02.png",
+    "bytes": 175411,
+    "sha256": "4177840b71e18bf6bd51c123f4d541b92d95ef558549002b27afb0329e802dbd"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-200-guidance-r07-s01.json",
+    "bytes": 89779,
+    "sha256": "09dfea55f6000cfddc0dd40bcef88eb92db2b2ad82e31f8f6d1f45d62756ec22"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-200-guidance-r07-s01.png",
+    "bytes": 174930,
+    "sha256": "fe79c52111445a08b319230e369d2610c7a909a065996d33d0e472a5fdc7dbbd"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-200-guidance-r08-s01.json",
+    "bytes": 89913,
+    "sha256": "be35368fbdde171f46938556cfabd871124a5b9431e6acc2c6efa99fdc3b0811"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-200-guidance-r08-s01.png",
+    "bytes": 175324,
+    "sha256": "a6d4e2e14a7e1a972d04b7f410ffb9cbda93f77fc61da3c436ee397b090d5d6f"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-313-guidance-r02-s02.json",
+    "bytes": 89816,
+    "sha256": "12c79da48940fac4df8c15a4f757aeb0048b7364384f134d5c720b8522b1910e"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-313-guidance-r02-s02.png",
+    "bytes": 174620,
+    "sha256": "0edfe70eed8b02baf283e86225061a36b89beccec40b5e3652e02a4fcc96d2b0"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-313-guidance-r07-s02.json",
+    "bytes": 89806,
+    "sha256": "798c7cc01b01a32527c94f58d7fc781451f36b067637fb63265be4f1f30b9270"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-313-guidance-r07-s02.png",
+    "bytes": 174382,
+    "sha256": "f3345d821d82ea98aa7078f476c9b197e12147e5a0141a3b2ea846c3e121bafd"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-313-guidance-r08-s02.json",
+    "bytes": 89939,
+    "sha256": "435a8391eba516bba9ca80f9f17c47c09f0c6c86bb4f13e909159d3c0d66b1e4"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-313-guidance-r08-s02.png",
+    "bytes": 173618,
+    "sha256": "955098b7e397ffc5c9f467ff73b87cc05462580107edc2431800e8855cffa7b6"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-338-guidance-r02-s01.json",
+    "bytes": 89817,
+    "sha256": "e9d90af7191a1efe6c7eca79e4eb17fc4eccab3ad720ec9a62f356329f398b60"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-338-guidance-r02-s01.png",
+    "bytes": 178365,
+    "sha256": "869eb2b6955ef6f1263965b7ca4af03d28c9169aa40768c65c7c479d712e7709"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-338-guidance-r07-s01.json",
+    "bytes": 89808,
+    "sha256": "8f44b4e5de7b41b56cc9cd2ce70aec28e7754df26956eff43eb01290d2899d5f"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-338-guidance-r07-s01.png",
+    "bytes": 179014,
+    "sha256": "911084a40375bd1428e53ebf0d1267311d823acb854fb94c07d533b76a5179c2"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-338-guidance-r08-s01.json",
+    "bytes": 89941,
+    "sha256": "6afc1ced30bbfdeaa1dccb03646424948bcf3c2abc9e971795532cf11b3a612f"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-338-guidance-r08-s01.png",
+    "bytes": 180402,
+    "sha256": "b2eee0503ba383b374307a819c8bed63ba511cc8fefe2a329aef21fe01e4459c"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-396-guidance-r02-s01.json",
+    "bytes": 89807,
+    "sha256": "9c8ddccf2f996ec2c3f190f62845de29c0d1cf90b7c6181198f4483992099885"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-396-guidance-r02-s01.png",
+    "bytes": 180308,
+    "sha256": "e4c625cf1a79c8d1e59d6426c181fe732538b5c7a56b23d15d15406184aee0c5"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-396-guidance-r07-s02.json",
+    "bytes": 89798,
+    "sha256": "f8ffb1d4e35a83f61fa941e50aaa70b672079ae5bccc542fb44711b66db3dbb4"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-396-guidance-r07-s02.png",
+    "bytes": 180352,
+    "sha256": "9129322b428370a8bd78e8fa34da26800297407541ba092560670dbd547daa3c"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed4d-396-guidance-r08-s01.json",
+    "bytes": 89930,
+    "sha256": "c0602ac44c368a7bd84a397a87995abcd9fabcaba5c4ecb8d0a8c7a532a8bcc3"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed4d-396-guidance-r08-s01.png",
+    "bytes": 180579,
+    "sha256": "c75e7c3bcc0f2b8a70acadc8ff793ff00da5bc1c5ea660aca1f898977de2daf0"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed5b-69-guidance-r02-s02.json",
+    "bytes": 89810,
+    "sha256": "6f9e499f7b888f08da8f61050ac41c0266724fe3749e85169e477fbfb414b652"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed5b-69-guidance-r02-s02.png",
+    "bytes": 175193,
+    "sha256": "3365af2b04d9ac6c61554367111bf9faa5f5351a8f76b7f04db6c6fc97757268"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed5b-69-guidance-r07-s02.json",
+    "bytes": 89800,
+    "sha256": "26d574379ee7f761d7c57b2a83060195bb0f822f4cd4d2d0911177d8577275a9"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed5b-69-guidance-r07-s02.png",
+    "bytes": 175241,
+    "sha256": "7cd3f7ccd33152228f9a7ee897b74c77157c4f0e8e7d042936088a9ad47f11f6"
+  },
+  {
+    "path": "models/neural-growth/custom/mixed5b-69-guidance-r08-s02.json",
+    "bytes": 89936,
+    "sha256": "2224525c3afabf4b5f49237d481d3736bcd19f7791bc98aacfecae6e46c4b347"
+  },
+  {
+    "path": "models/neural-growth/previews/mixed5b-69-guidance-r08-s02.png",
+    "bytes": 175979,
+    "sha256": "d5df4f48a551c09a03e0852ca8801a5a440e6a9369311e22114bc78ea850fb22"
   }
 ]

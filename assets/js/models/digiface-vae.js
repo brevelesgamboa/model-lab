@@ -196,7 +196,7 @@ export class DigiFaceVaeModel {
   }
 
   get family() {
-    return "BETA-VAE / LEARNED RGB LATENT SPACE";
+    return "BETA-VAE / RGB DECODER";
   }
 
   get backend() {
@@ -204,7 +204,7 @@ export class DigiFaceVaeModel {
   }
 
   get description() {
-    return "A locally executed 48-dimensional beta-VAE decoder trained separately on DigiFace research images. The semantic controls deliberately expose which latent axis is being used so feature entanglement stays visible instead of being hidden.";
+    return "A locally executed 48-dimensional beta-VAE decoder trained separately on DigiFace research images. The semantic controls deliberately expose which decoder coordinate is being used so feature entanglement stays visible instead of being hidden.";
   }
 
   get technicalInfo() {
@@ -259,7 +259,7 @@ export class DigiFaceVaeModel {
       },
       {
         key: "temperature",
-        label: "LATENT TEMPERATURE",
+        label: "SAMPLING TEMPERATURE",
         type: "range",
         min: 0,
         max: 3,
@@ -267,7 +267,7 @@ export class DigiFaceVaeModel {
         fineStep: 0.002,
         default: 1,
         format: "decimal2",
-        help: "1.0 samples the learned prior. Larger values move farther from typical latent regions.",
+        help: "1.0 samples the learned prior. Larger values move farther from typical decoder inputs.",
       },
 
       {
@@ -362,14 +362,14 @@ export class DigiFaceVaeModel {
       },
       {
         key: "freeAxis",
-        label: "FREE LATENT AXIS",
+        label: "DECODER COORDINATE",
         type: "select",
         options: AXIS_OPTIONS,
         default: 5,
       },
       {
         key: "freeAmount",
-        label: "FREE LATENT AMOUNT",
+        label: "COORDINATE OFFSET",
         type: "range",
         min: -4,
         max: 4,

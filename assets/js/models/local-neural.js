@@ -135,7 +135,7 @@ export class LocalNeuralModel {
       label: `${String(index + 1).padStart(2, "0")} / ${String(name).slice(0, 30)}`,
     }));
     if (!sourceOptions.length)
-      sourceOptions.push({ value: 0, label: "NO STORED LATENTS" });
+      sourceOptions.push({ value: 0, label: "NO STORED FEATURES" });
     const controls = [];
     controls.push(
       {
@@ -154,7 +154,7 @@ export class LocalNeuralModel {
       },
       {
         key: "mix",
-        label: "LATENT INTERPOLATION",
+        label: "FEATURE BLEND",
         type: "range",
         min: 0,
         max: 1,
@@ -162,11 +162,11 @@ export class LocalNeuralModel {
         fineStep: 0.002,
         default: 0.5,
         format: "percent",
-        help: "Moves through latent space between the encoded A and B examples rather than blending their pixels.",
+        help: "Blends the encoded features of examples A and B before decoding.",
       },
       {
         key: "temperature",
-        label: "LATENT SCALE",
+        label: "FEATURE SCALE",
         type: "range",
         min: 0.4,
         max: 1.8,
@@ -177,14 +177,14 @@ export class LocalNeuralModel {
       },
       {
         key: "latentAxis",
-        label: "FREE LATENT AXIS",
+        label: "FEATURE COORDINATE",
         type: "select",
         options: latentOptions(metadata?.latentDim || 64),
         default: 0,
       },
       {
         key: "latentAmount",
-        label: "FREE LATENT AMOUNT",
+        label: "COORDINATE OFFSET",
         type: "range",
         min: -3,
         max: 3,
@@ -195,7 +195,7 @@ export class LocalNeuralModel {
       },
       {
         key: "motion",
-        label: "INTERPOLATION DRIFT",
+        label: "FEATURE DRIFT",
         type: "range",
         min: 0,
         max: 1,
@@ -203,7 +203,7 @@ export class LocalNeuralModel {
         fineStep: 0.002,
         default: 0,
         format: "percent",
-        help: "Automatically moves the interpolation position. LFOs can still modulate this or any other numeric control.",
+        help: "Automatically moves the feature blend position. LFOs can still modulate this or any other numeric control.",
       },
     );
     return controls;

@@ -15,6 +15,10 @@ import {
 import {
   detectAudioProfile,
 } from "../../assets/js/models/neural-growth/audio-profiles.js";
+import {
+  ResonanceConfig,
+  RESONANCE_PRESETS,
+} from "../../assets/js/models/neural-growth/resonance-config.js";
 
 const checkpoint = JSON.parse(
   await readFile(
@@ -91,7 +95,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
   assert.deepEqual(captureCapabilities(model), {
     png: true,
     gif: false,
-    highResolution: false,
+    highResolution: true,
     savedRun: true,
   });
   assert.deepEqual(captureCapabilities({}), {
@@ -118,7 +122,7 @@ test("Growth declares explicit capture and modulation capabilities", () => {
   );
 });
 
-test("redraws, palette, shading, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
+test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots do not reset or advance state", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
   model.step();
@@ -129,9 +133,6 @@ test("redraws, palette, shading, speed, rotation, topology, zoom, viewport and s
     {
       ...params,
       palette: "spectral",
-      shading: "gloss",
-      reliefStrength: 2.0,
-      lightAngle: 120,
       displayFilter: "crisp",
       coordinateTransform: "spiral",
       twist: 45,
@@ -155,9 +156,6 @@ test("default simulation size is 256 and pattern switching preserves simulation 
   const model = new NeuralGrowthModel();
   const defaults = defaultParameters(model);
   assert.equal(defaults.simulationSize, 256);
-  assert.equal(defaults.shading, "relief");
-  assert.equal(defaults.reliefStrength, 1.2);
-  assert.equal(defaults.lightAngle, 45);
   assert.equal(defaults.displayFilter, "smooth");
   assert.equal(defaults.coordinateTransform, "cartesian");
   assert.equal(defaults.twist, 0);
@@ -177,18 +175,79 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   const model = new NeuralGrowthModel();
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "spiral"), { twist: 35 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "wave"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "saddle"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "kaleidoscope"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "vortex_pair"), { twist: 0 });
+  assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "voronoi"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "julia"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "dipole"), { twist: 0 });
   assert.deepEqual(model.parameterDefaultsForChange("coordinateTransform", "cartesian"), { twist: 0 });
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "wave"), "wave");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "saddle"), "saddle");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "kaleidoscope"), "kaleidoscope");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "vortex_pair"), "vortex_pair");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "voronoi"), "voronoi");
+  assert.equal(model.normalizeStoredParameter("coordinateTransform", "unknown"), "cartesian");
+
+  // Twist guidance for wave, saddle, kaleidoscope, vortex_pair, and voronoi
+  const twistCtrl = model.controls.find((c) => c.key === "twist");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "wave" }).tag, "horizontal");
+  assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "wave" }).tag, "skewed wave");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "saddle" }).tag, "orthogonal");
+  assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "saddle" }).tag, "spiral saddle");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "kaleidoscope" }).tag, "6-fold petals");
+  assert.equal(twistCtrl.getGuidance(45, { coordinateTransform: "kaleidoscope" }).tag, "8-fold petals");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "vortex_pair" }).tag, "balanced pair");
+  assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "vortex_pair" }).tag, "co-rotating");
+  assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "vortex_pair" }).tag, "counter-spin");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "voronoi" }).tag, "cellular eddies");
+  assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "voronoi" }).tag, "island nodules");
+  assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "voronoi" }).tag, "capillary maze");
+
+  // Softness guidance for voronoi and vortex_pair
+  const softnessCtrl = model.controls.find((c) => c.key === "geometrySoftness");
+  assert.equal(softnessCtrl.getGuidance(0.1, { coordinateTransform: "voronoi" }).tag, "macro islands");
+  assert.equal(softnessCtrl.getGuidance(0.4, { coordinateTransform: "voronoi" }).tag, "organic cells");
+  assert.equal(softnessCtrl.getGuidance(0.8, { coordinateTransform: "voronoi" }).tag, "micro cells");
+  assert.equal(softnessCtrl.getGuidance(0.1, { coordinateTransform: "vortex_pair" }).tag, "tight poles");
+  assert.equal(softnessCtrl.getGuidance(0.4, { coordinateTransform: "vortex_pair" }).tag, "split pair");
+  assert.equal(softnessCtrl.getGuidance(0.8, { coordinateTransform: "vortex_pair" }).tag, "wide poles");
+
+  // Pattern guidance across catalog categories
+  const patternCtrl = model.controls.find((c) => c.key === "pattern");
+  assert.equal(patternCtrl.getGuidance("mixed4c-439").tag, "inception");
+  assert.equal(patternCtrl.getGuidance("membrane-field").tag, "organic");
+  assert.equal(patternCtrl.getGuidance("bubbly-0101").tag, "vgg texture");
+
   assert.equal(model.onParameterChange("coordinateTransform", "spiral"), true);
 
   const { model: runModel, params, canvas, runtimes } = setup(context);
-  await runModel.render(canvas, { ...params, coordinateTransform: "julia", twist: 30, rotation: 90 }, 0);
+  await runModel.render(
+    canvas,
+    {
+      ...params,
+      coordinateTransform: "julia",
+      twist: 30,
+      rotation: 90,
+      geometryStrength: 0.8,
+      geometryCenterX: 0.25,
+      geometryCenterY: -0.15,
+      geometrySoftness: 0.4,
+    },
+    0,
+  );
   runModel.step();
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].lastStepOptions.coordinateTransform, "julia");
   assert.ok(Math.abs(runtimes[0].lastStepOptions.twist - (30 * Math.PI) / 180) < 1e-6);
   assert.ok(Math.abs(runtimes[0].lastStepOptions.rotation - (90 * Math.PI) / 180) < 1e-6);
+  assert.equal(runtimes[0].lastStepOptions.geometryStrength, 0.8);
+  assert.equal(runtimes[0].lastStepOptions.geometryCenterX, 0.25);
+  assert.equal(runtimes[0].lastStepOptions.geometryCenterY, -0.15);
+  assert.equal(runtimes[0].lastStepOptions.geometrySoftness, 0.4);
 });
 
 test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpolate continuous strokes", async (context) => {
@@ -303,7 +362,7 @@ test("only live ticks advance, pause rebases, and catch-up is bounded", async (c
   await model.render(canvas, params, 1 / 30, live);
   assert.equal(runtimes[0].steps, 1);
   await model.render(canvas, params, 20, live);
-  assert.ok(runtimes[0].steps <= 3);
+  assert.ok(runtimes[0].steps <= 4);
   const before = runtimes[0].steps;
   model.setClockRunning(false);
   await model.render(canvas, params, 50, live);
@@ -312,6 +371,92 @@ test("only live ticks advance, pause rebases, and catch-up is bounded", async (c
   assert.equal(runtimes[0].steps, before);
   await model.render(canvas, params, 100 + 1 / 30, live);
   assert.equal(runtimes[0].steps, before + 1);
+});
+
+test("simulation clock preserves real-time rate down to 10 FPS and bounds catch-up below 10 FPS", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const testParams = { ...params, growthSpeed: 30 };
+  await model.render(canvas, testParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 0, live);
+
+  // 10 FPS: 10 frames of 0.1s each -> exactly 1.0 second elapsed -> 30 steps
+  for (let i = 1; i <= 10; i += 1) {
+    await model.render(canvas, testParams, i * 0.1, live);
+  }
+  assert.equal(runtimes[0].steps, 30);
+
+  // Pause and rebase
+  model.setClockRunning(false);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 10, live);
+  const stepsAt10 = runtimes[0].steps;
+
+  // 5 FPS: 5 frames of 0.2s each -> 1.0 second elapsed. Bounded to 3 steps/frame -> 15 steps
+  for (let i = 1; i <= 5; i += 1) {
+    await model.render(canvas, testParams, 10 + i * 0.2, live);
+  }
+  assert.equal(runtimes[0].steps - stepsAt10, 15);
+});
+
+test("simulation clock preserves fractional remainder across irregular frames and hitches", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const testParams = { ...params, growthSpeed: 30 };
+  await model.render(canvas, testParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 0, live);
+
+  // Irregular frames:
+  // Frame 1: 0.040s -> 0.040 * 30 = 1.2 steps. Executes 1 step, leaves 0.2 remainder.
+  await model.render(canvas, testParams, 0.040, live);
+  assert.equal(runtimes[0].steps, 1);
+
+  // Frame 2: 0.060s later (t = 0.100s) -> 0.060 * 30 = 1.8 steps + 0.2 = 2.0 steps. Executes 2 steps.
+  await model.render(canvas, testParams, 0.100, live);
+  assert.equal(runtimes[0].steps, 3);
+
+  // Long hitch: 1.05s later (t = 1.150s) -> 1.05 * 30 = 31.5 steps.
+  // Executes max 3 steps (runtimes[0].steps becomes 6).
+  // Discards 28 excess whole steps, preserves 0.5 fractional remainder.
+  await model.render(canvas, testParams, 1.150, live);
+  assert.equal(runtimes[0].steps, 6);
+
+  // Next frame: 1/60s later (t = 1.150 + 0.0166667s) -> 0.5 steps + 0.5 remainder = 1.0 step! Executes 1 step.
+  await model.render(canvas, testParams, 1.150 + 1 / 60, live);
+  assert.equal(runtimes[0].steps, 7);
+});
+
+test("dream guidance cadence strictly reflects executed steps", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const dispatched = [];
+  model._dispatchDreamGuidance = (...args) => dispatched.push(args);
+
+  const dreamParams = {
+    ...params,
+    growthSpeed: 30,
+    dreamEnabled: "on",
+    dreamStrength: 0.1,
+    dreamCadence: 4,
+  };
+
+  await model.render(canvas, dreamParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, dreamParams, 0, live);
+
+  // Execute 3 steps in one frame (t = 0.1s at 10 FPS)
+  await model.render(canvas, dreamParams, 0.1, live);
+  assert.equal(runtimes[0].steps, 3);
+  assert.equal(model._dreamStepCounter, 3);
+  assert.equal(dispatched.length, 0);
+
+  // Execute another 3 steps (t = 0.2s) -> total 6 steps -> triggers cadence 4 once, remainder 2
+  await model.render(canvas, dreamParams, 0.2, live);
+  assert.equal(runtimes[0].steps, 6);
+  assert.equal(model._dreamStepCounter, 2);
+  assert.equal(dispatched.length, 1);
 });
 
 test("failed initialization is latched until explicit retry; stale loads cannot paint", async (context) => {
@@ -503,7 +648,7 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(runtimes[0].disposed, false);
 });
 
-test("audio-reactive profiles and beat shockwaves map routes and dispatch kick disturbances", async (context) => {
+test("audio-reactive profiles and beat shockwaves map routes and dispatch optical kick ripples", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
 
@@ -519,76 +664,72 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     ["Off", "Subtle", "Continuous", "Dynamic", "Custom"],
   );
 
-  const reachControl = model.controls.find((c) => c.key === "shockwaveReach");
-  assert.ok(reachControl);
-  assert.equal(reachControl.default, "canvas");
-  assert.deepEqual(
-    reachControl.options.map((o) => o.value),
-    ["canvas", "brush"],
-  );
-
   const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
   assert.ok(shockwaveControl);
-  assert.equal(shockwaveControl.default, "off");
+  assert.equal(shockwaveControl.default, "on");
   assert.deepEqual(
     shockwaveControl.options.map((o) => o.value),
-    ["off", "center", "pointer"],
+    ["off", "on"],
   );
 
-  const styleControl = model.controls.find((c) => c.key === "shockwaveStyle");
-  assert.ok(styleControl);
-  assert.equal(styleControl.default, "refract");
-  assert.deepEqual(
-    styleControl.options.map((o) => o.value),
-    ["refract", "chromatic", "glow", "harmonic"],
-  );
-  assert.deepEqual(
-    styleControl.options.map((o) => o.label),
-    [
-      "Water Ripple · Clear Refraction",
-      "Prism Split · Rainbow Aberration",
-      "Neon Halo · Radiant Energy Ring",
-      "Cymatic Echo · Concentric Double Wave",
-    ],
-  );
+  const intensityControl = model.controls.find((c) => c.key === "shockwaveIntensity");
+  assert.ok(intensityControl);
+  assert.equal(intensityControl.default, 0.30);
+  assert.equal(intensityControl.min, 0.0);
+  assert.equal(intensityControl.max, 1.0);
 
-  const impactControl = model.controls.find((c) => c.key === "shockwaveImpact");
-  assert.ok(impactControl);
-  assert.equal(impactControl.default, "color");
-  assert.deepEqual(
-    impactControl.options.map((o) => o.value),
-    ["color", "none"],
-  );
-  assert.deepEqual(
-    impactControl.options.map((o) => o.label),
-    ["Color Blend · Auto Standout", "Visual Only · Optical Lens"],
-  );
+  // Removed legacy controls and discrete kick pruning/infusion
+  assert.equal(model.controls.find((c) => c.key === "quietPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusion"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusionStrength"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "shockwaveReach"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "shockwaveStyle"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "shockwaveImpact"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "shading"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "reliefStrength"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "lightAngle"), undefined);
 
   const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
   assert.equal(kickInputControl, undefined);
+
+  const channelControl = model.controls.find((c) => c.key === "channelView");
+  assert.ok(channelControl);
+  assert.equal(channelControl.default, "phenotype");
+  assert.deepEqual(
+    channelControl.options.map((o) => o.value),
+    [
+      "phenotype",
+      "vitality",
+      "fast_signals",
+      "memory_waves",
+      "energy_heat",
+      "xray",
+    ],
+  );
 
   assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
   assert.equal(model.parameterDefaultsForChange("audioProfile", "off"), null);
-  assert.deepEqual(model.parameterDefaultsForChange("beatShockwave", "pointer"), {
-    disturbanceMode: "shockwave",
-  });
 
   // Backward compatibility: legacy saved ambient and rhythm runs reopen as custom
   assert.equal(model.normalizeStoredParameter("audioProfile", "ambient"), "custom");
   assert.equal(model.normalizeStoredParameter("audioProfile", "rhythm"), "custom");
   assert.equal(model.normalizeStoredParameter("audioProfile", "subtle"), "subtle");
   assert.equal(model.normalizeStoredParameter("audioProfile", "continuous"), "continuous");
+  assert.equal(model.normalizeStoredParameter("beatShockwave", "center"), "on");
+  assert.equal(model.normalizeStoredParameter("beatShockwave", "off"), "off");
+  assert.equal(model.normalizeStoredParameter("shockwaveIntensity", 0.45), 0.45);
+  assert.equal(model.normalizeStoredParameter("channelView", "invalid"), "phenotype");
+  assert.equal(model.normalizeStoredParameter("channelView", "fast_signals"), "fast_signals");
 
   assert.equal(detectAudioProfile({}), "off");
 
   // Subtle route detection
   const subtleRoutes = {
-    rotation: { source: "kick", depth: 0.25 },
+    rotation: { source: "kick", depth: 0.20 },
     twist: { source: "kick", depth: 0.01 },
-    reliefStrength: { source: "kick", depth: 0.25 },
-    lightAngle: { source: "kick", depth: -0.10 },
   };
   assert.equal(detectAudioProfile(subtleRoutes), "subtle");
 
@@ -596,8 +737,6 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   const continuousRoutes = {
     rotation: { source: "kick", depth: 0.05 },
     twist: { source: "kick", depth: 0.05 },
-    reliefStrength: { source: "kick", depth: -1.00 },
-    lightAngle: { source: "kick", depth: 1.00 },
   };
   assert.equal(detectAudioProfile(continuousRoutes), "continuous");
 
@@ -605,15 +744,13 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
   const dynamicRoutes = {
     rotation: { source: "kick", depth: 0.10 },
     twist: { source: "kick", depth: 0.06 },
-    reliefStrength: { source: "kick", depth: -0.80 },
-    lightAngle: { source: "kick", depth: 0.90 },
   };
   assert.equal(detectAudioProfile(dynamicRoutes), "dynamic");
 
   // Custom route detection
   assert.equal(
     detectAudioProfile({
-      reliefStrength: { source: "kick", depth: 0.8 },
+      rotation: { source: "kick", depth: 0.8 },
     }),
     "custom",
   );
@@ -623,18 +760,14 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     growthSpeed: 60,
     rotation: 185,
     twist: 0,
-    reliefStrength: 1.8,
-    lightAngle: 210,
-    shading: "relief",
     coordinateTransform: "cartesian",
-    beatShockwave: "center",
-    shockwaveReach: "canvas",
+    resonanceMode: "subtle",
+    beatShockwave: "on",
+    shockwaveIntensity: 0.25,
   };
   const subtleLfos = {
     rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
     twist: { enabled: true, rate: 0.04, depth: 0.72, phase: 0, waveform: "sine" },
-    reliefStrength: { enabled: false, rate: 0.10, depth: 1.00, phase: 0 },
-    lightAngle: { enabled: false, rate: 0.10, depth: 0.20, phase: 0 },
   };
   assert.equal(
     detectAudioProfile({
@@ -673,16 +806,14 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     growthSpeed: 100,
     rotation: 180,
     twist: 0,
-    reliefStrength: 1.5,
-    lightAngle: 180,
-    shading: "relief",
     coordinateTransform: "cartesian",
+    resonanceMode: "subtle",
+    beatShockwave: "on",
+    shockwaveIntensity: 0.35,
   };
   const continuousLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
     twist: { enabled: true, rate: 0.01, depth: 0.50, phase: 0, waveform: "sine" },
-    reliefStrength: { enabled: true, rate: 0.005, depth: 1.00, phase: 1.00, waveform: "sine" },
-    lightAngle: { enabled: true, rate: 0.01, depth: 1.00, phase: 0, waveform: "sine" },
   };
   assert.equal(
     detectAudioProfile({
@@ -706,16 +837,14 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     growthSpeed: 45,
     rotation: 180,
     twist: 0,
-    reliefStrength: 1.4,
-    lightAngle: 180,
-    shading: "relief",
     coordinateTransform: "vortex",
+    resonanceMode: "full",
+    beatShockwave: "on",
+    shockwaveIntensity: 0.50,
   };
   const dynamicLfos = {
     rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
     twist: { enabled: true, rate: 0.015, depth: 0.60, calmDepth: 0.08, phase: 0, waveform: "sine" },
-    reliefStrength: { enabled: true, rate: 0.008, depth: 0.90, calmDepth: 0.15, phase: 1.00, waveform: "sine" },
-    lightAngle: { enabled: true, rate: 0.012, depth: 0.90, calmDepth: 0.10, phase: 0, waveform: "sine" },
   };
   assert.equal(
     detectAudioProfile({
@@ -734,55 +863,896 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch kick d
     "custom",
   );
 
+  // Optical beat shockwave tests: purely visual ripple, zero cell disturbance
   assert.equal(model.triggerBeatShockwave("off"), false);
-  assert.equal(model.triggerBeatShockwave("center"), true);
-  assert.equal(model._queuedDisturbances.length, 1);
-  const centerPulse = model._queuedDisturbances[0];
+  assert.equal(model.triggerBeatShockwave("on"), true);
+  assert.ok(model.hasActiveRipples);
+  assert.equal(model._activeRipples.length, 1);
+  const centerPulse = model._activeRipples[0];
   assert.equal(centerPulse.x, 64);
   assert.equal(centerPulse.y, 64);
-  assert.equal(centerPulse.mode, "shockwave");
+  assert.equal(centerPulse.amplitude, 0.30);
+  assert.equal(model._queuedDisturbances.length, 0);
 
+  // Pointer position shockwave
   assert.equal(
-    model.triggerBeatShockwave("pointer", { x: 30, y: 40 }),
+    model.triggerBeatShockwave("on", { x: 30, y: 40 }),
     true,
   );
-  assert.equal(model._queuedDisturbances.length, 2);
-  const pointerPulse = model._queuedDisturbances[1];
+  assert.equal(model._activeRipples.length, 2);
+  const pointerPulse = model._activeRipples[1];
   assert.equal(pointerPulse.x, 30);
   assert.equal(pointerPulse.y, 40);
-  assert.equal(pointerPulse.mode, "shockwave");
 
+  // Step advances without adding cell disturbances
   model.step();
-  assert.equal(runtimes[0].disturbances.length, 2);
-  assert.equal(runtimes[0].disturbances[0][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[0][4].shockwaveImpact, "color");
-  assert.equal(runtimes[0].disturbances[1][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[1][4].shockwaveImpact, "color");
+  assert.equal(runtimes[0].disturbances.length, 0);
 
-  model.onParameterChange("shockwaveImpact", "none");
-  assert.equal(model.triggerBeatShockwave("center"), true);
-  model.step();
-  assert.equal(runtimes[0].disturbances.length, 3);
-  assert.equal(runtimes[0].disturbances[2][3], "shockwave");
-  assert.equal(runtimes[0].disturbances[2][4].shockwaveImpact, "none");
+  // Intensity parameter test
+  model.onParameterChange("shockwaveIntensity", 0.65);
+  assert.equal(model.triggerBeatShockwave("on"), true);
+  const intensePulse = model._activeRipples[model._activeRipples.length - 1];
+  assert.equal(intensePulse.amplitude, 0.65);
 
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
-  assert.equal(runtimes[0].lastDrawOptions.shockwaveStyle, "refract");
+  assert.equal(runtimes[0].lastDrawOptions.channelView, "phenotype");
+  assert.equal(runtimes[0].lastDrawOptions.displayFilter, "smooth");
 
-  // Kick input: active when impact is color
-  model.onParameterChange("shockwaveImpact", "color");
-  assert.equal(model.triggerKickInput(0.8, 1000), true);
-  // Refractory lockout (< 180ms)
-  assert.equal(model.triggerKickInput(0.8, 1050), false);
-  // Allowed after cooldown
-  assert.equal(model.triggerKickInput(0.8, 1250), true);
-
-  model.onParameterChange("shockwaveImpact", "none");
-  assert.equal(model.triggerKickInput(0.8, 1500), false);
+  model.onParameterChange("channelView", "fast_signals");
+  await model.render(canvas, model.parameters, 0.2, { advanceSimulation: true });
+  assert.equal(runtimes[0].lastDrawOptions.channelView, "fast_signals");
 
   model.queueDisturbance(20, 20, 10, "invert");
   model.step();
   const distModes = runtimes[0].disturbances.map((d) => d[3]);
-  assert.ok(distModes.includes("kick_color"));
   assert.equal(distModes[distModes.length - 1], "invert");
 });
+
+test("simulationSize options and normalization adapt dynamically to hardware capabilities", () => {
+  // Constrained device (e.g. mobile or headless software WebGL with maxTextureSize 8192 or 2048)
+  const constrainedModel = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 8192 },
+  });
+  const constrainedSizes = constrainedModel.controls.find(
+    (c) => c.key === "simulationSize",
+  ).options.map((o) => o.value);
+  assert.deepEqual(constrainedSizes, [128, 256]);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 1024), 256);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 512), 256);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 256), 256);
+  assert.equal(constrainedModel.normalizeStoredParameter("simulationSize", 128), 128);
+
+  // High-DPI capable device (e.g. desktop GPU with maxTextureSize 16384 >= 16384)
+  const capableModel = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 16384 },
+  });
+  const capableControl = capableModel.controls.find(
+    (c) => c.key === "simulationSize",
+  );
+  const capableSizes = capableControl.options.map((o) => o.value);
+  assert.deepEqual(capableSizes, [128, 256, 512, 1024]);
+  assert.equal(capableModel.normalizeStoredParameter("simulationSize", 1024), 1024);
+  assert.equal(capableModel.normalizeStoredParameter("simulationSize", 512), 512);
+
+  const ultraOption = capableControl.options.find((o) => o.value === 512);
+  assert.equal(ultraOption.compute, "demanding");
+  assert.ok(ultraOption.guidance.includes("262,144"));
+
+  const megaOption = capableControl.options.find((o) => o.value === 1024);
+  assert.equal(megaOption.compute, "demanding");
+  assert.ok(megaOption.guidance.includes("1,048,576"));
+
+  // Dynamic capabilities update
+  constrainedModel.capabilities = { maxTextureSize: 16384 };
+  const updatedSizes = constrainedModel.controls.find(
+    (c) => c.key === "simulationSize",
+  ).options.map((o) => o.value);
+  assert.deepEqual(updatedSizes, [128, 256, 512, 1024]);
+});
+
+test("grid resizing preserves state via 2x2 tiling when runtime supports state transfer", async (context) => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ width: 0, height: 0 }) };
+  context.after(() => {
+    globalThis.document = previousDocument;
+  });
+  const runtimes = [];
+  const model = new NeuralGrowthModel({
+    load: async () => checkpoint,
+    capabilities: { maxTextureSize: 16384 },
+    createRuntime: ({ size, seed }) => {
+      const runtime = {
+        size,
+        seed,
+        steps: 0,
+        restarts: 0,
+        draws: 0,
+        data: new Uint8Array(size * size * 12).fill(size === 128 ? 123 : 0),
+        step(count) {
+          this.steps += count;
+        },
+        draw() {
+          this.draws += 1;
+        },
+        restart() {},
+        readState() {
+          return this.data;
+        },
+        writeState(data) {
+          this.data = data;
+        },
+        dispose() {
+          this.disposed = true;
+        },
+        getStats() {
+          return { size: this.size, seed: this.seed, steps: this.steps, resources: { bytes: 100 } };
+        },
+      };
+      runtimes.push(runtime);
+      return runtime;
+    },
+  });
+  const canvas = { width: 256, height: 256 };
+  await model.render(canvas, { ...defaultParameters(model), simulationSize: 128 }, 0);
+  model.step();
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].data[0], 123);
+
+  // Upgrade grid size to 256
+  await model.render(canvas, { ...defaultParameters(model), simulationSize: 256 }, 0);
+  assert.equal(runtimes.length, 2);
+  assert.equal(runtimes[0].disposed, true);
+  assert.equal(runtimes[1].size, 256);
+  assert.equal(runtimes[1].steps, 1);
+  assert.equal(runtimes[1].data.length, 256 * 256 * 12);
+  assert.equal(runtimes[1].data[0], 123);
+  assert.equal(runtimes[1].data[(128 * 256 + 128) * 12], 123);
+
+  // Upgrade grid size to 1024 (tiling from 256)
+  await model.render(canvas, { ...defaultParameters(model), simulationSize: 1024 }, 0);
+  assert.equal(runtimes.length, 3);
+  assert.equal(runtimes[1].disposed, true);
+  assert.equal(runtimes[2].size, 1024);
+  assert.equal(runtimes[2].steps, 1);
+  assert.equal(runtimes[2].data.length, 1024 * 1024 * 12);
+  assert.equal(runtimes[2].data[0], 123);
+  assert.equal(runtimes[2].data[(512 * 1024 + 512) * 12], 123);
+});
+
+test("audio frame re-arms during silence and triggers kick shockwave and kick input", () => {
+  let lastBeatTime = 0;
+  let beatArmed = true;
+  const shockwaves = [];
+  const kickInputs = [];
+
+  const mockModel = {
+    ready: true,
+    isClockRunning: true,
+    parameters: { audioProfile: "dynamic", beatShockwave: "off" },
+    triggerBeatShockwave: (m) => shockwaves.push(m),
+    triggerKickInput: (k, t) => {
+      kickInputs.push({ k, t });
+      return true;
+    },
+  };
+
+  function simulateAudioFrame(levels, timestamp) {
+    if (!mockModel?.ready || !levels) return;
+    const triggerKick = Number(levels.kickOnset ?? levels.kick) || 0;
+    if (!levels.hasSignal || triggerKick < 0.25) {
+      beatArmed = true;
+    }
+    if (!levels.hasSignal) return;
+
+    const elapsed = timestamp - lastBeatTime;
+    if (beatArmed && triggerKick >= 0.55 && elapsed >= 180) {
+      lastBeatTime = timestamp;
+      beatArmed = false;
+      const mode = mockModel.parameters?.beatShockwave || "off";
+      const isAudioActive = (mockModel.parameters?.audioProfile || "off") !== "off";
+      if (mode === "center" || (mode !== "pointer" && isAudioActive)) {
+        mockModel.triggerBeatShockwave("center");
+        if (typeof mockModel.triggerKickInput === "function") {
+          mockModel.triggerKickInput(triggerKick, timestamp);
+        }
+      }
+    }
+  }
+
+  // 1. Kick 1 spikes
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1000);
+  assert.equal(shockwaves.length, 1);
+  assert.equal(kickInputs.length, 1);
+
+  // 2. Immediate frame still hot (< 180ms or unarmed)
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1050);
+  assert.equal(shockwaves.length, 1);
+
+  // 3. Silence gap (hasSignal: false): must re-arm!
+  simulateAudioFrame({ hasSignal: false, kickOnset: 0.0 }, 1200);
+  assert.equal(beatArmed, true);
+
+  // 4. Kick 2 after silence: must trigger!
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.75 }, 1300);
+  assert.equal(shockwaves.length, 2);
+  assert.equal(kickInputs.length, 2);
+
+  // 5. Steady bass without onset (kickOnset: 0.2, kick: 0.3): must not trigger shockwave
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.2, kick: 0.3 }, 1500);
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.3, kick: 0.4 }, 1700);
+  assert.equal(shockwaves.length, 2);
+
+  // 6. Audio Off profile: must not trigger shockwave
+  mockModel.parameters.audioProfile = "off";
+  simulateAudioFrame({ hasSignal: false }, 1800);
+  simulateAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1900);
+  assert.equal(shockwaves.length, 2);
+});
+
+test("neural growth controls provide contextual guidance and dormant tap recovery", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  // 1. Growth speed guidance
+  const speedCtrl = controls.find((c) => c.key === "growthSpeed");
+  assert.ok(speedCtrl && typeof speedCtrl.getGuidance === "function");
+  assert.equal(speedCtrl.getGuidance(0).tag, "paused");
+  assert.equal(speedCtrl.getGuidance(30).tag, "recommended");
+  assert.equal(speedCtrl.getGuidance(60).tag, "active");
+  assert.equal(speedCtrl.getGuidance(100).tag, "rapid");
+
+  // 2. Coordinate transform options and tags
+  const transformCtrl = controls.find((c) => c.key === "coordinateTransform");
+  assert.ok(transformCtrl && Array.isArray(transformCtrl.options));
+  const cartesianOpt = transformCtrl.options.find((o) => o.value === "cartesian");
+  const spiralOpt = transformCtrl.options.find((o) => o.value === "spiral");
+  assert.equal(cartesianOpt.tag, "recommended");
+  assert.equal(spiralOpt.tag, "swirl");
+  assert.ok(spiralOpt.guidance.includes("Logarithmic swirl"));
+
+  // 3. Twist contextual guidance
+  const twistCtrl = controls.find((c) => c.key === "twist");
+  assert.ok(twistCtrl && typeof twistCtrl.getGuidance === "function");
+  // In Cartesian mode: inactive
+  assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "cartesian" }).tag, "inactive");
+  // In Spiral mode: contextual ranges
+  assert.equal(twistCtrl.getGuidance(5, { coordinateTransform: "spiral" }).tag, "gentle");
+  assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "spiral" }).tag, "recommended");
+  assert.equal(twistCtrl.getGuidance(55, { coordinateTransform: "spiral" }).tag, "vivid");
+  assert.equal(twistCtrl.getGuidance(85, { coordinateTransform: "spiral" }).tag, "high shear");
+
+  // 4. Disturbance mode guidance
+  const modeCtrl = controls.find((c) => c.key === "disturbanceMode");
+  assert.ok(modeCtrl && Array.isArray(modeCtrl.options));
+  const eraseOpt = modeCtrl.options.find((o) => o.value === "erase");
+  const noiseOpt = modeCtrl.options.find((o) => o.value === "noise");
+  assert.equal(eraseOpt.tag, "clear");
+  assert.equal(noiseOpt.tag, "re-seed");
+
+  // 5. Channel inspector guidance
+  const channelCtrl = controls.find((c) => c.key === "channelView");
+  assert.ok(channelCtrl && Array.isArray(channelCtrl.options));
+  const phenotypeOpt = channelCtrl.options.find((o) => o.value === "phenotype");
+  const signalsOpt = channelCtrl.options.find((o) => o.value === "fast_signals");
+  assert.equal(phenotypeOpt.tag, "recommended");
+  assert.equal(signalsOpt.tag, "ch 4-6");
+
+  // 6. Dormant check on model without runtime returns false
+  assert.equal(model.isDormant(), false);
+});
+
+test("manual infuse and prune brushes dispatch without kick infusion dependency", () => {
+  const model = new NeuralGrowthModel();
+  const disturbances = [];
+  model._runtime = {
+    disturb: (x, y, r, mode, opts) => {
+      disturbances.push({ x, y, r, mode, ...opts });
+    },
+  };
+  model._needsRuntime = false;
+  model._loadingPattern = false;
+  model.lastError = null;
+
+  // 1. Infuse brush queuing and draining
+  model.queueDisturbance(64, 64, 16, "infuse");
+  assert.equal(model._drainDisturbances(), true);
+  assert.equal(disturbances.length, 1);
+  assert.equal(disturbances[0].mode, "infuse");
+  assert.equal(disturbances[0].strength, 1.2);
+
+  // 2. Prune brush queuing and draining
+  model.queueDisturbance(80, 90, 20, "prune");
+  assert.equal(model._drainDisturbances(), true);
+  assert.equal(disturbances.length, 2);
+  assert.equal(disturbances[1].mode, "prune");
+  assert.equal(disturbances[1].strength, 0.85);
+
+  // 3. Removed automatic kick infusion and prune controls
+  assert.equal(model.controls.find((c) => c.key === "kickInfusion"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickInfusionStrength"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "quietPruning"), undefined);
+  assert.equal(model.controls.find((c) => c.key === "kickPruning"), undefined);
+});
+
+test("resonance controls support modulation matrix routing and parameter bounds", () => {
+  const model = new NeuralGrowthModel();
+
+  for (const key of ["resonanceDrift", "resonanceFeedback", "resonanceNoise", "resonanceWarp"]) {
+    const ctrl = model.controls.find((c) => c.key === key);
+    assert.ok(ctrl, `Control ${key} must exist`);
+    assert.equal(ctrl.type, "range");
+    assert.notEqual(ctrl.modulation, false, `${key} must support modulation`);
+  }
+
+  // Bounds checks
+  const driftCtrl = model.controls.find((c) => c.key === "resonanceDrift");
+  assert.equal(driftCtrl.min, -0.1);
+  assert.equal(driftCtrl.max, 0.1);
+
+  const feedbackCtrl = model.controls.find((c) => c.key === "resonanceFeedback");
+  assert.equal(feedbackCtrl.min, 0.0);
+  assert.equal(feedbackCtrl.max, 0.8);
+
+  const noiseCtrl = model.controls.find((c) => c.key === "resonanceNoise");
+  assert.equal(noiseCtrl.min, 0.0);
+  assert.equal(noiseCtrl.max, 0.3);
+
+  const warpCtrl = model.controls.find((c) => c.key === "resonanceWarp");
+  assert.equal(warpCtrl.min, 0.0);
+  assert.equal(warpCtrl.max, 1.0);
+});
+
+test("brushRadius bounds and normalizes dynamically across simulation grid sizes", () => {
+  const model = new NeuralGrowthModel({
+    capabilities: { maxTextureSize: 16384 },
+  });
+
+  const brushControl = model.controls.find((c) => c.key === "brushRadius");
+  assert.equal(brushControl.min, 4);
+  assert.equal(brushControl.max, 256);
+  assert.equal(brushControl.default, 16);
+
+  // Normalization on default 256 grid: clamped to [4, 128]
+  assert.equal(model.normalizeStoredParameter("brushRadius", 16), 16);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 4), 4);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 2), 4);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 100), 100);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 128), 128);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 200), 128);
+  assert.equal(model.normalizeStoredParameter("brushRadius", NaN), 16);
+
+  // Normalization when grid is 128: clamped to [4, 64]
+  model._parameters.simulationSize = 128;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 100), 64);
+
+  // Normalization when grid is 512: clamped to [4, 256]
+  model._parameters.simulationSize = 512;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 200), 200);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 300), 256);
+
+  // Normalization when grid is 1024: clamped to [4, 256]
+  model._parameters.simulationSize = 1024;
+  assert.equal(model.normalizeStoredParameter("brushRadius", 256), 256);
+  assert.equal(model.normalizeStoredParameter("brushRadius", 400), 256);
+
+  // onParameterChange updates brushRadius without restarting
+  assert.equal(model.onParameterChange("brushRadius", 64), true);
+  assert.equal(model.parameters.brushRadius, 64);
+});
+
+test("ResonanceConfig validates bounds and generates step uniforms", () => {
+  const defaultConfig = new ResonanceConfig();
+  assert.equal(defaultConfig.enabled, false);
+  assert.equal(defaultConfig.perceptionDrift, 0.0);
+  assert.equal(defaultConfig.latentFeedback, 0.0);
+  assert.equal(defaultConfig.latentDecay, 1.0);
+  assert.equal(defaultConfig.noiseStrength, 0.0);
+  assert.equal(defaultConfig.activationWarp, 0.0);
+
+  // Disabled config returns zeroed/neutral uniforms
+  const disabledUniforms = defaultConfig.toUniforms(150);
+  assert.equal(disabledUniforms.perceptionPhase, 0.0);
+  assert.equal(disabledUniforms.latentFeedback, 0.0);
+  assert.equal(disabledUniforms.latentDecay, 1.0);
+  assert.equal(disabledUniforms.noiseStrength, 0.0);
+  assert.equal(disabledUniforms.activationWarp, 0.0);
+  assert.equal(disabledUniforms.stepSeed, 0);
+
+  // Clamping of extreme values
+  const clampedConfig = new ResonanceConfig({
+    enabled: true,
+    perceptionDrift: 0.99,
+    latentFeedback: 1.5,
+    latentDecay: 0.1,
+    noiseStrength: 0.99,
+    activationWarp: 2.0,
+    warpFrequency: 50.0,
+  });
+  assert.equal(clampedConfig.perceptionDrift, 0.2);
+  assert.equal(clampedConfig.latentFeedback, 0.95);
+  assert.equal(clampedConfig.latentDecay, 0.5);
+  assert.equal(clampedConfig.noiseStrength, 0.5);
+  assert.equal(clampedConfig.activationWarp, 1.0);
+  assert.equal(clampedConfig.warpFrequency, 12.0);
+
+  // Active uniform computation with dynamic drift and step seeds
+  const activeConfig = new ResonanceConfig({
+    enabled: true,
+    perceptionDrift: 0.01,
+    perceptionPhase: 0.1,
+    latentFeedback: 0.25,
+    latentDecay: 0.98,
+    noiseStrength: 0.04,
+    activationWarp: 0.3,
+  });
+  const u0 = activeConfig.toUniforms(0);
+  assert.equal(u0.perceptionPhase, 0.1);
+  assert.equal(u0.latentFeedback, 0.25);
+  assert.equal(u0.noiseStrength, 0.04);
+  assert.equal(u0.activationWarp, 0.3);
+  assert.equal(u0.stepSeed, 1013904223);
+
+  const u50 = activeConfig.toUniforms(50);
+  assert.ok(Math.abs(u50.perceptionPhase - (0.1 + 0.01 * 50)) < 1e-6);
+  assert.notEqual(u50.stepSeed, u0.stepSeed);
+});
+
+test("RESONANCE_PRESETS are defined and within valid configuration bounds", () => {
+  assert.ok(RESONANCE_PRESETS.off);
+  assert.equal(RESONANCE_PRESETS.off.enabled, false);
+
+  for (const key of ["subtle", "full"]) {
+    const preset = RESONANCE_PRESETS[key];
+    assert.ok(preset, `Preset ${key} must exist`);
+    assert.equal(preset.enabled, true);
+    const config = new ResonanceConfig(preset);
+    assert.equal(config.enabled, true);
+    assert.ok(config.perceptionDrift >= -0.2 && config.perceptionDrift <= 0.2);
+    assert.ok(config.latentFeedback >= 0.0 && config.latentFeedback <= 0.95);
+    assert.ok(config.latentDecay >= 0.5 && config.latentDecay <= 1.0);
+    assert.ok(config.noiseStrength >= 0.0 && config.noiseStrength <= 0.5);
+    assert.ok(config.activationWarp >= 0.0 && config.activationWarp <= 1.0);
+  }
+});
+
+test("NeuralGrowthModel integrates perturbation resonance controls and forwards configuration to steps", async (t) => {
+  const { model, params, canvas, runtimes } = setup(t);
+
+  const modeControl = model.controls.find((c) => c.key === "resonanceMode");
+  assert.ok(modeControl);
+  assert.equal(modeControl.default, "off");
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "subtle"), "subtle");
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "full"), "full");
+  assert.equal(model.normalizeStoredParameter("resonanceMode", "invalid"), "off");
+  assert.equal(model.normalizeStoredParameter("resonanceDrift", 0.05), 0.05);
+  assert.equal(model.normalizeStoredParameter("resonanceFeedback", 0.5), 0.5);
+  assert.equal(model.normalizeStoredParameter("resonanceNoise", 0.1), 0.1);
+  assert.equal(model.normalizeStoredParameter("resonanceWarp", 0.7), 0.7);
+
+  // parameterDefaultsForChange maps preset values
+  const subtleDefaults = model.parameterDefaultsForChange("resonanceMode", "subtle");
+  assert.ok(subtleDefaults);
+  assert.equal(subtleDefaults.resonanceDrift, 0.01);
+  assert.equal(subtleDefaults.resonanceFeedback, 0.20);
+
+  const fullDefaults = model.parameterDefaultsForChange("resonanceMode", "full");
+  assert.ok(fullDefaults);
+  assert.equal(fullDefaults.resonanceDrift, 0.03);
+  assert.equal(fullDefaults.resonanceFeedback, 0.45);
+  assert.equal(fullDefaults.resonanceWarp, 0.25);
+
+  // Switching preset via onParameterChange updates slider values
+  model.onParameterChange("resonanceMode", "full");
+  assert.equal(model.parameters.resonanceMode, "full");
+  assert.equal(model.parameters.resonanceWarp, 0.25);
+
+  // Modifying slider shifts mode to custom
+  model.onParameterChange("resonanceDrift", 0.08);
+  assert.equal(model.parameters.resonanceMode, "custom");
+  assert.equal(model.parameters.resonanceDrift, 0.08);
+
+  // _getResonanceConfig produces valid ResonanceConfig
+  const customConfig = model._getResonanceConfig();
+  assert.ok(customConfig instanceof ResonanceConfig);
+  assert.equal(customConfig.enabled, true);
+  assert.equal(customConfig.perceptionDrift, 0.08);
+
+  // Initialize runtime via render
+  await model.render(canvas, params, 0);
+  const runtime = runtimes[0];
+  assert.ok(runtime);
+
+  // Manual step passes resonance configuration
+  model.step();
+  assert.ok(runtime.lastStepOptions);
+  assert.ok(runtime.lastStepOptions.resonance instanceof ResonanceConfig);
+
+  // Live simulation tick forwards resonance configuration
+  model.setClockRunning(true);
+  await model.render(canvas, { ...params, growthSpeed: 30 }, 0.0);
+  await model.render(canvas, { ...params, growthSpeed: 30 }, 0.04, { advanceSimulation: true });
+  assert.ok(runtime.lastStepOptions.resonance instanceof ResonanceConfig);
+
+  // Reset to off returns disabled config
+  model.onParameterChange("resonanceMode", "off");
+  const offConfig = model._getResonanceConfig();
+  assert.equal(offConfig.enabled, false);
+});
+
+test("NeuralGrowthModel integrates coordinate geometry controls (strength, center, softness)", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const strengthCtrl = controls.find((c) => c.key === "geometryStrength");
+  assert.ok(strengthCtrl);
+  assert.equal(strengthCtrl.default, 1.0);
+  assert.equal(strengthCtrl.min, 0);
+  assert.equal(strengthCtrl.max, 1);
+
+  const centerXCtrl = controls.find((c) => c.key === "geometryCenterX");
+  assert.ok(centerXCtrl);
+  assert.equal(centerXCtrl.default, 0);
+  assert.equal(centerXCtrl.min, -1);
+  assert.equal(centerXCtrl.max, 1);
+
+  const centerYCtrl = controls.find((c) => c.key === "geometryCenterY");
+  assert.ok(centerYCtrl);
+  assert.equal(centerYCtrl.default, 0);
+
+  const softnessCtrl = controls.find((c) => c.key === "geometrySoftness");
+  assert.ok(softnessCtrl);
+  assert.equal(softnessCtrl.default, 0.25);
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("geometryStrength", 0.5), 0.5);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", 2.5), 1.0);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("geometryStrength", "invalid"), 1.0);
+
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", -0.75), -0.75);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", 2.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", -2.0), -1.0);
+  assert.equal(model.normalizeStoredParameter("geometryCenterX", "invalid"), 0.0);
+
+  assert.equal(model.normalizeStoredParameter("geometryCenterY", 0.35), 0.35);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", 0.8), 0.8);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", -0.1), 0.0);
+  assert.equal(model.normalizeStoredParameter("geometrySoftness", "invalid"), 0.25);
+
+  // Guidance checks
+  assert.equal(
+    strengthCtrl.getGuidance(0.5, { coordinateTransform: "cartesian" }).tag,
+    "inactive",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.02, { coordinateTransform: "vortex" }).tag,
+    "subtle",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.3, { coordinateTransform: "vortex" }).tag,
+    "balanced",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.7, { coordinateTransform: "vortex" }).tag,
+    "orbital",
+  );
+  assert.equal(
+    strengthCtrl.getGuidance(0.95, { coordinateTransform: "vortex" }).tag,
+    "full warp",
+  );
+
+  assert.equal(
+    centerXCtrl.getGuidance(0.0, { coordinateTransform: "spiral" }).tag,
+    "centered",
+  );
+  assert.equal(
+    centerXCtrl.getGuidance(0.5, { coordinateTransform: "spiral" }).tag,
+    "right",
+  );
+  assert.equal(
+    centerXCtrl.getGuidance(-0.5, { coordinateTransform: "spiral" }).tag,
+    "left",
+  );
+
+  assert.equal(
+    softnessCtrl.getGuidance(0.02, { coordinateTransform: "dipole" }).tag,
+    "sharp",
+  );
+  assert.equal(
+    softnessCtrl.getGuidance(0.3, { coordinateTransform: "dipole" }).tag,
+    "regularized",
+  );
+  assert.equal(
+    softnessCtrl.getGuidance(0.7, { coordinateTransform: "dipole" }).tag,
+    "feathered",
+  );
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("geometryStrength", 0.7), true);
+  assert.equal(model.parameters.geometryStrength, 0.7);
+  assert.equal(model.onParameterChange("geometryCenterX", 0.3), true);
+  assert.equal(model.parameters.geometryCenterX, 0.3);
+  assert.equal(model.onParameterChange("geometryCenterY", -0.4), true);
+  assert.equal(model.parameters.geometryCenterY, -0.4);
+  assert.equal(model.onParameterChange("geometrySoftness", 0.5), true);
+  assert.equal(model.parameters.geometrySoftness, 0.5);
+
+  // setGeometryCenter and resetGeometryCenter convenience helpers
+  model.setGeometryCenter(0.42, -0.85);
+  assert.equal(model.parameters.geometryCenterX, 0.42);
+  assert.equal(model.parameters.geometryCenterY, -0.85);
+
+  model.resetGeometryCenter();
+  assert.equal(model.parameters.geometryCenterX, 0);
+  assert.equal(model.parameters.geometryCenterY, 0);
+});
+
+test("palette cycling with slow phase drift configures controls, normalizes values and updates dynamics", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const paletteCtrl = controls.find((c) => c.key === "palette");
+  assert.ok(paletteCtrl);
+  const paletteValues = paletteCtrl.options.map((o) => o.value);
+  assert.deepEqual(paletteValues, [
+    "native",
+    "spectral",
+    "thermal",
+    "neon",
+    "ocean",
+    "verdant",
+  ]);
+
+  const phaseCtrl = controls.find((c) => c.key === "palettePhase");
+  assert.ok(phaseCtrl);
+  assert.equal(phaseCtrl.min, 0);
+  assert.equal(phaseCtrl.max, 360);
+  assert.equal(phaseCtrl.default, 0);
+  assert.equal(phaseCtrl.wrap, true);
+  assert.equal(phaseCtrl.format, "degrees");
+  assert.equal(phaseCtrl.getGuidance(0).tag, "aligned");
+  assert.equal(phaseCtrl.getGuidance(45).tag, "45° shift");
+
+  const speedCtrl = controls.find((c) => c.key === "paletteCycleSpeed");
+  assert.ok(speedCtrl);
+  assert.equal(speedCtrl.min, 0);
+  assert.equal(speedCtrl.max, 1);
+  assert.equal(speedCtrl.default, 0);
+  assert.equal(speedCtrl.format, "percent");
+  assert.equal(speedCtrl.getGuidance(0).tag, "stationary");
+  assert.equal(speedCtrl.getGuidance(0.08).tag, "slow drift");
+  assert.equal(speedCtrl.getGuidance(0.3).tag, "flowing");
+  assert.equal(speedCtrl.getGuidance(0.8).tag, "rapid");
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("palette", "thermal"), "thermal");
+  assert.equal(model.normalizeStoredParameter("palette", "neon"), "neon");
+  assert.equal(model.normalizeStoredParameter("palette", "ocean"), "ocean");
+  assert.equal(model.normalizeStoredParameter("palette", "verdant"), "verdant");
+  assert.equal(model.normalizeStoredParameter("palette", "invalid"), "native");
+
+  assert.equal(model.normalizeStoredParameter("palettePhase", 180), 180);
+  assert.equal(model.normalizeStoredParameter("palettePhase", 450), 90);
+  assert.equal(model.normalizeStoredParameter("palettePhase", -90), 270);
+  assert.equal(model.normalizeStoredParameter("palettePhase", "invalid"), 0);
+
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", 0.05), 0.05);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", 1.5), 1.0);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("paletteCycleSpeed", "invalid"), 0.0);
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("palette", "thermal"), true);
+  assert.equal(model.parameters.palette, "thermal");
+  assert.equal(model.onParameterChange("palettePhase", 120), true);
+  assert.equal(model.parameters.palettePhase, 120);
+  assert.equal(model.onParameterChange("paletteCycleSpeed", 0.1), true);
+  assert.equal(model.parameters.paletteCycleSpeed, 0.1);
+
+  // isDynamic activation via paletteCycleSpeed
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      paletteCycleSpeed: 0.05,
+    }),
+    true,
+  );
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      paletteCycleSpeed: 0,
+    }),
+    false,
+  );
+});
+
+test("temporal echoes configure controls, normalize values, and update dynamics", () => {
+  const model = new NeuralGrowthModel();
+  const controls = model.controls;
+
+  const decayCtrl = controls.find((c) => c.key === "echoDecay");
+  assert.ok(decayCtrl);
+  assert.equal(decayCtrl.min, 0);
+  assert.equal(decayCtrl.max, 0.98);
+  assert.equal(decayCtrl.step, 0.02);
+  assert.equal(decayCtrl.default, 0.0);
+  assert.equal(decayCtrl.format, "percent");
+  assert.equal(decayCtrl.getGuidance(0).tag, "disabled");
+  assert.equal(decayCtrl.getGuidance(0.2).tag, "subtle wake");
+  assert.equal(decayCtrl.getGuidance(0.6).tag, "comet wake");
+  assert.equal(decayCtrl.getGuidance(0.9).tag, "phosphor dream");
+
+  const driftCtrl = controls.find((c) => c.key === "echoDrift");
+  assert.ok(driftCtrl);
+  assert.equal(driftCtrl.min, -1);
+  assert.equal(driftCtrl.max, 1);
+  assert.equal(driftCtrl.step, 0.05);
+  assert.equal(driftCtrl.default, 0.25);
+  assert.equal(driftCtrl.getGuidance(0).tag, "stationary");
+  assert.equal(driftCtrl.getGuidance(0.5).tag, "downstream");
+  assert.equal(driftCtrl.getGuidance(-0.5).tag, "counter-stream");
+
+  const modeCtrl = controls.find((c) => c.key === "echoMode");
+  assert.ok(modeCtrl);
+  assert.deepEqual(
+    modeCtrl.options.map((o) => o.value),
+    ["field_advection", "radial_bloom", "linear_drift"],
+  );
+
+  const styleCtrl = controls.find((c) => c.key === "echoStyle");
+  assert.ok(styleCtrl);
+  assert.deepEqual(
+    styleCtrl.options.map((o) => o.value),
+    ["phosphor", "mist"],
+  );
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("echoDecay", 0.7), 0.7);
+  assert.equal(model.normalizeStoredParameter("echoDecay", 1.5), 0.98);
+  assert.equal(model.normalizeStoredParameter("echoDecay", -0.5), 0.0);
+  assert.equal(model.normalizeStoredParameter("echoDecay", "invalid"), 0.0);
+
+  assert.equal(model.normalizeStoredParameter("echoDrift", 0.4), 0.4);
+  assert.equal(model.normalizeStoredParameter("echoDrift", 2.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("echoDrift", -2.0), -1.0);
+  assert.equal(model.normalizeStoredParameter("echoDrift", "invalid"), 0.25);
+
+  assert.equal(model.normalizeStoredParameter("echoMode", "radial_bloom"), "radial_bloom");
+  assert.equal(model.normalizeStoredParameter("echoMode", "linear_drift"), "linear_drift");
+  assert.equal(model.normalizeStoredParameter("echoMode", "invalid"), "field_advection");
+
+  assert.equal(model.normalizeStoredParameter("echoStyle", "mist"), "mist");
+  assert.equal(model.normalizeStoredParameter("echoStyle", "invalid"), "phosphor");
+
+  // onParameterChange
+  assert.equal(model.onParameterChange("echoDecay", 0.8), true);
+  assert.equal(model.parameters.echoDecay, 0.8);
+  assert.equal(model.onParameterChange("echoDrift", -0.3), true);
+  assert.equal(model.parameters.echoDrift, -0.3);
+  assert.equal(model.onParameterChange("echoMode", "radial_bloom"), true);
+  assert.equal(model.parameters.echoMode, "radial_bloom");
+  assert.equal(model.onParameterChange("echoStyle", "mist"), true);
+  assert.equal(model.parameters.echoStyle, "mist");
+
+  // isDynamic activation via echoDecay
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      echoDecay: 0.5,
+    }),
+    true,
+  );
+  assert.equal(
+    model.isDynamic({
+      growthSpeed: 0,
+      echoDecay: 0,
+    }),
+    false,
+  );
+});
+
+test("acoustic field injection configures controls, normalizes values and dispatches disturbances", () => {
+  const model = new NeuralGrowthModel();
+
+  // Control definitions
+  const injectCtrl = model.controls.find((c) => c.key === "acousticInjection");
+  assert.ok(injectCtrl && Array.isArray(injectCtrl.options));
+  assert.equal(injectCtrl.default, "off");
+
+  const threshCtrl = model.controls.find((c) => c.key === "acousticThreshold");
+  assert.ok(threshCtrl && threshCtrl.modulatable);
+  assert.equal(threshCtrl.default, 0.45);
+
+  const posCtrl = model.controls.find((c) => c.key === "acousticPosition");
+  assert.ok(posCtrl && Array.isArray(posCtrl.options));
+  assert.equal(posCtrl.default, "curve_peaks");
+
+  // Normalization
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "dye"),
+    "dye",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "shockwave"),
+    "shockwave",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticInjection", "invalid"),
+    "off",
+  );
+  assert.equal(model.normalizeStoredParameter("acousticThreshold", 0.65), 0.65);
+  assert.equal(model.normalizeStoredParameter("acousticThreshold", 10.0), 0.8);
+  assert.equal(
+    model.normalizeStoredParameter("acousticPosition", "baseline"),
+    "baseline",
+  );
+  assert.equal(
+    model.normalizeStoredParameter("acousticPosition", "invalid"),
+    "curve_peaks",
+  );
+
+  // Parameter changes
+  assert.equal(model.onParameterChange("acousticInjection", "dye"), true);
+  assert.equal(model.parameters.acousticInjection, "dye");
+  assert.equal(model.onParameterChange("acousticThreshold", 0.3), true);
+  assert.equal(model.parameters.acousticThreshold, 0.3);
+  assert.equal(model.onParameterChange("acousticPosition", "baseline"), true);
+  assert.equal(model.parameters.acousticPosition, "baseline");
+
+  const rhythm = {
+    analyser: { fftSize: 2048 },
+    context: { sampleRate: 48000 },
+  };
+  const spectrum = new Uint8Array(1024).fill(0);
+  for (let i = 0; i < 30; i += 1) spectrum[i] = 250;
+
+  // With ready = false (initial uninitialized state): returns 0 cleanly
+  assert.equal(
+    model.processAcousticInjection(
+      spectrum,
+      { hasSignal: true },
+      1000,
+      rhythm,
+    ),
+    0,
+  );
+});
+
+test("audio-reactive camera breathing configures controls, normalizes values and updates viewport", () => {
+  const model = new NeuralGrowthModel();
+
+  // Controls
+  const breathCtrl = model.controls.find((c) => c.key === "cameraBreathing");
+  assert.ok(breathCtrl && Array.isArray(breathCtrl.options));
+  assert.equal(breathCtrl.default, "off");
+
+  const reactCtrl = model.controls.find((c) => c.key === "cameraReactivity");
+  assert.ok(reactCtrl && reactCtrl.modulatable);
+  assert.equal(reactCtrl.default, 0.50);
+
+  // Normalization
+  assert.equal(model.normalizeStoredParameter("cameraBreathing", "punchy"), "punchy");
+  assert.equal(model.normalizeStoredParameter("cameraBreathing", "invalid"), "off");
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", 0.75), 0.75);
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", 5.0), 1.0);
+  assert.equal(model.normalizeStoredParameter("cameraReactivity", -1.0), 0.1);
+
+  // Parameter change
+  assert.equal(model.onParameterChange("cameraBreathing", "punchy"), true);
+  assert.equal(model.parameters.cameraBreathing, "punchy");
+  assert.equal(model.onParameterChange("cameraReactivity", 0.8), true);
+  assert.equal(model.parameters.cameraReactivity, 0.8);
+
+  // Camera motion update
+  model._parameters = { ...model.parameters, zoom: 2 };
+  Object.defineProperty(model, "ready", { value: true, configurable: true });
+  const moving = model.processCameraMotion({ hasSignal: true, kickOnset: 0.9, bass: 0.5 }, 1000);
+  assert.equal(moving, true);
+  assert.ok(model.effectiveZoom > 2.0);
+  assert.ok(Array.isArray(model.effectivePan));
+});
+
+
+
