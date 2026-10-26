@@ -1,0 +1,44 @@
+[
+  {
+    "renderFps": 60,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 300,
+    "actualStepsPerSecond": 30
+  },
+  {
+    "renderFps": 30,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 300,
+    "actualStepsPerSecond": 30
+  },
+  {
+    "renderFps": 20,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 300,
+    "actualStepsPerSecond": 30
+  },
+  {
+    "renderFps": 15,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 225,
+    "actualStepsPerSecond": 22.5
+  },
+  {
+    "renderFps": 10,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 150,
+    "actualStepsPerSecond": 15
+  },
+  {
+    "renderFps": 5,
+    "requestedStepsPerSecond": 30,
+    "durationSeconds": 10,
+    "actualSteps": 75,
+    "actualStepsPerSecond": 7.5
+  }
+]

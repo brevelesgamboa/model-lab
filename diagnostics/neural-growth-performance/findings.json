@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-26",
+  "snapshot": {
+    "branch": "snapshot/gl-bench-ui-antigravity-2026-10-26",
+    "commit": "d43b43e64f3c0c1d85bf95dc202635a7c7095576",
+    "pushed": true,
+    "remote": "origin"
+  },
+  "investigation_branch": "investigate/neural-growth-performance-2026-10-26",
+  "user_observation": "Running normally with Dream Guidance off",
+  "scope": "Stop at the first supported finding for a second opinion. No performance fix or production source changes.",
+  "plan": [
+    "Preserve and push all UI and Antigravity changes.",
+    "Create a fresh investigation branch from the snapshot.",
+    "Compare the prior and current runtime with Dream Guidance off and the same checkpoint, grid, and output resolution.",
+    "Reproduce the scheduler response to lower render rates independently of GPU work.",
+    "Report evidence and uncertainty before implementing fixes."
+  ],
+  "confirmed_finding": {
+    "summary": "The simulation update rate is coupled to rendering and drops below the requested Growth Speed when rendering falls below 20 FPS.",
+    "source": "assets/js/models/neural-growth.js:2334",
+    "mechanism": [
+      "Elapsed time is limited to 0.05 seconds per accepted render.",
+      "At a requested Growth Speed of 30, this adds at most 1.5 simulation steps per rendered frame.",
+      "The accumulator is capped at 2 steps, and the last-tick timestamp moves forward, discarding the excess elapsed time."
+    ],
+    "clock_probe": "Actual NeuralGrowthModel.render() exercised with an injected no-op runtime and deterministic timestamps; it isolates scheduler behavior from GPU speed.",
+    "results": [
+      {
+        "renderFps": 60,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 300,
+        "actualStepsPerSecond": 30
+      },
+      {
+        "renderFps": 30,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 300,
+        "actualStepsPerSecond": 30
+      },
+      {
+        "renderFps": 20,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 300,
+        "actualStepsPerSecond": 30
+      },
+      {
+        "renderFps": 15,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 225,
+        "actualStepsPerSecond": 22.5
+      },
+      {
+        "renderFps": 10,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 150,
+        "actualStepsPerSecond": 15
+      },
+      {
+        "renderFps": 5,
+        "requestedStepsPerSecond": 30,
+        "durationSeconds": 10,
+        "actualSteps": 75,
+        "actualStepsPerSecond": 7.5
+      }
+    ],
+    "new_regression": false,
+    "history": "The same 50ms clamp and two-step accumulator cap are present in ac5e8b2, before the snapshot. This is a confirmed slowdown amplifier, not a proven explanation for the new render-performance regression."
+  },
+  "runtime_comparison": {
+    "baseline_commit": "ac5e8b2",
+    "current_commit": "d43b43e",
+    "checkpoint": "Vesicle Study / mixed4c-439",
+    "grid": 256,
+    "dream_guidance": "off / zero strength",
+    "comparison_order": ["current", "previous", "current"],
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "combined_step_and_draw_768_median_ms": [
+      208.29999999993015, 208.40000000002328, 211.59999999997672
+    ],
+    "display_only_384_median_ms": [
+      28.100000000093132, 28.29999999993015, 29.199999999953434
+    ],
+    "display_only_1536_median_ms": [
+      437.0999999999767, 440.5, 448.70000000006985
+    ],
+    "conclusion": "The controlled runtime test did not reproduce a meaningful current-versus-previous slowdown with Dream Guidance off. The output drawing cost rose about 16x from 384px to 1536px in this software-rendered environment.",
+    "limits": [
+      "The browser selected SwiftShader software WebGL. These absolute frame times are not measurements of the user hardware GPU.",
+      "This is an isolated runtime comparison, not a full before/after UI profile.",
+      "No GPU timer query extension was available. The raw stepCpuSubmissionOnly samples do not measure completed GPU work.",
+      "The initiating cause of the reported new slowdown is not established; the clock finding explains its effect on growth speed."
+    ]
+  },
+  "second_opinion_questions": [
+    "Is the intended slow-frame policy to preserve real-time simulation speed or deliberately reduce the simulation rate under load?",
+    "Which rendering, display-copy, or UI cost makes the user browser fall below 20 FPS with Dream Guidance off?",
+    "Should live output resolution be controlled independently of the NCA grid and still-image export quality?"
+  ],
+  "reproduction_commands": [
+    "node tools/diagnostics/neural-growth-clock-probe.mjs",
+    "node tools/diagnostics/neural-growth-runtime-benchmark.mjs"
+  ],
+  "baseline_validation": {
+    "source_checks": "passed",
+    "lint": "passed",
+    "unit_tests": {
+      "passed": 114,
+      "failed": 0
+    }
+  },
+  "fix_applied": false
+}
