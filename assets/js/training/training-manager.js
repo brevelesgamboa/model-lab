@@ -184,7 +184,7 @@ export class TrainingManager {
       }
 
       this.callbacks.onStatus?.(
-        "ENCODING TRAINING IMAGES INTO THE LATENT SPACE",
+        "ENCODING TRAINING IMAGE FEATURES",
       );
       const sampleLatents = await encodeSamples(
         bundle.encoder,

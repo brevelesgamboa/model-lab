@@ -59,7 +59,7 @@ await writeFile(
   path.join(destination, "build-info.json"),
   JSON.stringify(
     {
-      name: "Latent Field",
+      name: "gl-bench",
       version: packageInfo.version,
       builtAt: new Date().toISOString(),
       buildType: "static-local-onnx-tfjs",

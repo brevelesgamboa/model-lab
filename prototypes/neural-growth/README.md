@@ -3,7 +3,7 @@
 A development-only feasibility test for one pretrained Texture Neural Cellular
 Automaton (NCA). It evolves a persistent 12-channel cell grid using a learned
 local update rule. The selected reference checkpoint produces vesicle-like
-structures; it is not an original Latent Field checkpoint or a biological model.
+structures; it is not an original gl-bench checkpoint or a biological model.
 
 Neural Growth is now registered in the main application. This standalone harness
 shares its production engine in `assets/js/models/neural-growth/` and checkpoint

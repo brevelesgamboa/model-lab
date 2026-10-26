@@ -17,12 +17,16 @@ export class ModelRegistry {
   constructor() {
     this.customModel = new CustomPcaModel();
     this.neuralModel = new LocalNeuralModel();
+    const inceptionDream = new InceptionDreamModel();
+    const neuralGrowth = new NeuralGrowthModel({
+      getInceptionModel: () => inceptionDream,
+    });
     this.models = [
       ...createGpuModels(),
       new FractalFunctionModel(),
       new DigiFaceVaeModel(),
-      new InceptionDreamModel(),
-      new NeuralGrowthModel(),
+      inceptionDream,
+      neuralGrowth,
       this.customModel,
       this.neuralModel,
     ];

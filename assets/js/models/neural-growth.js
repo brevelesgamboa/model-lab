@@ -22,6 +22,7 @@ import {
   CameraMotionEngine,
   CAMERA_BREATHING_MODES,
 } from "./neural-growth/camera-motion.js";
+import { DreamGuidanceBridge } from "./neural-growth/dream-guidance.js";
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -55,6 +56,7 @@ export class NeuralGrowthModel {
     load = loadCheckpoint,
     createRuntime = (options) => new TextureNcaRuntime(options),
     capabilities = detectCapabilities(),
+    getInceptionModel = null,
   } = {}) {
     this.id = "neural-growth";
     this.name = "Neural Growth";
@@ -95,12 +97,18 @@ export class NeuralGrowthModel {
     this._lastPaletteTime = null;
     this._acousticEmitter = null;
     this._cameraMotion = new CameraMotionEngine();
+    this._dreamBridge = new DreamGuidanceBridge({ getInceptionModel });
+    this._dreamStepCounter = 0;
     this._effectiveZoom = 1.0;
     this._effectivePan = [0.0, 0.0];
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
+  }
+
+  get dreamBridge() {
+    return this._dreamBridge;
   }
 
   get effectiveZoom() {
@@ -686,6 +694,37 @@ export class NeuralGrowthModel {
         },
       },
       {
+        key: "foldCount",
+        label: "KALEIDOSCOPE FOLDS",
+        type: "range",
+        min: 3,
+        max: 12,
+        step: 1,
+        default: 6,
+        format: "integer",
+        modulation: false,
+        help: "Number of rotational symmetry sectors (petals) when Coordinate Geometry is set to Kaleidoscope.",
+        getGuidance: (value, allParams) => {
+          const transform =
+            allParams?.coordinateTransform ??
+            this._parameters?.coordinateTransform ??
+            "cartesian";
+          const n = Math.round(Number(value) || 6);
+          if (transform !== "kaleidoscope") {
+            return {
+              compute: "neutral",
+              tag: "inactive",
+              text: "Fold count is active when Coordinate Geometry is set to Kaleidoscope.",
+            };
+          }
+          return {
+            compute: "neutral",
+            tag: `${n}-fold`,
+            text: `${n} symmetrical reflection sectors across the coordinate circle.`,
+          };
+        },
+      },
+      {
         key: "resonanceMode",
         label: "RESONANCE MODE",
         type: "select",
@@ -703,7 +742,7 @@ export class NeuralGrowthModel {
             label: "Subtle · Organic Drift",
             compute: "balanced",
             tag: "drift",
-            guidance: "Gentle phase drift, light latent memory, and micro-noise to breathe organic life into patterns.",
+            guidance: "Gentle phase drift, light cell-state memory, and micro-noise to breathe organic life into patterns.",
           },
           {
             value: "full",
@@ -717,10 +756,10 @@ export class NeuralGrowthModel {
             label: "Custom · User Defined",
             compute: "moderate",
             tag: "custom",
-            guidance: "User-defined dynamic drift, latent feedback, noise, and warp parameters.",
+            guidance: "User-defined dynamic drift, cell-state feedback, noise, and warp parameters.",
           },
         ],
-        help: "Non-linear resonance and perturbation modes modulating perception, latent feedback, noise, and activation warping.",
+        help: "Non-linear resonance and perturbation modes modulating perception, cell-state feedback, noise, and activation warping.",
       },
       {
         key: "resonanceDrift",
@@ -734,7 +773,7 @@ export class NeuralGrowthModel {
       },
       {
         key: "resonanceFeedback",
-        label: "LATENT FEEDBACK",
+        label: "STATE FEEDBACK",
         type: "range",
         min: 0.0,
         max: 0.8,
@@ -761,6 +800,39 @@ export class NeuralGrowthModel {
         step: 0.02,
         default: 0.0,
         help: "Periodic harmonic sine blend in update activations to alter symmetry and palette convergence.",
+      },
+      {
+        key: "latentMomentum",
+        label: "STATE MOMENTUM",
+        type: "range",
+        min: 0.0,
+        max: 0.9,
+        step: 0.05,
+        default: 0.0,
+        modulation: false,
+        help: "Temporal inertia and viscous damping on hidden channels 4..11.",
+        getGuidance: (value) => {
+          const m = Number(value) || 0;
+          if (m <= 0.001) {
+            return {
+              compute: "neutral",
+              tag: "instant",
+              text: "Zero state inertia. Instantaneous discrete cellular transitions.",
+            };
+          }
+          if (m <= 0.4) {
+            return {
+              compute: "balanced",
+              tag: "moderate",
+              text: "Fluid cell-state momentum. Imparts trailing temporal persistence and stabilizes motifs.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: "heavy",
+            text: "Heavy viscous inertia. Hidden channels resist rapid changes, producing persistent fluid waves.",
+          };
+        },
       },
       {
         key: "audioProfile",
@@ -1372,6 +1444,248 @@ export class NeuralGrowthModel {
         ],
         help: "Blending operator used to combine current frames with fading historical impressions.",
       },
+      {
+        key: "dreamEnabled",
+        label: "DREAM GUIDANCE",
+        type: "select",
+        default: "off",
+        options: [
+          {
+            value: "off",
+            label: "Off · Vanilla Growth",
+            compute: "neutral",
+            guidance: "Default. Pure cellular automaton growth rules.",
+          },
+          {
+            value: "on",
+            label: "On · Inception Guided",
+            compute: "balanced",
+            guidance: "Couples live InceptionV3 perceptual gradient ascent into the growing pattern.",
+          },
+        ],
+        help: "Injects live InceptionV3 perceptual gradients into the visible cell phenotype.",
+      },
+      {
+        key: "dreamStrength",
+        label: "DREAM STRENGTH",
+        type: "range",
+        min: 0.0,
+        max: 1.0,
+        step: 0.01,
+        default: 0.0,
+        modulation: false,
+        help: "Perceptual gradient injection strength into visible phenotype cells.",
+        getGuidance: (value) => {
+          const s = Number(value) || 0;
+          if (s <= 0.001) {
+            return {
+              compute: "neutral",
+              tag: "dormant",
+              text: "No perceptual gradients injected. Vanilla cellular growth.",
+            };
+          }
+          if (s <= 0.15) {
+            return {
+              compute: "balanced",
+              tag: "subtle",
+              text: "Subtle perceptual guidance. Preserves organic cellular texture while coaxing motifs.",
+            };
+          }
+          if (s <= 0.40) {
+            return {
+              compute: "balanced",
+              tag: "pronounced",
+              text: "Pronounced dream motifs. Inception features emerge visibly in cellular colonies.",
+            };
+          }
+          return {
+            compute: "intensive",
+            tag: "intense",
+            text: "Strong feature attractor. Deep dream forms dominate cellular morphogenesis.",
+          };
+        },
+      },
+      {
+        key: "dreamCadence",
+        label: "DREAM CADENCE",
+        type: "range",
+        min: 1,
+        max: 32,
+        step: 1,
+        default: 8,
+        modulation: false,
+        help: "Evaluate Inception perceptual gradients every K cellular steps.",
+        getGuidance: (value) => {
+          const k = Math.round(Number(value) || 8);
+          if (k <= 4) {
+            return {
+              compute: "intensive",
+              tag: "rapid",
+              text: "Evaluates every 1-4 steps. Fast guidance, high GPU load.",
+            };
+          }
+          if (k <= 12) {
+            return {
+              compute: "balanced",
+              tag: "recommended",
+              text: `Recommended (${k} steps). Fluid perceptual guidance with locked 60fps simulation.`,
+            };
+          }
+          return {
+            compute: "light",
+            tag: "relaxed",
+            text: `Evaluates every ${k} steps. Relaxed guidance, minimal compute overhead.`,
+          };
+        },
+      },
+      {
+        key: "targetLayer",
+        label: "DREAM LAYER",
+        type: "select",
+        default: "mixed_6c",
+        options: [
+          {
+            value: "mixed_6c",
+            label: "Mixed_6c · Regional Contours",
+            compute: "balanced",
+            guidance: "Recommended. Intermediate organic contours and circular motifs.",
+          },
+          {
+            value: "mixed_6a",
+            label: "Mixed_6a · Mid-Level Features",
+            compute: "balanced",
+            guidance: "Rich intermediate textural motifs and flowing patterns.",
+          },
+          {
+            value: "mixed_5b",
+            label: "Mixed_5b · Early Lattices",
+            compute: "balanced",
+            guidance: "High-frequency geometric lattices and fine edge details.",
+          },
+          {
+            value: "mixed_7b",
+            label: "Mixed_7b · Deep Semantic Forms",
+            compute: "balanced",
+            guidance: "Macro-scale semantic representations and deep architectural forms.",
+          },
+        ],
+        help: "InceptionV3 layer depth for perceptual feature ascent guidance.",
+      },
+      {
+        key: "targetChannel",
+        label: "DREAM NEURON",
+        type: "range",
+        min: -1,
+        max: 767,
+        step: 1,
+        default: -1,
+        format: "integer",
+        modulation: false,
+        help: "Single feature channel (neuron) index to target, or -1 to optimize all channels simultaneously.",
+        getGuidance: (value) => {
+          const ch = Math.round(Number(value));
+          if (ch < 0) {
+            return {
+              compute: "balanced",
+              tag: "all-neurons",
+              text: "Optimizing all feature channels in the layer simultaneously.",
+            };
+          }
+          return {
+            compute: "intensive",
+            tag: `neuron #${ch}`,
+            text: `Isolating feature map channel #${ch} for single-neuron feature ascent.`,
+          };
+        },
+      },
+      {
+        key: "dreamJitter",
+        label: "DREAM JITTER",
+        type: "select",
+        default: "on",
+        options: [
+          {
+            value: "on",
+            label: "On · Spatial Roll",
+            compute: "balanced",
+            guidance: "Shifts input randomly by [-8, 8] px each cadence to diffuse dream motifs across boundaries.",
+          },
+          {
+            value: "off",
+            label: "Off · Static Alignment",
+            compute: "neutral",
+            guidance: "Fixes coordinate alignment to grid center without spatial translations.",
+          },
+        ],
+        help: "Random circular spatial roll during gradient ascent to eliminate edge seam artifacts.",
+      },
+      {
+        key: "dreamTvWeight",
+        label: "DREAM SMOOTHNESS (TV)",
+        type: "range",
+        min: 0.0,
+        max: 0.05,
+        step: 0.001,
+        default: 0.005,
+        modulation: false,
+        help: "Total Variation regularizer penalizing pixel-to-pixel discontinuity and high-frequency static.",
+        getGuidance: (value) => {
+          const w = Number(value) || 0;
+          if (w <= 0.0005) {
+            return {
+              compute: "neutral",
+              tag: "raw",
+              text: "Minimal TV penalty. Maximum feature contrast, higher static risk.",
+            };
+          }
+          if (w <= 0.015) {
+            return {
+              compute: "balanced",
+              tag: "clean",
+              text: "Balanced TV regularization. Eliminates checkerboard static while retaining contours.",
+            };
+          }
+          return {
+            compute: "gentle",
+            tag: "soft",
+            text: "Strong smoothness prior. Coaxes soft, painterly macro structures.",
+          };
+        },
+      },
+      {
+        key: "dreamChroma",
+        label: "DREAM CHROMINANCE",
+        type: "range",
+        min: 0.0,
+        max: 1.0,
+        step: 0.05,
+        default: 0.0,
+        format: "percent",
+        modulation: false,
+        help: "Ratio of chromatic color gradient versus structural luminance contrast. 0% is strictly achromatic structure.",
+        getGuidance: (value) => {
+          const c = Number(value) || 0;
+          if (c <= 0.01) {
+            return {
+              compute: "balanced",
+              tag: "structural",
+              text: "Zero color alteration. Guides morphology and edges purely via luminance contrast.",
+            };
+          }
+          if (c <= 0.3) {
+            return {
+              compute: "balanced",
+              tag: "subtle",
+              text: "Gentle pastel tints over structural contours.",
+            };
+          }
+          return {
+            compute: "intensive",
+            tag: "vivid",
+            text: "Full multi-channel color gradients.",
+          };
+        },
+      },
     ];
   }
 
@@ -1732,6 +2046,66 @@ export class NeuralGrowthModel {
       if (valid.includes(value)) return value;
       return "phosphor";
     }
+    if (key === "dreamEnabled") {
+      return value === "on" || value === true ? "on" : "off";
+    }
+    if (key === "dreamStrength") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
+    if (key === "dreamCadence") {
+      const num = Math.round(Number(value));
+      if (Number.isInteger(num)) {
+        return Math.max(1, Math.min(32, num));
+      }
+      return 8;
+    }
+    if (key === "targetLayer") {
+      const valid = ["mixed_5b", "mixed_6a", "mixed_6c", "mixed_7b"];
+      if (valid.includes(value)) return value;
+      return "mixed_6c";
+    }
+    if (key === "targetChannel") {
+      const num = Math.round(Number(value));
+      if (Number.isFinite(num)) {
+        return Math.max(-1, Math.min(767, num));
+      }
+      return -1;
+    }
+    if (key === "dreamJitter") {
+      return value === "off" || value === false ? "off" : "on";
+    }
+    if (key === "foldCount") {
+      const num = Math.round(Number(value));
+      if (Number.isFinite(num)) {
+        return Math.max(3, Math.min(12, num));
+      }
+      return 6;
+    }
+    if (key === "latentMomentum") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(0.9, num));
+      }
+      return 0.0;
+    }
+    if (key === "dreamTvWeight") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(0.05, num));
+      }
+      return 0.005;
+    }
+    if (key === "dreamChroma") {
+      const num = Number(value);
+      if (Number.isFinite(num)) {
+        return Math.max(0.0, Math.min(1.0, num));
+      }
+      return 0.0;
+    }
     return value;
   }
 
@@ -1744,6 +2118,16 @@ export class NeuralGrowthModel {
       key === "echoDrift" ||
       key === "echoMode" ||
       key === "echoStyle" ||
+      key === "dreamEnabled" ||
+      key === "dreamStrength" ||
+      key === "dreamCadence" ||
+      key === "targetLayer" ||
+      key === "targetChannel" ||
+      key === "dreamJitter" ||
+      key === "dreamTvWeight" ||
+      key === "dreamChroma" ||
+      key === "foldCount" ||
+      key === "latentMomentum" ||
       key === "palette" ||
       key === "palettePhase" ||
       key === "paletteCycleSpeed" ||
@@ -1963,6 +2347,12 @@ export class NeuralGrowthModel {
               (Number(parameters.rotation || 0) * Math.PI) / 180;
             const twistRad =
               (Number(parameters.twist || 0) * Math.PI) / 180;
+            const isDreamActive =
+              (parameters.dreamEnabled === "on" || parameters.dreamEnabled === true) &&
+              Number(parameters.dreamStrength) > 0.0001;
+            const effectiveDreamStrength = isDreamActive
+              ? Number(parameters.dreamStrength)
+              : 0.0;
             this._runtime.step(count, {
               rotation: angleRad,
               topology: parameters.topology,
@@ -1973,7 +2363,24 @@ export class NeuralGrowthModel {
               geometryCenterY: parameters.geometryCenterY,
               geometrySoftness: parameters.geometrySoftness,
               resonance: this._getResonanceConfig(),
+              dreamStrength: effectiveDreamStrength,
+              dreamChroma: Number(parameters.dreamChroma ?? 0.0),
+              foldCount: parameters.foldCount,
+              latentMomentum: parameters.latentMomentum,
             });
+            if (isDreamActive) {
+              this._dreamStepCounter += count;
+              const cadence = Math.max(1, Math.round(Number(parameters.dreamCadence) || 8));
+              if (this._dreamStepCounter >= cadence) {
+                this._dreamStepCounter %= cadence;
+                this._dispatchDreamGuidance(
+                  parameters.targetLayer,
+                  parameters.targetChannel,
+                  parameters.dreamJitter !== "off",
+                  parameters.dreamTvWeight,
+                );
+              }
+            }
           }
           this._accumulator -= count;
         }
@@ -2058,6 +2465,12 @@ export class NeuralGrowthModel {
     this._drainDisturbances();
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
     const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
+    const isDreamActive =
+      (this._parameters.dreamEnabled === "on" || this._parameters.dreamEnabled === true) &&
+      Number(this._parameters.dreamStrength) > 0.0001;
+    const effectiveDreamStrength = isDreamActive
+      ? Number(this._parameters.dreamStrength)
+      : 0.0;
     this._runRuntime(() =>
       this._runtime.step(1, {
         rotation: angleRad,
@@ -2069,8 +2482,25 @@ export class NeuralGrowthModel {
         geometryCenterY: this._parameters.geometryCenterY,
         geometrySoftness: this._parameters.geometrySoftness,
         resonance: this._getResonanceConfig(),
+        dreamStrength: effectiveDreamStrength,
+        dreamChroma: Number(this._parameters.dreamChroma ?? 0.0),
+        foldCount: this._parameters.foldCount,
+        latentMomentum: this._parameters.latentMomentum,
       }),
     );
+    if (isDreamActive) {
+      this._dreamStepCounter += 1;
+      const cadence = Math.max(1, Math.round(Number(this._parameters.dreamCadence) || 8));
+      if (this._dreamStepCounter >= cadence) {
+        this._dreamStepCounter %= cadence;
+        this._dispatchDreamGuidance(
+          this._parameters.targetLayer,
+          this._parameters.targetChannel,
+          this._parameters.dreamJitter !== "off",
+          this._parameters.dreamTvWeight,
+        );
+      }
+    }
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -2089,6 +2519,29 @@ export class NeuralGrowthModel {
     this._kickInputIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
+    this._dreamStepCounter = 0;
+    this._dreamBridge?.resetMomentum();
+  }
+
+  _dispatchDreamGuidance(targetLayer, targetChannel = -1, jitter = true, tvWeight = 0.005) {
+    if (!this._runtime || !this._dreamBridge || this._dreamBridge.isBusy) {
+      return;
+    }
+    try {
+      const rgbBytes = this._runtime.readPhenotypeRgb(192, 192);
+      this._dreamBridge
+        .computeGradient(rgbBytes, 192, 192, targetLayer, targetChannel, jitter, tvWeight)
+        .then((gradBytes) => {
+          if (gradBytes && this._runtime && !this._runtime.disposed) {
+            this._runtime.updateDreamGradient(gradBytes, 192, 192);
+          }
+        })
+        .catch((error) => {
+          console.warn("[DreamGuidance] Gradient evaluation error:", error);
+        });
+    } catch (err) {
+      console.warn("[DreamGuidance] Phenotype read error:", err);
+    }
   }
 
   setGeometryCenter(cx, cy) {
@@ -2456,6 +2909,7 @@ export class NeuralGrowthModel {
   dispose() {
     this.cancel();
     this._disposed = true;
+    this._dreamBridge?.dispose();
     this._runtime?.dispose();
     this._runtime = null;
     this._checkpoints.clear();

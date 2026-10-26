@@ -1,4 +1,4 @@
-# Latent Field
+# gl-bench
 
 A local-first browser playground for generative shaders, fractals, and neural visualization. 
 
@@ -11,8 +11,9 @@ Built with vanilla JavaScript modules, Canvas/WebGL2, ONNX Runtime Web, and Tens
 * **Fractals and Shaders:** Chromatic Flow, Folded Fractal, and Fractal Explorer with high-res export support.
 * **Neural Growth:** Interactive Neural Cellular Automata (NCA) that simulate organic textures (Membrane Field, Filament Network, Xeno Reef, and Vesicle Study).
 * **Inception Dream:** DeepDream-style feature ascent on custom images using Inception v1 feature layers.
-* **DigiFace VAE:** Interactive latent face explorer running through an ONNX decoder.
-* **Toy Experiments:** Quick browser-based PCA, experimental autoencoder training, and a Wikimedia image search tool for sourcing textures.
+* **DigiFace VAE:** Interactive face decoder explorer running through an ONNX decoder.
+* **Workbench shell:** Persistent Lab canvas, model controls, brush tools, capture actions, and the existing local audio EQ. Saved Runs, Experiments, and About are empty route placeholders in this frontend pass.
+* **Modulation preview:** The nested SVG drawer is a visual draft. Existing working LFO and audio routes remain available under Advanced routing. Browser training and archive controller targets remain hidden in the DOM for the next UI pass.
 
 ***
 

@@ -154,7 +154,7 @@ export function createArchiveController({
     const blob = new Blob([ExperimentStore.toCsv()], {
       type: "text/csv;charset=utf-8",
     });
-    const filename = `LATENT_FIELD_SAVED_RUNS_${formatTimestampForFile()}.csv`;
+    const filename = `GL_BENCH_SAVED_RUNS_${formatTimestampForFile()}.csv`;
     downloadBlob(blob, filename);
     terminal("DATA", `${filename} written / ${records.length} rows`);
     setStatus("CSV EXPORTED");

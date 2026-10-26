@@ -26,7 +26,7 @@ export function createExportController({
     width = elements.canvas.width,
     height = elements.canvas.height,
   ) {
-    const model = getState().model?.name || "LATENT FIELD";
+    const model = getState().model?.name || "gl-bench";
     const safeModel = model.replace(/[^a-z0-9]+/gi, "_");
     return (
       safeModel +

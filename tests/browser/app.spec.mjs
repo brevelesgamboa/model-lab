@@ -32,7 +32,7 @@ test("retained routes, model controls, and runtime loading are coherent", async 
   ).toContainText("Reduced Compute");
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator(".modulation-toggle:visible")).toHaveCount(0);
-  for (const view of ["archive", "experiments", "about", "lab"]) {
+  for (const view of ["saved", "experiments", "about", "lab"]) {
     await page.locator('[data-view="' + view + '"]').click();
     await expect(
       page.locator('[data-view-panel="' + view + '"]'),
@@ -54,7 +54,7 @@ test("legacy navigation maps into the consolidated views", async ({ page }) => {
   }
 });
 
-test("navigation pauses the clock, saved runs restore, and PNG capture works", async ({
+test("navigation pauses the clock, runs persist, and PNG capture works", async ({
   page,
 }) => {
   await page.goto("/");
@@ -70,14 +70,12 @@ test("navigation pauses the clock, saved runs restore, and PNG capture works", a
     .poll(() => page.locator("#frame-index").textContent())
     .not.toBe(pausedFrame);
   await page.locator("#run-experiment").click();
-  await page.locator('[data-view="archive"]').click();
+  await page.locator('[data-view="saved"]').click();
   await expect(page.locator(".run-card")).toHaveCount(1);
   await page.reload();
   await expect(page.locator(".run-card")).toHaveCount(1);
-  await page
-    .getByRole("button", { name: /restore|load/i })
-    .first()
-    .click();
+  await expect(page.locator("#view-saved")).toBeEmpty();
+  await page.locator('[data-view="lab"]').click();
   await expect(page.locator('[data-view-panel="lab"]')).toBeVisible();
   const download = page.waitForEvent("download");
   await page.locator("#save-image").click();
@@ -90,6 +88,7 @@ for (const width of [360, 900, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+    if (width <= 800) await page.locator("#toggle-input").click();
     await expect(page.locator("#model-select")).toBeVisible();
     await expect(page.locator("#output-canvas")).toBeVisible();
     expect(
@@ -98,7 +97,8 @@ for (const width of [360, 900, 1440]) {
       ),
     ).toBe(true);
     await page.locator('[data-view="experiments"]').click();
-    await expect(page.locator("#train-model")).toBeVisible();
+    await expect(page.locator("#view-experiments")).toBeEmpty();
+    await expect(page.locator("#train-model")).toBeHidden();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -107,23 +107,19 @@ for (const width of [360, 900, 1440]) {
   });
 }
 
-test("Quick PCA trains in its worker and renders the saved model", async ({
+test("deferred views keep controller targets hidden and legacy archive links work", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
-  await page.goto("/#experiments");
-  await page.locator("#add-synthetic-set").click();
-  await expect(page.locator("#add-synthetic-set")).toBeEnabled({
-    timeout: 30_000,
-  });
-  await expect(page.locator("#sample-count")).toHaveText("32 / 64");
-  await page.locator("#training-engine").selectOption("pca");
-  await page.locator("#train-model").click();
-  await expect(page.locator("#launch-custom")).toBeEnabled({ timeout: 30_000 });
-  await page.locator("#launch-custom").click();
-  await expect(page.locator("#model-select")).toHaveValue("custom-pca");
-  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
-  await page.reload();
-  await page.locator("#model-select").selectOption("custom-pca");
-  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+  await page.goto("/#archive");
+  await expect(page.locator("#view-saved")).toBeVisible();
+  for (const id of [
+    "train-model",
+    "draw-canvas",
+    "archive-grid",
+    "fractal-process",
+  ]) {
+    await expect(page.locator("#" + id)).toHaveCount(1);
+    await expect(page.locator("#" + id)).toBeHidden();
+  }
+  await expect(page.locator("#view-saved")).toBeEmpty();
 });

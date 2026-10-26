@@ -1,21 +1,22 @@
 <!doctype html>
+
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="LATENT FIELD is a local-first browser laboratory for generative models, mathematical fields, local datasets, and saved visual experiments."
+      content="gl-bench is a local-first browser laboratory for generative models, mathematical fields, local datasets, and saved visual experiments."
     />
-    <title>latent field</title>
+    <title>gl-bench</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 fill=%22%23000%22/%3E%3Cpath d=%22M12 32h40M32 12v40%22 stroke=%22%237254f4%22 stroke-width=%226%22/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 fill=%22%23000%22/%3E%3Cpath d=%22M12 32h40M32 12v40%22 stroke=%22%23f4f4f6%22 stroke-width=%226%22/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Gajraj+One&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Gajraj+One&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/styles.css" />
@@ -23,12 +24,12 @@
   </head>
   <body>
     <noscript>
-      <div class="noscript">JavaScript is required to run LATENT FIELD.</div>
+      <div class="noscript">JavaScript is required to run gl-bench.</div>
     </noscript>
 
     <div id="site" class="site is-visible" aria-hidden="false">
-      <section class="app-window" aria-label="LATENT FIELD application">
-        <header class="masthead">
+      <section class="app-window" aria-label="gl-bench application">
+        <header id="app-header" class="masthead">
           <div class="brand-lockup">
             <button
               id="brand-home"
@@ -36,57 +37,75 @@
               type="button"
               aria-label="Open lab"
             >
-              LATENT FIELD
-            </button>
-            <span class="brand-subtitle">LOCAL GENERATIVE MODEL LAB</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20">
+                <path
+                  d="M3 6h5V3h4v3h5v8h-5v3H8v-3H3z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                ></path>
+                <path d="M8 8h4v4H8z" fill="currentColor"></path></svg
+              >gl-bench</button
+            ><span class="brand-subtitle">WEBGL2</span>
           </div>
-
-          <div class="masthead__tools" aria-label="Lab layout controls">
-            <label class="quality-control">
-              <span>QUALITY</span>
-              <select id="quality-select" aria-label="Output quality"></select>
-            </label>
+          <nav class="nav" aria-label="Primary navigation">
+            <button
+              class="nav__item is-active"
+              type="button"
+              data-view="lab"
+              aria-current="page"
+            >
+              Lab</button
+            ><button class="nav__item" type="button" data-view="saved">
+              Saved Runs</button
+            ><button class="nav__item" type="button" data-view="experiments">
+              Experiments</button
+            ><button class="nav__item" type="button" data-view="about">
+              About
+            </button>
+          </nav>
+          <div class="masthead__tools" aria-label="Workbench utilities">
             <button
               id="toggle-input"
               class="utility-button is-active"
               type="button"
               aria-pressed="true"
+              aria-label="Toggle parameter sidebar"
+              title="Toggle parameter sidebar"
             >
-              INPUT
-            </button>
-            <button
-              id="toggle-terminal"
-              class="utility-button"
-              type="button"
-              aria-pressed="false"
-            >
-              LOG
-            </button>
+              ☷</button
+            ><label class="quality-control">
+              <span>QUALITY</span>
+              <select id="quality-select" aria-label="Output quality"></select>
+            </label>
           </div>
-
-          <nav class="nav" aria-label="Primary navigation">
-            <button class="nav__item is-active" type="button" data-view="lab">
-              LAB
-            </button>
-            <button class="nav__item" type="button" data-view="archive">
-              SAVED RUNS
-            </button>
-            <button class="nav__item" type="button" data-view="experiments">
-              EXPERIMENTS
-            </button>
-            <button class="nav__item" type="button" data-view="about">
-              ABOUT
-            </button>
-          </nav>
         </header>
-
-        <main class="app-main">
+        <main class="app-main" id="app-viewport">
           <section id="view-lab" class="view is-active" data-view-panel="lab">
             <div id="lab-grid" class="lab-grid">
               <aside class="panel input-panel">
+                <div class="sidebar-caption">
+                  <span>WORKBENCH</span><span>01 / LAB</span>
+                </div>
                 <div class="panel-heading">
                   <h1 class="panel__title">Parameters</h1>
-                  <span class="panel-code">INPUT</span>
+
+                  <div class="parameter-heading__actions">
+                    <button
+                      id="run-experiment"
+                      class="action-button"
+                      type="button"
+                    >
+                      SAVE</button
+                    ><button
+                      id="reset-parameters"
+                      class="reset-button"
+                      type="button"
+                      title="Reset active model parameters"
+                    >
+                      RESET
+                    </button>
+                  </div>
                 </div>
 
                 <label class="field field--model">
@@ -95,6 +114,7 @@
                 </label>
 
                 <div class="model-readout">
+                  <span class="section-caption">ARCHITECTURE</span>
                   <span id="model-family">MODEL FAMILY: —</span>
                   <span id="model-backend">BACKEND: —</span>
                   <p id="model-description">Select a model route.</p>
@@ -108,53 +128,54 @@
                   </details>
                 </div>
 
-                <section id="growth-tools" class="growth-tools" aria-label="Neural Growth actions" hidden>
+                <section
+                  id="growth-tools"
+                  class="growth-tools"
+                  aria-label="Neural Growth actions"
+                  hidden
+                >
                   <div class="growth-tools__actions">
-                    <button id="open-growth-gallery" class="mini-button mini-button--highlight" type="button">PATTERN GALLERY</button>
-                    <button id="step-growth" class="mini-button" type="button">SINGLE STEP</button>
-                    <button id="restart-growth" class="mini-button" type="button">RESTART</button>
-                    <button id="disturb-growth" class="mini-button" type="button">DISTURB CENTER</button>
+                    <button
+                      id="open-growth-gallery"
+                      class="mini-button mini-button--highlight"
+                      type="button"
+                    >
+                      Gallery
+                    </button>
+                    <button id="step-growth" class="mini-button" type="button">
+                      Step
+                    </button>
+                    <button
+                      id="restart-growth"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Restart
+                    </button>
+                    <button
+                      id="disturb-growth"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Disturb Center
+                    </button>
                   </div>
-                  <p id="growth-status" class="field__help" role="status" aria-live="off"></p>
+                  <p
+                    id="growth-status"
+                    class="field__help"
+                    role="status"
+                    aria-live="off"
+                  ></p>
                 </section>
-
-                <details id="advanced-controls" class="advanced-controls" open>
-                  <summary>MODEL CONTROLS</summary>
-                  <div id="parameter-controls" class="parameter-controls"></div>
-                </details>
-
-                <div id="input-actions" class="input-actions">
-                  <button
-                    id="run-experiment"
-                    class="action-button"
-                    type="button"
-                  >
-                    SAVE RUN
-                  </button>
-                  <button
-                    id="randomize-all"
-                    class="action-button action-button--secondary"
-                    type="button"
-                  >
-                    RANDOMIZE
-                  </button>
-                </div>
-              </aside>
-
-              <section id="output-panel" class="panel output-panel">
-                <div class="panel-heading panel-heading--output">
-                  <h1 class="panel__title">Output</h1>
-                  <span id="output-resolution" class="panel-code"
-                    >512 × 512</span
-                  >
-                </div>
 
                 <div id="fractal-tools" class="fractal-tools" hidden>
                   <div class="fractal-explore-actions">
-                    <span id="explore-hint" class="explore-hint"
+                    <span id="explore-hint" class="explore-hint hidden"
                       >DRAG TO EXPLORE</span
                     >
-                    <label id="fractal-examples-tool" class="fractal-examples-tool"
+                    <label
+                      id="fractal-examples-tool"
+                      class="fractal-examples-tool"
                       ><span>CLASSIC EXAMPLES</span
                       ><select
                         id="classic-fractal-view"
@@ -163,7 +184,6 @@
                     ></label>
                   </div>
                 </div>
-
                 <div id="neural-dream-tools" class="neural-dream-tools" hidden>
                   <div class="neural-dream-tools__source">
                     <label
@@ -311,55 +331,22 @@
                     hidden
                   ></div>
                 </div>
+                <details id="advanced-controls" class="advanced-controls" open>
+                  <summary>MODEL CONTROLS</summary>
+                  <div id="parameter-controls" class="parameter-controls"></div>
+                </details>
 
-                <div id="growth-canvas-tools" class="growth-canvas-tools" hidden>
-                  <div class="growth-canvas-tools__row" role="toolbar" aria-label="Neural Growth interactive brushes">
-                    <span class="growth-tools-label">BRUSH:</span>
-                    <button class="mini-button growth-brush-btn is-active" type="button" data-brush="erase">ERASE</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="noise">NOISE</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="dye">COLOR</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="shockwave">RIPPLE</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="freeze">FREEZE</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="thaw">UNFREEZE</button>
-                    <button class="mini-button growth-brush-btn" type="button" data-brush="groom">FLOW</button>
-                  </div>
-                  <div id="growth-brush-options" class="growth-brush-options">
-                    <div class="growth-option-group">
-                      <span class="growth-option-label">SIZE</span>
-                      <input id="growth-brush-radius" type="range" min="4" max="256" step="1" value="16" aria-label="Brush radius" />
-                      <span id="growth-brush-radius-val" class="growth-option-val">16px</span>
-                    </div>
-                    <div id="growth-color-options" class="growth-option-group" hidden>
-                      <span class="growth-option-label">COLOR</span>
-                      <div id="growth-color-pills" class="growth-color-pills">
-                        <button class="color-preset-pill is-active" type="button" data-color="#00f0ff" style="--pill-color: #00f0ff" title="Cyan"></button>
-                        <button class="color-preset-pill" type="button" data-color="#ff00a0" style="--pill-color: #ff00a0" title="Magenta"></button>
-                        <button class="color-preset-pill" type="button" data-color="#ffb800" style="--pill-color: #ffb800" title="Gold"></button>
-                        <button class="color-preset-pill" type="button" data-color="#00ff66" style="--pill-color: #00ff66" title="Lime"></button>
-                        <button class="color-preset-pill" type="button" data-color="#9d4edd" style="--pill-color: #9d4edd" title="Violet"></button>
-                        <button class="color-preset-pill" type="button" data-color="#ffffff" style="--pill-color: #ffffff" title="White"></button>
-                      </div>
-                      <input id="growth-color-picker" type="color" value="#00f0ff" aria-label="Brush color picker" />
-                      <input id="growth-color-hex" class="growth-color-hex" type="text" value="#00F0FF" maxlength="7" spellcheck="false" aria-label="Brush color hex value" />
-                    </div>
-                    <div id="growth-freeze-options" class="growth-option-group" hidden>
-                      <div class="growth-freeze-lock-group" role="group" aria-label="Freeze lock mode">
-                        <button id="growth-freeze-lock-mask" class="mini-button mini-button--brush is-active" type="button" data-freeze-lock="mask" title="Mask: locked barrier, nothing can draw or grow over it">MASK</button>
-                        <button id="growth-freeze-lock-draw" class="mini-button mini-button--brush" type="button" data-freeze-lock="draw" title="Draw: editable barrier, draw on frozen cells then unfreeze">DRAW</button>
-                      </div>
-                      <label class="growth-option-label-select">
-                        <span>OUTLINE</span>
-                        <select id="growth-outline-select" aria-label="Barrier outline visibility">
-                          <option value="auto">Auto</option>
-                          <option value="always">Always</option>
-                          <option value="off">Off</option>
-                        </select>
-                      </label>
-                    </div>
-                    <button id="growth-clear-barrier-btn" class="mini-button" type="button" title="Clear all frozen barriers (Press C)">CLEAR BARRIERS</button>
-                  </div>
+                <div id="input-actions" class="input-actions">
+                  <button
+                    id="randomize-all"
+                    class="action-button action-button--secondary"
+                    type="button"
+                  >
+                    RANDOMIZE
+                  </button>
                 </div>
-
+              </aside>
+              <section id="output-panel" class="panel output-panel">
                 <div class="output-stage">
                   <div class="output-frame">
                     <canvas
@@ -389,50 +376,6 @@
                       hidden
                       aria-hidden="true"
                     ></div>
-                    <div id="render-state" class="render-state">READY</div>
-                    <div id="gif-progress" class="gif-progress" hidden>
-                      <span>ENCODING GIF</span>
-                      <progress
-                        id="gif-progress-bar"
-                        max="100"
-                        value="0"
-                      ></progress>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="output-meta">
-                  <span id="active-route" class="output-live-info"
-                    >ROUTE —</span
-                  >
-                  <span id="live-fps" class="output-live-info">LIVE —</span>
-                  <span id="run-id" hidden>UNSAVED</span>
-                  <span id="frame-index" hidden>0000</span>
-                  <span id="lfo-count" hidden>0</span>
-                  <span id="capture-status" hidden></span>
-                  <input id="capture-note" type="hidden" />
-                  <div class="output-actions">
-                    <button
-                      id="toggle-fullscreen"
-                      class="text-button"
-                      type="button"
-                      aria-pressed="false"
-                    >
-                      FULLSCREEN
-                    </button>
-                    <button
-                      id="toggle-animation"
-                      class="text-button"
-                      type="button"
-                    >
-                      CLOCK: OFF
-                    </button>
-                    <button id="save-image" class="text-button" type="button">
-                      SAVE PNG
-                    </button>
-                    <button id="save-gif" class="text-button" type="button">
-                      EXPORT GIF
-                    </button>
                   </div>
                 </div>
 
@@ -465,9 +408,463 @@
                     </div>
                   </div>
                 </div>
-              </section>
 
-              <section class="panel terminal-panel">
+                <div
+                  id="canvas-status-bar"
+                  class="canvas-status-bar"
+                  aria-label="Renderer status and capture controls"
+                >
+                  <div class="status-telemetry">
+                    <span class="live-indicator"
+                      ><span class="live-dot"></span>LIVE</span
+                    ><span class="status-divider"></span
+                    ><span id="live-fps" class="output-live-info"
+                      >0 FPS · 0.0 MS</span
+                    >
+                  </div>
+                  <div
+                    id="audio-monitor"
+                    class="audio-monitor"
+                    aria-label="Audio spectrum"
+                  >
+                    <span class="audio-monitor__label">EQ</span
+                    ><canvas
+                      id="audio-meter"
+                      class="audio-monitor__spectrum"
+                      width="112"
+                      height="18"
+                      role="img"
+                      aria-label="System audio spectrum: off"
+                      >Live system audio spectrum</canvas
+                    >
+                  </div>
+                  <span id="output-resolution" class="panel-code"
+                    >512 × 512</span
+                  >
+                  <div id="gif-progress" class="gif-progress" hidden>
+                    <span>ENCODING GIF</span>
+                    <progress
+                      id="gif-progress-bar"
+                      max="100"
+                      value="0"
+                    ></progress>
+                  </div>
+                  <div
+                    id="render-state"
+                    class="render-state visually-hidden"
+                    hidden
+                  >
+                    READY
+                  </div>
+                  <div class="output-actions">
+                    <button
+                      id="toggle-animation"
+                      class="text-button"
+                      type="button"
+                    >
+                      CLOCK: OFF</button
+                    ><button
+                      id="save-image"
+                      class="text-button"
+                      type="button"
+                      aria-label="Save PNG snapshot"
+                    >
+                      PNG</button
+                    ><button
+                      id="save-gif"
+                      class="text-button"
+                      type="button"
+                      aria-label="Export GIF"
+                    >
+                      GIF</button
+                    ><button
+                      id="toggle-fullscreen"
+                      class="text-button"
+                      type="button"
+                      aria-pressed="false"
+                      aria-label="Toggle fullscreen"
+                    >
+                      FULL
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <div
+                id="growth-canvas-tools"
+                class="growth-canvas-tools tool-rail hidden"
+                hidden
+                aria-label="Canvas brush tools"
+              >
+                <div
+                  class="growth-canvas-tools__row"
+                  role="toolbar"
+                  aria-label="Neural Growth interactive brushes"
+                >
+                  <span class="growth-tools-label">BRUSH:</span>
+                  <button
+                    class="mini-button growth-brush-btn is-active"
+                    type="button"
+                    data-brush="erase"
+                    title="Erase"
+                    aria-label="Erase"
+                    aria-pressed="true"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -139)">
+                        <path
+                          d="M1409 157L1406 154L1416 144L1421 149L1413 157H1409Z"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1406 157H1418"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Erase</span>
+                  </button>
+                  <button
+                    class="mini-button growth-brush-btn"
+                    type="button"
+                    data-brush="noise"
+                    title="Noise / Seed"
+                    aria-label="Noise / Seed"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -180)">
+                        <path
+                          d="M1409 189.5C1409.83 189.5 1410.5 188.828 1410.5 188C1410.5 187.172 1409.83 186.5 1409 186.5C1408.17 186.5 1407.5 187.172 1407.5 188C1407.5 188.828 1408.17 189.5 1409 189.5Z"
+                          fill="currentColor"
+                        ></path>
+                        <path
+                          d="M1419 187.2C1419.66 187.2 1420.2 186.663 1420.2 186C1420.2 185.337 1419.66 184.8 1419 184.8C1418.34 184.8 1417.8 185.337 1417.8 186C1417.8 186.663 1418.34 187.2 1419 187.2Z"
+                          fill="currentColor"
+                        ></path>
+                        <path
+                          d="M1414 195.8C1414.99 195.8 1415.8 194.994 1415.8 194C1415.8 193.006 1414.99 192.2 1414 192.2C1413.01 192.2 1412.2 193.006 1412.2 194C1412.2 194.994 1413.01 195.8 1414 195.8Z"
+                          fill="currentColor"
+                        ></path>
+                        <path
+                          d="M1407 199.2C1407.66 199.2 1408.2 198.663 1408.2 198C1408.2 197.337 1407.66 196.8 1407 196.8C1406.34 196.8 1405.8 197.337 1405.8 198C1405.8 198.663 1406.34 199.2 1407 199.2Z"
+                          fill="currentColor"
+                        ></path>
+                        <path
+                          d="M1420 198.5C1420.83 198.5 1421.5 197.828 1421.5 197C1421.5 196.172 1420.83 195.5 1420 195.5C1419.17 195.5 1418.5 196.172 1418.5 197C1418.5 197.828 1419.17 198.5 1420 198.5Z"
+                          fill="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Noise / Seed</span>
+                  </button>
+                  <button
+                    class="mini-button growth-brush-btn"
+                    type="button"
+                    data-brush="dye"
+                    title="Color / Dropper"
+                    aria-label="Color / Dropper"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -222)">
+                        <path
+                          d="M1417 227C1416 226 1414 226 1413 227L1410 230L1412 232L1406 238H1404V240L1406 242L1408 240V236L1414 230L1416 232C1417 231 1417 228 1417 227Z"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                          stroke="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Color / Dropper</span>
+                  </button>
+                  <button
+                    class="mini-button growth-brush-btn"
+                    type="button"
+                    data-brush="shockwave"
+                    title="Ripple"
+                    aria-label="Ripple"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -266)">
+                        <path
+                          d="M1404 276C1408 272 1416 272 1420 276"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1407 280C1409 277 1415 277 1417 280"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1412 284C1412.55 284 1413 283.552 1413 283C1413 282.448 1412.55 282 1412 282C1411.45 282 1411 282.448 1411 283C1411 283.552 1411.45 284 1412 284Z"
+                          fill="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Ripple</span>
+                  </button>
+                  <button
+                    class="mini-button growth-brush-btn"
+                    type="button"
+                    data-brush="freeze"
+                    title="Freeze / Barrier"
+                    aria-label="Freeze / Barrier"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -306)">
+                        <path
+                          d="M1412 310V326"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1404 318H1420"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1406 312L1418 324"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1406 324L1418 312"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Freeze / Barrier</span>
+                  </button>
+
+                  <button
+                    class="mini-button growth-brush-btn"
+                    type="button"
+                    data-brush="groom"
+                    title="Flow / Vector"
+                    aria-label="Flow / Vector"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      fill="none"
+                      aria-hidden="true"
+                      data-icon-source="figma-reference"
+                      viewBox="0 0 24 24"
+                    >
+                      <g transform="translate(-1400 -348)">
+                        <path
+                          d="M1404 356C1409.33 353.333 1414 353.667 1418 357"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1406 364C1410 361.333 1414.67 361.667 1420 365"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke="currentColor"
+                        ></path>
+                        <path
+                          d="M1417 362L1420 365L1416 367"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke="currentColor"
+                        ></path>
+                      </g></svg
+                    ><span class="visually-hidden">Flow / Vector</span>
+                  </button>
+                </div>
+
+                <details id="brush-settings" class="brush-settings">
+                  <summary
+                    title="Brush size — expand controls below"
+                    aria-label="Brush size — expand controls below"
+                  >
+                    <span
+                      id="brush-diameter-preview"
+                      class="brush-diameter-preview"
+                    ></span>
+                    <span id="growth-brush-radius-val" class="growth-option-val"
+                      >16px</span
+                    >
+                  </summary>
+                  <div id="growth-brush-options" class="growth-brush-options">
+                    <div class="growth-option-group">
+                      <span class="growth-option-label">SIZE</span>
+                      <input
+                        id="growth-brush-radius"
+                        type="range"
+                        min="4"
+                        max="256"
+                        step="1"
+                        value="16"
+                        aria-label="Brush radius"
+                      />
+                    </div>
+                    <div
+                      id="growth-color-options"
+                      class="growth-option-group"
+                      hidden
+                    >
+                      <span class="growth-option-label">COLOR</span>
+                      <div id="growth-color-pills" class="growth-color-pills">
+                        <button
+                          class="color-preset-pill is-active"
+                          type="button"
+                          data-color="#00f0ff"
+                          style="--pill-color: #00f0ff"
+                          title="Cyan"
+                        ></button>
+                        <button
+                          class="color-preset-pill"
+                          type="button"
+                          data-color="#ff00a0"
+                          style="--pill-color: #ff00a0"
+                          title="Magenta"
+                        ></button>
+                        <button
+                          class="color-preset-pill"
+                          type="button"
+                          data-color="#ffb800"
+                          style="--pill-color: #ffb800"
+                          title="Gold"
+                        ></button>
+                        <button
+                          class="color-preset-pill"
+                          type="button"
+                          data-color="#00ff66"
+                          style="--pill-color: #00ff66"
+                          title="Lime"
+                        ></button>
+                        <button
+                          class="color-preset-pill"
+                          type="button"
+                          data-color="#9d4edd"
+                          style="--pill-color: #9d4edd"
+                          title="Violet"
+                        ></button>
+                        <button
+                          class="color-preset-pill"
+                          type="button"
+                          data-color="#ffffff"
+                          style="--pill-color: #ffffff"
+                          title="White"
+                        ></button>
+                      </div>
+                      <input
+                        id="growth-color-picker"
+                        type="color"
+                        value="#00f0ff"
+                        aria-label="Brush color picker"
+                      />
+                      <input
+                        id="growth-color-hex"
+                        class="growth-color-hex"
+                        type="text"
+                        value="#00F0FF"
+                        maxlength="7"
+                        spellcheck="false"
+                        aria-label="Brush color hex value"
+                      />
+                    </div>
+                    <div
+                      id="growth-freeze-options"
+                      class="growth-option-group"
+                      hidden
+                    >
+                      <div
+                        class="growth-freeze-lock-group"
+                        role="group"
+                        aria-label="Freeze lock mode"
+                      >
+                        <button
+                          id="growth-freeze-lock-mask"
+                          class="mini-button mini-button--brush is-active"
+                          type="button"
+                          data-freeze-lock="mask"
+                          title="Mask: locked barrier, nothing can draw or grow over it"
+                        >
+                          MASK
+                        </button>
+                        <button
+                          id="growth-freeze-lock-draw"
+                          class="mini-button mini-button--brush"
+                          type="button"
+                          data-freeze-lock="draw"
+                          title="Draw: editable barrier, draw on frozen cells then unfreeze"
+                        >
+                          DRAW
+                        </button>
+                      </div>
+                      <label class="growth-option-label-select">
+                        <span>OUTLINE</span>
+                        <select
+                          id="growth-outline-select"
+                          aria-label="Barrier outline visibility"
+                        >
+                          <option value="auto">Auto</option>
+                          <option value="always">Always</option>
+                          <option value="off">Off</option>
+                        </select>
+                      </label>
+                      <button
+                        class="mini-button growth-brush-btn growth-thaw-button"
+                        type="button"
+                        data-brush="thaw"
+                        title="Unfreeze"
+                        aria-label="Unfreeze"
+                        aria-pressed="false"
+                      >
+                        THAW
+                      </button>
+                    </div>
+                  </div>
+                </details>
+                <button
+                  id="growth-clear-barrier-btn"
+                  class="mini-button"
+                  type="button"
+                  title="Clear all frozen barriers (Press C)"
+                  aria-label="Clear frozen barriers"
+                >
+                  CLR
+                </button>
+              </div>
+              <section class="panel terminal-panel" aria-label="Session log">
                 <div class="panel-heading panel-heading--terminal">
                   <h1 class="panel__title">Session Log</h1>
                   <span class="panel-code">LOCAL SESSION</span>
@@ -480,488 +877,904 @@
               </section>
             </div>
           </section>
-
+          <section
+            id="view-saved"
+            class="view hidden"
+            data-view-panel="saved"
+            aria-label="Saved Runs — coming soon"
+            hidden
+          ></section>
           <section
             id="view-experiments"
-            class="view"
+            class="view hidden"
             data-view-panel="experiments"
+            aria-label="Experiments — coming soon"
             hidden
+          ></section>
+          <section
+            id="view-about"
+            class="view hidden"
+            data-view-panel="about"
+            aria-label="About — coming soon"
+            hidden
+          ></section>
+          <dialog
+            id="export-modal"
+            class="export-modal"
+            aria-labelledby="export-modal-title"
           >
-            <div class="simple-page studio-page">
-              <div class="page-heading">
-                <div>
-                  <p class="eyebrow">OPTIONAL LOCAL TRAINING</p>
-                  <h1 class="page-title">Experiments</h1>
-                  <p>
-                    Build an image basis with Quick PCA, or train a small
-                    autoencoder on compatible hardware. These experiments use
-                    images you select and run on this device.
-                  </p>
+            <div class="export-modal__box">
+              <div class="export-modal__header">
+                <h2 id="export-modal-title" class="export-modal__title">
+                  EXPORT PNG
+                </h2>
+                <button
+                  id="export-modal-close"
+                  class="text-button export-modal__close"
+                  type="button"
+                  aria-label="Close dialog"
+                >
+                  ✕
+                </button>
+              </div>
+              <p class="export-modal__desc">Select output render resolution:</p>
+              <div
+                class="export-modal__options"
+                role="radiogroup"
+                aria-label="Export resolution options"
+              >
+                <label class="export-option">
+                  <input
+                    type="radio"
+                    name="export-resolution"
+                    value="current"
+                    checked
+                  />
+                  <span class="export-option__content">
+                    <span id="export-name-current" class="export-option__name"
+                      >CURRENT VIEWPORT</span
+                    >
+                    <span id="export-res-current" class="export-option__res"
+                      >512 × 512</span
+                    >
+                  </span>
+                </label>
+                <label id="export-option-2k" class="export-option">
+                  <input type="radio" name="export-resolution" value="2048" />
+                  <span class="export-option__content">
+                    <span id="export-name-2k" class="export-option__name"
+                      >2K SCREEN</span
+                    >
+                    <span id="export-res-2k" class="export-option__res"
+                      >2048 × 2048</span
+                    >
+                  </span>
+                </label>
+                <label id="export-option-4k" class="export-option">
+                  <input type="radio" name="export-resolution" value="4096" />
+                  <span class="export-option__content">
+                    <span id="export-name-4k" class="export-option__name"
+                      >4K SCREEN</span
+                    >
+                    <span id="export-res-4k" class="export-option__res"
+                      >4096 × 4096</span
+                    >
+                  </span>
+                </label>
+              </div>
+              <div class="export-modal__actions">
+                <button
+                  id="export-modal-cancel"
+                  class="action-button action-button--secondary"
+                  type="button"
+                >
+                  CANCEL
+                </button>
+                <button
+                  id="export-modal-confirm"
+                  class="action-button"
+                  type="button"
+                >
+                  EXPORT PNG
+                </button>
+              </div>
+            </div>
+          </dialog>
+          <dialog
+            id="growth-gallery-dialog"
+            class="growth-gallery-dialog"
+            aria-labelledby="growth-gallery-title"
+          >
+            <div class="growth-gallery">
+              <header class="growth-gallery__header">
+                <div class="growth-gallery__title-group">
+                  <h2 id="growth-gallery-title" class="growth-gallery__title">
+                    PATTERN GALLERY
+                  </h2>
+                  <span id="growth-gallery-count" class="growth-gallery__count"
+                    >91 patterns</span
+                  >
                 </div>
-                <div class="page-actions">
+                <button
+                  id="close-growth-gallery"
+                  class="growth-gallery__close-button"
+                  type="button"
+                  aria-label="Close pattern gallery"
+                >
+                  ✕
+                </button>
+              </header>
+              <div class="growth-gallery__toolbar">
+                <div class="growth-gallery__search-wrapper">
+                  <input
+                    id="growth-gallery-search"
+                    class="growth-gallery__search"
+                    type="search"
+                    placeholder="Search patterns (e.g. bubbly, mixed4c, honeycombed)..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div
+                  id="growth-gallery-tabs"
+                  class="growth-gallery__tabs"
+                  role="tablist"
+                >
                   <button
-                    id="open-datasets-from-studio"
-                    class="action-button action-button--secondary"
+                    class="growth-gallery__tab is-active"
                     type="button"
+                    role="tab"
+                    data-filter="all"
                   >
-                    FIND OPEN IMAGES
+                    All (159)
                   </button>
                   <button
-                    id="launch-custom"
-                    class="action-button action-button--secondary"
+                    class="growth-gallery__tab"
                     type="button"
-                    disabled
+                    role="tab"
+                    data-filter="texture"
                   >
-                    OPEN PCA IN LAB
+                    Textures (39)
                   </button>
                   <button
-                    id="launch-neural"
-                    class="action-button"
+                    class="growth-gallery__tab"
                     type="button"
-                    disabled
+                    role="tab"
+                    data-filter="inception"
                   >
-                    OPEN NEURAL IN LAB
+                    Inception (41)
+                  </button>
+                  <button
+                    class="growth-gallery__tab"
+                    type="button"
+                    role="tab"
+                    data-filter="organic"
+                  >
+                    Originals (25)
+                  </button>
+                  <button
+                    class="growth-gallery__tab"
+                    type="button"
+                    role="tab"
+                    data-filter="testing"
+                  >
+                    Testing / WIP (54)
+                  </button>
+                  <button
+                    class="growth-gallery__tab"
+                    type="button"
+                    role="tab"
+                    data-filter="favorites"
+                  >
+                    Favorites (<span id="growth-favorites-count">0</span>)
                   </button>
                 </div>
               </div>
-
-              <div class="studio-grid studio-grid--neural">
-                <section class="panel studio-panel studio-panel--dataset">
-                  <div class="panel-heading">
-                    <h2 class="panel__title">01 / Dataset</h2>
-                    <span class="panel-code">128PX RGB</span>
-                  </div>
-                  <label class="upload-zone" for="image-upload">
-                    <strong>ADD IMAGE FILES</strong>
-                    <span
-                      >PNG / JPG / WEBP · 3 TO 64 FILES · NORMALIZED
-                      LOCALLY</span
-                    >
-                  </label>
-                  <input
-                    id="image-upload"
-                    class="visually-hidden"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    multiple
-                  />
-                  <button
-                    id="add-synthetic-set"
-                    class="mini-button synthetic-set-button"
-                    type="button"
-                  >
-                    GENERATE 32 DIGIFACE MODEL SAMPLES
-                  </button>
-
-                  <div class="draw-lab">
-                    <div class="draw-lab__header">
-                      <span>DRAW A TRAINING SAMPLE</span>
-                      <label
-                        >COLOR
-                        <input id="draw-color" type="color" value="#ffffff"
-                      /></label>
-                      <label
-                        >BRUSH
-                        <input
-                          id="brush-size"
-                          type="range"
-                          min="2"
-                          max="30"
-                          value="12"
-                      /></label>
-                    </div>
-                    <canvas
-                      id="draw-canvas"
-                      width="256"
-                      height="256"
-                      aria-label="Drawing pad"
-                    ></canvas>
-                    <div class="draw-lab__actions">
-                      <button
-                        id="clear-drawing"
-                        class="mini-button"
-                        type="button"
-                      >
-                        CLEAR PAD
-                      </button>
-                      <button
-                        id="add-drawing"
-                        class="mini-button mini-button--active"
-                        type="button"
-                      >
-                        ADD DRAWING
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="dataset-count">
-                    SAMPLES <strong id="sample-count">0 / 64</strong>
-                  </div>
-                  <div
-                    id="sample-grid"
-                    class="sample-grid"
-                    aria-live="polite"
-                  ></div>
-                  <button
-                    id="clear-dataset"
-                    class="text-button text-button--danger"
-                    type="button"
-                  >
-                    CLEAR DATASET
-                  </button>
-                </section>
-
-                <section
-                  class="panel studio-panel studio-panel--training studio-panel--training-main"
+              <div
+                id="growth-recent-strip"
+                class="growth-gallery__recent"
+                hidden
+              >
+                <span class="growth-gallery__recent-label">RECENT:</span>
+                <div
+                  id="growth-recent-items"
+                  class="growth-gallery__recent-items"
+                ></div>
+              </div>
+              <div
+                id="growth-gallery-grid"
+                class="growth-gallery__grid"
+                role="listbox"
+              ></div>
+            </div>
+          </dialog>
+        </main>
+        <footer id="app-status-bar" class="status-line">
+          <button
+            id="toggle-terminal"
+            class="utility-button"
+            type="button"
+            aria-pressed="false"
+          >
+            Session Log<svg aria-hidden="true" viewBox="0 0 16 16">
+              <path
+                d="m3 6 5 5 5-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ></path>
+            </svg>
+          </button>
+          <div class="status-feedback">
+            <span id="status-message">READY</span>
+          </div>
+          <div class="footer-tools" aria-label="Audio and visualizer controls">
+            <button
+              id="toggle-audio-input"
+              class="audio-monitor__toggle utility-pill"
+              type="button"
+              aria-pressed="false"
+              aria-describedby="audio-share-hint"
+            >
+              AUDIO: OFF</button
+            ><button
+              id="toggle-audio-visualizer"
+              class="audio-monitor__toggle visualizer-toggle utility-pill"
+              type="button"
+              aria-pressed="false"
+              title="Toggle audio waveform overlay"
+            >
+              WAVE: OFF</button
+            ><button
+              id="open-visualizer-settings"
+              class="audio-monitor__cfg-btn utility-pill"
+              type="button"
+              aria-label="Visualizer wave settings"
+              title="Visualizer wave settings"
+            >
+              CFG
+            </button>
+            <div
+              id="visualizer-settings-popover"
+              class="visualizer-settings-popover"
+              hidden
+              role="dialog"
+              aria-label="Audio visualizer settings"
+            >
+              <div class="visualizer-popover-header">
+                <span class="visualizer-popover-title">AUDIO WAVE</span>
+                <button
+                  id="close-visualizer-settings"
+                  class="visualizer-popover-close"
+                  type="button"
+                  aria-label="Close visualizer settings"
                 >
-                  <div class="panel-heading">
-                    <h2 class="panel__title">02 / Training</h2>
-                    <span class="panel-code">PCA + TF.JS</span>
-                  </div>
-
-                  <label class="field">
-                    <span>MODEL NAME</span>
-                    <input
-                      id="custom-model-name"
-                      type="text"
-                      maxlength="32"
-                      value="My Local Model"
-                      spellcheck="false"
-                    />
-                  </label>
-
-                  <label class="field">
-                    <span>TRAINING ENGINE</span>
-                    <select id="training-engine">
-                      <option value="pca" selected>
-                        QUICK PCA / WEB WORKER
-                      </option>
-                      <option value="neural">
-                        EXPERIMENTAL NEURAL / REQUIRES GPU CHECK
-                      </option>
-                    </select>
-                  </label>
-
-                  <div
-                    id="neural-training-controls"
-                    class="neural-training-controls"
+                  ×
+                </button>
+              </div>
+              <div class="visualizer-popover-body">
+                <div class="visualizer-control-row">
+                  <label for="visualizer-mode-select">MODE</label>
+                  <select
+                    id="visualizer-mode-select"
+                    aria-label="Visualizer mode"
                   >
-                    <dl class="training-configuration">
-                      <div>
-                        <dt>Architecture</dt>
-                        <dd>Convolutional autoencoder</dd>
-                      </div>
-                      <div>
-                        <dt>Input</dt>
-                        <dd>128 × 128 RGB</dd>
-                      </div>
-                      <div>
-                        <dt>Latent dimensions</dt>
-                        <dd>64</dd>
-                      </div>
-                      <div>
-                        <dt>Training limit</dt>
-                        <dd>Up to 5 minutes</dd>
-                      </div>
-                      <div>
-                        <dt>Output treatment</dt>
-                        <dd>Square-pixel displacement</dd>
-                      </div>
-                    </dl>
-
-                    <div class="hardware-benchmark-card">
-                      <div>
-                        <span>TRAINING BACKEND</span>
-                        <strong id="training-backend">NOT BENCHMARKED</strong>
-                      </div>
-                      <div>
-                        <span>SPEED CLASS</span>
-                        <strong id="training-speed">—</strong>
-                      </div>
-                      <div>
-                        <span>RECOMMENDED</span>
-                        <strong id="training-recommended">—</strong>
-                      </div>
+                    <option value="waveform" selected>Waveform</option>
+                    <option value="spectrum">Spectrum Line</option>
+                    <option value="bass_history">Bass History</option>
+                  </select>
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-style-select">STYLE</label>
+                  <select
+                    id="visualizer-style-select"
+                    aria-label="Visualizer style"
+                  >
+                    <option value="single">Single Line</option>
+                    <option value="mirrored">Mirrored</option>
+                  </select>
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-injection-select">COUPLING</label>
+                  <select
+                    id="visualizer-injection-select"
+                    aria-label="Acoustic field coupling"
+                  >
+                    <option value="off">Off (Overlay)</option>
+                    <option value="dye">Dye (Color)</option>
+                    <option value="sprout">Sprout (Growth)</option>
+                    <option value="shockwave">Ripple</option>
+                    <option value="flow">Flow</option>
+                  </select>
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-height-range">HEIGHT</label>
+                  <input
+                    id="visualizer-height-range"
+                    type="range"
+                    min="0.05"
+                    max="0.50"
+                    step="0.01"
+                    value="0.25"
+                    aria-label="Line height"
+                  />
+                  <span
+                    id="visualizer-height-val"
+                    class="visualizer-val-readout"
+                    >25%</span
+                  >
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-position-range">POSITION</label>
+                  <input
+                    id="visualizer-position-range"
+                    type="range"
+                    min="0.05"
+                    max="0.95"
+                    step="0.01"
+                    value="0.50"
+                    aria-label="Vertical position"
+                  />
+                  <span
+                    id="visualizer-position-val"
+                    class="visualizer-val-readout"
+                    >50%</span
+                  >
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-opacity-range">OPACITY</label>
+                  <input
+                    id="visualizer-opacity-range"
+                    type="range"
+                    min="0.10"
+                    max="1.00"
+                    step="0.05"
+                    value="0.80"
+                    aria-label="Wave opacity"
+                  />
+                  <span
+                    id="visualizer-opacity-val"
+                    class="visualizer-val-readout"
+                    >80%</span
+                  >
+                </div>
+                <div class="visualizer-control-row">
+                  <label for="visualizer-color-picker">COLOR</label>
+                  <div
+                    class="visualizer-color-tools"
+                    style="display: flex; align-items: center; gap: 6px"
+                  >
+                    <input
+                      id="visualizer-color-picker"
+                      type="color"
+                      value="#00f0ff"
+                      aria-label="Custom wave color"
+                    />
+                    <div
+                      class="visualizer-color-pills"
+                      id="visualizer-color-pills"
+                    >
                       <button
-                        id="benchmark-training"
-                        class="mini-button"
+                        class="color-preset-pill is-active"
                         type="button"
-                      >
-                        CHECK NEURAL TRAINING ACCESS
-                      </button>
+                        data-color="#00f0ff"
+                        style="--pill-color: #00f0ff"
+                        title="Cyan"
+                      ></button>
+                      <button
+                        class="color-preset-pill"
+                        type="button"
+                        data-color="#00ff66"
+                        style="--pill-color: #00ff66"
+                        title="Emerald"
+                      ></button>
+                      <button
+                        class="color-preset-pill"
+                        type="button"
+                        data-color="#ff00a0"
+                        style="--pill-color: #ff00a0"
+                        title="Magenta"
+                      ></button>
+                      <button
+                        class="color-preset-pill"
+                        type="button"
+                        data-color="#ffffff"
+                        style="--pill-color: #ffffff"
+                        title="White"
+                      ></button>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
+        <div class="hidden" hidden>
+          <span id="active-route" class="output-live-info">ROUTE —</span
+          ><span id="run-id" hidden>UNSAVED</span
+          ><span id="frame-index" hidden>0000</span
+          ><span id="lfo-count" hidden>0</span
+          ><span id="capture-status" hidden></span
+          ><input id="capture-note" type="hidden" /><span id="resource-status"
+            >RENDERER: DETECTING</span
+          ><span id="audio-share-hint" class="audio-monitor__hint"
+            >CHECK “SHARE TAB AUDIO” OR “SHARE SYSTEM AUDIO” IN THE PICKER</span
+          ><span class="status-line__shortcuts"
+            >F = FULLSCREEN · SPACE = PAUSE/RESUME ALL MOTION · CTRL/⌘ + ENTER =
+            SAVE RUN</span
+          >
+        </div>
+        <div
+          id="deferred-view-controls"
+          class="hidden"
+          hidden
+          aria-hidden="true"
+          inert
+        >
+          <div class="simple-page studio-page">
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow">OPTIONAL LOCAL TRAINING</p>
+                <h1 class="page-title">Experiments</h1>
+                <p>
+                  Build an image basis with Quick PCA, or train a small
+                  autoencoder on compatible hardware. These experiments use
+                  images you select and run on this device.
+                </p>
+              </div>
+              <div class="page-actions">
+                <button
+                  id="open-datasets-from-studio"
+                  class="action-button action-button--secondary"
+                  type="button"
+                >
+                  FIND OPEN IMAGES
+                </button>
+                <button
+                  id="launch-custom"
+                  class="action-button action-button--secondary"
+                  type="button"
+                  disabled
+                >
+                  OPEN PCA IN LAB
+                </button>
+                <button
+                  id="launch-neural"
+                  class="action-button"
+                  type="button"
+                  disabled
+                >
+                  OPEN NEURAL IN LAB
+                </button>
+              </div>
+            </div>
 
-                  <div
-                    id="pca-training-controls"
-                    class="pca-training-controls"
-                    hidden
+            <div class="studio-grid studio-grid--neural">
+              <section class="panel studio-panel studio-panel--dataset">
+                <div class="panel-heading">
+                  <h2 class="panel__title">01 / Dataset</h2>
+                  <span class="panel-code">128PX RGB</span>
+                </div>
+                <label class="upload-zone" for="image-upload">
+                  <strong>ADD IMAGE FILES</strong>
+                  <span
+                    >PNG / JPG / WEBP · 3 TO 64 FILES · NORMALIZED LOCALLY</span
                   >
-                    <label class="field">
-                      <span>PCA INPUT RESOLUTION</span>
-                      <input type="text" value="48 × 48 RGB" disabled />
-                    </label>
-                    <label class="field field--range">
-                      <span class="field__heading"
-                        ><span>PRINCIPAL COMPONENTS</span
-                        ><output id="studio-components-output">4</output></span
-                      >
+                </label>
+                <input
+                  id="image-upload"
+                  class="visually-hidden"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                />
+                <button
+                  id="add-synthetic-set"
+                  class="mini-button synthetic-set-button"
+                  type="button"
+                >
+                  GENERATE 32 DIGIFACE MODEL SAMPLES
+                </button>
+
+                <div class="draw-lab">
+                  <div class="draw-lab__header">
+                    <span>DRAW A TRAINING SAMPLE</span>
+                    <label
+                      >COLOR
+                      <input id="draw-color" type="color" value="#ffffff"
+                    /></label>
+                    <label
+                      >BRUSH
                       <input
-                        id="studio-components"
+                        id="brush-size"
                         type="range"
                         min="2"
-                        max="8"
-                        step="1"
-                        value="4"
-                      />
-                    </label>
+                        max="30"
+                        value="12"
+                    /></label>
                   </div>
-
-                  <div id="training-note" class="training-note">
-                    <strong>QUICK PCA PATH</strong>
-                    <p>
-                      Quick PCA stays available on ordinary devices. The 128px
-                      datamosh autoencoder is a five-minute quality run reserved
-                      for hardware that passes the FAST WebGL check.
-                    </p>
-                  </div>
-
-                  <div class="training-actions-main">
+                  <canvas
+                    id="draw-canvas"
+                    width="256"
+                    height="256"
+                    aria-label="Drawing pad"
+                  ></canvas>
+                  <div class="draw-lab__actions">
                     <button
-                      id="train-model"
-                      class="action-button action-button--wide"
-                      type="button"
-                    >
-                      TRAIN QUICK PCA MODEL
-                    </button>
-                    <button
-                      id="stop-training"
-                      class="mini-button text-button--danger"
-                      type="button"
-                      hidden
-                    >
-                      STOP TRAINING
-                    </button>
-                  </div>
-                  <progress
-                    id="training-progress"
-                    class="training-progress"
-                    max="100"
-                    value="0"
-                  ></progress>
-                  <p id="training-status" class="training-status">
-                    PCA NEEDS AT LEAST 3 IMAGES.
-                  </p>
-
-                  <div
-                    id="pca-model-file-actions"
-                    class="model-file-actions"
-                    hidden
-                  >
-                    <button
-                      id="export-model"
+                      id="clear-drawing"
                       class="mini-button"
                       type="button"
-                      disabled
                     >
-                      EXPORT PCA JSON
+                      CLEAR PAD
                     </button>
-                    <label class="mini-button" for="import-model"
-                      >IMPORT PCA JSON</label
+                    <button
+                      id="add-drawing"
+                      class="mini-button mini-button--active"
+                      type="button"
+                    >
+                      ADD DRAWING
+                    </button>
+                  </div>
+                </div>
+
+                <div class="dataset-count">
+                  SAMPLES <strong id="sample-count">0 / 64</strong>
+                </div>
+                <div
+                  id="sample-grid"
+                  class="sample-grid"
+                  aria-live="polite"
+                ></div>
+                <button
+                  id="clear-dataset"
+                  class="text-button text-button--danger"
+                  type="button"
+                >
+                  CLEAR DATASET
+                </button>
+              </section>
+
+              <section
+                class="panel studio-panel studio-panel--training studio-panel--training-main"
+              >
+                <div class="panel-heading">
+                  <h2 class="panel__title">02 / Training</h2>
+                  <span class="panel-code">PCA + TF.JS</span>
+                </div>
+
+                <label class="field">
+                  <span>MODEL NAME</span>
+                  <input
+                    id="custom-model-name"
+                    type="text"
+                    maxlength="32"
+                    value="My Local Model"
+                    spellcheck="false"
+                  />
+                </label>
+
+                <label class="field">
+                  <span>TRAINING ENGINE</span>
+                  <select id="training-engine">
+                    <option value="pca" selected>QUICK PCA / WEB WORKER</option>
+                    <option value="neural">
+                      EXPERIMENTAL NEURAL / REQUIRES GPU CHECK
+                    </option>
+                  </select>
+                </label>
+
+                <div
+                  id="neural-training-controls"
+                  class="neural-training-controls"
+                >
+                  <dl class="training-configuration">
+                    <div>
+                      <dt>Architecture</dt>
+                      <dd>Convolutional autoencoder</dd>
+                    </div>
+                    <div>
+                      <dt>Input</dt>
+                      <dd>128 × 128 RGB</dd>
+                    </div>
+                    <div>
+                      <dt>Feature dimensions</dt>
+                      <dd>64</dd>
+                    </div>
+                    <div>
+                      <dt>Training limit</dt>
+                      <dd>Up to 5 minutes</dd>
+                    </div>
+                    <div>
+                      <dt>Output treatment</dt>
+                      <dd>Square-pixel displacement</dd>
+                    </div>
+                  </dl>
+
+                  <div class="hardware-benchmark-card">
+                    <div>
+                      <span>TRAINING BACKEND</span>
+                      <strong id="training-backend">NOT BENCHMARKED</strong>
+                    </div>
+                    <div>
+                      <span>SPEED CLASS</span>
+                      <strong id="training-speed">—</strong>
+                    </div>
+                    <div>
+                      <span>RECOMMENDED</span>
+                      <strong id="training-recommended">—</strong>
+                    </div>
+                    <button
+                      id="benchmark-training"
+                      class="mini-button"
+                      type="button"
+                    >
+                      CHECK NEURAL TRAINING ACCESS
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  id="pca-training-controls"
+                  class="pca-training-controls"
+                  hidden
+                >
+                  <label class="field">
+                    <span>PCA INPUT RESOLUTION</span>
+                    <input type="text" value="48 × 48 RGB" disabled />
+                  </label>
+                  <label class="field field--range">
+                    <span class="field__heading"
+                      ><span>PRINCIPAL COMPONENTS</span
+                      ><output id="studio-components-output">4</output></span
                     >
                     <input
-                      id="import-model"
-                      class="visually-hidden"
-                      type="file"
-                      accept="application/json,.json"
+                      id="studio-components"
+                      type="range"
+                      min="2"
+                      max="8"
+                      step="1"
+                      value="4"
                     />
-                    <button
-                      id="delete-model"
-                      class="mini-button"
-                      type="button"
-                      disabled
-                    >
-                      DELETE PCA MODEL
-                    </button>
-                  </div>
-                  <div class="model-file-actions">
-                    <button
-                      id="delete-neural-model"
-                      class="mini-button"
-                      type="button"
-                      disabled
-                    >
-                      DELETE NEURAL MODEL
-                    </button>
-                  </div>
-                </section>
+                  </label>
+                </div>
 
-                <aside
-                  class="panel studio-panel studio-panel--analysis studio-panel--analysis-main"
-                >
-                  <div class="panel-heading">
-                    <h2 class="panel__title">03 / Analysis</h2>
-                    <span class="panel-code">MODEL</span>
-                  </div>
-
-                  <section id="neural-analysis-block">
-                    <dl class="stats-list studio-stats">
-                      <div>
-                        <dt>STATUS</dt>
-                        <dd id="neural-status">NOT TRAINED</dd>
-                      </div>
-                      <div>
-                        <dt>MODEL ID</dt>
-                        <dd id="neural-id">—</dd>
-                      </div>
-                      <div>
-                        <dt>PROFILE</dt>
-                        <dd id="neural-profile-stat">—</dd>
-                      </div>
-                      <div>
-                        <dt>OBJECTIVE</dt>
-                        <dd id="neural-objective-stat">—</dd>
-                      </div>
-                      <div>
-                        <dt>TRAINING SAMPLES</dt>
-                        <dd id="neural-samples">—</dd>
-                      </div>
-                      <div>
-                        <dt>LATENT DIMENSIONS</dt>
-                        <dd id="neural-latent">—</dd>
-                      </div>
-                      <div>
-                        <dt>BACKEND</dt>
-                        <dd id="neural-backend-stat">—</dd>
-                      </div>
-                      <div>
-                        <dt>BEST LOSS</dt>
-                        <dd id="neural-loss">—</dd>
-                      </div>
-                      <div>
-                        <dt>CREATED</dt>
-                        <dd id="neural-created">—</dd>
-                      </div>
-                    </dl>
-
-                    <div class="variance-chart-wrap">
-                      <span>TRAINING LOSS</span>
-                      <canvas
-                        id="training-loss-chart"
-                        width="360"
-                        height="180"
-                        aria-label="Neural training loss chart"
-                      ></canvas>
-                    </div>
-                  </section>
-
-                  <section id="pca-analysis-block" hidden>
-                    <dl class="stats-list studio-stats">
-                      <div>
-                        <dt>STATUS</dt>
-                        <dd id="custom-status">NOT TRAINED</dd>
-                      </div>
-                      <div>
-                        <dt>MODEL ID</dt>
-                        <dd id="custom-id">—</dd>
-                      </div>
-                      <div>
-                        <dt>TRAINING SAMPLES</dt>
-                        <dd id="custom-samples">—</dd>
-                      </div>
-                      <div>
-                        <dt>COMPONENTS</dt>
-                        <dd id="custom-components">—</dd>
-                      </div>
-                      <div>
-                        <dt>VARIANCE RETAINED</dt>
-                        <dd id="custom-variance">—</dd>
-                      </div>
-                      <div>
-                        <dt>CREATED</dt>
-                        <dd id="custom-created">—</dd>
-                      </div>
-                    </dl>
-                    <div class="variance-chart-wrap">
-                      <span>EXPLAINED VARIANCE BY COMPONENT</span>
-                      <canvas
-                        id="variance-chart"
-                        width="360"
-                        height="180"
-                        aria-label="Explained variance chart"
-                      ></canvas>
-                    </div>
-                  </section>
-
-                  <div class="studio-explanation">
-                    <strong>WHAT TO COMPARE</strong>
-                    <p>
-                      PCA is the quick linear baseline. The autoencoder learns a
-                      nonlinear reconstruction space and applies square-pixel
-                      displacement in the Lab. Training and inference remain
-                      local.
-                    </p>
-                  </div>
-                </aside>
-              </div>
-              <details id="dataset-library" class="dataset-library">
-                <summary>Find images on Wikimedia Commons</summary>
-                <p class="field__help">
-                  Optional internet access. Review each image’s source and
-                  license before use.
-                </p>
-                <section class="panel dataset-search-panel">
-                  <div class="panel-heading">
-                    <h2 class="panel__title">Wikimedia Commons Search</h2>
-                    <span class="panel-code">LICENSE-AWARE</span>
-                  </div>
-                  <form id="commons-search-form" class="dataset-search-form">
-                    <label class="field dataset-query">
-                      <span>SEARCH TERMS</span>
-                      <input
-                        id="commons-search-input"
-                        type="search"
-                        value="portrait photography"
-                        placeholder="portrait photography"
-                        autocomplete="off"
-                      />
-                    </label>
-                    <label class="field dataset-license">
-                      <span>LICENSE FILTER</span>
-                      <select id="commons-license-filter">
-                        <option value="reusable">REUSABLE RESULTS</option>
-                        <option value="public-domain">
-                          PUBLIC DOMAIN / CC0
-                        </option>
-                        <option value="cc-by">CC BY</option>
-                        <option value="cc-by-sa">CC BY-SA</option>
-                        <option value="all">SHOW ALL METADATA</option>
-                      </select>
-                    </label>
-                    <button
-                      id="commons-search-button"
-                      class="action-button"
-                      type="submit"
-                    >
-                      SEARCH
-                    </button>
-                  </form>
-                  <p id="commons-status" class="dataset-status">
-                    SEARCH USES THE WIKIMEDIA COMMONS MEDIAWIKI API. INTERNET
-                    ACCESS IS REQUIRED.
+                <div id="training-note" class="training-note">
+                  <strong>QUICK PCA PATH</strong>
+                  <p>
+                    Quick PCA stays available on ordinary devices. The 128px
+                    datamosh autoencoder is a five-minute quality run reserved
+                    for hardware that passes the FAST WebGL check.
                   </p>
-                  <div id="commons-results" class="commons-results"></div>
-                </section>
-              </details>
-            </div>
-          </section>
+                </div>
 
-          <section
-            id="view-archive"
-            class="view"
-            data-view-panel="archive"
-            hidden
-          >
+                <div class="training-actions-main">
+                  <button
+                    id="train-model"
+                    class="action-button action-button--wide"
+                    type="button"
+                  >
+                    TRAIN QUICK PCA MODEL
+                  </button>
+                  <button
+                    id="stop-training"
+                    class="mini-button text-button--danger"
+                    type="button"
+                    hidden
+                  >
+                    STOP TRAINING
+                  </button>
+                </div>
+                <progress
+                  id="training-progress"
+                  class="training-progress"
+                  max="100"
+                  value="0"
+                ></progress>
+                <p id="training-status" class="training-status">
+                  PCA NEEDS AT LEAST 3 IMAGES.
+                </p>
+
+                <div
+                  id="pca-model-file-actions"
+                  class="model-file-actions"
+                  hidden
+                >
+                  <button
+                    id="export-model"
+                    class="mini-button"
+                    type="button"
+                    disabled
+                  >
+                    EXPORT PCA JSON
+                  </button>
+                  <label class="mini-button" for="import-model"
+                    >IMPORT PCA JSON</label
+                  >
+                  <input
+                    id="import-model"
+                    class="visually-hidden"
+                    type="file"
+                    accept="application/json,.json"
+                  />
+                  <button
+                    id="delete-model"
+                    class="mini-button"
+                    type="button"
+                    disabled
+                  >
+                    DELETE PCA MODEL
+                  </button>
+                </div>
+                <div class="model-file-actions">
+                  <button
+                    id="delete-neural-model"
+                    class="mini-button"
+                    type="button"
+                    disabled
+                  >
+                    DELETE NEURAL MODEL
+                  </button>
+                </div>
+              </section>
+
+              <aside
+                class="panel studio-panel studio-panel--analysis studio-panel--analysis-main"
+              >
+                <div class="panel-heading">
+                  <h2 class="panel__title">03 / Analysis</h2>
+                  <span class="panel-code">MODEL</span>
+                </div>
+
+                <section id="neural-analysis-block">
+                  <dl class="stats-list studio-stats">
+                    <div>
+                      <dt>STATUS</dt>
+                      <dd id="neural-status">NOT TRAINED</dd>
+                    </div>
+                    <div>
+                      <dt>MODEL ID</dt>
+                      <dd id="neural-id">—</dd>
+                    </div>
+                    <div>
+                      <dt>PROFILE</dt>
+                      <dd id="neural-profile-stat">—</dd>
+                    </div>
+                    <div>
+                      <dt>OBJECTIVE</dt>
+                      <dd id="neural-objective-stat">—</dd>
+                    </div>
+                    <div>
+                      <dt>TRAINING SAMPLES</dt>
+                      <dd id="neural-samples">—</dd>
+                    </div>
+                    <div>
+                      <dt>FEATURE DIMENSIONS</dt>
+                      <dd id="neural-latent">—</dd>
+                    </div>
+                    <div>
+                      <dt>BACKEND</dt>
+                      <dd id="neural-backend-stat">—</dd>
+                    </div>
+                    <div>
+                      <dt>BEST LOSS</dt>
+                      <dd id="neural-loss">—</dd>
+                    </div>
+                    <div>
+                      <dt>CREATED</dt>
+                      <dd id="neural-created">—</dd>
+                    </div>
+                  </dl>
+
+                  <div class="variance-chart-wrap">
+                    <span>TRAINING LOSS</span>
+                    <canvas
+                      id="training-loss-chart"
+                      width="360"
+                      height="180"
+                      aria-label="Neural training loss chart"
+                    ></canvas>
+                  </div>
+                </section>
+
+                <section id="pca-analysis-block" hidden>
+                  <dl class="stats-list studio-stats">
+                    <div>
+                      <dt>STATUS</dt>
+                      <dd id="custom-status">NOT TRAINED</dd>
+                    </div>
+                    <div>
+                      <dt>MODEL ID</dt>
+                      <dd id="custom-id">—</dd>
+                    </div>
+                    <div>
+                      <dt>TRAINING SAMPLES</dt>
+                      <dd id="custom-samples">—</dd>
+                    </div>
+                    <div>
+                      <dt>COMPONENTS</dt>
+                      <dd id="custom-components">—</dd>
+                    </div>
+                    <div>
+                      <dt>VARIANCE RETAINED</dt>
+                      <dd id="custom-variance">—</dd>
+                    </div>
+                    <div>
+                      <dt>CREATED</dt>
+                      <dd id="custom-created">—</dd>
+                    </div>
+                  </dl>
+                  <div class="variance-chart-wrap">
+                    <span>EXPLAINED VARIANCE BY COMPONENT</span>
+                    <canvas
+                      id="variance-chart"
+                      width="360"
+                      height="180"
+                      aria-label="Explained variance chart"
+                    ></canvas>
+                  </div>
+                </section>
+
+                <div class="studio-explanation">
+                  <strong>WHAT TO COMPARE</strong>
+                  <p>
+                    PCA is the quick linear baseline. The autoencoder learns a
+                    nonlinear reconstruction space and applies square-pixel
+                    displacement in the Lab. Training and inference remain
+                    local.
+                  </p>
+                </div>
+              </aside>
+            </div>
+            <details id="dataset-library" class="dataset-library">
+              <summary>Find images on Wikimedia Commons</summary>
+              <p class="field__help">
+                Optional internet access. Review each image’s source and license
+                before use.
+              </p>
+              <section class="panel dataset-search-panel">
+                <div class="panel-heading">
+                  <h2 class="panel__title">Wikimedia Commons Search</h2>
+                  <span class="panel-code">LICENSE-AWARE</span>
+                </div>
+                <form id="commons-search-form" class="dataset-search-form">
+                  <label class="field dataset-query">
+                    <span>SEARCH TERMS</span>
+                    <input
+                      id="commons-search-input"
+                      type="search"
+                      value="portrait photography"
+                      placeholder="portrait photography"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <label class="field dataset-license">
+                    <span>LICENSE FILTER</span>
+                    <select id="commons-license-filter">
+                      <option value="reusable">REUSABLE RESULTS</option>
+                      <option value="public-domain">PUBLIC DOMAIN / CC0</option>
+                      <option value="cc-by">CC BY</option>
+                      <option value="cc-by-sa">CC BY-SA</option>
+                      <option value="all">SHOW ALL METADATA</option>
+                    </select>
+                  </label>
+                  <button
+                    id="commons-search-button"
+                    class="action-button"
+                    type="submit"
+                  >
+                    SEARCH
+                  </button>
+                </form>
+                <p id="commons-status" class="dataset-status">
+                  SEARCH USES THE WIKIMEDIA COMMONS MEDIAWIKI API. INTERNET
+                  ACCESS IS REQUIRED.
+                </p>
+                <div id="commons-results" class="commons-results"></div>
+              </section>
+            </details>
+          </div>
+          <section id="view-archive" class="view" hidden>
             <div class="simple-page archive-page">
               <section class="panel page-panel">
                 <div class="page-panel__heading">
@@ -1001,398 +1814,202 @@
               </section>
             </div>
           </section>
-
-          <section id="view-about" class="view" data-view-panel="about" hidden>
-            <div class="simple-page method-page">
-              <div class="page-heading">
-                <div>
-                  <p class="eyebrow">LOCAL GENERATIVE GRAPHICS</p>
-                  <h1 class="page-title">About Latent Field</h1>
-                  <p>
-                    Explore mathematical fields and pretrained image models,
-                    adjust their parameters, and save your results. Image
-                    processing runs locally; dataset search uses Wikimedia
-                    Commons. Start in the Lab with Folded Fractal.
-                  </p>
-                </div>
-              </div>
-
-              <div class="method-grid">
-                <section class="panel method-card">
-                  <h2 class="panel__title">Inception Dream</h2>
-                  <p>
-                    InceptionV3 feature visualization increases Mixed_6a and
-                    Mixed_6c activations through gradient ascent at several
-                    image scales. Quality and Reduced Compute use the same
-                    objective with different compute limits.
-                  </p>
-                  <code
-                    >image → feature activations → normalized gradients → octave
-                    ascent</code
-                  >
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">DigiFace Generator</h2>
-                  <p>
-                    A separately trained 48-dimensional beta-VAE decoder runs
-                    locally through ONNX Runtime Web. Feature controls expose
-                    the selected latent axis so users can see when eyes, nose,
-                    mouth, expression, and age-like appearance are entangled
-                    rather than pretending every slider is perfectly semantic.
-                  </p>
-                  <code
-                    >z → ONNX decoder → 112 × 112 RGB → optional color
-                    transform</code
-                  >
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">Chromatic Flow</h2>
-                  <p>
-                    A WebGL fragment shader evaluates a warped mathematical
-                    signal for every pixel.
-                  </p>
-                  <code>color = field(transform(uv, time, parameters))</code>
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">Folded Fractal</h2>
-                  <p>
-                    A recursive coordinate field repeatedly applies folding,
-                    rotation, inversion, translation, and symmetry. Ghost Effect
-                    adds offset contours only when it is enabled.
-                  </p>
-                  <code
-                    >coordinates → fold → rotate → invert → translate →
-                    repeat</code
-                  >
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">Fractal Explorer</h2>
-                  <p>
-                    Mandelbrot, Julia, Burning Ship, and Tricorn iterations
-                    visualize escape time, orbit traps, zoom, and sensitivity to
-                    complex constants. Click or drag moves through the selected
-                    equation. Right-click or touch-hold starts a small optional
-                    motion while your direct moves stay as the base view.
-                  </p>
-                  <code>zₙ₊₁ = f(zₙ) + c</code>
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">Quick Local Model</h2>
-                  <p>
-                    Model Studio reduces user-selected RGB images to a local
-                    color basis. Training happens in a Web Worker and the model
-                    can be exported as JSON.
-                  </p>
-                  <code>local images → covariance → color basis</code>
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">MODULATION & MOTION</h2>
-                  <p>
-                    Every numeric slider can connect to an internal LFO with
-                    selectable waveforms (sine, triangle, saw, square, noise),
-                    rate, and depth. Audio reactivity lets any parameter dance
-                    to whole-music bass or focused kick transients.
-                  </p>
-                  <code>base view → LFO oscillator → audio reactivity</code>
-                </section>
-                <section class="panel method-card">
-                  <h2 class="panel__title">MODULATION MATRIX</h2>
-                  <p>
-                    Any numeric slider can combine an LFO with either a
-                    bass-weighted whole-music envelope or a focused kick
-                    transient. Each audio route has a bipolar depth control,
-                    while the live markers and four-second history graph show
-                    the final effective value.
-                  </p>
-                  <code
-                    >value(t) = base + LFO(t) × depth + audio(t) × depth</code
-                  >
-                </section>
-              </div>
-
-              <section
-                id="fractal-process"
-                class="panel fractal-process"
-                data-step="fold"
-              >
-                <div class="fractal-process__intro">
-                  <p class="eyebrow">ONE FRAME, FIVE OPERATIONS</p>
-                  <h2 class="panel__title">How the Folded Fractal Grows</h2>
-                  <p id="fractal-process-copy">
-                    The coordinates mirror at the center, turning one shape into
-                    a balanced pair.
-                  </p>
-                </div>
-                <div
-                  class="fractal-process__steps"
-                  aria-label="Fractal operation explanation"
-                >
-                  <button
-                    class="is-active"
-                    type="button"
-                    data-fractal-step="fold"
-                    aria-pressed="true"
-                  >
-                    <b>01</b> FOLD
-                  </button>
-                  <button
-                    type="button"
-                    data-fractal-step="rotate"
-                    aria-pressed="false"
-                  >
-                    <b>02</b> ROTATE
-                  </button>
-                  <button
-                    type="button"
-                    data-fractal-step="invert"
-                    aria-pressed="false"
-                  >
-                    <b>03</b> INVERT
-                  </button>
-                  <button
-                    type="button"
-                    data-fractal-step="translate"
-                    aria-pressed="false"
-                  >
-                    <b>04</b> MOVE
-                  </button>
-                  <button
-                    type="button"
-                    data-fractal-step="repeat"
-                    aria-pressed="false"
-                  >
-                    <b>05</b> REPEAT
-                  </button>
-                </div>
-                <div class="fractal-process__visual" aria-hidden="true">
-                  <span class="fractal-process__grid"></span>
-                  <i></i><i></i><i></i><i></i>
-                  <strong>FOLD → ROTATE → INVERT → MOVE → REPEAT</strong>
-                </div>
-              </section>
-
-              <section class="panel pipeline-panel">
-                <h2 class="panel__title">Local Pipeline</h2>
-                <div class="pipeline">
-                  <span>BASE VIEW</span><b>→</b
-                  ><span>MODULATION MATRIX</span><b>→</b><span>MODEL ROUTE</span
-                  ><b>→</b><span>GPU / CPU CANVAS</span><b>→</b
-                  ><span>IMAGE METRICS</span><b>→</b><span>SAVED RUN</span>
-                </div>
+          <div class="simple-page method-page">
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow">LOCAL GENERATIVE GRAPHICS</p>
+                <h1 class="page-title">About gl-bench</h1>
                 <p>
-                  Quality mode changes the live square canvas from 384 to 1,536
-                  pixels. Fractal routes can separately make screen-shaped 2K or
-                  4K stills when the active WebGL limit allows it. The DigiFace
-                  VAE itself produces 112 × 112 RGB and is smoothly enlarged for
-                  display. ONNX Runtime Web requests WebGPU first and falls back
-                  to WASM CPU inference. Browsers and operating systems still
-                  decide which physical GPU is used.
+                  Explore mathematical fields and pretrained image models,
+                  adjust their parameters, and save your results. Image
+                  processing runs locally; dataset search uses Wikimedia
+                  Commons. Start in the Lab with Folded Fractal.
                 </p>
+              </div>
+            </div>
+
+            <div class="method-grid">
+              <section class="panel method-card">
+                <h2 class="panel__title">Inception Dream</h2>
+                <p>
+                  InceptionV3 feature visualization increases Mixed_6a and
+                  Mixed_6c activations through gradient ascent at several image
+                  scales. Quality and Reduced Compute use the same objective
+                  with different compute limits.
+                </p>
+                <code
+                  >image → feature activations → normalized gradients → octave
+                  ascent</code
+                >
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">DigiFace Generator</h2>
+                <p>
+                  A separately trained 48-dimensional beta-VAE decoder runs
+                  locally through ONNX Runtime Web. Feature controls expose the
+                  selected decoder coordinate so users can see when eyes, nose,
+                  mouth, expression, and age-like appearance are entangled
+                  rather than pretending every slider is perfectly semantic.
+                </p>
+                <code
+                  >z → ONNX decoder → 112 × 112 RGB → optional color
+                  transform</code
+                >
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">Chromatic Flow</h2>
+                <p>
+                  A WebGL fragment shader evaluates a warped mathematical signal
+                  for every pixel.
+                </p>
+                <code>color = field(transform(uv, time, parameters))</code>
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">Folded Fractal</h2>
+                <p>
+                  A recursive coordinate field repeatedly applies folding,
+                  rotation, inversion, translation, and symmetry. Ghost Effect
+                  adds offset contours only when it is enabled.
+                </p>
+                <code
+                  >coordinates → fold → rotate → invert → translate →
+                  repeat</code
+                >
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">Fractal Explorer</h2>
+                <p>
+                  Mandelbrot, Julia, Burning Ship, and Tricorn iterations
+                  visualize escape time, orbit traps, zoom, and sensitivity to
+                  complex constants. Click or drag moves through the selected
+                  equation. Right-click or touch-hold starts a small optional
+                  motion while your direct moves stay as the base view.
+                </p>
+                <code>zₙ₊₁ = f(zₙ) + c</code>
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">Quick Local Model</h2>
+                <p>
+                  Model Studio reduces user-selected RGB images to a local color
+                  basis. Training happens in a Web Worker and the model can be
+                  exported as JSON.
+                </p>
+                <code>local images → covariance → color basis</code>
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">MODULATION & MOTION</h2>
+                <p>
+                  Every numeric slider can connect to an internal LFO with
+                  selectable waveforms (sine, triangle, saw, square, noise),
+                  rate, and depth. Audio reactivity lets any parameter dance to
+                  whole-music bass or focused kick transients.
+                </p>
+                <code>base view → LFO oscillator → audio reactivity</code>
+              </section>
+              <section class="panel method-card">
+                <h2 class="panel__title">MODULATION MATRIX</h2>
+                <p>
+                  Any numeric slider can combine an LFO with either a
+                  bass-weighted whole-music envelope or a focused kick
+                  transient. Each audio route has a bipolar depth control, while
+                  the live markers and four-second history graph show the final
+                  effective value.
+                </p>
+                <code>value(t) = base + LFO(t) × depth + audio(t) × depth</code>
               </section>
             </div>
-          </section>
 
-        <dialog id="export-modal" class="export-modal" aria-labelledby="export-modal-title">
-          <div class="export-modal__box">
-            <div class="export-modal__header">
-              <h2 id="export-modal-title" class="export-modal__title">EXPORT PNG</h2>
-              <button id="export-modal-close" class="text-button export-modal__close" type="button" aria-label="Close dialog">✕</button>
-            </div>
-            <p class="export-modal__desc">Select output render resolution:</p>
-            <div class="export-modal__options" role="radiogroup" aria-label="Export resolution options">
-              <label class="export-option">
-                <input type="radio" name="export-resolution" value="current" checked />
-                <span class="export-option__content">
-                  <span id="export-name-current" class="export-option__name">CURRENT VIEWPORT</span>
-                  <span id="export-res-current" class="export-option__res">512 × 512</span>
-                </span>
-              </label>
-              <label id="export-option-2k" class="export-option">
-                <input type="radio" name="export-resolution" value="2048" />
-                <span class="export-option__content">
-                  <span id="export-name-2k" class="export-option__name">2K SCREEN</span>
-                  <span id="export-res-2k" class="export-option__res">2048 × 2048</span>
-                </span>
-              </label>
-              <label id="export-option-4k" class="export-option">
-                <input type="radio" name="export-resolution" value="4096" />
-                <span class="export-option__content">
-                  <span id="export-name-4k" class="export-option__name">4K SCREEN</span>
-                  <span id="export-res-4k" class="export-option__res">4096 × 4096</span>
-                </span>
-              </label>
-            </div>
-            <div class="export-modal__actions">
-              <button id="export-modal-cancel" class="action-button action-button--secondary" type="button">CANCEL</button>
-              <button id="export-modal-confirm" class="action-button" type="button">EXPORT PNG</button>
-            </div>
-          </div>
-        </dialog>
-
-        <dialog id="growth-gallery-dialog" class="growth-gallery-dialog" aria-labelledby="growth-gallery-title">
-          <div class="growth-gallery">
-            <header class="growth-gallery__header">
-              <div class="growth-gallery__title-group">
-                <h2 id="growth-gallery-title" class="growth-gallery__title">PATTERN GALLERY</h2>
-                <span id="growth-gallery-count" class="growth-gallery__count">91 patterns</span>
+            <section
+              id="fractal-process"
+              class="panel fractal-process"
+              data-step="fold"
+            >
+              <div class="fractal-process__intro">
+                <p class="eyebrow">ONE FRAME, FIVE OPERATIONS</p>
+                <h2 class="panel__title">How the Folded Fractal Grows</h2>
+                <p id="fractal-process-copy">
+                  The coordinates mirror at the center, turning one shape into a
+                  balanced pair.
+                </p>
               </div>
-              <button id="close-growth-gallery" class="growth-gallery__close-button" type="button" aria-label="Close pattern gallery">✕</button>
-            </header>
-            <div class="growth-gallery__toolbar">
-              <div class="growth-gallery__search-wrapper">
-                <input
-                  id="growth-gallery-search"
-                  class="growth-gallery__search"
-                  type="search"
-                  placeholder="Search patterns (e.g. bubbly, mixed4c, honeycombed)..."
-                  autocomplete="off"
-                />
-              </div>
-              <div id="growth-gallery-tabs" class="growth-gallery__tabs" role="tablist">
-                <button class="growth-gallery__tab is-active" type="button" role="tab" data-filter="all">All (159)</button>
-                <button class="growth-gallery__tab" type="button" role="tab" data-filter="texture">Textures (39)</button>
-                <button class="growth-gallery__tab" type="button" role="tab" data-filter="inception">Inception (41)</button>
-                <button class="growth-gallery__tab" type="button" role="tab" data-filter="organic">Originals (25)</button>
-                <button class="growth-gallery__tab" type="button" role="tab" data-filter="testing">Testing / WIP (54)</button>
-                <button class="growth-gallery__tab" type="button" role="tab" data-filter="favorites">Favorites (<span id="growth-favorites-count">0</span>)</button>
-              </div>
-            </div>
-            <div id="growth-recent-strip" class="growth-gallery__recent" hidden>
-              <span class="growth-gallery__recent-label">RECENT:</span>
-              <div id="growth-recent-items" class="growth-gallery__recent-items"></div>
-            </div>
-            <div id="growth-gallery-grid" class="growth-gallery__grid" role="listbox"></div>
-          </div>
-        </dialog>
-      </main>
-
-        <footer class="status-line">
-          <span id="status-message">READY</span>
-          <span id="resource-status">RENDERER: DETECTING</span>
-          <span class="status-line__shortcuts"
-            >F = FULLSCREEN · SPACE = PAUSE/RESUME ALL MOTION · CTRL/⌘ + ENTER =
-            SAVE RUN</span
-          >
-          <div
-            id="audio-monitor"
-            class="audio-monitor"
-            aria-label="Global system audio monitor"
-          >
-            <span class="audio-monitor__label">EQ</span>
-            <canvas
-              id="audio-meter"
-              class="audio-monitor__spectrum"
-              width="112"
-              height="18"
-              role="img"
-              aria-label="System audio spectrum: off"
-              >Live system audio spectrum</canvas
-            >
-            <span id="audio-share-hint" class="audio-monitor__hint"
-              >CHECK “SHARE TAB AUDIO” OR “SHARE SYSTEM AUDIO” IN THE
-              PICKER</span
-            >
-            <button
-              id="toggle-audio-input"
-              class="audio-monitor__toggle"
-              type="button"
-              aria-pressed="false"
-              aria-describedby="audio-share-hint"
-            >
-              AUDIO: OFF
-            </button>
-            <button
-              id="toggle-audio-visualizer"
-              class="audio-monitor__toggle visualizer-toggle"
-              type="button"
-              aria-pressed="false"
-              title="Toggle audio waveform overlay"
-            >
-              WAVE: OFF
-            </button>
-            <button
-              id="open-visualizer-settings"
-              class="audio-monitor__cfg-btn"
-              type="button"
-              aria-label="Visualizer wave settings"
-              title="Visualizer wave settings"
-            >
-              CFG
-            </button>
-            <div
-              id="visualizer-settings-popover"
-              class="visualizer-settings-popover"
-              hidden
-              role="dialog"
-              aria-label="Audio visualizer settings"
-            >
-              <div class="visualizer-popover-header">
-                <span class="visualizer-popover-title">AUDIO WAVE</span>
+              <div
+                class="fractal-process__steps"
+                aria-label="Fractal operation explanation"
+              >
                 <button
-                  id="close-visualizer-settings"
-                  class="visualizer-popover-close"
+                  class="is-active"
                   type="button"
-                  aria-label="Close visualizer settings"
-                >×</button>
+                  data-fractal-step="fold"
+                  aria-pressed="true"
+                >
+                  <b>01</b> FOLD
+                </button>
+                <button
+                  type="button"
+                  data-fractal-step="rotate"
+                  aria-pressed="false"
+                >
+                  <b>02</b> ROTATE
+                </button>
+                <button
+                  type="button"
+                  data-fractal-step="invert"
+                  aria-pressed="false"
+                >
+                  <b>03</b> INVERT
+                </button>
+                <button
+                  type="button"
+                  data-fractal-step="translate"
+                  aria-pressed="false"
+                >
+                  <b>04</b> MOVE
+                </button>
+                <button
+                  type="button"
+                  data-fractal-step="repeat"
+                  aria-pressed="false"
+                >
+                  <b>05</b> REPEAT
+                </button>
               </div>
-              <div class="visualizer-popover-body">
-                <div class="visualizer-control-row">
-                  <label for="visualizer-mode-select">MODE</label>
-                  <select id="visualizer-mode-select" aria-label="Visualizer mode">
-                    <option value="waveform" selected>Waveform</option>
-                    <option value="spectrum">Spectrum Line</option>
-                    <option value="bass_history">Bass History</option>
-                  </select>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-style-select">STYLE</label>
-                  <select id="visualizer-style-select" aria-label="Visualizer style">
-                    <option value="single">Single Line</option>
-                    <option value="mirrored">Mirrored</option>
-                  </select>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-injection-select">COUPLING</label>
-                  <select id="visualizer-injection-select" aria-label="Acoustic field coupling">
-                    <option value="off">Off (Overlay)</option>
-                    <option value="dye">Dye (Color)</option>
-                    <option value="sprout">Sprout (Growth)</option>
-                    <option value="shockwave">Ripple</option>
-                    <option value="flow">Flow</option>
-                  </select>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-height-range">HEIGHT</label>
-                  <input id="visualizer-height-range" type="range" min="0.05" max="0.50" step="0.01" value="0.25" aria-label="Line height" />
-                  <span id="visualizer-height-val" class="visualizer-val-readout">25%</span>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-position-range">POSITION</label>
-                  <input id="visualizer-position-range" type="range" min="0.05" max="0.95" step="0.01" value="0.50" aria-label="Vertical position" />
-                  <span id="visualizer-position-val" class="visualizer-val-readout">50%</span>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-opacity-range">OPACITY</label>
-                  <input id="visualizer-opacity-range" type="range" min="0.10" max="1.00" step="0.05" value="0.80" aria-label="Wave opacity" />
-                  <span id="visualizer-opacity-val" class="visualizer-val-readout">80%</span>
-                </div>
-                <div class="visualizer-control-row">
-                  <label for="visualizer-color-picker">COLOR</label>
-                  <div class="visualizer-color-tools" style="display: flex; align-items: center; gap: 6px;">
-                    <input id="visualizer-color-picker" type="color" value="#00f0ff" aria-label="Custom wave color" />
-                    <div class="visualizer-color-pills" id="visualizer-color-pills">
-                      <button class="color-preset-pill is-active" type="button" data-color="#00f0ff" style="--pill-color: #00f0ff" title="Cyan"></button>
-                      <button class="color-preset-pill" type="button" data-color="#00ff66" style="--pill-color: #00ff66" title="Emerald"></button>
-                      <button class="color-preset-pill" type="button" data-color="#ff00a0" style="--pill-color: #ff00a0" title="Magenta"></button>
-                      <button class="color-preset-pill" type="button" data-color="#ffffff" style="--pill-color: #ffffff" title="White"></button>
-                    </div>
-                  </div>
-                </div>
+              <div class="fractal-process__visual" aria-hidden="true">
+                <span class="fractal-process__grid"></span>
+                <i></i><i></i><i></i><i></i>
+                <strong>FOLD → ROTATE → INVERT → MOVE → REPEAT</strong>
               </div>
-            </div>
+            </section>
+
+            <section class="panel pipeline-panel">
+              <h2 class="panel__title">Local Pipeline</h2>
+              <div class="pipeline">
+                <span>BASE VIEW</span><b>→</b><span>MODULATION MATRIX</span
+                ><b>→</b><span>MODEL ROUTE</span><b>→</b
+                ><span>GPU / CPU CANVAS</span><b>→</b><span>IMAGE METRICS</span
+                ><b>→</b><span>SAVED RUN</span>
+              </div>
+              <p>
+                Quality mode changes the live square canvas from 384 to 1,536
+                pixels. Fractal routes can separately make screen-shaped 2K or
+                4K stills when the active WebGL limit allows it. The DigiFace
+                VAE itself produces 112 × 112 RGB and is smoothly enlarged for
+                display. ONNX Runtime Web requests WebGPU first and falls back
+                to WASM CPU inference. Browsers and operating systems still
+                decide which physical GPU is used.
+              </p>
+            </section>
           </div>
-        </footer>
+        </div>
       </section>
+      <div class="canvas-annotations hidden" hidden aria-hidden="true">
+        <div class="panel-heading panel-heading--output">
+          <span class="viewport-kind">REALTIME RENDER</span>
+        </div>
+        <div class="viewport-caption">
+          <span class="viewport-crosshair">+</span
+          ><span>LOCAL ENGINE <span class="caption-dot">·</span> WEBGL2</span>
+        </div>
+      </div>
     </div>
   </body>
 </html>

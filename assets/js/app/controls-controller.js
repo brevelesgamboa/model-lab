@@ -1,3 +1,7 @@
+import {
+  createModulationDraft,
+  updateRangeProgress,
+} from "../ui/workbench-shell.js";
 import { clamp, randomSeed } from "../core/utils.js";
 import { defaultLfoConfig } from "../core/lfo.js";
 import { getAudioRoute } from "../core/modulation-matrix.js";
@@ -39,11 +43,7 @@ export function coerceRangeValue(definition, value) {
         Number(definition.min);
     }
   } else {
-    numeric = clamp(
-      numeric,
-      Number(definition.min),
-      Number(definition.max),
-    );
+    numeric = clamp(numeric, Number(definition.min), Number(definition.max));
   }
   if (definition.format === "integer" || Number(definition.step) >= 1)
     return Math.round(numeric);
@@ -99,7 +99,7 @@ export function renderModelTechnicalInfo(elements, model) {
   addRow("DATASET IDENTITIES", info.datasetIdentities);
   addRow("DATASET IMAGES", info.datasetImages);
   addRow("TRAINING RESOLUTION", info.trainingResolution);
-  addRow("LATENT DIMENSIONS", info.latentDimensions);
+  addRow("FEATURE DIMENSIONS", info.latentDimensions);
   addRow("EPOCHS", info.epochs);
 
   addRow("TARGET LAYERS", info.targetLayers);
@@ -200,7 +200,10 @@ export function createControlsController({
 
     function resolveGuidance(value) {
       if (typeof definition.getGuidance === "function") {
-        return definition.getGuidance(value, typeof getParameters === "function" ? getParameters() : undefined);
+        return definition.getGuidance(
+          value,
+          typeof getParameters === "function" ? getParameters() : undefined,
+        );
       }
       if (definition.type === "select" && Array.isArray(definition.options)) {
         const match = definition.options.find(
@@ -259,6 +262,7 @@ export function createControlsController({
     currentModel.controls.forEach((definition) => {
       const block = document.createElement("div");
       block.className = "control-block";
+      block.dataset.parameter = definition.key;
 
       if (definition.type === "range") {
         const head = document.createElement("div");
@@ -341,6 +345,19 @@ export function createControlsController({
 
         const modulation = makeModulationPanel(definition, config, supportsLfo);
         const canModulate = supportsModulation(currentModel, definition);
+        if (canModulate) {
+          const routing = document.createElement("details");
+          routing.className = "existing-routing";
+          routing.open = active;
+          const summary = document.createElement("summary");
+          summary.textContent = "Advanced routing · active engine controls";
+          routing.append(summary, ...Array.from(modulation.panel.childNodes));
+          modulation.panel.append(
+            createModulationDraft(definition.label),
+            routing,
+          );
+        }
+        modulation.panel.classList.toggle("hidden", modulation.panel.hidden);
         modulationToggle.hidden = !canModulate;
         modulationTrack.hidden = !canModulate;
         modulation.panel.hidden = !canModulate || modulation.panel.hidden;
@@ -359,6 +376,7 @@ export function createControlsController({
 
         const update = (value) => {
           onRange(definition, value);
+          updateRangeProgress(slider);
           guidance.update(value);
         };
         slider.addEventListener("input", () => update(slider.value));
@@ -374,11 +392,16 @@ export function createControlsController({
         );
         modulationToggle.addEventListener("click", () => {
           modulation.panel.hidden = !modulation.panel.hidden;
+          modulation.panel.classList.toggle("hidden", modulation.panel.hidden);
           modulationToggle.setAttribute(
             "aria-expanded",
             String(!modulation.panel.hidden),
           );
           if (!modulation.panel.hidden) {
+            const route = getAudioRoute(currentModel.id, definition.key);
+            if (modulationIsActive(currentLfoState[definition.key], route)) {
+              modulation.panel.querySelector(".existing-routing").open = true;
+            }
             onModulationOpen();
           }
         });
@@ -503,7 +526,9 @@ export function createControlsController({
           presetsContainer.append(pill);
         });
 
-        pickerInput.addEventListener("input", () => setColor(pickerInput.value));
+        pickerInput.addEventListener("input", () =>
+          setColor(pickerInput.value),
+        );
 
         hexInput.addEventListener("change", () => {
           const norm = normalizeHex(hexInput.value);
@@ -570,6 +595,9 @@ export function createControlsController({
         block.append(help);
       }
       elements.parameterControls.append(block);
+      block
+        .querySelectorAll('input[type="range"]')
+        .forEach(updateRangeProgress);
     });
   }
 

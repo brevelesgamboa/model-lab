@@ -469,7 +469,7 @@ export function createStudioController({
       elements.trainingStatus.textContent = `${metadata.name} READY · ${metadata.profile.toUpperCase()} ${metadata.objective.toUpperCase()} · LOSS ${Number(metadata.bestLoss).toFixed(5)}.`;
       terminal(
         "NEURAL MODEL",
-        `${metadata.name} / ${metadata.trainingSamples} images / ${metadata.latentDim} latent / ${metadata.backend.toUpperCase()} / ${metadata.trainingSeconds.toFixed(1)}s`,
+        `${metadata.name} / ${metadata.trainingSamples} images / ${metadata.latentDim} features / ${metadata.backend.toUpperCase()} / ${metadata.trainingSeconds.toFixed(1)}s`,
       );
       setStatus("LOCAL NEURAL MODEL READY");
       updateResourceStatus();
@@ -695,8 +695,8 @@ export function createStudioController({
           canvasToRgbSample(portraitCanvas),
           `DIGIFACE_VAE_${String(sequence + 1).padStart(2, "0")}`,
           {
-            title: `Latent Field DigiFace output ${sequence + 1}`,
-            creator: "Latent Field / DigiFace Generator",
+            title: `gl-bench DigiFace output ${sequence + 1}`,
+            creator: "gl-bench / DigiFace Generator",
             license: "MODEL OUTPUT / REVIEW DIGIFACE RESEARCH TERMS",
             sourceUrl: "local://digiface-latent-vae-01",
           },
@@ -930,8 +930,8 @@ export function createStudioController({
     const blob = new Blob([JSON.stringify(model, null, 2)], {
       type: "application/json",
     });
-    downloadBlob(blob, `${model.name}.latent-field-model.json`);
-    terminal("MODEL FILE", `${model.name}.latent-field-model.json written`);
+    downloadBlob(blob, `${model.name}.gl-bench-model.json`);
+    terminal("MODEL FILE", `${model.name}.gl-bench-model.json written`);
   }
 
   async function importCustomModel(file) {

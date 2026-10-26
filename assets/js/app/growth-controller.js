@@ -1,4 +1,8 @@
 // Route-local interactions only. Playback remains owned by the app controller.
+import {
+  setBrushRailVisible,
+  updateBrushPreview,
+} from "../ui/workbench-shell.js";
 import { renderModelTechnicalInfo } from "./controls-controller.js";
 import { PATTERNS } from "../models/neural-growth/patterns.js";
 
@@ -73,7 +77,7 @@ export function createGrowthController({
       };
     }
     return {
-      source: "Latent Field Baseline",
+      source: "gl-bench Baseline",
       details: "Multiscale Gram and RGB Moments",
       license: "Project MIT terms",
     };
@@ -82,29 +86,50 @@ export function createGrowthController({
   function updateTabCounts() {
     if (!elements.growthGalleryTabs) return;
     const allCount = PATTERNS.length;
-    const textureCount = PATTERNS.filter((p) => p.category === "texture").length;
-    const inceptionCount = PATTERNS.filter((p) => p.category === "inception").length;
-    const organicCount = PATTERNS.filter((p) => p.category === "organic").length;
-    const testingCount = PATTERNS.filter((p) => p.category === "testing").length;
+    const textureCount = PATTERNS.filter(
+      (p) => p.category === "texture",
+    ).length;
+    const inceptionCount = PATTERNS.filter(
+      (p) => p.category === "inception",
+    ).length;
+    const organicCount = PATTERNS.filter(
+      (p) => p.category === "organic",
+    ).length;
+    const testingCount = PATTERNS.filter(
+      (p) => p.category === "testing",
+    ).length;
 
-    const allBtn = elements.growthGalleryTabs.querySelector('[data-filter="all"]');
+    const allBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="all"]',
+    );
     if (allBtn) allBtn.textContent = `All (${allCount})`;
 
-    const texBtn = elements.growthGalleryTabs.querySelector('[data-filter="texture"]');
+    const texBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="texture"]',
+    );
     if (texBtn) texBtn.textContent = `Textures (${textureCount})`;
 
-    const incBtn = elements.growthGalleryTabs.querySelector('[data-filter="inception"]');
+    const incBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="inception"]',
+    );
     if (incBtn) incBtn.textContent = `Inception (${inceptionCount})`;
 
-    const orgBtn = elements.growthGalleryTabs.querySelector('[data-filter="organic"]');
+    const orgBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="organic"]',
+    );
     if (orgBtn) orgBtn.textContent = `Originals (${organicCount})`;
 
-    const testingBtn = elements.growthGalleryTabs.querySelector('[data-filter="testing"]');
+    const testingBtn = elements.growthGalleryTabs.querySelector(
+      '[data-filter="testing"]',
+    );
     if (testingBtn) testingBtn.textContent = `Testing / WIP (${testingCount})`;
   }
 
   function addRecent(patternId) {
-    recents = [patternId, ...recents.filter((id) => id !== patternId)].slice(0, 8);
+    recents = [patternId, ...recents.filter((id) => id !== patternId)].slice(
+      0,
+      8,
+    );
     saveStorageJson(RECENTS_KEY, recents);
     renderRecents();
   }
@@ -130,11 +155,16 @@ export function createGrowthController({
   function getFilteredPatterns() {
     const q = searchQuery.trim().toLowerCase();
     return PATTERNS.filter((pattern) => {
-      if (currentTab === "texture" && pattern.category !== "texture") return false;
-      if (currentTab === "inception" && pattern.category !== "inception") return false;
-      if (currentTab === "organic" && pattern.category !== "organic") return false;
-      if (currentTab === "testing" && pattern.category !== "testing") return false;
-      if (currentTab === "favorites" && !favorites.has(pattern.id)) return false;
+      if (currentTab === "texture" && pattern.category !== "texture")
+        return false;
+      if (currentTab === "inception" && pattern.category !== "inception")
+        return false;
+      if (currentTab === "organic" && pattern.category !== "organic")
+        return false;
+      if (currentTab === "testing" && pattern.category !== "testing")
+        return false;
+      if (currentTab === "favorites" && !favorites.has(pattern.id))
+        return false;
       if (q) {
         const matchName = pattern.name.toLowerCase().includes(q);
         const matchId = pattern.id.toLowerCase().includes(q);
@@ -256,7 +286,9 @@ export function createGrowthController({
 
       infoBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const existingOverlay = thumbWrapper.querySelector(".growth-gallery__info-overlay");
+        const existingOverlay = thumbWrapper.querySelector(
+          ".growth-gallery__info-overlay",
+        );
         if (existingOverlay) {
           existingOverlay.remove();
           infoBtn.classList.remove("is-active");
@@ -342,7 +374,7 @@ export function createGrowthController({
     const model = activeModel();
     elements.growthTools.hidden = !model;
     if (elements.growthCanvasTools) {
-      elements.growthCanvasTools.hidden = !model;
+      setBrushRailVisible(elements.growthCanvasTools, Boolean(model));
       if (model) {
         const currentMode = model.parameters?.disturbanceMode || "erase";
         for (const btn of elements.growthBrushBtns) {
@@ -358,6 +390,7 @@ export function createGrowthController({
           elements.growthBrushRadius.max = String(maxRadius);
           const radius = Number(model.parameters?.brushRadius) || 16;
           elements.growthBrushRadius.value = Math.min(maxRadius, radius);
+          updateBrushPreview(elements.growthBrushRadius);
           if (elements.growthBrushRadiusVal) {
             elements.growthBrushRadiusVal.textContent = `${elements.growthBrushRadius.value}px`;
           }
@@ -365,10 +398,14 @@ export function createGrowthController({
         if (elements.growthColorOptions) {
           elements.growthColorOptions.hidden = currentMode !== "dye";
           const color = model.parameters?.dyeColor || "#00f0ff";
-          if (elements.growthColorPicker) elements.growthColorPicker.value = color;
-          if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+          if (elements.growthColorPicker)
+            elements.growthColorPicker.value = color;
+          if (elements.growthColorHex)
+            elements.growthColorHex.value = color.toUpperCase();
           if (elements.growthColorPills) {
-            for (const pill of elements.growthColorPills.querySelectorAll(".color-preset-pill")) {
+            for (const pill of elements.growthColorPills.querySelectorAll(
+              ".color-preset-pill",
+            )) {
               pill.classList.toggle(
                 "is-active",
                 pill.dataset.color.toLowerCase() === color.toLowerCase(),
@@ -535,7 +572,8 @@ export function createGrowthController({
     const mode = model.parameters?.disturbanceMode || "erase";
     const channelView = model.parameters?.channelView || "phenotype";
     const speed = Number(model.parameters?.growthSpeed) || 0;
-    const isStandardView = channelView === "phenotype" || channelView === "xray";
+    const isStandardView =
+      channelView === "phenotype" || channelView === "xray";
     if (
       mode !== "erase" &&
       model.isClockRunning &&
@@ -558,7 +596,8 @@ export function createGrowthController({
 
   function handlePointerMove(event) {
     const model = activeModel();
-    if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1) return;
+    if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1)
+      return;
     if (isCentering) {
       const coords = getGridCoords(event, model);
       if (coords) updateCenterFromPointer(coords, model);
@@ -569,7 +608,14 @@ export function createGrowthController({
     const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
     if (lastCoord) {
-      model.queueDisturbanceStroke(lastCoord.gx, lastCoord.gy, coords.gx, coords.gy, radius, mode);
+      model.queueDisturbanceStroke(
+        lastCoord.gx,
+        lastCoord.gy,
+        coords.gx,
+        coords.gy,
+        radius,
+        mode,
+      );
     } else {
       model.queueDisturbance(coords.gx, coords.gy, radius, mode);
     }
@@ -622,7 +668,8 @@ export function createGrowthController({
     const mode = model.parameters?.disturbanceMode || "erase";
     const channelView = model.parameters?.channelView || "phenotype";
     const speed = Number(model.parameters?.growthSpeed) || 0;
-    const isStandardView = channelView === "phenotype" || channelView === "xray";
+    const isStandardView =
+      channelView === "phenotype" || channelView === "xray";
     if (
       mode !== "erase" &&
       model.isClockRunning &&
@@ -705,7 +752,8 @@ export function createGrowthController({
   if (elements.growthColorPicker) {
     listen(elements.growthColorPicker, "input", (e) => {
       const hex = e.target.value;
-      if (elements.growthColorHex) elements.growthColorHex.value = hex.toUpperCase();
+      if (elements.growthColorHex)
+        elements.growthColorHex.value = hex.toUpperCase();
       onParameterChange?.("dyeColor", hex);
       update();
     });
@@ -732,7 +780,8 @@ export function createGrowthController({
       if (!pill || !pill.dataset.color) return;
       const color = pill.dataset.color;
       if (elements.growthColorPicker) elements.growthColorPicker.value = color;
-      if (elements.growthColorHex) elements.growthColorHex.value = color.toUpperCase();
+      if (elements.growthColorHex)
+        elements.growthColorHex.value = color.toUpperCase();
       onParameterChange?.("dyeColor", color);
       update();
     });
@@ -793,7 +842,8 @@ export function createGrowthController({
   listen(document, "pointerdown", (event) => {
     const isCanvas =
       elements.canvas &&
-      (elements.canvas === event.target || elements.canvas.contains(event.target));
+      (elements.canvas === event.target ||
+        elements.canvas.contains(event.target));
     const isToolbar =
       elements.growthCanvasTools &&
       elements.growthCanvasTools.contains(event.target);

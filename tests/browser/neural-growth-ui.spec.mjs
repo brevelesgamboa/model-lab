@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
 
 async function selectGrowth(page) {
   await page.locator("#model-select").selectOption("neural-growth");
-  await expect(page.locator("#step-growth")).toBeEnabled();
+  await expect(page.locator("#step-growth")).toBeEnabled({ timeout: 30_000 });
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
     "256",
@@ -140,7 +140,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   await page.setViewportSize({ width: 1000, height: 800 });
   await page.waitForTimeout(150);
   expect(await state(page)).toEqual(before);
-  for (const view of ["archive", "experiments", "about", "lab"]) {
+  for (const view of ["saved", "experiments", "about", "lab"]) {
     await page.locator(`[data-view="${view}"]`).click();
   }
   await page.locator("#model-select").selectOption("folded-fractal");
@@ -176,7 +176,7 @@ test("PNG is an immutable snapshot and experiment runs save to archive", async (
   expect(await state(page)).toEqual(before);
   await page.keyboard.press("Control+Enter");
   await expect(page.locator("#status-message")).toContainText("SAVED");
-  await page.locator('[data-view="archive"]').click();
+  await page.locator('[data-view="saved"]').click();
   await expect(page.locator(".run-card")).toHaveCount(1);
   for (const [asset, text] of [
     ["/models/neural-growth/NOTICE.md", "CC-BY-4.0"],
@@ -534,6 +534,8 @@ test("all original checkpoints grow in the app, fit narrow layouts, and snapshot
 test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and switches models", async ({
   page,
 }) => {
+  // Software WebGL can block the page while compiling a replacement runtime.
+  test.setTimeout(120_000);
   await selectGrowth(page);
   const galleryBtn = page.locator("#open-growth-gallery");
   await expect(galleryBtn).toBeVisible();
@@ -560,7 +562,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await testingCard.click();
   await expect(dialog).not.toBeVisible();
   await expect
-    .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), { timeout: 45_000 })
     .toBe("mixed4a-391-guidance-r02-s02");
   await galleryBtn.click();
 
@@ -612,7 +614,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   // Selected pattern should now be loaded
   await expect
-    .poll(() => page.evaluate(() => window.__growthRuntime.model.id))
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), { timeout: 45_000 })
     .toBe("bubbly-0101");
 });
 
@@ -881,7 +883,7 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(rotationSource).toBeVisible();
   await expect(rotationSource).toHaveValue("kick");
 
-  const rotationLfoCheckbox = page.locator('.control-block:has-text("ROTATION") input[aria-label="Enable ROTATION LFO"]');
+  const rotationLfoCheckbox = page.locator('.control-block[data-parameter="rotation"] input[aria-label="Enable ROTATION LFO"]');
   await expect(rotationLfoCheckbox).toBeChecked();
 
   // Changing shockwave mode independently preserves audio preset
@@ -908,11 +910,11 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(rotationLfoCheckbox).toBeChecked();
 
   // Verify growth speed base value for dynamic is 45 (calm baseline)
-  const growthSpeedInput = page.locator('.control-block:has-text("GROWTH SPEED") input.fine-input');
+  const growthSpeedInput = page.locator('.control-block[data-parameter="growthSpeed"] input.fine-input');
   await expect(growthSpeedInput).toHaveValue("45");
 
   // Tweak audio depth on rotation to trigger custom profile detection
-  const depthInput = page.locator('.control-block:has-text("ROTATION") .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  const depthInput = page.locator('.control-block[data-parameter="rotation"] .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
   await depthInput.fill("0.85");
   await depthInput.dispatchEvent("input");
 
@@ -922,7 +924,7 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   // Save run to archive and verify
   await page.keyboard.press("Control+Enter");
   await expect(page.locator("#status-message")).toContainText("SAVED");
-  await page.locator('[data-view="archive"]').click();
+  await page.locator('[data-view="saved"]').click();
   await expect(page.locator(".run-card")).toHaveCount(1);
 });
 
@@ -1177,6 +1179,56 @@ test("camera breathing configures modes and updates viewport cleanly", async ({
   expect(errors).toEqual([]);
 });
 
+test("advanced inception guidance and state dynamics configure controls cleanly", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await selectGrowth(page);
 
+  // Inception Dream Guidance controls
+  const dreamSelect = page.locator('select[aria-label="DREAM GUIDANCE"]');
+  await expect(dreamSelect).toHaveValue("off");
+  await dreamSelect.selectOption("on");
+  await expect(dreamSelect).toHaveValue("on");
 
+  const neuronInput = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  await expect(neuronInput).toBeVisible();
+  await neuronInput.fill("42");
 
+  const jitterSelect = page.locator('select[aria-label="DREAM JITTER"]');
+  await expect(jitterSelect).toHaveValue("on");
+  await jitterSelect.selectOption("off");
+  await expect(jitterSelect).toHaveValue("off");
+
+  const chromaInput = page.getByLabel("DREAM CHROMINANCE exact value", { exact: true });
+  await expect(chromaInput).toBeVisible();
+  await chromaInput.fill("0");
+
+  // Kaleidoscope Folds
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  await geometrySelect.selectOption("kaleidoscope");
+
+  const foldInput = page.getByLabel("KALEIDOSCOPE FOLDS exact value", { exact: true });
+  await expect(foldInput).toBeVisible();
+  await foldInput.fill("8");
+
+  // Cell-state momentum
+  const momentumInput = page.getByLabel("STATE MOMENTUM exact value", { exact: true });
+  await expect(momentumInput).toBeVisible();
+  await momentumInput.fill("0.45");
+
+  // Step simulation once to ensure shader execution with all new uniforms
+  await page.locator("#step-growth").click();
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-steps",
+    "1",
+  );
+
+  // WebGL context is healthy with zero loss
+  expect(
+    await page.evaluate(() => window.__growthRuntime.getStats().contextLost),
+  ).toBe(false);
+
+  expect(errors).toEqual([]);
+});

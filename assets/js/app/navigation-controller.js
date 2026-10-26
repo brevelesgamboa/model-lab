@@ -1,9 +1,10 @@
 const VIEW_ALIASES = {
+  archive: "saved",
   studio: "experiments",
   datasets: "experiments",
   method: "about",
 };
-const VIEWS = new Set(["lab", "experiments", "archive", "about"]);
+const VIEWS = new Set(["lab", "experiments", "saved", "about"]);
 
 export function resolveView(view) {
   const resolved = VIEW_ALIASES[view] || view;
@@ -21,6 +22,7 @@ export function createNavigationController({
     elements.views.forEach((panel) => {
       const selected = panel.dataset.viewPanel === next;
       panel.hidden = !selected;
+      panel.classList.toggle("hidden", !selected);
       panel.classList.toggle("is-active", selected);
     });
     elements.navItems.forEach((button) => {

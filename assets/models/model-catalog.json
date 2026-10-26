@@ -6,7 +6,7 @@
       "id": "digiface-vae",
       "name": "DigiFace Generator",
       "version": "1.0.0",
-      "publisher": "Latent Field",
+      "publisher": "gl-bench",
       "architecture": "BETA-VAE DECODER",
       "resolution": "112 × 112 RGB",
       "latentDimensions": 48,

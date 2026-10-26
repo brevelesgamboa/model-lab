@@ -69,7 +69,7 @@ export class CustomPcaModel {
       },
       {
         key: "coordinateA",
-        label: "LATENT COORDINATE A",
+        label: "BASIS COORDINATE A",
         type: "range",
         min: -3,
         max: 3,
@@ -80,7 +80,7 @@ export class CustomPcaModel {
       },
       {
         key: "coordinateB",
-        label: "LATENT COORDINATE B",
+        label: "BASIS COORDINATE B",
         type: "range",
         min: -3,
         max: 3,
@@ -91,7 +91,7 @@ export class CustomPcaModel {
       },
       {
         key: "temperature",
-        label: "LATENT TEMPERATURE",
+        label: "SAMPLING TEMPERATURE",
         type: "range",
         min: 0.2,
         max: 2.5,
@@ -124,7 +124,7 @@ export class CustomPcaModel {
       },
       {
         key: "motion",
-        label: "LATENT DRIFT",
+        label: "BASIS DRIFT",
         type: "range",
         min: 0,
         max: 1,

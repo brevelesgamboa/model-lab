@@ -2,7 +2,7 @@
 
 ## Application code
 
-Latent Field's own source code and documentation are MIT-licensed; see LICENSE. This grant does not automatically cover third-party components or model weights. Their applicable terms are documented below and in each model notice.
+gl-bench's own source code and documentation are MIT-licensed; see LICENSE. This grant does not automatically cover third-party components or model weights. Their applicable terms are documented below and in each model notice.
 
 ## Browser runtimes
 
@@ -42,7 +42,7 @@ Inception rights remain an unresolved public-release blocker. DigiFace's self-tr
   targets, generation prompts, and the development-only trainer remain in the
   source repository; they are not downloaded by the application.
 
-Vesicle Study is a published reference, not an original Latent Field checkpoint.
+Vesicle Study is a published reference, not an original gl-bench checkpoint.
 Upstream terms do not independently establish all original training-data rights.
 The separate Inception and DigiFace release review remains outstanding.
 
