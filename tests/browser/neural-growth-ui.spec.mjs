@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 async function state(page) {
   return page.evaluate(async () => {
@@ -46,6 +47,339 @@ async function selectGrowth(page) {
     "256",
   );
 }
+
+test("growth uploads fractional pan and integer step uniforms without WebGL errors", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const result = await page.evaluate(() => {
+    const runtime = window.__growthRuntime;
+    const gl = runtime.gl;
+    const errors = [gl.getError()];
+    runtime.step(2);
+    errors.push(gl.getError());
+    runtime.draw(document.getElementById("output-canvas"), {
+      zoom: 2,
+      pan: [0.125, -0.0625],
+    });
+    errors.push(gl.getError());
+    return {
+      errors,
+      pan: Array.from(
+        gl.getUniform(
+          runtime.program.visualize.handle,
+          runtime.program.visualize.locations.get("u_pan"),
+        ),
+      ),
+    };
+  });
+  expect(result.errors).toEqual([0, 0, 0]);
+  expect(result.pan).toEqual([0.125, -0.0625]);
+});
+
+test("live readouts avoid measuring closed modulation charts and keep open charts drawing", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.evaluate(() => {
+    window.__closedChartMeasurements = 0;
+    window.__visibleChartMeasurements = 0;
+    const descriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "clientWidth",
+    );
+    Object.defineProperty(Element.prototype, "clientWidth", {
+      ...descriptor,
+      get() {
+        if (this.classList.contains("modulation-visualizer")) {
+          if (this.closest("[hidden], details:not([open])"))
+            window.__closedChartMeasurements += 1;
+          else window.__visibleChartMeasurements += 1;
+        }
+        return descriptor.get.call(this);
+      },
+    });
+  });
+  await page.locator("#toggle-animation").click();
+  await expect.poll(async () => (await state(page)).steps).toBeGreaterThan(3);
+  expect(await page.evaluate(() => window.__closedChartMeasurements)).toBe(0);
+  const toggle = page.locator('.modulation-toggle[data-key="growthSpeed"]');
+  await toggle.click();
+  await page
+    .locator('.control-block:has(.modulation-toggle[data-key="growthSpeed"]) .existing-routing > summary')
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => window.__visibleChartMeasurements))
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page
+        .locator(".modulation-visualizer:visible")
+        .first()
+        .evaluate((canvas) => {
+          const pixels = canvas
+            .getContext("2d")
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          return pixels.some((value, index) => index % 4 === 3 && value > 0);
+        }),
+    )
+    .toBe(true);
+  await toggle.click();
+  const before = (await state(page)).steps;
+  await expect
+    .poll(async () => (await state(page)).steps)
+    .toBeGreaterThan(before + 3);
+  await page.locator("#toggle-animation").click();
+  expect(await page.evaluate(() => window.__closedChartMeasurements)).toBe(0);
+});
+
+async function displaySize(page) {
+  return page.locator("#output-canvas").evaluate((canvas) => ({
+    width: canvas.width,
+    height: canvas.height,
+    runtimeWidth: window.__growthRuntime.canvas.width,
+    runtimeHeight: window.__growthRuntime.canvas.height,
+  }));
+}
+
+test("live display caps honor quality and model switches without changing the NCA grid", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.getByLabel("GROWTH SPEED exact value", { exact: true }).fill("0");
+  await page.locator("#quality-select").selectOption("extreme");
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 1536,
+      height: 1536,
+      runtimeWidth: 1536,
+      runtimeHeight: 1536,
+    });
+  const before = await state(page);
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 768,
+      height: 768,
+      runtimeWidth: 768,
+      runtimeHeight: 768,
+    });
+  await page.locator("#quality-select").selectOption("economy");
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 384,
+      height: 384,
+      runtimeWidth: 384,
+      runtimeHeight: 384,
+    });
+  await page.locator("#quality-select").selectOption("extreme");
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 768,
+      height: 768,
+      runtimeWidth: 768,
+      runtimeHeight: 768,
+    });
+  await page.locator("#model-select").selectOption("folded-fractal");
+  await expect(page.locator("#output-canvas")).toHaveAttribute("width", "1536");
+  await selectGrowth(page);
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 768,
+      height: 768,
+      runtimeWidth: 768,
+      runtimeHeight: 768,
+    });
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 1536,
+      height: 1536,
+      runtimeWidth: 1536,
+      runtimeHeight: 1536,
+    });
+  expect(await state(page)).toEqual(before);
+});
+
+test.describe("Neural Growth fullscreen display resolution", () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test("high-DPR playback stays capped through resize and restores paused detail", async ({
+    page,
+  }) => {
+    await selectGrowth(page);
+    await page
+      .getByLabel("GROWTH SPEED exact value", { exact: true })
+      .fill("0");
+    await page.locator("#quality-select").selectOption("extreme");
+    const before = await state(page);
+    await page.locator("#toggle-animation").click();
+    await page.locator("#toggle-fullscreen").click();
+    await expect
+      .poll(() => page.evaluate(() => document.fullscreenElement?.id))
+      .toBe("output-panel");
+    async function checkFullscreen() {
+      await expect
+        .poll(async () => {
+          const { width, height } = await displaySize(page);
+          return Math.max(width, height);
+        })
+        .toBe(768);
+      await expect
+        .poll(() =>
+          page.locator("#output-canvas").evaluate((canvas) => {
+            const bounds = canvas.getBoundingClientRect();
+            return Math.abs(
+              bounds.width / bounds.height - canvas.width / canvas.height,
+            );
+          }),
+        )
+        .toBeLessThan(0.01);
+    }
+    await checkFullscreen();
+    // Chromium disallows native window resizing while fullscreen. Resize its
+    // emulated viewport instead, which still delivers the app's resize event.
+    const session = await page.context().newCDPSession(page);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: 900,
+      height: 1200,
+      deviceScaleFactor: 2,
+      mobile: false,
+    });
+    await checkFullscreen();
+    await page.keyboard.press("Space");
+    await expect
+      .poll(async () => {
+        const { width, height } = await displaySize(page);
+        return Math.max(width, height);
+      })
+      .toBeGreaterThan(768);
+    expect(await state(page)).toEqual(before);
+    await page.keyboard.press("Space");
+    await checkFullscreen();
+    await page.keyboard.press("f");
+    await expect
+      .poll(() => displaySize(page))
+      .toEqual({
+        width: 768,
+        height: 768,
+        runtimeWidth: 768,
+        runtimeHeight: 768,
+      });
+    expect(await state(page)).toEqual(before);
+  });
+});
+
+test("PNG exports retain current, 2K and 4K sizes while live growth remains capped", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.getByLabel("GROWTH SPEED exact value", { exact: true }).fill("0");
+  await page.locator("#quality-select").selectOption("extreme");
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() => displaySize(page))
+    .toEqual({
+      width: 768,
+      height: 768,
+      runtimeWidth: 768,
+      runtimeHeight: 768,
+    });
+  const before = await state(page);
+  await page.evaluate(() => {
+    window.__growthDraws = [];
+    const runtime = window.__growthRuntime;
+    const draw = runtime.draw;
+    runtime.draw = function (canvas, options) {
+      const live = document.getElementById("output-canvas");
+      window.__growthDraws.push({
+        width: canvas.width,
+        height: canvas.height,
+        liveWidth: live.width,
+        liveHeight: live.height,
+      });
+      return draw.call(this, canvas, options);
+    };
+  });
+  for (const [resolution, size] of [
+    ["current", 768],
+    ["2048", 2048],
+    ["4096", 4096],
+  ]) {
+    await page.locator("#save-image").click();
+    await page
+      .locator(`input[name="export-resolution"][value="${resolution}"]`)
+      .check();
+    const downloaded = page.waitForEvent("download");
+    await page.locator("#export-modal-confirm").click();
+    const download = await downloaded;
+    const bytes = await readFile(await download.path());
+    expect(bytes.readUInt32BE(16)).toBe(size);
+    expect(bytes.readUInt32BE(20)).toBe(size);
+    await expect
+      .poll(() => displaySize(page))
+      .toEqual({
+        width: 768,
+        height: 768,
+        runtimeWidth: 768,
+        runtimeHeight: 768,
+      });
+    expect(await state(page)).toEqual(before);
+  }
+  const draws = await page.evaluate(() => window.__growthDraws);
+  expect(draws.map(({ width }) => width)).toEqual(
+    expect.arrayContaining([768, 2048, 4096]),
+  );
+  expect(
+    draws.every(
+      ({ liveWidth, liveHeight }) => liveWidth === 768 && liveHeight === 768,
+    ),
+  ).toBe(true);
+});
+
+test("display resizing releases replaced echo buffers and preserves simulation state", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.getByLabel("GROWTH SPEED exact value", { exact: true }).fill("0");
+  await page.locator("#quality-select").selectOption("ultra");
+  await page
+    .getByLabel("TEMPORAL ECHO DECAY exact value", { exact: true })
+    .fill("0.6");
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__growthRuntime.echoTargets?.[0].width),
+    )
+    .toBe(1024);
+  const before = await state(page);
+  const resources = await page.evaluate(
+    () => window.__growthRuntime.getStats().resources,
+  );
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await page.locator("#toggle-animation").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__growthRuntime.echoTargets[0].width),
+      )
+      .toBe(768);
+    await page.locator("#toggle-animation").click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__growthRuntime.echoTargets[0].width),
+      )
+      .toBe(1024);
+    expect(
+      await page.evaluate(() => window.__growthRuntime.getStats().resources),
+    ).toEqual(resources);
+  }
+  expect(await state(page)).toEqual(before);
+});
 
 test("a lost WebGL context requires explicit retry and releases the old runtime", async ({
   page,
@@ -322,9 +656,7 @@ test("drawing while paused modifies the field without advancing simulation steps
   await page.mouse.move(centerX + side * 0.2, centerY);
   await page.mouse.up();
 
-  await expect
-    .poll(async () => (await state(page)).hash)
-    .not.toBe(before.hash);
+  await expect.poll(async () => (await state(page)).hash).not.toBe(before.hash);
 
   const after = await state(page);
   expect(after.steps).toBe(before.steps);
@@ -556,13 +888,17 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   );
   await expect
     .poll(() =>
-      testingCard.locator("img").evaluate((img) => img.complete && img.naturalWidth > 0),
+      testingCard
+        .locator("img")
+        .evaluate((img) => img.complete && img.naturalWidth > 0),
     )
     .toBe(true);
   await testingCard.click();
   await expect(dialog).not.toBeVisible();
   await expect
-    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), { timeout: 45_000 })
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), {
+      timeout: 45_000,
+    })
     .toBe("mixed4a-391-guidance-r02-s02");
   await galleryBtn.click();
 
@@ -591,7 +927,9 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await expect(page.locator("#growth-gallery-count")).toContainText("25");
 
   const organicCard = page.locator(".growth-gallery__card").first();
-  const cardSubId = await organicCard.locator(".growth-gallery__card-id").textContent();
+  const cardSubId = await organicCard
+    .locator(".growth-gallery__card-id")
+    .textContent();
   expect(cardSubId).not.toContain("glitch/");
   expect(cardSubId).not.toContain("overnight/");
 
@@ -614,7 +952,9 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   // Selected pattern should now be loaded
   await expect
-    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), { timeout: 45_000 })
+    .poll(() => page.evaluate(() => window.__growthRuntime.model.id), {
+      timeout: 45_000,
+    })
     .toBe("bubbly-0101");
 });
 
@@ -623,20 +963,23 @@ test("continuous rotation and growth speed expose modulation controls with circu
 }) => {
   await selectGrowth(page);
   // Ensure rotation has MOD button and circular wrap works
-  const rotationMod = page.locator('button.modulation-toggle[data-key="rotation"]');
+  const rotationMod = page.locator(
+    'button.modulation-toggle[data-key="rotation"]',
+  );
   await expect(rotationMod).toBeVisible();
 
   const twistMod = page.locator('button.modulation-toggle[data-key="twist"]');
   await expect(twistMod).toBeVisible();
 
-  const speedMod = page.locator('button.modulation-toggle[data-key="growthSpeed"]');
+  const speedMod = page.locator(
+    'button.modulation-toggle[data-key="growthSpeed"]',
+  );
   await expect(speedMod).toBeVisible();
 
   // Test circular wrap on rotation
   const wrapped = await page.evaluate(async () => {
-    const { coerceRangeValue } = await import(
-      "/assets/js/app/controls-controller.js"
-    );
+    const { coerceRangeValue } =
+      await import("/assets/js/app/controls-controller.js");
     const def = { min: 0, max: 360, step: 1, wrap: true };
     return [
       coerceRangeValue(def, 375),
@@ -653,7 +996,9 @@ test("coordinate geometry selector switches modes, updates smart pitch defaults,
   await selectGrowth(page);
 
   // Check controls exist
-  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", {
+    exact: true,
+  });
   await expect(geometrySelect).toBeVisible();
   await expect(geometrySelect).toHaveValue("cartesian");
 
@@ -768,7 +1113,9 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   await expect(colorOptions).toBeVisible();
 
   // Click Magenta preset pill in canvas toolbar
-  const magentaPill = colorOptions.locator(".color-preset-pill[data-color='#ff00a0']");
+  const magentaPill = colorOptions.locator(
+    ".color-preset-pill[data-color='#ff00a0']",
+  );
   await expect(magentaPill).toBeVisible();
   await magentaPill.click();
 
@@ -857,10 +1204,14 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(shockwaveSelect).toBeVisible();
   await expect(shockwaveSelect).toHaveValue("on");
 
-  const intensityInput = page.locator('input.control-slider[aria-label="SHOCKWAVE INTENSITY"]');
+  const intensityInput = page.locator(
+    'input.control-slider[aria-label="SHOCKWAVE INTENSITY"]',
+  );
   await expect(intensityInput).toBeVisible();
 
-  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", {
+    exact: true,
+  });
   await expect(geometrySelect).toHaveValue("cartesian");
 
   // Select Continuous preset: switches Cartesian geometry to Vortex, sets base values and LFOs
@@ -872,18 +1223,24 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
 
   // Check rotation MOD toggle is active
-  const rotationModToggle = page.locator('button.modulation-toggle[data-key="rotation"]');
+  const rotationModToggle = page.locator(
+    'button.modulation-toggle[data-key="rotation"]',
+  );
   await expect(rotationModToggle).toHaveClass(/is-active/);
 
   // Open rotation MOD drawer if not already open
-  const rotationSource = page.locator('select[aria-label="ROTATION audio source"]');
+  const rotationSource = page.locator(
+    'select[aria-label="ROTATION audio source"]',
+  );
   if (await rotationSource.isHidden()) {
     await rotationModToggle.click();
   }
   await expect(rotationSource).toBeVisible();
   await expect(rotationSource).toHaveValue("kick");
 
-  const rotationLfoCheckbox = page.locator('.control-block[data-parameter="rotation"] input[aria-label="Enable ROTATION LFO"]');
+  const rotationLfoCheckbox = page.locator(
+    '.control-block[data-parameter="rotation"] input[aria-label="Enable ROTATION LFO"]',
+  );
   await expect(rotationLfoCheckbox).toBeChecked();
 
   // Changing shockwave mode independently preserves audio preset
@@ -899,7 +1256,9 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(rotationLfoCheckbox).not.toBeChecked();
 
   // Verify twist LFO is active in Subtle
-  const twistModToggle = page.locator('button.modulation-toggle[data-key="twist"]');
+  const twistModToggle = page.locator(
+    'button.modulation-toggle[data-key="twist"]',
+  );
   await expect(twistModToggle).toHaveClass(/is-active/);
 
   // Switch to Dynamic preset: verifies dynamic configuration and LFO activation
@@ -910,11 +1269,15 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await expect(rotationLfoCheckbox).toBeChecked();
 
   // Verify growth speed base value for dynamic is 45 (calm baseline)
-  const growthSpeedInput = page.locator('.control-block[data-parameter="growthSpeed"] input.fine-input');
+  const growthSpeedInput = page.locator(
+    '.control-block[data-parameter="growthSpeed"] input.fine-input',
+  );
   await expect(growthSpeedInput).toHaveValue("45");
 
   // Tweak audio depth on rotation to trigger custom profile detection
-  const depthInput = page.locator('.control-block[data-parameter="rotation"] .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]');
+  const depthInput = page.locator(
+    '.control-block[data-parameter="rotation"] .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]',
+  );
   await depthInput.fill("0.85");
   await depthInput.dispatchEvent("input");
 
@@ -998,7 +1361,9 @@ test("contextual guidance pills render beneath key controls and tap recovery spr
   });
   const speedGuidance = speedBlock.locator(".control-guidance");
   await expect(speedGuidance).toBeVisible();
-  await expect(speedGuidance.locator(".control-guidance__tag")).toHaveText("RECOMMENDED");
+  await expect(speedGuidance.locator(".control-guidance__tag")).toHaveText(
+    "RECOMMENDED",
+  );
 
   // 2. Verify twist guidance is INACTIVE while in Cartesian mode
   const twistBlock = page.locator(".control-block", {
@@ -1006,36 +1371,42 @@ test("contextual guidance pills render beneath key controls and tap recovery spr
   });
   const twistGuidance = twistBlock.locator(".control-guidance");
   await expect(twistGuidance).toBeVisible();
-  await expect(twistGuidance.locator(".control-guidance__tag")).toHaveText("INACTIVE");
+  await expect(twistGuidance.locator(".control-guidance__tag")).toHaveText(
+    "INACTIVE",
+  );
 
   // 3. Switch coordinate geometry to Spiral
-  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", {
+    exact: true,
+  });
   await geometrySelect.selectOption("spiral");
 
   // In Spiral mode: twist guidance updates reactively
-  await expect(twistGuidance.locator(".control-guidance__tag")).not.toHaveText("INACTIVE");
+  await expect(twistGuidance.locator(".control-guidance__tag")).not.toHaveText(
+    "INACTIVE",
+  );
 
   // 4. Disturbance mode guidance
   const modeSelect = page.getByLabel("DISTURBANCE MODE", { exact: true });
   await modeSelect.selectOption("noise");
   const modeBlock = page.locator(".control-block", { has: modeSelect });
-  await expect(
-    modeBlock.locator(".control-guidance__tag"),
-  ).toHaveText("RE-SEED");
+  await expect(modeBlock.locator(".control-guidance__tag")).toHaveText(
+    "RE-SEED",
+  );
 
   // 5. Channel inspector guidance
   const channelSelect = page.getByLabel("CHANNEL INSPECTOR", { exact: true });
   await channelSelect.selectOption("fast_signals");
   const channelBlock = page.locator(".control-block", { has: channelSelect });
-  await expect(
-    channelBlock.locator(".control-guidance__tag"),
-  ).toHaveText("CH 4-6");
+  await expect(channelBlock.locator(".control-guidance__tag")).toHaveText(
+    "CH 4-6",
+  );
 
   // Return to Phenotype
   await channelSelect.selectOption("phenotype");
-  await expect(
-    channelBlock.locator(".control-guidance__tag"),
-  ).toHaveText("RECOMMENDED");
+  await expect(channelBlock.locator(".control-guidance__tag")).toHaveText(
+    "RECOMMENDED",
+  );
 
   // 6. Dormant tap recovery:
   // Step simulation, clear field with erase, verify dormant tap recovery
@@ -1079,15 +1450,23 @@ test("Shift+Click on canvas repositions geometry center and Shift+dblclick reset
   // Center X should be approx +0.5, Center Y should be approx +0.5 (bottom-up: 1 - 0.25 = 0.75 -> (0.75 - 0.5) * 2 = 0.5)
   const centerXInput = page.getByLabel("CENTER X", { exact: true });
   const centerYInput = page.getByLabel("CENTER Y", { exact: true });
-  await expect.poll(async () => Number(await centerXInput.inputValue())).toBeCloseTo(0.5, 1);
-  await expect.poll(async () => Number(await centerYInput.inputValue())).toBeCloseTo(0.5, 1);
+  await expect
+    .poll(async () => Number(await centerXInput.inputValue()))
+    .toBeCloseTo(0.5, 1);
+  await expect
+    .poll(async () => Number(await centerYInput.inputValue()))
+    .toBeCloseTo(0.5, 1);
 
   // Shift+dblclick resets center to 0, 0
   await page.keyboard.down("Shift");
   await page.mouse.dblclick(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.keyboard.up("Shift");
-  await expect.poll(async () => Number(await centerXInput.inputValue())).toBe(0);
-  await expect.poll(async () => Number(await centerYInput.inputValue())).toBe(0);
+  await expect
+    .poll(async () => Number(await centerXInput.inputValue()))
+    .toBe(0);
+  await expect
+    .poll(async () => Number(await centerYInput.inputValue()))
+    .toBe(0);
 });
 
 test("temporal echoes configure decay, drift and flow dynamics cleanly", async ({
@@ -1095,11 +1474,15 @@ test("temporal echoes configure decay, drift and flow dynamics cleanly", async (
 }) => {
   await selectGrowth(page);
 
-  const decayInput = page.getByLabel("TEMPORAL ECHO DECAY exact value", { exact: true });
+  const decayInput = page.getByLabel("TEMPORAL ECHO DECAY exact value", {
+    exact: true,
+  });
   await expect(decayInput).toBeVisible();
   await decayInput.fill("70");
 
-  const driftInput = page.getByLabel("TEMPORAL ECHO DRIFT exact value", { exact: true });
+  const driftInput = page.getByLabel("TEMPORAL ECHO DRIFT exact value", {
+    exact: true,
+  });
   await expect(driftInput).toBeVisible();
   await driftInput.fill("0.5");
 
@@ -1192,7 +1575,9 @@ test("advanced inception guidance and state dynamics configure controls cleanly"
   await dreamSelect.selectOption("on");
   await expect(dreamSelect).toHaveValue("on");
 
-  const neuronInput = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  const neuronInput = page.getByLabel("DREAM NEURON exact value", {
+    exact: true,
+  });
   await expect(neuronInput).toBeVisible();
   await neuronInput.fill("42");
 
@@ -1201,20 +1586,28 @@ test("advanced inception guidance and state dynamics configure controls cleanly"
   await jitterSelect.selectOption("off");
   await expect(jitterSelect).toHaveValue("off");
 
-  const chromaInput = page.getByLabel("DREAM CHROMINANCE exact value", { exact: true });
+  const chromaInput = page.getByLabel("DREAM CHROMINANCE exact value", {
+    exact: true,
+  });
   await expect(chromaInput).toBeVisible();
   await chromaInput.fill("0");
 
   // Kaleidoscope Folds
-  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", { exact: true });
+  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", {
+    exact: true,
+  });
   await geometrySelect.selectOption("kaleidoscope");
 
-  const foldInput = page.getByLabel("KALEIDOSCOPE FOLDS exact value", { exact: true });
+  const foldInput = page.getByLabel("KALEIDOSCOPE FOLDS exact value", {
+    exact: true,
+  });
   await expect(foldInput).toBeVisible();
   await foldInput.fill("8");
 
   // Cell-state momentum
-  const momentumInput = page.getByLabel("STATE MOMENTUM exact value", { exact: true });
+  const momentumInput = page.getByLabel("STATE MOMENTUM exact value", {
+    exact: true,
+  });
   await expect(momentumInput).toBeVisible();
   await momentumInput.fill("0.45");
 

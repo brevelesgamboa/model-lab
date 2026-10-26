@@ -147,8 +147,11 @@ const renderer = createRenderController({
     };
   },
   onStart() {
-    elements.renderState.textContent = "RENDERING";
-    elements.renderState.classList.add("is-processing");
+    if (!playback.isActive()) {
+      resizeLiveCanvas({ render: false });
+      elements.renderState.textContent = "RENDERING";
+      elements.renderState.classList.add("is-processing");
+    }
   },
   onFrame: acceptRenderedFrame,
   onError(error) {
@@ -1203,6 +1206,14 @@ function updateEffectiveControlReadouts(
   effectiveParameters,
   timeSeconds = lastTimeSeconds,
 ) {
+  // Measure visible charts together before changing labels and marker styles.
+  // Interleaving these reads and writes forces one layout per control in Firefox.
+  const visualizerWidths = new Map();
+  controlElements.forEach((control) => {
+    const canvas = control.modulationVisualizer;
+    if (canvas && !canvas.closest("[hidden], details:not([open])"))
+      visualizerWidths.set(canvas, canvas.clientWidth);
+  });
   currentModel.controls.forEach((definition) => {
     if (definition.type !== "range") return;
     const control = controlElements.get(definition.key);
@@ -1266,6 +1277,7 @@ function updateEffectiveControlReadouts(
       control.modulationVisualizer,
       frame,
       formatControlValue,
+      visualizerWidths.get(control.modulationVisualizer),
     );
   });
 }
@@ -1361,6 +1373,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   dreamController.update();
   growthController.update();
   updateAudioUi();
+  resizeLiveCanvas({ render: false });
 
   if (currentModel.id === "digiface-vae") {
     setStatus(`${currentModel.name} CHECKING`);
@@ -1580,7 +1593,7 @@ function animationLoop(timestamp) {
     qualityProfile.frameInterval + fallbackPenalty,
     adaptiveCost,
   );
-  if (canRender && timestamp - lastRenderedAt >= frameInterval) {
+  if (canRender && !renderer.getPending() && timestamp - lastRenderedAt >= frameInterval) {
     lastRenderedAt = timestamp;
     lastTimeSeconds = (timestamp - animationEpoch) / 1000;
     renderCurrentFrame({
@@ -1608,6 +1621,7 @@ function setAnimation(enabled, { log = true } = {}) {
   }
   animationEnabled = next;
   playback.sync();
+  resizeLiveCanvas({ render: false });
   if (animationEnabled) {
     animationEpoch = performance.now() - lastTimeSeconds * 1000;
   }
@@ -1645,13 +1659,8 @@ function applyQuality(mode, { render = true, log = true } = {}) {
     !hqGallery.isActive()
   ) {
     liveResolutionScale = 1;
-    resizeLiveFullscreenCanvas({ render: false });
-  } else {
-    elements.canvas.width = qualityProfile.size;
-    elements.canvas.height = qualityProfile.size;
-    elements.outputResolution.textContent =
-      qualityProfile.size + " x " + qualityProfile.size;
   }
+  resizeLiveCanvas({ render: false });
   updateResourceStatus();
   invalidateCurrentRun("QUALITY CHANGED - SAVE WHEN READY");
   if (render) renderCurrentFrame({ forceAnalysis: true });
@@ -1808,11 +1817,15 @@ function fullscreenLiveDimensions() {
   };
   const scale = profileScale[qualityProfile.mode] ?? 1.0;
   const baseEdge = Math.round(screenLongEdge * scale);
+  const resolutionScale =
+    currentModel.id === "neural-growth" && !playback.isActive()
+      ? 1
+      : liveResolutionScale;
   const longEdge = Math.max(
     512,
     Math.min(
       capabilities.maxTextureSize || 2048,
-      Math.round(baseEdge * liveResolutionScale),
+      Math.round(baseEdge * resolutionScale),
     ),
   );
   if (aspect >= 1)
@@ -1832,20 +1845,34 @@ function resizeLiveFullscreenCanvas({ render = true } = {}) {
     hqGallery.isActive()
   )
     return;
-  const { width, height } = fullscreenLiveDimensions();
-  if (elements.canvas.width === width && elements.canvas.height === height)
-    return;
-  elements.canvas.width = width;
-  elements.canvas.height = height;
-  elements.outputResolution.textContent = width + " × " + height;
-  if (render) renderCurrentFrame({ forceAnalysis: true });
+  resizeLiveCanvas({ render });
 }
 
-function restoreLiveCanvasSize({ render = true } = {}) {
-  elements.canvas.width = qualityProfile.size;
-  elements.canvas.height = qualityProfile.size;
-  elements.outputResolution.textContent =
-    qualityProfile.size + " × " + qualityProfile.size;
+function resizeLiveCanvas({ render = true } = {}) {
+  // Export and exclusive-compute suspensions must retain the captured viewport.
+  if (
+    hqGallery.isActive() ||
+    hqRendering ||
+    gifEncoding ||
+    playback.isSuspended()
+  )
+    return;
+  let { width, height } =
+    document.fullscreenElement === elements.outputPanel
+      ? fullscreenLiveDimensions()
+      : { width: qualityProfile.size, height: qualityProfile.size };
+  if (currentModel.id === "neural-growth" && playback.isActive()) {
+    // Display pixels are independent of the simulation grid and private exports.
+    const maxEdge = Math.min(768, qualityProfile.size);
+    const scale = Math.min(1, maxEdge / Math.max(width, height));
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+  }
+  if (elements.canvas.width === width && elements.canvas.height === height)
+    return;
+  elements.outputResolution.textContent = width + " × " + height;
+  elements.canvas.width = width;
+  elements.canvas.height = height;
   if (render) renderCurrentFrame({ forceAnalysis: true });
 }
 
@@ -1876,7 +1903,7 @@ function updateFullscreenUi() {
   } else {
     if (hqGallery.isActive()) hqGallery.closeViewer({ exitFullscreen: false });
     liveResolutionScale = 1;
-    restoreLiveCanvasSize();
+    resizeLiveCanvas();
   }
   setStatus(
     active

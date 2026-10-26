@@ -16,10 +16,12 @@ export function createRenderController({
         await pending;
         return render(request);
       }
-      queued = {
-        ...request,
-        forceAnalysis: Boolean(request.forceAnalysis || queued?.forceAnalysis),
-      };
+      if (!request.advanceSimulation) {
+        queued = {
+          ...request,
+          forceAnalysis: Boolean(request.forceAnalysis || queued?.forceAnalysis),
+        };
+      }
       return pending;
     }
     const snapshot = getSnapshot(request);

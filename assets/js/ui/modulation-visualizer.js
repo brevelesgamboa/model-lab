@@ -34,9 +34,15 @@ export function drawModulationVisualizer(
   canvas,
   frame,
   formatValue,
+  measuredWidth,
 ) {
   if (!canvas || !frame) return;
-  const cssWidth = Math.max(220, Math.round(canvas.clientWidth || 280));
+  const { history, sampledAt } = appendModulationHistory(canvas, frame);
+  // Closed panels still collect history without forcing layout or painting.
+  if (canvas.closest("[hidden], details:not([open])")) return;
+  const width = measuredWidth ?? canvas.clientWidth;
+  if (width <= 0) return;
+  const cssWidth = Math.max(220, Math.round(width));
   const cssHeight = 76;
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   if (
@@ -48,7 +54,6 @@ export function drawModulationVisualizer(
   }
   const context = canvas.getContext("2d");
   if (!context) return;
-  const { history, sampledAt } = appendModulationHistory(canvas, frame);
   const minimum = Number(definition.min);
   const maximum = Number(definition.max);
   const range = Math.max(1e-9, maximum - minimum);

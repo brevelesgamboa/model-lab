@@ -195,7 +195,7 @@ test("quality, fullscreen resizing, and GIF export retain the original hooks", a
   page,
 }) => {
   await page.locator("#quality-select").selectOption("economy");
-  await expect(page.locator("#output-resolution")).toHaveText("384 x 384");
+  await expect(page.locator("#output-resolution")).toHaveText("384 × 384");
   await page.locator("#toggle-fullscreen").click();
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement?.id))

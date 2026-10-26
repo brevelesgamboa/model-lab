@@ -2038,7 +2038,7 @@ export class InceptionDreamModel {
     const smoothness = clamp(Number(parameters?.smoothness ?? 0.15), 0, 0.5);
     const colorMode = parameters?.colorMode === "vivid" ? "vivid" : "natural";
     const frequencyBand = parameters?.frequencyBand || "high_freq_texture";
-    const previewInterval = reducedCompute ? 2 : 2;
+    const previewInterval = reducedCompute ? 5 : 10;
     const stepSize =
       clamp(Number(parameters?.dreamStrength ?? 1), 0.2, 2.0) * 0.01;
     const targetNodes = this.resolveTargetNodes();

@@ -220,7 +220,7 @@ export class NeuralGrowthModel {
         max: 120,
         step: 1,
         default: 30,
-        help: "Requested updates per second, limited to two per frame. Zero freezes growth; CLOCK pauses without resetting.",
+        help: "Requested updates per second, limited to three per frame. Zero freezes growth; CLOCK pauses without resetting.",
         getGuidance: (value) => {
           const speed = Number(value) || 0;
           if (speed === 0) {
@@ -2333,16 +2333,15 @@ export class NeuralGrowthModel {
       this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
         if (this._lastTick !== null) {
-          const delta = Math.max(
-            0,
-            Math.min(0.05, timeSeconds - this._lastTick),
+          const delta = Math.max(0, timeSeconds - this._lastTick);
+          const speed = Math.max(0, Number(parameters.growthSpeed) || 0);
+          this._accumulator += delta * speed;
+          const maxStepsPerFrame = 3;
+          const count = Math.min(
+            maxStepsPerFrame,
+            Math.floor(this._accumulator + 1e-9),
           );
-          this._accumulator = Math.min(
-            2,
-            this._accumulator + delta * parameters.growthSpeed,
-          );
-          const count = Math.floor(this._accumulator + 1e-9);
-          if (count) {
+          if (count > 0) {
             const angleRad =
               (Number(parameters.rotation || 0) * Math.PI) / 180;
             const twistRad =
@@ -2381,8 +2380,13 @@ export class NeuralGrowthModel {
                 );
               }
             }
+            this._accumulator -= count;
           }
-          this._accumulator -= count;
+          const excessWholeSteps = Math.floor(this._accumulator);
+          if (excessWholeSteps > 0) {
+            this._accumulator -= excessWholeSteps;
+          }
+          this._accumulator = Math.max(0, this._accumulator);
         }
         this._lastTick = timeSeconds;
       }

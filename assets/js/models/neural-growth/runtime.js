@@ -323,7 +323,7 @@ void main() {
   vec4 delta = decodeState(texelFetch(u_delta, ivec2(compressed.x + group * u_size, compressed.y), 0));
   if (group == 0 && u_dreamStrength > 0.0001) {
     vec2 dreamUv = (vec2(xy) + 0.5) / float(u_size);
-    vec3 dreamDelta = (texture(u_dreamGrad, dreamUv).rgb - 127.0 / 255.0) * 2.0;
+    vec3 dreamDelta = (textureLod(u_dreamGrad, dreamUv, 0.0).rgb - 127.0 / 255.0) * 2.0;
     float dreamLum = dot(dreamDelta, vec3(0.299, 0.587, 0.114));
     vec3 effectiveDream = mix(vec3(dreamLum), dreamDelta, clamp(u_dreamChroma, 0.0, 1.0));
     delta.rgb += effectiveDream * u_dreamStrength;
@@ -613,37 +613,37 @@ vec4 sampleBicubic(vec2 pos, int groupIdx) {
     -1.5 * f3.y + 2.0 * f2.y + 0.5 * f.y,
      0.5 * f3.y - 0.5 * f2.y
   );
-  int x0 = wrapCell(ivec2(i0.x - 1, 0)).x;
-  int x1 = wrapCell(ivec2(i0.x,     0)).x;
-  int x2 = wrapCell(ivec2(i0.x + 1, 0)).x;
-  int x3 = wrapCell(ivec2(i0.x + 2, 0)).x;
+  int x1 = (i0.x % u_size + u_size) % u_size;
+  int x0 = (x1 - 1 + u_size) % u_size;
+  int x2 = (x1 + 1) % u_size;
+  int x3 = (x1 + 2) % u_size;
 
-  int y0 = wrapCell(ivec2(0, i0.y - 1)).y;
-  int y1 = wrapCell(ivec2(0, i0.y    )).y;
-  int y2 = wrapCell(ivec2(0, i0.y + 1)).y;
-  int y3 = wrapCell(ivec2(0, i0.y + 2)).y;
+  int y1 = (i0.y % u_size + u_size) % u_size;
+  int y0 = (y1 - 1 + u_size) % u_size;
+  int y2 = (y1 + 1) % u_size;
+  int y3 = (y1 + 2) % u_size;
 
-  vec4 col0 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y0), 0)) +
-              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y0), 0)) +
-              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y0), 0)) +
-              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y0), 0));
+  vec4 col0 = wx.x * texelFetch(u_state, ivec2(x0 + xOff, y0), 0) +
+              wx.y * texelFetch(u_state, ivec2(x1 + xOff, y0), 0) +
+              wx.z * texelFetch(u_state, ivec2(x2 + xOff, y0), 0) +
+              wx.w * texelFetch(u_state, ivec2(x3 + xOff, y0), 0);
 
-  vec4 col1 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y1), 0)) +
-              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y1), 0)) +
-              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y1), 0)) +
-              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y1), 0));
+  vec4 col1 = wx.x * texelFetch(u_state, ivec2(x0 + xOff, y1), 0) +
+              wx.y * texelFetch(u_state, ivec2(x1 + xOff, y1), 0) +
+              wx.z * texelFetch(u_state, ivec2(x2 + xOff, y1), 0) +
+              wx.w * texelFetch(u_state, ivec2(x3 + xOff, y1), 0);
 
-  vec4 col2 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y2), 0)) +
-              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y2), 0)) +
-              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y2), 0)) +
-              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y2), 0));
+  vec4 col2 = wx.x * texelFetch(u_state, ivec2(x0 + xOff, y2), 0) +
+              wx.y * texelFetch(u_state, ivec2(x1 + xOff, y2), 0) +
+              wx.z * texelFetch(u_state, ivec2(x2 + xOff, y2), 0) +
+              wx.w * texelFetch(u_state, ivec2(x3 + xOff, y2), 0);
 
-  vec4 col3 = wx.x * decodeState(texelFetch(u_state, ivec2(x0 + xOff, y3), 0)) +
-              wx.y * decodeState(texelFetch(u_state, ivec2(x1 + xOff, y3), 0)) +
-              wx.z * decodeState(texelFetch(u_state, ivec2(x2 + xOff, y3), 0)) +
-              wx.w * decodeState(texelFetch(u_state, ivec2(x3 + xOff, y3), 0));
+  vec4 col3 = wx.x * texelFetch(u_state, ivec2(x0 + xOff, y3), 0) +
+              wx.y * texelFetch(u_state, ivec2(x1 + xOff, y3), 0) +
+              wx.z * texelFetch(u_state, ivec2(x2 + xOff, y3), 0) +
+              wx.w * texelFetch(u_state, ivec2(x3 + xOff, y3), 0);
 
-  vec4 result = wy.x * col0 + wy.y * col1 + wy.z * col2 + wy.w * col3;
+  vec4 result = decodeState(wy.x * col0 + wy.y * col1 + wy.z * col2 + wy.w * col3);
   return clamp(result, vec4(-2.0), vec4(2.0));
 }
 
@@ -1009,10 +1009,7 @@ export class TextureNcaRuntime {
       gl.disable(gl.BLEND);
       gl.disable(gl.DITHER);
       gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-      const debug = gl.getExtension("WEBGL_debug_renderer_info");
-      this.renderer = debug
-        ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)
-        : gl.getParameter(gl.RENDERER);
+      this.renderer = gl.getParameter(gl.RENDERER);
       this.vao = gl.createVertexArray();
       if (!this.vao) throw new Error("Could not allocate vertex array.");
       gl.bindVertexArray(this.vao);
@@ -1170,6 +1167,21 @@ export class TextureNcaRuntime {
     return { texture, framebuffer, width, height };
   }
 
+  releaseTarget(target) {
+    if (!target) return;
+    const textureIndex = this.textures.indexOf(target.texture);
+    const framebufferIndex = this.framebuffers.indexOf(target.framebuffer);
+    if (textureIndex !== -1) {
+      this.gl.deleteTexture(target.texture);
+      this.textures.splice(textureIndex, 1);
+      this.textureBytes -= target.width * target.height * 4;
+    }
+    if (framebufferIndex !== -1) {
+      this.gl.deleteFramebuffer(target.framebuffer);
+      this.framebuffers.splice(framebufferIndex, 1);
+    }
+  }
+
   run(name, output, inputs = {}, uniforms = {}) {
     const gl = this.gl;
     const program = this.program[name];
@@ -1201,9 +1213,10 @@ export class TextureNcaRuntime {
           gl.uniform4f(location(key), value[0], value[1], value[2], value[3]);
         else if (value.length === 3)
           gl.uniform3f(location(key), value[0], value[1], value[2]);
+        else if (key === "u_pan")
+          gl.uniform2f(location(key), value[0], value[1]);
         else gl.uniform2i(location(key), value[0], value[1]);
-      }
-      else if (
+      } else if (
         [
           "u_palette",
           "u_topology",
@@ -1269,7 +1282,9 @@ export class TextureNcaRuntime {
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
     if (this.model.startup?.seedState === "noise") {
-      this.writeState(createInitialState(this.size, this.seed, this.model.startup));
+      this.writeState(
+        createInitialState(this.size, this.seed, this.model.startup),
+      );
     } else {
       for (const buffer of [this.state, this.nextState]) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
@@ -1552,13 +1567,15 @@ export class TextureNcaRuntime {
       const impact = shockwaveImpact || "color";
       if (impact === "color") {
         modeCode = 5;
-        effectiveRadius = Math.min(12, Math.max(6, Math.round(this.size * 0.05)));
+        effectiveRadius = Math.min(
+          12,
+          Math.max(6, Math.round(this.size * 0.05)),
+        );
         effectiveStrength = 0.18;
       } else {
         modeCode = 3;
       }
-    }
-    else if (mode === "kick_color") modeCode = 5;
+    } else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
     else if (mode === "kick_hidden_perturb" || mode === "infuse") modeCode = 7;
     else if (mode === "kick_hidden_prune" || mode === "prune") modeCode = 8;
@@ -1683,7 +1700,10 @@ export class TextureNcaRuntime {
 
     const extent = Math.max(
       1,
-      Math.min(targetCanvas.width || this.size, targetCanvas.height || this.size),
+      Math.min(
+        targetCanvas.width || this.size,
+        targetCanvas.height || this.size,
+      ),
     );
     if (this.canvas.width !== extent || this.canvas.height !== extent) {
       this.canvas.width = extent;
@@ -1714,6 +1734,9 @@ export class TextureNcaRuntime {
         this.echoTargets[0].width !== extent ||
         this.echoTargets[0].height !== extent
       ) {
+        // Playback, paused inspection and exports can use different display sizes.
+        for (const target of this.echoTargets || []) this.releaseTarget(target);
+        this.releaseTarget(this.currentFrameTarget);
         this.echoTargets = [
           this.allocateEchoTarget(extent, extent),
           this.allocateEchoTarget(extent, extent),
@@ -1793,18 +1816,19 @@ export class TextureNcaRuntime {
       );
     }
 
-    context.fillStyle = "#101218";
-    context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
     context.imageSmoothingEnabled = false;
     const drawX = Math.round((targetCanvas.width - extent) * 0.5);
     const drawY = Math.round((targetCanvas.height - extent) * 0.5);
-    context.drawImage(
-      this.canvas,
-      drawX,
-      drawY,
-      extent,
-      extent,
-    );
+    if (
+      drawX > 0 ||
+      drawY > 0 ||
+      targetCanvas.width !== extent ||
+      targetCanvas.height !== extent
+    ) {
+      context.fillStyle = "#101218";
+      context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+    context.drawImage(this.canvas, drawX, drawY, extent, extent);
   }
 
   updateDreamGradient(uint8Array, width = 192, height = 192) {

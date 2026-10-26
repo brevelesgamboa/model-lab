@@ -362,7 +362,7 @@ test("only live ticks advance, pause rebases, and catch-up is bounded", async (c
   await model.render(canvas, params, 1 / 30, live);
   assert.equal(runtimes[0].steps, 1);
   await model.render(canvas, params, 20, live);
-  assert.ok(runtimes[0].steps <= 3);
+  assert.ok(runtimes[0].steps <= 4);
   const before = runtimes[0].steps;
   model.setClockRunning(false);
   await model.render(canvas, params, 50, live);
@@ -371,6 +371,92 @@ test("only live ticks advance, pause rebases, and catch-up is bounded", async (c
   assert.equal(runtimes[0].steps, before);
   await model.render(canvas, params, 100 + 1 / 30, live);
   assert.equal(runtimes[0].steps, before + 1);
+});
+
+test("simulation clock preserves real-time rate down to 10 FPS and bounds catch-up below 10 FPS", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const testParams = { ...params, growthSpeed: 30 };
+  await model.render(canvas, testParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 0, live);
+
+  // 10 FPS: 10 frames of 0.1s each -> exactly 1.0 second elapsed -> 30 steps
+  for (let i = 1; i <= 10; i += 1) {
+    await model.render(canvas, testParams, i * 0.1, live);
+  }
+  assert.equal(runtimes[0].steps, 30);
+
+  // Pause and rebase
+  model.setClockRunning(false);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 10, live);
+  const stepsAt10 = runtimes[0].steps;
+
+  // 5 FPS: 5 frames of 0.2s each -> 1.0 second elapsed. Bounded to 3 steps/frame -> 15 steps
+  for (let i = 1; i <= 5; i += 1) {
+    await model.render(canvas, testParams, 10 + i * 0.2, live);
+  }
+  assert.equal(runtimes[0].steps - stepsAt10, 15);
+});
+
+test("simulation clock preserves fractional remainder across irregular frames and hitches", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const testParams = { ...params, growthSpeed: 30 };
+  await model.render(canvas, testParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, testParams, 0, live);
+
+  // Irregular frames:
+  // Frame 1: 0.040s -> 0.040 * 30 = 1.2 steps. Executes 1 step, leaves 0.2 remainder.
+  await model.render(canvas, testParams, 0.040, live);
+  assert.equal(runtimes[0].steps, 1);
+
+  // Frame 2: 0.060s later (t = 0.100s) -> 0.060 * 30 = 1.8 steps + 0.2 = 2.0 steps. Executes 2 steps.
+  await model.render(canvas, testParams, 0.100, live);
+  assert.equal(runtimes[0].steps, 3);
+
+  // Long hitch: 1.05s later (t = 1.150s) -> 1.05 * 30 = 31.5 steps.
+  // Executes max 3 steps (runtimes[0].steps becomes 6).
+  // Discards 28 excess whole steps, preserves 0.5 fractional remainder.
+  await model.render(canvas, testParams, 1.150, live);
+  assert.equal(runtimes[0].steps, 6);
+
+  // Next frame: 1/60s later (t = 1.150 + 0.0166667s) -> 0.5 steps + 0.5 remainder = 1.0 step! Executes 1 step.
+  await model.render(canvas, testParams, 1.150 + 1 / 60, live);
+  assert.equal(runtimes[0].steps, 7);
+});
+
+test("dream guidance cadence strictly reflects executed steps", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const live = { advanceSimulation: true };
+  const dispatched = [];
+  model._dispatchDreamGuidance = (...args) => dispatched.push(args);
+
+  const dreamParams = {
+    ...params,
+    growthSpeed: 30,
+    dreamEnabled: "on",
+    dreamStrength: 0.1,
+    dreamCadence: 4,
+  };
+
+  await model.render(canvas, dreamParams, 0);
+  model.setClockRunning(true);
+  await model.render(canvas, dreamParams, 0, live);
+
+  // Execute 3 steps in one frame (t = 0.1s at 10 FPS)
+  await model.render(canvas, dreamParams, 0.1, live);
+  assert.equal(runtimes[0].steps, 3);
+  assert.equal(model._dreamStepCounter, 3);
+  assert.equal(dispatched.length, 0);
+
+  // Execute another 3 steps (t = 0.2s) -> total 6 steps -> triggers cadence 4 once, remainder 2
+  await model.render(canvas, dreamParams, 0.2, live);
+  assert.equal(runtimes[0].steps, 6);
+  assert.equal(model._dreamStepCounter, 2);
+  assert.equal(dispatched.length, 1);
 });
 
 test("failed initialization is latched until explicit retry; stale loads cannot paint", async (context) => {
