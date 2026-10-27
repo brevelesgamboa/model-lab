@@ -89,7 +89,7 @@ test("view switches preserve the canvas, GPU runtime, and paused NCA state", asy
   for (const view of ["saved", "experiments", "about"]) {
     await page.locator(`[data-view="${view}"]`).click();
     await expect(page.locator(`#view-${view}`)).toBeVisible();
-    await expect(page.locator(`#view-${view}`)).toBeEmpty();
+    await expect(page.locator(`#view-${view}`)).not.toBeEmpty();
     await expect(page.locator("#view-lab")).toHaveClass(/hidden/);
   }
   await page.locator('[data-view="lab"]').click();
@@ -248,11 +248,10 @@ test("the compact drawer controls direction, phase and logarithmic rate without 
   await expect(page.locator("#status-message")).toHaveText("Frame saved");
   await page.locator("#reset-parameters").click();
   await page.locator('[data-view="saved"]').click();
-  // The new Saved Runs view is a placeholder; exercise its retained restore handler.
   await page
-    .locator(".run-card button")
-    .filter({ hasText: /^RESTORE$/ })
-    .evaluate((button) => button.click());
+    .locator(".run-card")
+    .getByRole("button", { name: "Restore", exact: true })
+    .click();
   await expect(
     control.getByLabel("COORDINATE SCALE modulation direction", {
       exact: true,

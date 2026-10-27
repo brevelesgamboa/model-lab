@@ -17,7 +17,9 @@ export class ModelRegistry {
   constructor() {
     this.customModel = new CustomPcaModel();
     this.neuralModel = new LocalNeuralModel();
-    const inceptionDream = new InceptionDreamModel();
+    const inceptionDream = new InceptionDreamModel({
+      onModelReady: (model) => neuralGrowth.dreamBridge.onModelReady(model),
+    });
     const neuralGrowth = new NeuralGrowthModel({
       getInceptionModel: () => inceptionDream,
     });

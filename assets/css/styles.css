@@ -215,6 +215,7 @@ a {
   background: var(--bg-card-nested);
 }
 .nav__item {
+  text-decoration: none;
   border: 0;
   border-radius: 4px;
   padding: 4px 14px;
@@ -1750,13 +1751,14 @@ input[type="range"]::-moz-range-progress {
 }
 
 .hq-viewer {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 3;
+  z-index: 9999;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  background: #000;
-  padding: 12px;
+  background: rgba(8, 10, 15, 0.94);
+  backdrop-filter: blur(8px);
+  padding: 20px;
 }
 
 .hq-viewer img {
@@ -2123,6 +2125,64 @@ input[type="range"]::-moz-range-progress {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.neuron-gallery {
+  min-width: 0;
+  padding-block: 12px;
+  border-block: 1px solid var(--border-subtle);
+}
+.neuron-gallery h3 {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.neuron-gallery__note {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.neuron-gallery__note a {
+  color: var(--text-secondary);
+}
+.neuron-gallery__strip {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0 10px;
+  max-height: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.neuron-gallery__card {
+  flex: 0 0 190px;
+  padding: 12px;
+  gap: 8px;
+}
+.neuron-gallery__preview {
+  flex-shrink: 0;
+}
+.neuron-gallery__preview .growth-gallery__thumb {
+  image-rendering: auto;
+}
+.neuron-gallery__card .growth-gallery__card-name {
+  white-space: normal;
+  color: var(--text-primary);
+}
+.neuron-gallery__card .growth-gallery__card-id {
+  margin-top: auto;
+  color: var(--text-secondary);
+}
+.neuron-gallery__card:focus-visible {
+  outline: 2px solid var(--accent-mod);
+  outline-offset: -2px;
+}
+.neuron-gallery__description {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.neuron-gallery__manual {
+  margin-top: 4px;
 }
 
 .growth-gallery__card-badge {

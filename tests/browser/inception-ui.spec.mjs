@@ -43,7 +43,7 @@ test("image upload, pipeline changes, pause, and completed ascent preserve canva
     buffer: Buffer.from(image, "base64"),
   });
   await expect(page.locator("#status-message")).toHaveText(
-    "SOURCE IMAGE READY",
+    "Source image ready",
   );
   await page.locator("#load-neural-dream").click();
   await expect(page.locator("#load-neural-dream")).toHaveText("MODEL READY", {

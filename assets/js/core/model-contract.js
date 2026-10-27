@@ -9,12 +9,16 @@ export function defaultParameters(model) {
 export function sanitizeParameters(model, stored) {
   const parameters = defaultParameters(model);
   if (!stored || typeof stored !== "object") return parameters;
-  for (const definition of model.controls) {
+  // Resolve dependent bounds from the incoming set, not the previously rendered
+  // state (for example a saved channel in a newly selected Inception layer).
+  for (const definition of model.controlsForParameters?.(stored) ??
+    model.controls) {
     if (!(definition.key in stored)) continue;
     const value =
       model.normalizeStoredParameter?.(
         definition.key,
         stored[definition.key],
+        stored,
       ) ?? stored[definition.key];
     if (definition.type === "select") {
       const option = definition.options.find(
@@ -22,7 +26,10 @@ export function sanitizeParameters(model, stored) {
       );
       if (option) parameters[definition.key] = option.value;
     } else if (definition.type === "color") {
-      if (typeof value === "string" && /^#[0-9a-fA-F]{3,8}$/.test(value.trim())) {
+      if (
+        typeof value === "string" &&
+        /^#[0-9a-fA-F]{3,8}$/.test(value.trim())
+      ) {
         parameters[definition.key] = value.trim();
       }
     } else if (Number.isFinite(Number(value))) {

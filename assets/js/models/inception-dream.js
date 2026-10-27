@@ -354,7 +354,8 @@ function getDepthLabel(depth) {
 }
 
 export class InceptionDreamModel {
-  constructor() {
+  constructor({ onModelReady = null } = {}) {
+    this.onModelReady = onModelReady;
     this.model = null;
     this.modelPromise = null;
     this.loadError = null;
@@ -1670,6 +1671,7 @@ export class InceptionDreamModel {
             this.state = "INCEPTIONV3 READY";
             if (this.sourceLoaded) await this.resetDream();
             this.onStateChange?.();
+            this.onModelReady?.(this.model);
             return this.model;
           } catch (error) {
             candidate?.dispose();

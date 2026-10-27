@@ -18,6 +18,7 @@ import {
 import { getTrainingProfile } from "../training/profiles/index.js";
 import { TrainingManager } from "../training/training-manager.js";
 import { terminal } from "../ui/terminal.js";
+import { displayMessage } from "../ui/messages.js";
 
 const STUDIO_SAMPLE_SIZE = NEURAL_INPUT_SIZE;
 const PCA_TRAINING_SIZE = PCA_INPUT_SIZE;
@@ -49,7 +50,9 @@ export function createStudioController({
 
   const trainingManager = new TrainingManager({
     onStatus(message) {
-      elements.trainingStatus.textContent = String(message || "").toUpperCase();
+      elements.trainingStatus.textContent = message
+        ? displayMessage(message)
+        : "";
     },
     onBenchmark(result) {
       elements.trainingBackend.textContent = result.accelerated
@@ -59,9 +62,10 @@ export function createStudioController({
         result.speedClass +
         " / " +
         result.millisecondsPerPass.toFixed(1) +
-        " MS";
-      elements.trainingRecommended.textContent =
-        result.recommendedQuality.toUpperCase();
+        " ms";
+      elements.trainingRecommended.textContent = displayMessage(
+        result.recommendedQuality,
+      );
     },
     onProgress(progress) {
       trainingLossHistory = progress.lossHistory || trainingLossHistory;
@@ -69,17 +73,7 @@ export function createStudioController({
       const lossText = Number.isFinite(progress.loss)
         ? progress.loss.toFixed(5)
         : "—";
-      elements.trainingStatus.textContent =
-        "EPOCH " +
-        progress.epoch +
-        " · LOSS " +
-        lossText +
-        " · " +
-        progress.elapsedSeconds.toFixed(1) +
-        " / " +
-        progress.timeBudgetSeconds +
-        "s · " +
-        progress.backend.toUpperCase();
+      elements.trainingStatus.textContent = `Epoch ${progress.epoch} · Loss ${lossText} · ${progress.elapsedSeconds.toFixed(1)} / ${progress.timeBudgetSeconds}s`;
       drawTrainingLossChart(trainingLossHistory);
     },
   });
@@ -200,7 +194,7 @@ export function createStudioController({
       context.fillText(
         values.length
           ? `LOSS ${values[0].toFixed(5)}`
-          : "NO NEURAL TRAINING HISTORY",
+          : "No training history yet",
         chart.width / 2,
         chart.height / 2,
       );
@@ -274,7 +268,7 @@ export function createStudioController({
 
   async function withDatasetPreparation(operation) {
     if (datasetPreparing || trainingBusy()) {
-      setStatus("WAIT FOR THE CURRENT DATASET OPERATION");
+      setStatus("Wait for the current dataset operation");
       return false;
     }
     datasetPreparing = true;
@@ -295,43 +289,46 @@ export function createStudioController({
     elements.neuralAnalysisBlock.hidden = !neural;
     elements.pcaAnalysisBlock.hidden = neural;
     elements.trainModel.textContent = neural
-      ? "TRAIN NEURAL MODEL"
-      : "TRAIN QUICK PCA MODEL";
+      ? "Train neural model"
+      : "Train Quick PCA model";
 
     const strong = elements.trainingNote?.querySelector("strong");
     const paragraph = elements.trainingNote?.querySelector("p");
     if (neural) {
-      if (strong) strong.textContent = "EXPERIMENTAL NEURAL TRAINING";
+      if (strong) strong.textContent = "Neural autoencoder";
       if (paragraph)
         paragraph.textContent =
-          "This demo enables neural training only after an acceptable WebGL benchmark. CPU and limited WebGL devices can use Quick PCA and every curated inference model.";
+          "Check your device before starting. Neural training uses 128 × 128 images and can take up to five minutes.";
       const profile = currentNeuralProfile();
       if (!trainingBusy()) {
         if (!neuralTrainingApproved) {
-          elements.trainingStatus.textContent =
-            "NEURAL TRAINING LOCKED. RUN THE GPU ACCESS CHECK, OR USE QUICK PCA.";
+          elements.trainingStatus.textContent = displayMessage(
+            "Check your device to enable neural training.",
+          );
         } else {
-          elements.trainingStatus.textContent =
+          elements.trainingStatus.textContent = displayMessage(
             studioSamples.length >= profile.minSamples
               ? `${studioSamples.length} IMAGES READY FOR ${profile.name} NEURAL TRAINING.`
-              : `${profile.name} NEURAL TRAINING NEEDS AT LEAST ${profile.minSamples} IMAGES.`;
+              : `${profile.name} NEURAL TRAINING NEEDS AT LEAST ${profile.minSamples} IMAGES.`,
+          );
         }
       }
     } else {
-      if (strong) strong.textContent = "QUICK PCA PATH";
+      if (strong) strong.textContent = "Quick PCA";
       if (paragraph)
         paragraph.textContent =
-          "Quick PCA downsamples the 128px studio samples to 48 × 48 RGB and builds a fast linear baseline. The datamosh autoencoder is reserved for FAST WebGL hardware.";
+          "Builds an image model from 48 × 48 samples. Add at least three images, then choose how many components to keep.";
       if (!trainingBusy())
-        elements.trainingStatus.textContent =
+        elements.trainingStatus.textContent = displayMessage(
           studioSamples.length >= 3
             ? `${studioSamples.length} IMAGES READY FOR QUICK PCA.`
-            : "PCA NEEDS AT LEAST 3 IMAGES.";
+            : "PCA needs at least 3 images.",
+        );
     }
     updateTrainButtonState();
     if (announce)
       terminal(
-        "EXPERIMENTS",
+        "Experiments",
         neural
           ? "neural TensorFlow.js training selected"
           : "quick PCA training selected",
@@ -351,8 +348,9 @@ export function createStudioController({
     if (force) neuralTrainingApproved = false;
     updateTrainButtonState();
     elements.benchmarkTraining.disabled = true;
-    elements.trainingStatus.textContent =
-      "LOADING TENSORFLOW.JS AND BENCHMARKING THE TRAINING BACKEND.";
+    elements.trainingStatus.textContent = displayMessage(
+      "Loading TENSORFLOW.JS and benchmarking the training backend.",
+    );
     try {
       const result = await withExclusiveCompute(() =>
         trainingManager.benchmark({ force }),
@@ -363,17 +361,19 @@ export function createStudioController({
         result.speedClass === "FAST",
       );
       elements.trainingRecommended.textContent = neuralTrainingApproved
-        ? `${result.recommendedQuality.toUpperCase()} / ALLOWED`
-        : "PCA + LAB";
-      elements.trainingStatus.textContent = neuralTrainingApproved
-        ? "NEURAL TRAINING ACCESS ENABLED FOR THIS SESSION."
-        : "NEURAL TRAINING DISABLED: THIS DEMO REQUIRES AN ACCEPTABLE WEBGL GPU RESULT. USE QUICK PCA OR A LAB MODEL.";
+        ? `${displayMessage(result.recommendedQuality)} · Available`
+        : "Use Quick PCA";
+      elements.trainingStatus.textContent = displayMessage(
+        neuralTrainingApproved
+          ? "Neural training access enabled for this session."
+          : "This device did not pass the neural training check. Quick PCA is available.",
+      );
       terminal(
-        "NEURAL BENCHMARK",
+        "Neural benchmark",
         `${result.backend.toUpperCase()} / ${result.speedClass} / ${result.millisecondsPerPass.toFixed(1)} ms reference convolution`,
       );
       terminal(
-        "NEURAL ACCESS",
+        "Neural access",
         neuralTrainingApproved
           ? "enabled for this session"
           : "denied; Quick PCA and Lab models remain available",
@@ -381,19 +381,21 @@ export function createStudioController({
       );
       setStatus(
         neuralTrainingApproved
-          ? "NEURAL TRAINING ENABLED"
-          : "USE PCA OR LAB MODELS",
+          ? "Neural training enabled"
+          : "Use PCA or lab models",
       );
       updateTrainButtonState();
       return result;
     } catch (error) {
       neuralTrainingApproved = false;
       const message = error instanceof Error ? error.message : String(error);
-      elements.trainingBackend.textContent = "UNAVAILABLE";
-      elements.trainingSpeed.textContent = "ERROR";
-      elements.trainingRecommended.textContent = "USE PCA";
-      elements.trainingStatus.textContent = `BENCHMARK ERROR: ${message}`;
-      terminal("NEURAL BENCHMARK", message, "warning");
+      elements.trainingBackend.textContent = "Unavailable";
+      elements.trainingSpeed.textContent = "Error";
+      elements.trainingRecommended.textContent = "Use PCA";
+      elements.trainingStatus.textContent = displayMessage(
+        `BENCHMARK ERROR: ${message}`,
+      );
+      terminal("Neural benchmark", message, "warning");
       return null;
     } finally {
       updateTrainButtonState();
@@ -404,13 +406,13 @@ export function createStudioController({
   function updateNeuralModelPanel() {
     const metadata = NeuralModelStore.loadMetadata();
     const available = Boolean(metadata);
-    elements.neuralStatus.textContent = available ? "READY" : "NOT TRAINED";
+    elements.neuralStatus.textContent = available ? "Ready" : "Not trained";
     elements.neuralId.textContent = available ? metadata.name : "-";
     elements.neuralProfileStat.textContent = available
-      ? metadata.profile.toUpperCase()
+      ? displayMessage(metadata.profile)
       : "-";
     elements.neuralObjectiveStat.textContent = available
-      ? metadata.objective.toUpperCase()
+      ? displayMessage(metadata.objective)
       : "-";
     elements.neuralSamples.textContent = available
       ? String(metadata.trainingSamples)
@@ -437,14 +439,17 @@ export function createStudioController({
   async function trainNeuralModel() {
     if (neuralTrainingActive || trainingWorker) return;
     if (!neuralTrainingApproved) {
-      elements.trainingStatus.textContent =
-        "NEURAL TRAINING LOCKED. PASS THE GPU ACCESS CHECK FIRST.";
-      setStatus("NEURAL TRAINING LOCKED");
+      elements.trainingStatus.textContent = displayMessage(
+        "Neural training locked. pass the GPU access check first.",
+      );
+      setStatus("Neural training locked");
       return;
     }
     const profile = currentNeuralProfile();
     if (studioSamples.length < profile.minSamples) {
-      elements.trainingStatus.textContent = `${profile.name} NEURAL TRAINING NEEDS AT LEAST ${profile.minSamples} IMAGES.`;
+      elements.trainingStatus.textContent = displayMessage(
+        `${profile.name} NEURAL TRAINING NEEDS AT LEAST ${profile.minSamples} IMAGES.`,
+      );
       return;
     }
 
@@ -456,7 +461,9 @@ export function createStudioController({
     drawTrainingLossChart(trainingLossHistory);
     elements.trainingProgress.value = 1;
     setNeuralTrainingBusy(true);
-    elements.trainingStatus.textContent = "INITIALIZING NEURAL TRAINING.";
+    elements.trainingStatus.textContent = displayMessage(
+      "Initializing neural training.",
+    );
 
     try {
       const metadata = await withExclusiveCompute(() =>
@@ -466,18 +473,22 @@ export function createStudioController({
       refreshModelOptions(getCurrentModel().id);
       updateNeuralModelPanel();
       elements.trainingProgress.value = 100;
-      elements.trainingStatus.textContent = `${metadata.name} READY · ${metadata.profile.toUpperCase()} ${metadata.objective.toUpperCase()} · LOSS ${Number(metadata.bestLoss).toFixed(5)}.`;
+      elements.trainingStatus.textContent = displayMessage(
+        `${metadata.name} READY · ${metadata.profile.toUpperCase()} ${metadata.objective.toUpperCase()} · LOSS ${Number(metadata.bestLoss).toFixed(5)}.`,
+      );
       terminal(
-        "NEURAL MODEL",
+        "Neural model",
         `${metadata.name} / ${metadata.trainingSamples} images / ${metadata.latentDim} features / ${metadata.backend.toUpperCase()} / ${metadata.trainingSeconds.toFixed(1)}s`,
       );
-      setStatus("LOCAL NEURAL MODEL READY");
+      setStatus("Local neural model ready");
       updateResourceStatus();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      elements.trainingStatus.textContent = `NEURAL TRAINING ERROR: ${message}`;
-      terminal("NEURAL TRAINING", message, "warning");
-      setStatus("NEURAL TRAINING ERROR");
+      elements.trainingStatus.textContent = displayMessage(
+        `NEURAL TRAINING ERROR: ${message}`,
+      );
+      terminal("Neural training", message, "warning");
+      setStatus("Neural training error");
     } finally {
       setNeuralTrainingBusy(false);
     }
@@ -494,17 +505,21 @@ export function createStudioController({
         selectModel("digiface-vae", { log: false });
       refreshModelOptions(getCurrentModel().id);
       updateNeuralModelPanel();
-      elements.trainingStatus.textContent = "LOCAL NEURAL MODEL DELETED.";
+      elements.trainingStatus.textContent = displayMessage(
+        "Local neural model deleted.",
+      );
       terminal(
-        "NEURAL MODEL",
+        "Neural model",
         "encoder + decoder deleted from IndexedDB",
         "warning",
       );
-      setStatus("LOCAL NEURAL MODEL DELETED");
+      setStatus("Local neural model deleted");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      elements.trainingStatus.textContent = `DELETE ERROR: ${message}`;
-      terminal("NEURAL MODEL", message, "warning");
+      elements.trainingStatus.textContent = displayMessage(
+        `DELETE ERROR: ${message}`,
+      );
+      terminal("Neural model", message, "warning");
     }
   }
 
@@ -541,9 +556,9 @@ export function createStudioController({
       pixels: values,
       name: String(name || `SAMPLE_${studioSamples.length + 1}`).slice(0, 80),
       source: {
-        title: String(source.title || name || "LOCAL FILE").slice(0, 120),
-        creator: String(source.creator || "LOCAL USER").slice(0, 160),
-        license: String(source.license || "LOCAL INPUT").slice(0, 80),
+        title: String(source.title || name || "Local file").slice(0, 120),
+        creator: String(source.creator || "Local user").slice(0, 160),
+        license: String(source.license || "Local input").slice(0, 80),
         sourceUrl: String(source.sourceUrl || "").slice(0, 500),
       },
     });
@@ -556,16 +571,18 @@ export function createStudioController({
         canvasToRgbSample(elements.drawCanvas),
         `DRAWING_${String(studioSamples.length + 1).padStart(2, "0")}`,
         {
-          creator: "LOCAL DRAWING",
-          license: "USER PROVIDED",
+          creator: "Local drawing",
+          license: "User provided",
         },
       );
-      elements.trainingStatus.textContent =
-        "DRAWING ADDED TO THE LOCAL DATASET.";
-      setStatus("DRAWING ADDED");
+      elements.trainingStatus.textContent = displayMessage(
+        "Drawing added to the local dataset.",
+      );
+      setStatus("Drawing added");
     } catch (error) {
-      elements.trainingStatus.textContent =
-        error instanceof Error ? error.message.toUpperCase() : String(error);
+      elements.trainingStatus.textContent = displayMessage(
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -617,7 +634,9 @@ export function createStudioController({
       MAX_STUDIO_SAMPLES - studioSamples.length,
     );
     if (!selected.length) return;
-    elements.trainingStatus.textContent = `READING ${selected.length} IMAGE FILES.`;
+    elements.trainingStatus.textContent = displayMessage(
+      `READING ${selected.length} IMAGE FILES.`,
+    );
     let added = 0;
     for (const file of selected) {
       try {
@@ -625,22 +644,24 @@ export function createStudioController({
           file,
           sourceOverride || {
             title: file.name,
-            creator: "LOCAL USER",
-            license: "USER PROVIDED",
+            creator: "Local user",
+            license: "User provided",
           },
         );
         addStudioSample(sample.pixels, sample.name, sample.source);
         added += 1;
       } catch (error) {
         terminal(
-          "IMAGE SKIPPED",
+          "Image skipped",
           error instanceof Error ? error.message : String(error),
           "warning",
         );
       }
     }
     elements.imageUpload.value = "";
-    elements.trainingStatus.textContent = `${added} IMAGE${added === 1 ? "" : "S"} ADDED. ${studioSamples.length} TOTAL.`;
+    elements.trainingStatus.textContent = displayMessage(
+      `${added} IMAGE${added === 1 ? "" : "S"} ADDED. ${studioSamples.length} TOTAL.`,
+    );
     setStatus(`${added} IMAGES ADDED`);
   }
 
@@ -652,14 +673,17 @@ export function createStudioController({
     const remaining = MAX_STUDIO_SAMPLES - studioSamples.length;
     const count = Math.min(32, remaining);
     if (count <= 0) {
-      elements.trainingStatus.textContent = `THE LOCAL DATASET ALREADY CONTAINS ${MAX_STUDIO_SAMPLES} SAMPLES.`;
+      elements.trainingStatus.textContent = displayMessage(
+        `THE LOCAL DATASET ALREADY CONTAINS ${MAX_STUDIO_SAMPLES} SAMPLES.`,
+      );
       return;
     }
 
     const model = registry.get("digiface-vae");
     if (!model?.available) {
-      elements.trainingStatus.textContent =
-        "DIGIFACE VAE ROUTE IS NOT AVAILABLE.";
+      elements.trainingStatus.textContent = displayMessage(
+        "Digiface vae route is not available.",
+      );
       return;
     }
 
@@ -669,7 +693,9 @@ export function createStudioController({
     const initialSampleCount = studioSamples.length;
     const base = defaultParameters(model);
     elements.addSyntheticSet.disabled = true;
-    elements.trainingStatus.textContent = `GENERATING ${count} DIGIFACE MODEL SAMPLES LOCALLY.`;
+    elements.trainingStatus.textContent = displayMessage(
+      `GENERATING ${count} DIGIFACE MODEL SAMPLES LOCALLY.`,
+    );
 
     try {
       for (let index = 0; index < count; index += 1) {
@@ -701,14 +727,18 @@ export function createStudioController({
             sourceUrl: "local://digiface-latent-vae-01",
           },
         );
-        elements.trainingStatus.textContent = `GENERATED ${index + 1} / ${count} LOCAL MODEL SAMPLES.`;
+        elements.trainingStatus.textContent = displayMessage(
+          `GENERATED ${index + 1} / ${count} LOCAL MODEL SAMPLES.`,
+        );
       }
-      terminal("DATASET", `${count} DigiFace VAE outputs added to Experiments`);
+      terminal("Dataset", `${count} DigiFace VAE outputs added to Experiments`);
       setStatus(`${count} DIGIFACE OUTPUTS ADDED`);
     } catch (error) {
-      elements.trainingStatus.textContent = `DIGIFACE GENERATION FAILED: ${error instanceof Error ? error.message : String(error)}`;
+      elements.trainingStatus.textContent = displayMessage(
+        `DIGIFACE GENERATION FAILED: ${error instanceof Error ? error.message : String(error)}`,
+      );
       terminal(
-        "DIGIFACE",
+        "Digiface",
         error instanceof Error ? error.message : String(error),
         "warning",
       );
@@ -765,7 +795,7 @@ export function createStudioController({
     if (!studioSamples.length) {
       const empty = document.createElement("div");
       empty.className = "sample-empty";
-      empty.textContent = "NO LOCAL SAMPLES";
+      empty.textContent = "No local samples";
       elements.sampleGrid.append(empty);
       return;
     }
@@ -792,7 +822,7 @@ export function createStudioController({
       context.fillStyle = "#625c66";
       context.font = "11px monospace";
       context.textAlign = "center";
-      context.fillText("NO MODEL", chart.width / 2, chart.height / 2);
+      context.fillText("No model yet", chart.width / 2, chart.height / 2);
       return;
     }
     const values = model.explainedVarianceRatio;
@@ -821,7 +851,7 @@ export function createStudioController({
   function updateCustomModelPanel() {
     const model = CustomModelStore.load();
     const available = Boolean(model);
-    elements.customStatus.textContent = available ? "READY" : "NOT TRAINED";
+    elements.customStatus.textContent = available ? "Ready" : "Not trained";
     elements.customId.textContent = available ? model.name : "-";
     elements.customSamples.textContent = available
       ? String(model.trainingSamples)
@@ -847,7 +877,9 @@ export function createStudioController({
     const name = sanitizeModelName(elements.customModelName.value);
     elements.customModelName.value = name;
     elements.trainingProgress.value = 2;
-    elements.trainingStatus.textContent = "STARTING LOCAL RGB PCA WORKER.";
+    elements.trainingStatus.textContent = displayMessage(
+      "Starting local RGB PCA worker.",
+    );
     elements.trainModel.disabled = true;
     elements.trainingEngine.disabled = true;
     trainingWorker = new Worker(
@@ -866,7 +898,7 @@ export function createStudioController({
       const message = event.data;
       if (message.type === "progress") {
         elements.trainingProgress.value = message.value;
-        elements.trainingStatus.textContent = message.message;
+        elements.trainingStatus.textContent = displayMessage(message.message);
         return;
       }
       if (message.type === "complete") {
@@ -875,27 +907,33 @@ export function createStudioController({
         refreshModelOptions(getCurrentModel().id);
         updateCustomModelPanel();
         elements.trainingProgress.value = 100;
-        elements.trainingStatus.textContent = `${message.model.name} READY. ${message.model.basis.length} COLOR COMPONENTS RETAINED.`;
+        elements.trainingStatus.textContent = displayMessage(
+          `${message.model.name} READY. ${message.model.basis.length} COLOR COMPONENTS RETAINED.`,
+        );
         terminal(
-          "LOCAL MODEL",
+          "Local model",
           `${message.model.name} trained from ${message.model.trainingSamples} RGB samples`,
         );
         finishWorker();
         updateResourceStatus();
-        setStatus("LOCAL COLOR MODEL READY");
+        setStatus("Local color model ready");
         return;
       }
       if (message.type === "error") {
-        elements.trainingStatus.textContent = `TRAINING ERROR: ${message.message}`;
-        terminal("TRAINING ERROR", message.message, "warning");
+        elements.trainingStatus.textContent = displayMessage(
+          `TRAINING ERROR: ${message.message}`,
+        );
+        terminal("Training error", message.message, "warning");
         finishWorker();
-        setStatus("TRAINING ERROR");
+        setStatus("Training error");
       }
     });
 
     trainingWorker.addEventListener("error", (event) => {
-      elements.trainingStatus.textContent = `WORKER ERROR: ${event.message}`;
-      terminal("WORKER ERROR", event.message, "warning");
+      elements.trainingStatus.textContent = displayMessage(
+        `WORKER ERROR: ${event.message}`,
+      );
+      terminal("Worker error", event.message, "warning");
       finishWorker();
     });
 
@@ -931,7 +969,7 @@ export function createStudioController({
       type: "application/json",
     });
     downloadBlob(blob, `${model.name}.gl-bench-model.json`);
-    terminal("MODEL FILE", `${model.name}.gl-bench-model.json written`);
+    terminal("Model file", `${model.name}.gl-bench-model.json written`);
   }
 
   async function importCustomModel(file) {
@@ -943,16 +981,20 @@ export function createStudioController({
       registry.refreshCustom();
       refreshModelOptions(getCurrentModel().id);
       updateCustomModelPanel();
-      elements.trainingStatus.textContent = `${model.name} IMPORTED.`;
+      elements.trainingStatus.textContent = displayMessage(
+        `${model.name} IMPORTED.`,
+      );
       terminal(
-        "MODEL IMPORT",
+        "Model import",
         `${model.name} / ${model.width}px / ${model.basis.length} components`,
       );
-      setStatus("MODEL IMPORTED");
+      setStatus("Model imported");
     } catch (error) {
-      elements.trainingStatus.textContent = `IMPORT ERROR: ${error instanceof Error ? error.message : String(error)}`;
+      elements.trainingStatus.textContent = displayMessage(
+        `IMPORT ERROR: ${error instanceof Error ? error.message : String(error)}`,
+      );
       terminal(
-        "IMPORT ERROR",
+        "Import error",
         error instanceof Error ? error.message : String(error),
         "warning",
       );
@@ -971,9 +1013,11 @@ export function createStudioController({
       selectModel("digiface-vae", { log: false });
     refreshModelOptions(getCurrentModel().id);
     updateCustomModelPanel();
-    elements.trainingStatus.textContent = "LOCAL MODEL DELETED.";
-    terminal("LOCAL MODEL", "deleted", "warning");
-    setStatus("LOCAL MODEL DELETED");
+    elements.trainingStatus.textContent = displayMessage(
+      "Local model deleted.",
+    );
+    terminal("Local model", "deleted", "warning");
+    setStatus("Local model deleted");
   }
 
   function launchCustomModel() {
@@ -995,7 +1039,7 @@ export function createStudioController({
   async function addCommonsResult(result, button) {
     const originalLabel = button.textContent;
     button.disabled = true;
-    button.textContent = "FETCHING";
+    button.textContent = "Fetching";
     try {
       const response = await fetch(result.thumbnailUrl, { mode: "cors" });
       if (!response.ok)
@@ -1018,15 +1062,19 @@ export function createStudioController({
         sourceUrl: result.descriptionUrl,
       });
       addStudioSample(sample.pixels, sample.name, sample.source);
-      button.textContent = "ADDED";
-      elements.commonsStatus.textContent = `${result.title.toUpperCase()} ADDED TO EXPERIMENTS. ${studioSamples.length} TOTAL SAMPLES.`;
-      setStatus("OPEN IMAGE ADDED TO STUDIO");
+      button.textContent = "Added";
+      elements.commonsStatus.textContent = displayMessage(
+        `${result.title} added. ${studioSamples.length} samples in total.`,
+      );
+      setStatus("Open image added to studio");
     } catch (error) {
       button.textContent = originalLabel;
       button.disabled = false;
-      elements.commonsStatus.textContent = `DIRECT IMPORT FAILED: ${error instanceof Error ? error.message : String(error)} DOWNLOAD FROM THE SOURCE PAGE AND UPLOAD IT IN EXPERIMENTS.`;
+      elements.commonsStatus.textContent = displayMessage(
+        `DIRECT IMPORT FAILED: ${error instanceof Error ? error.message : String(error)} DOWNLOAD FROM THE SOURCE PAGE AND UPLOAD IT IN EXPERIMENTS.`,
+      );
       terminal(
-        "IMPORT",
+        "Import",
         "browser blocked direct image fetch; use the source download",
         "warning",
       );
@@ -1041,7 +1089,7 @@ export function createStudioController({
     if (!filtered.length) {
       const empty = document.createElement("div");
       empty.className = "commons-empty";
-      empty.textContent = "NO RESULTS MATCH THE SELECTED LICENSE FILTER.";
+      empty.textContent = "No results match the selected license filter.";
       elements.commonsResults.append(empty);
       return 0;
     }
@@ -1070,14 +1118,14 @@ export function createStudioController({
       const add = document.createElement("button");
       add.type = "button";
       add.className = "mini-button mini-button--active";
-      add.textContent = "ADD TO STUDIO";
+      add.textContent = "Add image";
       add.addEventListener("click", () => addCommonsResult(result, add));
       const source = document.createElement("a");
       source.className = "mini-button";
       source.href = result.descriptionUrl;
       source.target = "_blank";
       source.rel = "noopener noreferrer";
-      source.textContent = "SOURCE + LICENSE";
+      source.textContent = "Source and license";
       actions.append(add, source);
       body.append(license, title, creator, dimensions, actions);
       card.append(image, body);
@@ -1090,16 +1138,19 @@ export function createStudioController({
     event?.preventDefault();
     const query = elements.commonsInput.value.trim();
     if (!query) {
-      elements.commonsStatus.textContent = "ENTER SEARCH TERMS.";
+      elements.commonsStatus.textContent = displayMessage(
+        "Enter search terms.",
+      );
       return;
     }
     commonsAbortController?.abort();
     commonsAbortController = new AbortController();
     const requestController = commonsAbortController;
     elements.commonsButton.disabled = true;
-    elements.commonsButton.textContent = "SEARCHING";
-    elements.commonsStatus.textContent =
-      "QUERYING WIKIMEDIA COMMONS AND READING PER-FILE LICENSE METADATA.";
+    elements.commonsButton.textContent = "Searching";
+    elements.commonsStatus.textContent = displayMessage(
+      "Querying wikimedia commons and reading per-file license metadata.",
+    );
     try {
       const results = await searchCommons(query, {
         limit: 32,
@@ -1110,21 +1161,25 @@ export function createStudioController({
         results,
         elements.commonsLicense.value,
       );
-      elements.commonsStatus.textContent = `${count} RESULTS DISPLAYED. VERIFY EACH SOURCE PAGE BEFORE REUSE.`;
+      elements.commonsStatus.textContent = displayMessage(
+        `${count} RESULTS DISPLAYED. VERIFY EACH SOURCE PAGE BEFORE REUSE.`,
+      );
       setStatus(`${count} OPEN MEDIA RESULTS`);
     } catch (error) {
       if (error?.name === "AbortError") return;
       elements.commonsResults.replaceChildren();
-      elements.commonsStatus.textContent = `SEARCH FAILED: ${error instanceof Error ? error.message : String(error)} INTERNET ACCESS IS REQUIRED.`;
+      elements.commonsStatus.textContent = displayMessage(
+        `SEARCH FAILED: ${error instanceof Error ? error.message : String(error)} INTERNET ACCESS IS REQUIRED.`,
+      );
       terminal(
-        "DATASET SEARCH",
+        "Dataset search",
         error instanceof Error ? error.message : String(error),
         "warning",
       );
     } finally {
       if (requestController === commonsAbortController) {
         elements.commonsButton.disabled = false;
-        elements.commonsButton.textContent = "SEARCH";
+        elements.commonsButton.textContent = "Search";
       }
     }
   }
@@ -1133,7 +1188,9 @@ export function createStudioController({
     if (datasetPreparing || trainingBusy()) return;
     studioSamples = [];
     renderSampleGrid();
-    elements.trainingStatus.textContent = "LOCAL DATASET CLEARED.";
+    elements.trainingStatus.textContent = displayMessage(
+      "Local dataset cleared.",
+    );
   }
 
   function attachEvents() {
@@ -1186,9 +1243,10 @@ export function createStudioController({
       "click",
       () => {
         trainingManager.stop();
-        elements.trainingStatus.textContent =
-          "STOP REQUESTED. KEEPING THE BEST WEIGHTS SEEN SO FAR.";
-        setStatus("STOPPING NEURAL TRAINING");
+        elements.trainingStatus.textContent = displayMessage(
+          "Stop requested. keeping the best weights seen so far.",
+        );
+        setStatus("Stopping neural training");
       },
       options,
     );
