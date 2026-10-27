@@ -1,5 +1,5 @@
 import {
-  createModulationDraft,
+  bindModulationStrip,
   updateRangeProgress,
 } from "../ui/workbench-shell.js";
 import { clamp, randomSeed } from "../core/utils.js";
@@ -33,9 +33,9 @@ export function precisionFromStep(step) {
   return text.includes(".") ? text.split(".")[1].length : 0;
 }
 
-export function coerceRangeValue(definition, value) {
+export function coerceRangeValue(definition, value, wrap = definition.wrap) {
   let numeric = Number(value);
-  if (definition.wrap) {
+  if (wrap) {
     const span = Number(definition.max) - Number(definition.min);
     if (span > 0) {
       numeric =
@@ -304,9 +304,14 @@ export function createControlsController({
 
         const modulationTrack = document.createElement("div");
         modulationTrack.className = "modulation-track";
-        modulationTrack.setAttribute("aria-hidden", "true");
         const modulationRange = document.createElement("span");
         modulationRange.className = "modulation-track__range";
+        for (const end of ["start", "end"]) {
+          const handle = document.createElement("span");
+          handle.className = `modulation-track__handle modulation-track__handle--${end}`;
+          handle.setAttribute("aria-hidden", "true");
+          modulationRange.append(handle);
+        }
         const baseMarker = document.createElement("span");
         baseMarker.className = "modulation-track__base";
         const effectiveMarker = document.createElement("span");
@@ -344,22 +349,19 @@ export function createControlsController({
         );
 
         const modulation = makeModulationPanel(definition, config, supportsLfo);
+        modulation.bindStripSync(
+          bindModulationStrip({
+            track: modulationTrack,
+            definition,
+            getConfig: modulation.getLfoConfig,
+            getBase: () => getParameters()[definition.key],
+            onChange: modulation.setLfoConfig,
+          }),
+        );
         const canModulate = supportsModulation(currentModel, definition);
-        if (canModulate) {
-          const routing = document.createElement("details");
-          routing.className = "existing-routing";
-          routing.open = active;
-          const summary = document.createElement("summary");
-          summary.textContent = "Advanced routing · active engine controls";
-          routing.append(summary, ...Array.from(modulation.panel.childNodes));
-          modulation.panel.append(
-            createModulationDraft(definition.label),
-            routing,
-          );
-        }
         modulation.panel.classList.toggle("hidden", modulation.panel.hidden);
         modulationToggle.hidden = !canModulate;
-        modulationTrack.hidden = !canModulate;
+        modulationTrack.hidden = !supportsLfo;
         modulation.panel.hidden = !canModulate || modulation.panel.hidden;
         modulationToggle.setAttribute(
           "aria-expanded",
@@ -398,10 +400,6 @@ export function createControlsController({
             String(!modulation.panel.hidden),
           );
           if (!modulation.panel.hidden) {
-            const route = getAudioRoute(currentModel.id, definition.key);
-            if (modulationIsActive(currentLfoState[definition.key], route)) {
-              modulation.panel.querySelector(".existing-routing").open = true;
-            }
             onModulationOpen();
           }
         });
@@ -414,13 +412,19 @@ export function createControlsController({
           guidance,
           modulationToggle,
           modulationPanel: modulation.panel,
-          modulationVisualizer: modulation.visualizer,
+          modulationDrawer: modulation.drawer,
           syncAudioRoute: modulation.syncAudioRoute,
           syncLfoConfig: modulation.syncLfoConfig,
           modulationTrack,
           modulationRange,
           baseMarker,
           effectiveMarker,
+          feedbackBounds: { leftPercent: 0, widthPercent: 0 },
+          feedbackLeft: "",
+          feedbackWidth: "",
+          feedbackBase: "",
+          feedbackValue: "",
+          feedbackActive: null,
         });
       } else if (definition.type === "select") {
         block.classList.add("select-control");

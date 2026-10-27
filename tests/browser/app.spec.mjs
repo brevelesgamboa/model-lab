@@ -19,7 +19,7 @@ test("retained routes, model controls, and runtime loading are coherent", async 
   await page.goto("/");
   await expect(page.locator("#render-state")).not.toHaveText("BOOTING");
   await expect(page.locator(".nav__item")).toHaveCount(4);
-  await expect(page.locator("#status-message")).toContainText("READY");
+  await expect(page.locator("#status-message")).toContainText("ready");
   expect(runtimes).toEqual([]);
   const names = await page.locator("#model-select option").allTextContents();
   expect(names.join(" ")).not.toMatch(/dog|neural dream|about/i);

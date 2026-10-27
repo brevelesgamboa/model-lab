@@ -11,9 +11,10 @@ export function defaultLfoConfig() {
   return {
     enabled: false,
     waveform: "sine",
-    rate: 0.1,
+    rate: 0.05,
     depth: 0.2,
     phase: 0,
+    polarity: "bipolar",
   };
 }
 
@@ -32,15 +33,38 @@ export function waveformValue(waveform, cycles) {
   }
 }
 
+export function lfoPhaseAt(config, timeSeconds) {
+  const cycles =
+    timeSeconds * clamp(config.rate, 0.005, 8) + clamp(config.phase, 0, 1);
+  return cycles - Math.floor(cycles);
+}
+
+export function lfoSignalAt(config, phase) {
+  const value = waveformValue(config.waveform, phase);
+  if (config.polarity === "positive") return (value + 1) * 0.5;
+  if (config.polarity === "negative") return -(value + 1) * 0.5;
+  return value;
+}
+
+export function rateFromPosition(position, maximum = 0.5) {
+  return 0.005 * (maximum / 0.005) ** clamp(position, 0, 1);
+}
+
+export function positionFromRate(rate, maximum = 0.5) {
+  return clamp(
+    Math.log(clamp(rate, 0.005, maximum) / 0.005) / Math.log(maximum / 0.005),
+    0,
+    1,
+  );
+}
+
 export function applyLfo(definition, baseValue, config, timeSeconds) {
   if (!config?.enabled || definition.type !== "range") return Number(baseValue);
   const minimum = Number(definition.min);
   const maximum = Number(definition.max);
   const range = maximum - minimum;
-  const cycles =
-    timeSeconds * clamp(config.rate, 0.005, 8) + clamp(config.phase, 0, 1);
   const modulation =
-    waveformValue(config.waveform, cycles) *
+    lfoSignalAt(config, lfoPhaseAt(config, timeSeconds)) *
     clamp(config.depth, 0, 1) *
     range *
     0.5;

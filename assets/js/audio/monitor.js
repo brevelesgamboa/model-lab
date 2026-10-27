@@ -78,17 +78,17 @@ export function updateAudioUi() {
   toggleAudioInput.setAttribute("aria-pressed", String(audioCaptureActive));
 
   const labels = {
-    idle: "AUDIO: OFF",
-    requesting: "PICK SOURCE…",
-    active: "AUDIO: ON",
-    denied: "AUDIO: DENIED",
-    unsupported: "AUDIO: N/A",
-    error: "AUDIO: ERROR",
+    idle: "Audio: Off",
+    requesting: "Choose source…",
+    active: "Audio: On",
+    denied: "Audio: Denied",
+    unsupported: "Audio: Unavailable",
+    error: "Audio: Error",
   };
   toggleAudioInput.textContent = labels[rhythmController.status] || labels.idle;
   toggleAudioInput.title = audioCaptureActive
     ? "Audio analysis is local to this browser. Click to stop and release the shared source."
-    : "Choose system/tab audio or a microphone, then route its bands in a parameter Modulation Panel.";
+    : "Choose system/tab audio or a microphone, then adjust audio depth in a parameter's Mod drawer.";
   if (audioMeter) {
     audioMeter.setAttribute(
       "aria-label",
@@ -111,7 +111,7 @@ export async function toggleAudioInput(
     updateAudioUi();
     renderCurrentFrame({ forceAnalysis: true });
     terminal("AUDIO", "audio processing stopped");
-    setStatus("AUDIO REACTIVITY OFF");
+    setStatus("Audio disconnected");
     return;
   }
 
@@ -122,7 +122,7 @@ export async function toggleAudioInput(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     terminal("AUDIO", message, "warning");
-    setStatus("AUDIO UNAVAILABLE");
+    setStatus("Audio unavailable");
     return;
   }
 
@@ -140,21 +140,22 @@ export async function toggleAudioInput(
         "AUDIO",
         "system audio analyser enabled; shared audio stays on this device",
       );
-      setStatus("SYSTEM AUDIO READY");
+      setStatus("Audio connected");
     } else {
       await rhythmController.startMicrophone();
       terminal(
         "AUDIO",
         "microphone analyser enabled; captured audio stays on this device",
       );
-      setStatus("MICROPHONE AUDIO READY");
+      setStatus("Audio connected");
     }
     setAnimation(true, { log: false });
     renderCurrentFrame({ forceAnalysis: true });
+    setStatus("Audio connected");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     terminal("AUDIO", `access failed: ${message}`, "warning");
-    setStatus("AUDIO UNAVAILABLE");
+    setStatus("Audio unavailable");
   } finally {
     updateAudioUi();
   }

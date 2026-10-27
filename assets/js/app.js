@@ -34,11 +34,8 @@ import {
 } from "./core/quality.js";
 import { rhythmController } from "./core/rhythm-controller.js";
 import { terminal } from "./ui/terminal.js";
-import { drawModulationVisualizer } from "./ui/modulation-visualizer.js";
-import {
-  makeModulationPanel as buildModulationPanel,
-  modulationIsActive,
-} from "./ui/modulation-panel.js";
+import { displayMessage } from "./ui/messages.js";
+import { makeModulationPanel as buildModulationPanel } from "./ui/modulation-panel.js";
 import {
   updateAudioUi,
   toggleAudioInput,
@@ -73,12 +70,15 @@ import {
   hasActiveAudioRoute,
   restoreAudioMatrix,
   setAudioRoute,
+  updateModulationBounds,
 } from "./core/modulation-matrix.js";
 import {
   LFO_WAVEFORMS,
   applyLfo,
   defaultLfoConfig,
   hasActiveLfo,
+  lfoPhaseAt,
+  lfoSignalAt,
 } from "./core/lfo.js";
 import { clamp, deepClone, randomSeed } from "./core/utils.js";
 import {
@@ -238,7 +238,7 @@ const controlsController = createControlsController({
       { presetName: preset.name },
     );
     terminal("PRESET", `${preset.name} loaded`);
-    setStatus(`${preset.name} PRESET LOADED`);
+    setStatus(`${preset.name} loaded`);
   },
   onRange: syncRangeControl,
   onValue(definition, value) {
@@ -329,7 +329,7 @@ function acceptRenderedFrame({
   if (forceAnalysis || now - lastControlUiAt >= 100) {
     updateEffectiveControlReadouts(parameters, timeSeconds);
     lastControlUiAt = now;
-  }
+  } else updateModulationFeedback(parameters, now);
   updateLivePerformance(now, renderMilliseconds, parameters);
   frameCounter += 1;
   elements.frameIndex.textContent = String(frameCounter % 10000).padStart(
@@ -357,7 +357,7 @@ function acceptRenderedFrame({
     ["LOADING", "CHECKING"].some(
       (state) =>
         elements.statusMessage.textContent ===
-        `${model.name.toUpperCase()} ${state}`,
+        displayMessage(`${model.name} ${state}`),
     )
   )
     setStatus(`${model.name} READY`);
@@ -471,7 +471,7 @@ function saveQualityMode(mode) {
 }
 
 export function setStatus(message) {
-  elements.statusMessage.textContent = String(message || "READY").toUpperCase();
+  elements.statusMessage.textContent = displayMessage(message);
 }
 
 function defaultLfoState(model) {
@@ -497,6 +497,9 @@ function sanitizedLfoState(model, stored) {
       rate: clamp(candidate.rate, 0.005, 8),
       depth: clamp(candidate.depth, 0, 1),
       phase: clamp(candidate.phase, 0, 1),
+      polarity: ["positive", "negative"].includes(candidate.polarity)
+        ? candidate.polarity
+        : "bipolar",
     };
   });
   return defaults;
@@ -832,16 +835,25 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
       const coercedEffectiveValue = coerceRangeValue(
         definition,
         effectiveValue,
+        false,
       );
       output[definition.key] = coercedEffectiveValue;
       modulationFrame[definition.key] = {
-        baseValue: Number(baseValue),
+        baseValue: Number(effectiveBase),
         oscillatorValue: Number(oscillatorValue),
+        audioValue: Number(effectiveValue),
         effectiveValue: Number(coercedEffectiveValue),
         audioSource: audioRoute.source,
         audioLevel,
         kickLevel,
         lfoActive,
+        lfoDepth: lfoActive ? Number(lfoConfig.depth) : 0,
+        audioDepth: audioRoute.source === "none" ? 0 : audioRoute.depth,
+        lfoPhase: lfoActive ? lfoPhaseAt(lfoConfig, timeSeconds) : 0,
+        lfoPolarity: lfoConfig?.polarity || "bipolar",
+        lfoSignal: lfoActive
+          ? lfoSignalAt(lfoConfig, lfoPhaseAt(lfoConfig, timeSeconds))
+          : 0,
       };
       if (
         currentLfoState[definition.key]?.enabled ||
@@ -946,7 +958,7 @@ function showParameterInfo(definition) {
         "Enable the LFO to oscillate around the base value. Depth controls travel, rate controls cycles per second, and phase offsets timing.",
     );
   }
-  setStatus(`${definition.label} EXPLAINED IN SESSION LOG`);
+  setStatus("Parameter details opened");
 }
 
 function applyAudioProfile(profileKey) {
@@ -992,6 +1004,7 @@ function applyAudioProfile(profileKey) {
       currentLfoState[key] = {
         ...(currentLfoState[key] || defaultLfoConfig()),
         ...profile.lfos[key],
+        polarity: "bipolar",
       };
     } else {
       if (currentLfoState[key]) {
@@ -1063,7 +1076,7 @@ function makeModulationPanel(definition, config, supportsLfo) {
       currentParameters[definition.key] = value;
       modelParameterState.set(currentModel.id, deepClone(currentParameters));
     },
-    onChange({ config: nextConfig, active }) {
+    onChange({ config: nextConfig, active, activated }) {
       currentLfoState[definition.key] = nextConfig;
       modelLfoState.set(currentModel.id, deepClone(currentLfoState));
       markPresetCustom();
@@ -1075,7 +1088,7 @@ function makeModulationPanel(definition, config, supportsLfo) {
       control?.modulationToggle?.classList.toggle("is-active", active);
       control?.modulationToggle?.setAttribute("aria-pressed", String(active));
       updateLfoCount();
-      if (active) setAnimation(true, { log: false });
+      if (activated) setAnimation(true, { log: false });
       requestAnimationFrame(() =>
         updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds)),
       );
@@ -1202,84 +1215,71 @@ function renderParameterControls() {
   updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds));
 }
 
-function updateEffectiveControlReadouts(
-  effectiveParameters,
-  timeSeconds = lastTimeSeconds,
-) {
-  // Measure visible charts together before changing labels and marker styles.
-  // Interleaving these reads and writes forces one layout per control in Firefox.
-  const visualizerWidths = new Map();
-  controlElements.forEach((control) => {
-    const canvas = control.modulationVisualizer;
-    if (canvas && !canvas.closest("[hidden], details:not([open])"))
-      visualizerWidths.set(canvas, canvas.clientWidth);
-  });
-  currentModel.controls.forEach((definition) => {
-    if (definition.type !== "range") return;
+function updateEffectiveControlReadouts(effectiveParameters) {
+  for (const definition of currentModel.controls) {
+    if (definition.type !== "range") continue;
     const control = controlElements.get(definition.key);
-    if (!control?.effectiveLabel) return;
-    const config = currentLfoState[definition.key] || defaultLfoConfig();
-    const audioRoute = getAudioRoute(currentModel.id, definition.key);
-    const effectiveValue = Number(effectiveParameters[definition.key]);
-    const storedBaseValue = Number(currentParameters[definition.key]);
-    const computedFrame =
-      effectiveParameters.__modulationFrame?.[definition.key];
-    const frame = computedFrame || {
-      baseValue: storedBaseValue,
-      oscillatorValue: applyLfo(
-        definition,
-        storedBaseValue,
-        config,
-        timeSeconds,
-      ),
-      effectiveValue,
-      audioSource: audioRoute.source,
-      audioLevel: 0,
-      kickLevel: 0,
-      lfoActive: Boolean(config.enabled),
-    };
-    const baseValue = Number(frame.baseValue);
-    const comparisonStep = Math.max(
-      1e-9,
-      Number(definition.fineStep || definition.step || 0.001) * 0.25,
+    if (!control?.effectiveLabel) continue;
+    const frame = effectiveParameters.__modulationFrame?.[definition.key];
+    const active = Boolean(
+      frame?.lfoActive || (frame && frame.audioSource !== "none"),
     );
-    const active = modulationIsActive(config, audioRoute);
-    const modulated = Boolean(
-      active || Math.abs(effectiveValue - baseValue) > comparisonStep,
-    );
-    control.effectiveLabel.textContent = `${modulated ? "MOD" : "VALUE"} ${formatControlValue(definition, effectiveValue)}`;
-    control.effectiveLabel.classList.toggle("is-active", modulated);
+    control.effectiveLabel.textContent = `Value ${formatControlValue(definition, Number(effectiveParameters[definition.key]))}`;
+    control.effectiveLabel.classList.toggle("is-active", active);
     control.modulationToggle?.classList.toggle("is-active", active);
     control.modulationToggle?.setAttribute("aria-pressed", String(active));
+  }
+  updateModulationFeedback(effectiveParameters, performance.now());
+}
 
+function updateModulationFeedback(parameters, timestamp) {
+  const frames = parameters.__modulationFrame;
+  if (!frames) return;
+  const kickActive =
+    rhythmController.status === "active" &&
+    timestamp - rhythmController.lastKickHitTimestamp < 100;
+  for (const definition of currentModel.controls) {
+    const frame = frames[definition.key];
+    const control = controlElements.get(definition.key);
+    if (!frame || !control?.feedbackBounds) continue;
     const minimum = Number(definition.min);
-    const maximum = Number(definition.max);
-    const range = Math.max(1e-9, maximum - minimum);
-    const basePosition = clamp((baseValue - minimum) / range, 0, 1) * 100;
-    const effectivePosition =
-      clamp((effectiveValue - minimum) / range, 0, 1) * 100;
-    const lfoWidth = frame.lfoActive ? clamp(config.depth, 0, 1) * 50 : 0;
-    const audioWidth =
-      audioRoute.source !== "none"
-        ? Math.abs(clamp(audioRoute.depth, -1, 1)) * 50
-        : 0;
-    const negativeWidth = lfoWidth + (audioRoute.depth < 0 ? audioWidth : 0);
-    const positiveWidth = lfoWidth + (audioRoute.depth >= 0 ? audioWidth : 0);
-    const left = clamp(basePosition - negativeWidth, 0, 100);
-    const right = clamp(basePosition + positiveWidth, 0, 100);
-    control.baseMarker.style.left = `${basePosition}%`;
-    control.effectiveMarker.style.left = `${effectivePosition}%`;
-    control.modulationRange.style.left = `${left}%`;
-    control.modulationRange.style.width = `${Math.max(0, right - left)}%`;
-    control.modulationRange.style.opacity = active ? "1" : "0";
-    drawModulationVisualizer(
+    const range = Number(definition.max) - minimum;
+    updateModulationBounds(
+      control.feedbackBounds,
       definition,
-      control.modulationVisualizer,
-      frame,
-      formatControlValue,
-      visualizerWidths.get(control.modulationVisualizer),
+      frame.baseValue,
+      frame.lfoDepth,
+      0,
+      frame.lfoPolarity,
     );
-  });
+    const left = `${Math.round(control.feedbackBounds.leftPercent * 1000) / 1000}%`;
+    const width = `${Math.round(control.feedbackBounds.widthPercent * 1000) / 1000}%`;
+    const base = `${Math.round(clamp(range > 0 ? (frame.baseValue - minimum) / range : 0) * 100000) / 1000}%`;
+    const value = `${Math.round(clamp(range > 0 ? (frame.effectiveValue - minimum) / range : 0) * 100000) / 1000}%`;
+    const active = frame.lfoActive;
+    if (control.feedbackLeft !== left) {
+      control.modulationRange.style.left = left;
+      control.feedbackLeft = left;
+    }
+    if (control.feedbackWidth !== width) {
+      control.modulationRange.style.width = width;
+      control.feedbackWidth = width;
+    }
+    if (control.feedbackBase !== base) {
+      control.baseMarker.style.left = base;
+      control.feedbackBase = base;
+    }
+    if (control.feedbackValue !== value) {
+      control.effectiveMarker.style.left = value;
+      control.feedbackValue = value;
+    }
+    if (control.feedbackActive !== active) {
+      control.modulationRange.style.opacity = frame.lfoActive ? "1" : "0.25";
+      control.feedbackActive = active;
+    }
+    if (!control.modulationPanel.hidden)
+      control.modulationDrawer.updateFrame(frame, kickActive);
+  }
 }
 
 function refreshModelOptions(preferredId = currentModel?.id) {
@@ -1516,8 +1516,8 @@ function updateLivePerformance(now, renderMilliseconds) {
   }
 
   const performanceText = reportedFps
-    ? reportedFps + " FPS · " + smoothedRenderMs.toFixed(1) + " MS"
-    : "0 FPS · " + smoothedRenderMs.toFixed(1) + " MS";
+    ? reportedFps + " FPS · " + smoothedRenderMs.toFixed(1) + " ms"
+    : "0 FPS · " + smoothedRenderMs.toFixed(1) + " ms";
   elements.liveFps.textContent = performanceText;
   elements.liveFps.title = "Approximate display rate and renderer time";
 
@@ -1560,6 +1560,15 @@ function modelNeedsAnimation() {
 
 function animationLoop(timestamp) {
   rhythmController.update(timestamp);
+  if (currentView === "lab") {
+    const kickActive =
+      rhythmController.status === "active" &&
+      timestamp - rhythmController.lastKickHitTimestamp < 100;
+    for (const control of controlElements.values()) {
+      if (control.modulationDrawer && !control.modulationPanel.hidden)
+        control.modulationDrawer.updateKick(kickActive);
+    }
+  }
   drawAudioMeter();
   if (currentView === "lab") {
     visualizerOverlay.update(timestamp, rhythmController, elements.canvas);
@@ -1593,7 +1602,11 @@ function animationLoop(timestamp) {
     qualityProfile.frameInterval + fallbackPenalty,
     adaptiveCost,
   );
-  if (canRender && !renderer.getPending() && timestamp - lastRenderedAt >= frameInterval) {
+  if (
+    canRender &&
+    !renderer.getPending() &&
+    timestamp - lastRenderedAt >= frameInterval
+  ) {
     lastRenderedAt = timestamp;
     lastTimeSeconds = (timestamp - animationEpoch) / 1000;
     renderCurrentFrame({
@@ -1634,7 +1647,7 @@ function setAnimation(enabled, { log = true } = {}) {
         ? "enabled; motion and LFOs may advance"
         : "paused; all time-based modulation is frozen",
     );
-  setStatus(animationEnabled ? "ANIMATION CLOCK ENABLED" : "ALL MOTION PAUSED");
+  setStatus(animationEnabled ? "Playing" : "Paused");
 }
 
 function updateResourceStatus() {
@@ -1756,9 +1769,7 @@ async function saveCurrentRun() {
     `${record.id} / ${record.modelName} / ${record.qualityResolution}px`,
   );
   archiveController.render();
-  setStatus(
-    `${record.id} ${persistent ? "SAVED" : "SESSION ONLY — EXPORT TO KEEP"}`,
-  );
+  setStatus(persistent ? "Frame saved" : "Frame saved for this session");
   return record;
 }
 
@@ -1999,7 +2010,7 @@ function attachEvents() {
     restoreAudioMatrix(currentModel.id, {});
     // selectModel uses the original state application and render path.
     selectModel(currentModel.id, { log: false, preserveTime: true });
-    setStatus("PARAMETERS RESET");
+    setStatus("Parameters reset");
   });
   elements.navItems.forEach((button) =>
     button.addEventListener("click", () => navigate(button.dataset.view)),
@@ -2179,23 +2190,13 @@ function initialize() {
   updateResourceStatus();
   rhythmController.subscribe(() => {
     updateAudioUi();
+    controlElements.forEach((control) =>
+      control.modulationDrawer?.syncSettings(),
+    );
   });
   updateAudioUi();
 
-  terminal("BOOT", "gl-bench local WebGL2 workbench");
-  terminal(
-    "QUALITY",
-    `${qualityMode.toUpperCase()} -> ${qualityProfile.mode.toUpperCase()} / ${qualityProfile.size}px`,
-  );
-  terminal(
-    "RENDERER",
-    `${registry.rendererSummary()} / ${capabilities.threads} logical threads reported`,
-  );
-  terminal(
-    "MODEL ROUTES",
-    `${registry.getAll().length} registered / ${registry.getAll().filter((model) => model.available).length} available`,
-  );
-  terminal("READY", "save frames and modulate model parameters in the Lab");
+  terminal("", "Ready");
   attachEvents();
   animationHandle = requestAnimationFrame(animationLoop);
 }

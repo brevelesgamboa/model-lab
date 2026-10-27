@@ -150,6 +150,7 @@ export function matchesAudioProfile(profileId, context = {}) {
         return false;
       }
       if (expectedEnabled) {
+        if (currentLfo.polarity && currentLfo.polarity !== "bipolar") return false;
         if (Math.abs(Number(currentLfo.rate) - Number(expectedLfo.rate)) > 0.002) return false;
         if (Math.abs(Number(currentLfo.depth) - Number(expectedLfo.depth)) > 0.005) return false;
         if (Math.abs(Number(currentLfo.phase) - Number(expectedLfo.phase)) > 0.005) return false;

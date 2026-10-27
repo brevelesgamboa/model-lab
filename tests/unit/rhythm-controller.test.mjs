@@ -70,7 +70,9 @@ test("complete silence rejects signal and returns silent levels without auto-gai
   controller.context = mock.context;
   controller.analyser = mock.analyser;
   controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
-  controller.floatFrequencyData = new Float32Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
   controller.status = "active";
 
   mock.setSilence();
@@ -88,7 +90,9 @@ test("sustained ambient drone preserves bass level without decaying to zero", ()
   controller.context = mock.context;
   controller.analyser = mock.analyser;
   controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
-  controller.floatFrequencyData = new Float32Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
   controller.status = "active";
 
   // Simulate continuous 60 Hz ambient sub-bass drone at -20 dBFS
@@ -118,7 +122,9 @@ test("repeated kicks at 120 BPM trigger onsets and re-arm reliably", () => {
   controller.context = mock.context;
   controller.analyser = mock.analyser;
   controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
-  controller.floatFrequencyData = new Float32Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
   controller.status = "active";
 
   const beatIntervalMs = 500; // 120 BPM
@@ -169,7 +175,9 @@ test("kick sustain modulation envelope holds before releasing", () => {
   controller.context = mock.context;
   controller.analyser = mock.analyser;
   controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
-  controller.floatFrequencyData = new Float32Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
   controller.status = "active";
 
   // Hit a kick at t = 0
@@ -196,10 +204,7 @@ test("kick sustain modulation envelope holds before releasing", () => {
     releaseLevels.kick < holdLevels.kick,
     "Kick modulation envelope should release smoothly",
   );
-  assert.ok(
-    releaseLevels.kickOnset < 0.1,
-    "Kick onset should be near zero",
-  );
+  assert.ok(releaseLevels.kickOnset < 0.1, "Kick onset should be near zero");
 });
 
 test("quiet audio is boosted by auto-gain within safe limits", () => {
@@ -208,7 +213,9 @@ test("quiet audio is boosted by auto-gain within safe limits", () => {
   controller.context = mock.context;
   controller.analyser = mock.analyser;
   controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
-  controller.floatFrequencyData = new Float32Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
   controller.status = "active";
 
   // Quiet track at -30 dBFS
@@ -219,15 +226,15 @@ test("quiet audio is boosted by auto-gain within safe limits", () => {
     levels = controller.update(frame * 16.666);
   }
 
-  assert.ok(levels.hasSignal, "Quiet audio above noise floor should register as signal");
+  assert.ok(
+    levels.hasSignal,
+    "Quiet audio above noise floor should register as signal",
+  );
   assert.ok(
     levels.bass > 0.15,
     `Quiet audio should be scaled up to audible level, got bass = ${levels.bass}`,
   );
-  assert.ok(
-    levels.bass <= 1.0,
-    "Quiet audio should not exceed unit clamp",
-  );
+  assert.ok(levels.bass <= 1.0, "Quiet audio should not exceed unit clamp");
 });
 
 test("fallback to frequencyData if floatFrequencyData is missing", () => {
@@ -243,4 +250,72 @@ test("fallback to frequencyData if floatFrequencyData is missing", () => {
   const levels = controller.update(100);
   assert.ok(levels.hasSignal);
   assert.ok(levels.bass > 0);
+});
+
+function configuredController() {
+  const controller = new RhythmController();
+  const mock = createMockAudio();
+  controller.context = mock.context;
+  controller.analyser = mock.analyser;
+  controller.frequencyData = new Uint8Array(mock.analyser.frequencyBinCount);
+  controller.floatFrequencyData = new Float32Array(
+    mock.analyser.frequencyBinCount,
+  );
+  controller.status = "active";
+  return { controller, mock };
+}
+
+test("global detector settings clamp, preserve defaults and reject invalid input", () => {
+  const controller = new RhythmController();
+  assert.equal(controller.inputGain, 1);
+  assert.equal(controller.kickOffset, 0.06);
+  assert.equal(controller.kickGate, 0.04);
+  let changes = 0;
+  controller.subscribe(() => (changes += 1));
+  assert.equal(controller.setInputGain(10), 3);
+  assert.equal(controller.setInputGain(10), 3);
+  assert.equal(changes, 1);
+  assert.equal(controller.setInputGain(-1), 0.1);
+  assert.equal(controller.setKickOffset(1), 0.25);
+  assert.equal(controller.setKickGate(-1), 0);
+  assert.equal(controller.setKickOffset(NaN), 0.25);
+  assert.equal(controller.setInputGain(Infinity), 0.1);
+});
+
+test("gain and kick thresholds affect live detection without reallocating FFT buffers", () => {
+  const low = configuredController();
+  const high = configuredController();
+  low.controller.setInputGain(0.3);
+  high.controller.setInputGain(2);
+  low.mock.setTone(55, -24);
+  high.mock.setTone(55, -24);
+  const lowLevels = low.controller.update(100);
+  const highLevels = high.controller.update(100);
+  assert.ok(highLevels.bass > lowLevels.bass);
+  assert.ok(highLevels.kickOnset > lowLevels.kickOnset);
+  assert.equal(high.controller.kickHit, true);
+  assert.equal(high.controller.lastKickHitTimestamp, 100);
+
+  for (const setting of ["offset", "gate"]) {
+    const { controller, mock } = configuredController();
+    mock.setTone(55, -24);
+    if (setting === "offset") controller.setKickOffset(0.25);
+    else controller.setKickGate(0.2);
+    assert.equal(controller.update(100).kickOnset, 0);
+    assert.equal(controller.kickHit, false);
+    controller.setKickOffset(0);
+    controller.setKickGate(0);
+    const bytes = controller.frequencyData;
+    const floats = controller.floatFrequencyData;
+    assert.ok(controller.update(117).kickOnset > 0);
+    assert.equal(controller.frequencyData, bytes);
+    assert.equal(controller.floatFrequencyData, floats);
+    mock.setSilence();
+    controller.update(217);
+    assert.equal(controller.kickHit, false);
+    controller.resetAnalysis();
+    assert.equal(controller.activityEnvelope, 0);
+    assert.equal(controller.lastKickHitTimestamp, -Infinity);
+    assert.equal(controller.kickOffset, 0);
+  }
 });

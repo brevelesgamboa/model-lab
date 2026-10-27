@@ -915,6 +915,14 @@ export function createGrowthController({
           needsRender = true;
         }
       }
+      // State injection follows the clock; pausing must retain the cellular field.
+      if (
+        model.isClockRunning &&
+        typeof model.triggerKickInput === "function"
+      ) {
+        needsRender =
+          model.triggerKickInput(triggerKick, timestamp) || needsRender;
+      }
     }
 
     if (needsRender && !model.isClockRunning) {

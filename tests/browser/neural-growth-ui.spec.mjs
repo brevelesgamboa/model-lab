@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
     route.abort(),
   );
   await page.goto("/");
-  await expect(page.locator("#status-message")).toContainText("READY");
+  await expect(page.locator("#status-message")).toContainText("ready");
   await expect(page.locator("#toggle-animation")).toHaveAttribute(
     "aria-pressed",
     "false",
@@ -65,6 +65,16 @@ test("growth uploads fractional pan and integer step uniforms without WebGL erro
     errors.push(gl.getError());
     return {
       errors,
+      resonanceUniform:
+        gl.getUniformLocation(
+          runtime.program.update.handle,
+          "u_resonanceFeedback",
+        ) !== null,
+      legacyUniform:
+        gl.getUniformLocation(
+          runtime.program.update.handle,
+          "u_latentFeedback",
+        ) !== null,
       pan: Array.from(
         gl.getUniform(
           runtime.program.visualize.handle,
@@ -74,63 +84,26 @@ test("growth uploads fractional pan and integer step uniforms without WebGL erro
     };
   });
   expect(result.errors).toEqual([0, 0, 0]);
+  expect(result.resonanceUniform).toBe(true);
+  expect(result.legacyUniform).toBe(false);
   expect(result.pan).toEqual([0.125, -0.0625]);
 });
 
-test("live readouts avoid measuring closed modulation charts and keep open charts drawing", async ({
+test("the compact drawer animates without measuring history charts", async ({
   page,
 }) => {
   await selectGrowth(page);
-  await page.evaluate(() => {
-    window.__closedChartMeasurements = 0;
-    window.__visibleChartMeasurements = 0;
-    const descriptor = Object.getOwnPropertyDescriptor(
-      Element.prototype,
-      "clientWidth",
-    );
-    Object.defineProperty(Element.prototype, "clientWidth", {
-      ...descriptor,
-      get() {
-        if (this.classList.contains("modulation-visualizer")) {
-          if (this.closest("[hidden], details:not([open])"))
-            window.__closedChartMeasurements += 1;
-          else window.__visibleChartMeasurements += 1;
-        }
-        return descriptor.get.call(this);
-      },
-    });
-  });
+  const control = page.locator('[data-parameter="growthSpeed"]');
+  await control.locator(".modulation-toggle").click();
+  await control
+    .getByLabel("GROWTH SPEED modulation enabled", { exact: true })
+    .check();
+  const line = control.locator(".drawer-playhead");
+  const before = await line.getAttribute("x1");
+  await expect.poll(() => line.getAttribute("x1")).not.toBe(before);
+  await expect(page.locator(".modulation-visualizer")).toHaveCount(0);
+  await expect(page.locator(".existing-routing")).toHaveCount(0);
   await page.locator("#toggle-animation").click();
-  await expect.poll(async () => (await state(page)).steps).toBeGreaterThan(3);
-  expect(await page.evaluate(() => window.__closedChartMeasurements)).toBe(0);
-  const toggle = page.locator('.modulation-toggle[data-key="growthSpeed"]');
-  await toggle.click();
-  await page
-    .locator('.control-block:has(.modulation-toggle[data-key="growthSpeed"]) .existing-routing > summary')
-    .click();
-  await expect
-    .poll(() => page.evaluate(() => window.__visibleChartMeasurements))
-    .toBeGreaterThan(0);
-  await expect
-    .poll(() =>
-      page
-        .locator(".modulation-visualizer:visible")
-        .first()
-        .evaluate((canvas) => {
-          const pixels = canvas
-            .getContext("2d")
-            .getImageData(0, 0, canvas.width, canvas.height).data;
-          return pixels.some((value, index) => index % 4 === 3 && value > 0);
-        }),
-    )
-    .toBe(true);
-  await toggle.click();
-  const before = (await state(page)).steps;
-  await expect
-    .poll(async () => (await state(page)).steps)
-    .toBeGreaterThan(before + 3);
-  await page.locator("#toggle-animation").click();
-  expect(await page.evaluate(() => window.__closedChartMeasurements)).toBe(0);
 });
 
 async function displaySize(page) {
@@ -430,7 +403,7 @@ test("switching away during a delayed checkpoint load cannot paint the new route
   await page.locator("#model-select").selectOption("neural-growth");
   await entered;
   await page.locator("#model-select").selectOption("folded-fractal");
-  await expect(page.locator("#status-message")).toContainText("READY");
+  await expect(page.locator("#status-message")).toContainText("ready");
   const before = await page
     .locator("#output-canvas")
     .evaluate((canvas) => canvas.toDataURL());
@@ -505,11 +478,11 @@ test("PNG is an immutable snapshot and experiment runs save to archive", async (
     /^Neural_Growth_.*\.png$/,
   );
   await expect(page.locator("#status-message")).toContainText(
-    "PNG SNAPSHOT EXPORTED",
+    "PNG snapshot exported",
   );
   expect(await state(page)).toEqual(before);
   await page.keyboard.press("Control+Enter");
-  await expect(page.locator("#status-message")).toContainText("SAVED");
+  await expect(page.locator("#status-message")).toContainText("saved");
   await page.locator('[data-view="saved"]').click();
   await expect(page.locator(".run-card")).toHaveCount(1);
   for (const [asset, text] of [
@@ -1230,18 +1203,26 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
 
   // Open rotation MOD drawer if not already open
   const rotationSource = page.locator(
-    'select[aria-label="ROTATION audio source"]',
+    '[data-parameter="rotation"] .drawer-audio',
   );
   if (await rotationSource.isHidden()) {
     await rotationModToggle.click();
   }
   await expect(rotationSource).toBeVisible();
-  await expect(rotationSource).toHaveValue("kick");
+  await expect(rotationSource).toHaveAttribute("data-source", "kick");
 
   const rotationLfoCheckbox = page.locator(
-    '.control-block[data-parameter="rotation"] input[aria-label="Enable ROTATION LFO"]',
+    '.control-block[data-parameter="rotation"] input[aria-label="ROTATION modulation enabled"]',
   );
   await expect(rotationLfoCheckbox).toBeChecked();
+
+  const rotationDrawer = page.locator(
+    '[data-parameter="rotation"] .modulation-drawer',
+  );
+  await expect(rotationDrawer.locator('[data-field="enabled"]')).toBeChecked();
+  await expect(
+    rotationDrawer.getByRole("button", { name: "Kick", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 
   // Changing shockwave mode independently preserves audio preset
   await shockwaveSelect.selectOption("off");
@@ -1252,8 +1233,11 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await audioSelect.selectOption("subtle");
   await expect(shockwaveSelect).toHaveValue("on");
   await expect(geometrySelect).toHaveValue("vortex");
-  await expect(rotationSource).toHaveValue("kick");
+  await expect(rotationSource).toHaveAttribute("data-source", "kick");
   await expect(rotationLfoCheckbox).not.toBeChecked();
+  await expect(
+    rotationDrawer.locator('[data-field="enabled"]'),
+  ).not.toBeChecked();
 
   // Verify twist LFO is active in Subtle
   const twistModToggle = page.locator(
@@ -1265,8 +1249,9 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
   await audioSelect.selectOption("dynamic");
   await expect(shockwaveSelect).toHaveValue("on");
   await expect(geometrySelect).toHaveValue("vortex");
-  await expect(rotationSource).toHaveValue("kick");
+  await expect(rotationSource).toHaveAttribute("data-source", "kick");
   await expect(rotationLfoCheckbox).toBeChecked();
+  await expect(rotationDrawer.locator('[data-field="enabled"]')).toBeChecked();
 
   // Verify growth speed base value for dynamic is 45 (calm baseline)
   const growthSpeedInput = page.locator(
@@ -1276,17 +1261,20 @@ test("audio-reactive presets configure modulation routes and synchronize with MO
 
   // Tweak audio depth on rotation to trigger custom profile detection
   const depthInput = page.locator(
-    '.control-block[data-parameter="rotation"] .modulation-panel label:has-text("AUDIO DEPTH") input[type="range"]',
+    '.control-block[data-parameter="rotation"] .modulation-drawer [data-field="audioDepth"]',
   );
   await depthInput.fill("0.85");
   await depthInput.dispatchEvent("input");
+  await expect(
+    page.locator('[data-parameter="rotation"] .drawer-audio output'),
+  ).toHaveText("85%");
 
   // Verify AUDIO REACT select dynamically transitioned to custom
   await expect(audioSelect).toHaveValue("custom");
 
   // Save run to archive and verify
   await page.keyboard.press("Control+Enter");
-  await expect(page.locator("#status-message")).toContainText("SAVED");
+  await expect(page.locator("#status-message")).toContainText("saved");
   await page.locator('[data-view="saved"]').click();
   await expect(page.locator(".run-card")).toHaveCount(1);
 });

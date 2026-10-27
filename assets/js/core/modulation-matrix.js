@@ -90,3 +90,38 @@ export function applyAudioModulation(definition, value, route, levels) {
     maximum,
   );
 }
+
+// Mutate a caller-owned result so live slider feedback needs no temporary object.
+export function updateModulationBounds(
+  result,
+  definition,
+  base,
+  lfoDepth,
+  audioDepth,
+  polarity = "bipolar",
+) {
+  const minimum = Number(definition.min);
+  const maximum = Number(definition.max);
+  const range = maximum - minimum;
+  if (!(range > 0)) {
+    result.leftPercent = 0;
+    result.widthPercent = 0;
+    return result;
+  }
+  const halfSpan = range * 0.5;
+  const lfoSpan = Math.abs(clamp(lfoDepth, -1, 1)) * halfSpan;
+  const audioReach = clamp(audioDepth, -1, 1) * halfSpan;
+  const reachMin = clamp(
+    base - (polarity === "positive" ? 0 : lfoSpan) + Math.min(0, audioReach),
+    minimum,
+    maximum,
+  );
+  const reachMax = clamp(
+    base + (polarity === "negative" ? 0 : lfoSpan) + Math.max(0, audioReach),
+    minimum,
+    maximum,
+  );
+  result.leftPercent = ((reachMin - minimum) / range) * 100;
+  result.widthPercent = Math.max(0, ((reachMax - reachMin) / range) * 100);
+  return result;
+}
