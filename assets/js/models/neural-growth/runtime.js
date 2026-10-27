@@ -282,7 +282,7 @@ uniform sampler2D u_inverse;
 uniform sampler2D u_barrier;
 uniform sampler2D u_dreamGrad;
 uniform ivec2 u_offset;
-uniform float u_latentFeedback;
+uniform float u_resonanceFeedback;
 uniform float u_latentDecay;
 uniform float u_noiseStrength;
 uniform float u_dreamStrength;
@@ -336,8 +336,8 @@ void main() {
   if (group > 0 && u_latentMomentum > 0.0001) {
     targetState = mix(targetState, prevDecoded + delta * (1.0 - u_latentMomentum * 0.75), u_latentMomentum);
   }
-  if (group > 0 && u_latentFeedback > 0.0001) {
-    targetState = mix(targetState, prevDecoded * u_latentDecay, u_latentFeedback);
+  if (group > 0 && u_resonanceFeedback > 0.0001) {
+    targetState = mix(targetState, prevDecoded * u_latentDecay, u_resonanceFeedback);
   }
   out_color = encodeState(clamp(targetState, -2.0, 2.0));
 }`;
@@ -1195,8 +1195,12 @@ export class TextureNcaRuntime {
     gl.useProgram(program.handle);
     gl.bindVertexArray(this.vao);
     const location = (key) => {
-      if (!program.locations.has(key))
-        program.locations.set(key, gl.getUniformLocation(program.handle, key));
+      if (!program.locations.has(key)) {
+        let value = gl.getUniformLocation(program.handle, key);
+        if (value === null && key === "u_resonanceFeedback")
+          value = gl.getUniformLocation(program.handle, "u_latentFeedback");
+        program.locations.set(key, value);
+      }
       return program.locations.get(key);
     };
     gl.uniform1i(location("u_size"), this.size);
@@ -1449,7 +1453,7 @@ export class TextureNcaRuntime {
         },
         {
           u_offset: this.lastOffset,
-          u_latentFeedback: resUniforms?.latentFeedback ?? 0.0,
+          u_resonanceFeedback: resUniforms?.latentFeedback ?? 0.0,
           u_latentDecay: resUniforms?.latentDecay ?? 1.0,
           u_noiseStrength: resUniforms?.noiseStrength ?? 0.0,
           u_dreamStrength: this.dreamStrength,

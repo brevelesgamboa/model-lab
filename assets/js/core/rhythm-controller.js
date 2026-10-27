@@ -52,7 +52,35 @@ export class RhythmController {
     this.runningPeak = 0.08;
     this.runningFloor = 0.005;
     this.bassPhase = 0;
+    this.inputGain = 1;
+    this.kickOffset = 0.06;
+    this.kickGate = 0.04;
+    this.kickHit = false;
+    this.lastKickHitTimestamp = -Infinity;
     this.listeners = new Set();
+  }
+
+  setInputGain(value) {
+    return this.setAnalysisSetting("inputGain", value, 0.1, 3);
+  }
+
+  setKickOffset(value) {
+    return this.setAnalysisSetting("kickOffset", value, 0, 0.25);
+  }
+
+  setKickGate(value) {
+    return this.setAnalysisSetting("kickGate", value, 0, 0.2);
+  }
+
+  setAnalysisSetting(key, value, minimum, maximum) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return this[key];
+    const next = Math.max(minimum, Math.min(maximum, numeric));
+    if (next !== this[key]) {
+      this[key] = next;
+      this.emitState();
+    }
+    return next;
   }
 
   // Kept as read-only compatibility helpers. Runtime code uses status directly.
@@ -303,6 +331,9 @@ export class RhythmController {
     this.kickEnvelope = 0;
     this.kickOnsetEnvelope = 0;
     this.kickHoldRemaining = 0;
+    this.activityEnvelope = 0;
+    this.kickHit = false;
+    this.lastKickHitTimestamp = -Infinity;
     this.runningPeak = 0.08;
     this.runningFloor = 0.005;
     this.bassPhase = 0;
@@ -367,6 +398,7 @@ export class RhythmController {
       : performance.now();
     if (timestamp === this.lastFrameTimestamp) return this.levels;
     this.lastFrameTimestamp = timestamp;
+    this.kickHit = false;
 
     if (
       this.status !== "active" ||
@@ -410,9 +442,7 @@ export class RhythmController {
     const kickBandEnergy = this.linearBandRMS(45, 130);
 
     const totalPower =
-      subEnergy * subEnergy +
-      bodyEnergy * bodyEnergy +
-      airEnergy * airEnergy;
+      subEnergy * subEnergy + bodyEnergy * bodyEnergy + airEnergy * airEnergy;
     const hasSignal = totalPower > MIN_AUDIBLE_POWER;
 
     const smoothingAmount = (timeConstant) =>
@@ -423,8 +453,7 @@ export class RhythmController {
       const kickDecay = Math.exp(-elapsed / KICK_RELEASE_SECONDS);
       const onsetDecay = Math.exp(-elapsed / KICK_ONSET_RELEASE_SECONDS);
 
-      const previousBass =
-        this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
+      const previousBass = this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
       const bass = previousBass * bassDecay;
       this.kickEnvelope *= kickDecay;
       this.kickOnsetEnvelope *= onsetDecay;
@@ -454,8 +483,7 @@ export class RhythmController {
     } else {
       this.runningFloor = Math.min(
         MAX_RUNNING_FLOOR,
-        this.runningFloor +
-          (0.005 - this.runningFloor) * smoothingAmount(15.0),
+        this.runningFloor + (0.005 - this.runningFloor) * smoothingAmount(15.0),
       );
     }
 
@@ -473,19 +501,18 @@ export class RhythmController {
       );
     }
 
-    const dynamicSpan = Math.max(
-      0.025,
-      this.runningPeak - this.runningFloor,
-    );
-    const autoGain = Math.min(MAX_AUTO_GAIN, 1.0 / dynamicSpan);
+    const dynamicSpan = Math.max(0.025, this.runningPeak - this.runningFloor);
+    // User gain scales normalized amplitude after adaptation, independently of
+    // destination depth. Keep the raw silence gate and shared analyser intact.
+    const autoGain =
+      Math.min(MAX_AUTO_GAIN, 1.0 / dynamicSpan) * this.inputGain;
     const normalizedAmbient = clampUnit(
       (ambientEnergy - this.runningFloor) * autoGain,
     );
     // Smooth perceptual curve for ambient swells
     const targetBass = clampUnit(Math.sqrt(normalizedAmbient) * 1.05);
 
-    const previousBass =
-      this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
+    const previousBass = this.levels === SILENT_LEVELS ? 0 : this.levels.bass;
     const bassTime =
       targetBass > previousBass
         ? AMBIENT_ATTACK_SECONDS
@@ -502,11 +529,15 @@ export class RhythmController {
         ? KICK_BASELINE_ATTACK_SECONDS
         : KICK_BASELINE_RELEASE_SECONDS;
     this.slowBass +=
-      (normalizedKick - this.slowBass) *
-      smoothingAmount(baselineTimeConstant);
+      (normalizedKick - this.slowBass) * smoothingAmount(baselineTimeConstant);
 
-    const kickExcess = Math.max(0, normalizedKick - this.slowBass - 0.06);
-    const kickHit = kickExcess > 0.04 && normalizedKick > 0.12;
+    const kickExcess = Math.max(
+      0,
+      normalizedKick - this.slowBass - this.kickOffset,
+    );
+    const kickHit = kickExcess > this.kickGate && normalizedKick > 0.12;
+    this.kickHit = kickHit;
+    if (kickHit) this.lastKickHitTimestamp = timestamp;
     const kickStrength = kickHit ? clampUnit(kickExcess * 4.5) : 0;
 
     // Decoupled kick envelopes:
@@ -514,9 +545,7 @@ export class RhythmController {
     if (kickStrength > this.kickOnsetEnvelope) {
       this.kickOnsetEnvelope = kickStrength;
     } else {
-      this.kickOnsetEnvelope *= Math.exp(
-        -elapsed / KICK_ONSET_RELEASE_SECONDS,
-      );
+      this.kickOnsetEnvelope *= Math.exp(-elapsed / KICK_ONSET_RELEASE_SECONDS);
     }
 
     // 2. Sustain modulation envelope for visual parameters (hold + smooth release)

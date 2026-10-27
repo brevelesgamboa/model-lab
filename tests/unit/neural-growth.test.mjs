@@ -18,6 +18,45 @@ const checkpointUrl = new URL(
   import.meta.url,
 );
 
+test("resonance feedback resolves canonical and legacy shader uniforms once per program", () => {
+  for (const available of ["u_resonanceFeedback", "u_latentFeedback", null]) {
+    const queries = [];
+    const uploads = [];
+    const location = {};
+    const runtime = Object.create(TextureNcaRuntime.prototype);
+    runtime.canvas = { width: 1, height: 1 };
+    runtime.size = 256;
+    runtime.program = { update: { handle: {}, locations: new Map() } };
+    runtime.gl = {
+      bindFramebuffer() {},
+      viewport() {},
+      useProgram() {},
+      bindVertexArray() {},
+      uniform1i() {},
+      drawArrays() {},
+      getUniformLocation(program, key) {
+        queries.push(key);
+        return key === available ? location : null;
+      },
+      uniform1f(target, value) {
+        uploads.push([target, value]);
+      },
+    };
+    runtime.run("update", null, {}, { u_resonanceFeedback: 0.2 });
+    runtime.run("update", null, {}, { u_resonanceFeedback: 0.4 });
+    assert.deepEqual(
+      queries,
+      available === "u_resonanceFeedback"
+        ? ["u_size", "u_resonanceFeedback"]
+        : ["u_size", "u_resonanceFeedback", "u_latentFeedback"],
+    );
+    assert.deepEqual(uploads, [
+      [available ? location : null, 0.2],
+      [available ? location : null, 0.4],
+    ]);
+  }
+});
+
 function fixture() {
   return {
     format: "latent-field-texture-nca-v1",
@@ -184,8 +223,10 @@ test("sparse layout supports 1024x1024 grids with 10-bit coordinate unpacking", 
   let highBitSeen = false;
   for (let index = 0; index < 2048; index += 1) {
     const shufOffset = index * 4;
-    const x = layout.shuffle[shufOffset] + (layout.shuffle[shufOffset + 2] << 8);
-    const y = layout.shuffle[shufOffset + 1] + (layout.shuffle[shufOffset + 3] << 8);
+    const x =
+      layout.shuffle[shufOffset] + (layout.shuffle[shufOffset + 2] << 8);
+    const y =
+      layout.shuffle[shufOffset + 1] + (layout.shuffle[shufOffset + 3] << 8);
     assert.ok(x >= 0 && x < 1024);
     assert.ok(y >= 0 && y < 1024);
     const invOffset = (y * 1024 + x) * 4;
@@ -201,8 +242,11 @@ test("sparse layout supports 1024x1024 grids with 10-bit coordinate unpacking", 
   }
   const lastIndex = 524287;
   const lastShufOffset = lastIndex * 4;
-  const lx = layout.shuffle[lastShufOffset] + (layout.shuffle[lastShufOffset + 2] << 8);
-  const ly = layout.shuffle[lastShufOffset + 1] + (layout.shuffle[lastShufOffset + 3] << 8);
+  const lx =
+    layout.shuffle[lastShufOffset] + (layout.shuffle[lastShufOffset + 2] << 8);
+  const ly =
+    layout.shuffle[lastShufOffset + 1] +
+    (layout.shuffle[lastShufOffset + 3] << 8);
   const lastInvOffset = (ly * 1024 + lx) * 4;
   assert.equal(layout.inverse[lastInvOffset + 2], 255);
   const lastHigh = layout.inverse[lastInvOffset + 3];

@@ -21,18 +21,18 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
   const overlayCanvas = page.locator("#audio-visualizer-canvas");
 
   await expect(toggleBtn).toBeVisible();
-  await expect(toggleBtn).toHaveText("WAVE: OFF");
+  await expect(toggleBtn).toHaveText("Wave: Off");
   await expect(overlayCanvas).toBeHidden();
 
   // Pointer events must pass through to output canvas
-  const pointerEvents = await overlayCanvas.evaluate((el) =>
-    window.getComputedStyle(el).pointerEvents,
+  const pointerEvents = await overlayCanvas.evaluate(
+    (el) => window.getComputedStyle(el).pointerEvents,
   );
   expect(pointerEvents).toBe("none");
 
   // Toggle visualizer on
   await toggleBtn.click();
-  await expect(toggleBtn).toHaveText("WAVE: ON");
+  await expect(toggleBtn).toHaveText("Wave: On");
   await expect(toggleBtn).toHaveClass(/is-active/);
   await expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
   await expect(overlayCanvas).toBeVisible();
@@ -65,7 +65,9 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
   await expect(colorPicker).toHaveValue("#33aaff");
 
   // Test color pill selection
-  const magentaPill = page.locator('#visualizer-color-pills [data-color="#ff00a0"]');
+  const magentaPill = page.locator(
+    '#visualizer-color-pills [data-color="#ff00a0"]',
+  );
   await magentaPill.click();
   await expect(magentaPill).toHaveClass(/is-active/);
 
@@ -88,10 +90,9 @@ test("audio visualizer overlay toggles cleanly, opens settings popover and confi
 
   // Toggle visualizer off
   await toggleBtn.click();
-  await expect(toggleBtn).toHaveText("WAVE: OFF");
+  await expect(toggleBtn).toHaveText("Wave: Off");
   await expect(toggleBtn).not.toHaveClass(/is-active/);
   await expect(overlayCanvas).toBeHidden();
 
   expect(errors).toEqual([]);
 });
-

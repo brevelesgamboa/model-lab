@@ -15,8 +15,8 @@ export const DEFAULT_VISUALIZER_CONFIG = Object.freeze({
   mode: "waveform", // "waveform", "spectrum", "bass_history"
   style: "single", // "single", "mirrored"
   height: 0.25, // 0.05 to 0.50 (restricted height)
-  position: 0.50, // 0.05 to 0.95 (centered in middle)
-  opacity: 0.80, // 0.10 to 1.00
+  position: 0.5, // 0.05 to 0.95 (centered in middle)
+  opacity: 0.8, // 0.10 to 1.00
   color: "#00f0ff",
 });
 
@@ -30,7 +30,10 @@ function hexToRgb(hex) {
   const clean = String(hex || "#00f0ff").replace("#", "");
   const num = parseInt(
     clean.length === 3
-      ? clean.split("").map((c) => c + c).join("")
+      ? clean
+          .split("")
+          .map((c) => c + c)
+          .join("")
       : clean,
     16,
   );
@@ -236,7 +239,7 @@ export class AudioVisualizerOverlay {
       height: clampNumber(
         input.height,
         0.05,
-        0.50,
+        0.5,
         DEFAULT_VISUALIZER_CONFIG.height,
       ),
       position: clampNumber(
@@ -247,12 +250,13 @@ export class AudioVisualizerOverlay {
       ),
       opacity: clampNumber(
         input.opacity,
-        0.10,
-        1.00,
+        0.1,
+        1.0,
         DEFAULT_VISUALIZER_CONFIG.opacity,
       ),
       color:
-        typeof input.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(input.color)
+        typeof input.color === "string" &&
+        /^#[0-9a-fA-F]{3,8}$/.test(input.color)
           ? input.color
           : DEFAULT_VISUALIZER_CONFIG.color,
     };
@@ -351,8 +355,7 @@ export class AudioVisualizerOverlay {
       const last = Math.min(1023, Math.max(first, Math.floor(f1 / binWidth)));
       const count = Math.max(1, last - first + 1);
       // Quadratic bass emphasis weighting
-      const weight =
-        1.0 + 0.6 * ((NUM_POINTS - 1 - i) / (NUM_POINTS - 1)) ** 2;
+      const weight = 1.0 + 0.6 * ((NUM_POINTS - 1 - i) / (NUM_POINTS - 1)) ** 2;
       lut.push({ first, last, count, weight });
     }
     this.frequencyLut = lut;
@@ -546,7 +549,8 @@ export class AudioVisualizerOverlay {
         sum += timeDomainData[k];
         count += 1;
       }
-      const avgSample = count > 0 ? sum / count : (timeDomainData[winStart] ?? 128);
+      const avgSample =
+        count > 0 ? sum / count : (timeDomainData[winStart] ?? 128);
       const rawDev = ((avgSample - 128) / 128) * 1.35;
 
       // Temporal inertia filter: smooth 45% new, 55% previous
@@ -575,7 +579,7 @@ export class AudioVisualizerOverlay {
 
   drawData(data) {
     const baseY = this.config.position; // 0.05 to 0.95 (default 0.50)
-    const ampHeight = 0.50 * this.config.height;
+    const ampHeight = 0.5 * this.config.height;
     const [r, g, b] = hexToRgb(this.config.color);
     const isMirrored = this.config.style === "mirrored";
 
@@ -672,7 +676,7 @@ export function initVisualizerUi(
   if (!visualizer || !elements?.toggleAudioVisualizer) return;
 
   function syncUi(config) {
-    elements.toggleAudioVisualizer.textContent = `WAVE: ${config.enabled ? "ON" : "OFF"}`;
+    elements.toggleAudioVisualizer.textContent = `Wave: ${config.enabled ? "On" : "Off"}`;
     elements.toggleAudioVisualizer.classList.toggle(
       "is-active",
       config.enabled,
@@ -697,18 +701,17 @@ export function initVisualizerUi(
         elements.visualizerPositionVal.textContent = `${Math.round(config.position * 100)}%`;
     }
     if (elements.visualizerOpacityRange) {
-      elements.visualizerOpacityRange.value = String(config.opacity ?? 0.80);
+      elements.visualizerOpacityRange.value = String(config.opacity ?? 0.8);
       if (elements.visualizerOpacityVal)
-        elements.visualizerOpacityVal.textContent = `${Math.round((config.opacity ?? 0.80) * 100)}%`;
+        elements.visualizerOpacityVal.textContent = `${Math.round((config.opacity ?? 0.8) * 100)}%`;
     }
     if (elements.visualizerColorPicker) {
       elements.visualizerColorPicker.value = config.color;
     }
 
     if (elements.visualizerColorPills) {
-      const pills = elements.visualizerColorPills.querySelectorAll(
-        ".color-preset-pill",
-      );
+      const pills =
+        elements.visualizerColorPills.querySelectorAll(".color-preset-pill");
       pills.forEach((pill) => {
         pill.classList.toggle(
           "is-active",
@@ -728,9 +731,7 @@ export function initVisualizerUi(
     visualizer.enabled = nextState;
     terminal(
       "VISUALIZER",
-      nextState
-        ? "audio wave overlay enabled"
-        : "audio wave overlay disabled",
+      nextState ? "audio wave overlay enabled" : "audio wave overlay disabled",
     );
     setStatus(nextState ? "AUDIO WAVE ON" : "AUDIO WAVE OFF");
   });

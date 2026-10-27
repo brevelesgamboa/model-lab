@@ -415,27 +415,8 @@
                   aria-label="Renderer status and capture controls"
                 >
                   <div class="status-telemetry">
-                    <span class="live-indicator"
-                      ><span class="live-dot"></span>LIVE</span
-                    ><span class="status-divider"></span
-                    ><span id="live-fps" class="output-live-info"
-                      >0 FPS · 0.0 MS</span
-                    >
-                  </div>
-                  <div
-                    id="audio-monitor"
-                    class="audio-monitor"
-                    aria-label="Audio spectrum"
-                  >
-                    <span class="audio-monitor__label">EQ</span
-                    ><canvas
-                      id="audio-meter"
-                      class="audio-monitor__spectrum"
-                      width="112"
-                      height="18"
-                      role="img"
-                      aria-label="System audio spectrum: off"
-                      >Live system audio spectrum</canvas
+                    <span id="live-fps" class="output-live-info"
+                      >0 FPS · 0.0 ms</span
                     >
                   </div>
                   <span id="output-resolution" class="panel-code"
@@ -867,7 +848,6 @@
               <section class="panel terminal-panel" aria-label="Session log">
                 <div class="panel-heading panel-heading--terminal">
                   <h1 class="panel__title">Session Log</h1>
-                  <span class="panel-code">LOCAL SESSION</span>
                 </div>
                 <div
                   id="terminal-output"
@@ -1095,7 +1075,7 @@
             type="button"
             aria-pressed="false"
           >
-            Session Log<svg aria-hidden="true" viewBox="0 0 16 16">
+            Log<svg aria-hidden="true" viewBox="0 0 16 16">
               <path
                 d="m3 6 5 5 5-5"
                 fill="none"
@@ -1107,9 +1087,24 @@
             </svg>
           </button>
           <div class="status-feedback">
-            <span id="status-message">READY</span>
+            <span id="status-message">Ready</span>
           </div>
           <div class="footer-tools" aria-label="Audio and visualizer controls">
+            <div
+              id="audio-monitor"
+              class="audio-monitor"
+              aria-label="Audio spectrum"
+            >
+              <canvas
+                id="audio-meter"
+                class="audio-monitor__spectrum"
+                width="112"
+                height="18"
+                role="img"
+                aria-label="Audio spectrum: off"
+                >Audio spectrum</canvas
+              >
+            </div>
             <button
               id="toggle-audio-input"
               class="audio-monitor__toggle utility-pill"
@@ -1117,7 +1112,7 @@
               aria-pressed="false"
               aria-describedby="audio-share-hint"
             >
-              AUDIO: OFF</button
+              Audio: Off</button
             ><button
               id="toggle-audio-visualizer"
               class="audio-monitor__toggle visualizer-toggle utility-pill"
@@ -1125,7 +1120,7 @@
               aria-pressed="false"
               title="Toggle audio waveform overlay"
             >
-              WAVE: OFF</button
+              Wave: Off</button
             ><button
               id="open-visualizer-settings"
               class="audio-monitor__cfg-btn utility-pill"
@@ -1133,7 +1128,7 @@
               aria-label="Visualizer wave settings"
               title="Visualizer wave settings"
             >
-              CFG
+              Settings
             </button>
             <div
               id="visualizer-settings-popover"

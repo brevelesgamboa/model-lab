@@ -8,6 +8,25 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
 });
 
+test("the footer keeps EQ beside Audio and uses quiet status and log messages", async ({
+  page,
+}) => {
+  await expect(page.locator("#app-status-bar #audio-meter")).toBeVisible();
+  await expect(page.locator("#canvas-status-bar #audio-meter")).toHaveCount(0);
+  await expect(page.locator(".live-indicator, .drawer-badge")).toHaveCount(0);
+  await expect(page.locator("#toggle-audio-input")).toHaveText("Audio: Off");
+  await page.locator("#toggle-animation").click();
+  await expect(page.locator("#status-message")).toHaveText("Playing");
+  await page.locator("#toggle-animation").click();
+  await expect(page.locator("#status-message")).toHaveText("Paused");
+  await page.locator("#toggle-terminal").click();
+  await expect(page.locator(".terminal-panel")).not.toContainText(
+    "LOCAL SESSION",
+  );
+  await expect(page.locator("#terminal-output")).not.toContainText(">BOOT");
+  await expect(page.locator("#terminal-output")).toContainText("Ready");
+});
+
 test("reference chrome and brush rail frame the canvas without overlays", async ({
   page,
 }) => {
@@ -123,40 +142,266 @@ test("range, numeric stepper, preset, and reset update the rendered shader", asy
   await expect(
     page.locator('[data-parameter="zoomExponent"] .fine-input'),
   ).toHaveValue("3.05");
-  await expect(page.locator("#status-message")).toContainText("LOADED");
+  await expect(page.locator("#status-message")).toContainText("loaded");
 });
 
-test("the SVG modulation draft is isolated and existing routing stays functional", async ({
+test("the compact drawer controls direction, phase and logarithmic rate without duplicate routing", async ({
   page,
 }) => {
   const control = page.locator('[data-parameter="scale"]');
-  const toggle = control.locator(".modulation-toggle");
-  const originalValue = await control.locator(".fine-input").inputValue();
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await expect(control.locator(".draft-waveform")).toBeVisible();
-  const draft = control.locator(".modulation-draft");
-  await draft.getByLabel("Preview LFO rate").fill("1.25");
-  await expect(draft.locator("output").first()).toHaveText("1.25 Hz");
-  await draft.getByRole("button", { name: "FULL", exact: true }).click();
-  await expect(draft.locator(".draft-audio")).toHaveAttribute(
-    "data-source",
-    "full",
-  );
-  await draft.getByRole("button", { name: "KICK", exact: true }).click();
+  await control.locator(".fine-input").fill("2.4");
+  await control.locator(".modulation-toggle").click();
+  const drawer = control.locator(".modulation-drawer");
+  await expect(page.locator(".existing-routing")).toHaveCount(0);
   await expect(
-    draft.getByRole("button", { name: "KICK", exact: true }),
-  ).toHaveCSS("color", "rgb(217, 119, 6)");
-  await expect(control.locator(".fine-input")).toHaveValue(originalValue);
-  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: OFF");
-  await control.locator(".existing-routing > summary").click();
-  await control
-    .getByLabel("Enable COORDINATE SCALE LFO", { exact: true })
+    drawer.getByLabel("COORDINATE SCALE LFO rate range", { exact: true }),
+  ).toHaveValue("slow");
+  const hz = drawer.getByLabel("COORDINATE SCALE LFO rate in Hz", {
+    exact: true,
+  });
+  await expect(hz).toHaveValue("0.05");
+  await hz.fill("1.25");
+  await hz.dispatchEvent("change");
+  await expect(
+    drawer.getByLabel("COORDINATE SCALE LFO rate range", { exact: true }),
+  ).toHaveValue("full");
+  await drawer
+    .getByLabel("COORDINATE SCALE modulation enabled", { exact: true })
     .check();
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
-  await toggle.click();
-  await expect(control.locator(".modulation-panel")).toHaveClass(/hidden/);
+  await drawer
+    .getByLabel("COORDINATE SCALE LFO depth percent", { exact: true })
+    .fill("20");
+  await drawer.getByRole("button", { name: "Full", exact: true }).click();
+  await drawer.getByRole("button", { name: "Kick", exact: true }).click();
+  await drawer
+    .getByLabel("COORDINATE SCALE audio modulation depth", { exact: true })
+    .fill("0.5");
+  await drawer
+    .getByRole("button", {
+      name: "COORDINATE SCALE audio depth below base",
+      exact: true,
+    })
+    .click();
+  const strip = control.getByRole("slider", {
+    name: "COORDINATE SCALE LFO amount",
+    exact: true,
+  });
+  const range = control.locator(".modulation-track__range");
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("40%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("20%");
+  const polarity = drawer.getByLabel("COORDINATE SCALE modulation direction", {
+    exact: true,
+  });
+  await polarity.selectOption("positive");
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("50%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("10%");
+  await expect(strip).toHaveAttribute("aria-valuetext", "20%, above base");
+  await polarity.selectOption("negative");
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("40%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("10%");
+  await expect(strip).toHaveAttribute("aria-valuetext", "20%, below base");
+  const phase = drawer.locator(".drawer-playhead");
+  const first = await phase.getAttribute("x1");
+  await expect.poll(() => phase.getAttribute("x1")).not.toBe(first);
+  await page.locator("#toggle-animation").click();
+  await expect(page.locator("#status-message")).toHaveText("Paused");
+  const before = Number(await phase.getAttribute("x1"));
+  await drawer
+    .getByLabel("COORDINATE SCALE LFO phase", { exact: true })
+    .fill("90");
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: OFF");
+  await expect
+    .poll(
+      async () => (Number(await phase.getAttribute("x1")) - before + 256) % 256,
+    )
+    .toBeCloseTo(64, 0);
+  await expect(drawer.locator(".drawer-value output")).toHaveText(
+    /^\d+\.\d{2}$/,
+  );
+  await expect(drawer.locator(".drawer-value")).toHaveCSS(
+    "white-space",
+    "nowrap",
+  );
+  await drawer
+    .getByLabel("COORDINATE SCALE waveform", { exact: true })
+    .selectOption("triangle");
+  await drawer.getByRole("button", { name: "Off", exact: true }).click();
+  await expect(
+    drawer.getByLabel("COORDINATE SCALE audio modulation depth", {
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page.locator("#model-select").selectOption("fractal-functions");
+  await page.locator("#model-select").selectOption("folded-fractal");
+  await expect(
+    control.getByLabel("COORDINATE SCALE modulation direction", {
+      exact: true,
+    }),
+  ).toHaveValue("negative");
+  await expect(
+    control.getByLabel("COORDINATE SCALE LFO phase", { exact: true }),
+  ).toHaveValue("90");
+  await expect(
+    control.getByLabel("COORDINATE SCALE LFO rate in Hz", { exact: true }),
+  ).toHaveValue("1.25");
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  await page.locator("#reset-parameters").click();
+  await page.locator('[data-view="saved"]').click();
+  // The new Saved Runs view is a placeholder; exercise its retained restore handler.
+  await page
+    .locator(".run-card button")
+    .filter({ hasText: /^RESTORE$/ })
+    .evaluate((button) => button.click());
+  await expect(
+    control.getByLabel("COORDINATE SCALE modulation direction", {
+      exact: true,
+    }),
+  ).toHaveValue("negative");
+  await expect(
+    control.getByLabel("COORDINATE SCALE LFO phase", { exact: true }),
+  ).toHaveValue("90");
+});
+
+test("dragging and keyboard adjustment of the blue strip change depth while preserving the base", async ({
+  page,
+}) => {
+  const control = page.locator('[data-parameter="scale"]');
+  await control.locator(".fine-input").fill("2.4");
+  const strip = control.getByRole("slider", {
+    name: "COORDINATE SCALE LFO amount",
+    exact: true,
+  });
+  await strip.focus();
+  await strip.press("ArrowRight");
+  await expect(strip).toHaveAttribute("aria-valuenow", "25");
+  await expect(page.locator("#status-message")).toHaveText("Playing");
+  const main = await control.locator(".control-slider").boundingBox();
+  const track = await strip.boundingBox();
+  expect(track.y).toBeGreaterThanOrEqual(main.y + main.height);
+  const handle = await strip
+    .locator(".modulation-track__handle--end")
+    .boundingBox();
+  await page.mouse.move(
+    handle.x + handle.width / 2,
+    handle.y + handle.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    handle.x + handle.width / 2 + track.width * 0.1,
+    handle.y + handle.height / 2,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await strip.getAttribute("aria-valuenow")))
+    .toBeCloseTo(45, 0);
+  await expect(control.locator(".fine-input")).toHaveValue("2.4");
+  await control.locator(".modulation-toggle").click();
+  await expect(
+    control.getByLabel("COORDINATE SCALE LFO depth percent", { exact: true }),
+  ).toHaveValue("45");
+  await strip.focus();
+  await strip.press("Home");
+  await expect(strip).toHaveAttribute("aria-valuenow", "0");
+  await strip.press("End");
+  await expect(strip).toHaveAttribute("aria-valuenow", "100");
+  await expect(
+    control.getByLabel("COORDINATE SCALE LFO depth percent", { exact: true }),
+  ).toHaveValue("100");
+});
+
+test("global detector settings synchronize across drawers independently of signed audio depth", async ({
+  page,
+}) => {
+  const first = page.locator('[data-parameter="scale"]');
+  const second = page.locator('[data-parameter="rotation"]');
+  await first.locator(".modulation-toggle").click();
+  await second.locator(".modulation-toggle").click();
+  await first.locator(".drawer-global-settings > summary").click();
+  await second.locator(".drawer-global-settings > summary").click();
+  await first
+    .getByLabel("COORDINATE SCALE global input gain", { exact: true })
+    .fill("1.7");
+  await first
+    .getByLabel("COORDINATE SCALE global kick threshold", { exact: true })
+    .fill("0.1");
+  await first
+    .getByLabel("COORDINATE SCALE global kick gate", { exact: true })
+    .fill("0.08");
+  await expect(
+    second.getByLabel("ITERATION ROTATION global input gain", { exact: true }),
+  ).toHaveValue("1.7");
+  await expect(
+    second.getByLabel("ITERATION ROTATION global kick threshold", {
+      exact: true,
+    }),
+  ).toHaveValue("0.1");
+  await expect(
+    second.getByLabel("ITERATION ROTATION global kick gate", { exact: true }),
+  ).toHaveValue("0.08");
+  await first.getByRole("button", { name: "Full", exact: true }).click();
+  await first
+    .getByLabel("COORDINATE SCALE audio modulation depth", { exact: true })
+    .fill("0.8");
+  const negative = first.getByRole("button", {
+    name: "COORDINATE SCALE audio depth below base",
+    exact: true,
+  });
+  await negative.click();
+  await expect(negative).toHaveAttribute("aria-pressed", "true");
+  await expect(first.locator(".drawer-audio output")).toHaveText("-80%");
+  const state = await page.evaluate(async () => {
+    const { rhythmController } =
+      await import("/assets/js/core/rhythm-controller.js");
+    const { getAudioRoute } =
+      await import("/assets/js/core/modulation-matrix.js");
+    return {
+      gain: rhythmController.inputGain,
+      offset: rhythmController.kickOffset,
+      gate: rhythmController.kickGate,
+      route: getAudioRoute("folded-fractal", "scale"),
+    };
+  });
+  expect(state).toEqual({
+    gain: 1.7,
+    offset: 0.1,
+    gate: 0.08,
+    route: { source: "bass", depth: -0.8 },
+  });
+  await page.locator("#model-select").selectOption("fractal-functions");
+  await page.locator("#model-select").selectOption("folded-fractal");
+  await expect(first.locator(".drawer-audio")).toHaveAttribute(
+    "data-source",
+    "bass",
+  );
+  await expect(
+    first.getByLabel("COORDINATE SCALE audio modulation depth", {
+      exact: true,
+    }),
+  ).toHaveValue("0.8");
+  await expect(negative).toHaveAttribute("aria-pressed", "true");
+  await first
+    .getByRole("button", {
+      name: "COORDINATE SCALE audio depth above base",
+      exact: true,
+    })
+    .click();
+  await expect(first.locator(".drawer-audio output")).toHaveText("80%");
+  const depth = first.getByLabel("COORDINATE SCALE audio modulation depth", {
+    exact: true,
+  });
+  await depth.fill("0");
+  await negative.click();
+  await depth.fill("0.3");
+  await expect(first.locator(".drawer-audio output")).toHaveText("-30%");
+  expect(
+    await page.evaluate(async () => {
+      const { getAudioRoute } =
+        await import("/assets/js/core/modulation-matrix.js");
+      return getAudioRoute("folded-fractal", "scale").depth;
+    }),
+  ).toBe(-0.3);
 });
 
 for (const width of [360, 900, 1440]) {
