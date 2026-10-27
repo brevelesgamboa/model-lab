@@ -7,6 +7,7 @@ import { defaultLfoConfig } from "../core/lfo.js";
 import { getAudioRoute } from "../core/modulation-matrix.js";
 import { supportsModulation } from "../core/model-contract.js";
 import { modulationIsActive } from "../ui/modulation-panel.js";
+import { createNeuronGallery } from "../ui/neuron-gallery.js";
 
 export function formatControlValue(definition, value) {
   const numeric = Number(value);
@@ -138,8 +139,30 @@ export function createControlsController({
   onInfo,
   makeModulationPanel,
   onModulationOpen,
+  onNeuronPreset,
 }) {
   let presetSelect = null;
+  let neuronGallery = null;
+  let manualChannelOpen = false;
+
+  function syncNeuronGallery() {
+    if (!neuronGallery) return;
+    const parameters = getParameters();
+    neuronGallery.update(parameters);
+    const channel = controlElements.get("targetChannel");
+    const definition = getModel()
+      .controlsForParameters(parameters)
+      .find((entry) => entry.key === "targetChannel");
+    if (!channel || !definition) return;
+    // Keep the object captured by the range/stepper listeners current too.
+    Object.assign(channel.definition, definition);
+    channel.slider.max = channel.fine.max = String(definition.max);
+    channel.slider.value = channel.fine.value = String(
+      parameters.targetChannel,
+    );
+    channel.guidance.update(parameters.targetChannel);
+    updateRangeProgress(channel.slider);
+  }
   function makeLabel(definition) {
     const wrapper = document.createElement("span");
     wrapper.className = "control-label-wrap";
@@ -253,16 +276,39 @@ export function createControlsController({
     const currentModel = getModel();
     const currentParameters = getParameters();
     const currentLfoState = getLfoState();
+    neuronGallery?.dispose();
     elements.parameterControls.replaceChildren();
     controlElements.clear();
     presetSelect = null;
+    neuronGallery = null;
 
     renderPresetControl();
 
-    currentModel.controls.forEach((definition) => {
+    const definitions =
+      currentModel.controlsForParameters?.(currentParameters) ??
+      currentModel.controls;
+    definitions.forEach((definition) => {
+      if (definition.key === "targetLayer" && currentModel.neuronArchetypes) {
+        neuronGallery = createNeuronGallery({
+          neurons: currentModel.neuronArchetypes,
+          parameters: currentParameters,
+          onSelect: onNeuronPreset,
+          manualOpen: manualChannelOpen,
+          previewBridge: currentModel.dreamBridge,
+          onToggleManual(open) {
+            manualChannelOpen = open;
+            controlElements.get("targetChannel").block.hidden = !open;
+          },
+        });
+        elements.parameterControls.append(neuronGallery.element);
+      }
       const block = document.createElement("div");
       block.className = "control-block";
       block.dataset.parameter = definition.key;
+      if (definition.key === "targetChannel" && currentModel.neuronArchetypes) {
+        block.id = "dream-channel-control";
+        block.hidden = !manualChannelOpen;
+      }
 
       if (definition.type === "range") {
         const head = document.createElement("div");
@@ -405,6 +451,7 @@ export function createControlsController({
         });
 
         controlElements.set(definition.key, {
+          block,
           definition,
           slider,
           fine,
@@ -607,6 +654,7 @@ export function createControlsController({
 
   return {
     render,
+    syncNeuronGallery,
     setPreset: (name) => {
       if (presetSelect) presetSelect.value = name;
     },

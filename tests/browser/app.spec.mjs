@@ -74,7 +74,7 @@ test("navigation pauses the clock, runs persist, and PNG capture works", async (
   await expect(page.locator(".run-card")).toHaveCount(1);
   await page.reload();
   await expect(page.locator(".run-card")).toHaveCount(1);
-  await expect(page.locator("#view-saved")).toBeEmpty();
+  await expect(page.locator("#view-saved .run-card")).toBeVisible();
   await page.locator('[data-view="lab"]').click();
   await expect(page.locator('[data-view-panel="lab"]')).toBeVisible();
   const download = page.waitForEvent("download");
@@ -97,8 +97,8 @@ for (const width of [360, 900, 1440]) {
       ),
     ).toBe(true);
     await page.locator('[data-view="experiments"]').click();
-    await expect(page.locator("#view-experiments")).toBeEmpty();
-    await expect(page.locator("#train-model")).toBeHidden();
+    await expect(page.locator("#view-experiments")).toContainText("Training");
+    await expect(page.locator("#train-model")).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -107,19 +107,18 @@ for (const width of [360, 900, 1440]) {
   });
 }
 
-test("deferred views keep controller targets hidden and legacy archive links work", async ({
+test("legacy links open working views and their controller targets", async ({
   page,
 }) => {
   await page.goto("/#archive");
   await expect(page.locator("#view-saved")).toBeVisible();
-  for (const id of [
-    "train-model",
-    "draw-canvas",
-    "archive-grid",
-    "fractal-process",
-  ]) {
+  await expect(page.locator("#archive-grid")).toBeVisible();
+  await expect(page.locator("#view-saved")).toContainText("No saved runs yet");
+  await page.locator('[data-view="experiments"]').click();
+  for (const id of ["train-model", "draw-canvas"]) {
     await expect(page.locator("#" + id)).toHaveCount(1);
-    await expect(page.locator("#" + id)).toBeHidden();
+    await expect(page.locator("#" + id)).toBeVisible();
   }
-  await expect(page.locator("#view-saved")).toBeEmpty();
+  await page.locator('[data-view="about"]').click();
+  await expect(page.locator(".about-card")).toHaveCount(8);
 });

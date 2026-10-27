@@ -899,7 +899,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await page.locator(".growth-gallery__tab[data-filter='organic']").click();
   await expect(page.locator("#growth-gallery-count")).toContainText("25");
 
-  const organicCard = page.locator(".growth-gallery__card").first();
+  const organicCard = dialog.locator(".growth-gallery__card").first();
   const cardSubId = await organicCard
     .locator(".growth-gallery__card-id")
     .textContent();
@@ -919,7 +919,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
   await page.locator(".growth-gallery__tab[data-filter='favorites']").click();
 
   // Select pattern from gallery
-  const card = page.locator(".growth-gallery__card").first();
+  const card = dialog.locator(".growth-gallery__card").first();
   await card.click();
   await expect(dialog).not.toBeVisible();
 
@@ -1550,6 +1550,212 @@ test("camera breathing configures modes and updates viewport cleanly", async ({
   expect(errors).toEqual([]);
 });
 
+test("neuron archetype cards update all three targets without changing the cellular field", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  await page.evaluate(() => {
+    window.__initialGrowthRuntime = window.__growthRuntime;
+  });
+  const neurons = await page.evaluate(
+    async () =>
+      (await import("/assets/js/models/neural-growth.js")).CURATED_NEURONS,
+  );
+  await expect(page.locator(".neuron-gallery__card")).toHaveCount(7);
+  await expect(page.locator('[data-parameter="targetChannel"]')).toBeHidden();
+  for (const neuron of neurons) {
+    const card = page.locator(`[data-neuron-id="${neuron.id}"]`);
+    await expect(card).toContainText(neuron.name);
+    await expect(card).toContainText(neuron.desc);
+    await expect(card).toContainText(neuron.layer);
+    await card.click();
+    await expect(card).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
+      neuron.layer,
+    );
+    await expect(
+      page.getByLabel("DREAM NEURON exact value", { exact: true }),
+    ).toHaveValue(String(neuron.channel));
+    await expect(
+      page.getByLabel("DREAM STRENGTH exact value", { exact: true }),
+    ).toHaveValue(String(neuron.strength));
+    await expect(page.locator(".modulation-toggle:visible")).toHaveCount(18);
+    expect(await state(page)).toEqual(before);
+  }
+  expect(
+    await page.evaluate(
+      () => window.__growthRuntime === window.__initialGrowthRuntime,
+    ),
+  ).toBe(true);
+  await expect(page.getByLabel("DREAM GUIDANCE", { exact: true })).toHaveValue(
+    "off",
+  );
+});
+
+test("manual channel exploration follows every layer ceiling and clamps deep-to-shallow changes", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  const toggle = page.getByRole("button", {
+    name: "Manual Channel Explorer",
+    exact: true,
+  });
+  await toggle.click();
+  const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  const slider = page.getByLabel("DREAM NEURON", { exact: true });
+  const layer = page.getByLabel("DREAM LAYER", { exact: true });
+  const depths = await page.evaluate(
+    async () =>
+      (await import("/assets/js/models/neural-growth/dream-guidance.js"))
+        .INCEPTION_LAYER_CHANNELS,
+  );
+  for (const [id, depth] of Object.entries(depths)) {
+    await layer.selectOption(id);
+    await expect(channel).toBeVisible();
+    await expect(channel).toHaveAttribute("max", String(depth - 1));
+    await expect(slider).toHaveAttribute("max", String(depth - 1));
+  }
+  await layer.selectOption("mixed_7b");
+  await channel.fill("1800");
+  await expect(channel).toHaveValue("1800");
+  await layer.selectOption("mixed_5b");
+  await expect(channel).toHaveValue("255");
+  await layer.selectOption("mixed_7b");
+  await expect(channel).toHaveValue("255");
+  await slider.evaluate((input) => {
+    input.value = "1900";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(channel).toHaveValue("1900");
+  await page.locator('[data-neuron-id="curve"]').click();
+  await expect(channel).toHaveValue("144");
+  await expect(channel).toHaveAttribute("max", "767");
+  await channel.fill("145");
+  await expect(page.locator('[data-neuron-id="curve"]')).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await toggle.click();
+  await expect(channel).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(await state(page)).toEqual(before);
+});
+
+test("live archetype changes preserve playback and deliver the selected guidance targets", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.evaluate(async () => {
+    const { DreamGuidanceBridge } =
+      await import("/assets/js/models/neural-growth/dream-guidance.js");
+    window.__guidanceTargets = [];
+    // Isolate scheduling/routing from Inception inference cost in this UI test.
+    DreamGuidanceBridge.prototype.computeGradient = async function (
+      _rgb,
+      _w,
+      _h,
+      layer,
+      channel,
+    ) {
+      window.__guidanceTargets.push({ layer, channel });
+      return null;
+    };
+  });
+  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("128");
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-size",
+    "128",
+  );
+  await page.getByLabel("DREAM CADENCE exact value", { exact: true }).fill("1");
+  await page.getByLabel("DREAM GUIDANCE", { exact: true }).selectOption("on");
+  await page.evaluate(() => {
+    window.__initialGrowthRuntime = window.__growthRuntime;
+  });
+  await page.locator("#toggle-animation").click();
+  let previousSteps = 0;
+  for (const [id, layer, channel] of [
+    ["semantic", "mixed_7b", 312],
+    ["hatch", "mixed_5b", 120],
+    ["ensemble", "mixed_6c", -1],
+  ]) {
+    await page.locator(`[data-neuron-id="${id}"]`).click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          ({ layer, channel }) =>
+            window.__guidanceTargets.some(
+              (target) => target.layer === layer && target.channel === channel,
+            ),
+          { layer, channel },
+        ),
+      )
+      .toBe(true);
+    const steps = await page.evaluate(
+      () => window.__growthRuntime.getStats().steps,
+    );
+    expect(steps).toBeGreaterThan(previousSteps);
+    previousSteps = steps;
+    await expect(page.locator("#toggle-animation")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      await page.evaluate(
+        () => window.__growthRuntime === window.__initialGrowthRuntime,
+      ),
+    ).toBe(true);
+  }
+  await page.locator("#toggle-animation").click();
+});
+
+test("neuron gallery stays inside the sidebar and restores channels above the old ceiling", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  for (const width of [360, 900, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const sizes = await page.locator(".neuron-gallery").evaluate((gallery) => {
+      const strip = gallery.querySelector(".neuron-gallery__strip");
+      const sidebar = gallery.closest(".input-panel");
+      return {
+        sidebar: sidebar.clientWidth,
+        content: sidebar.scrollWidth,
+        strip: strip.clientWidth,
+        cards: strip.scrollWidth,
+      };
+    });
+    expect(sizes.content).toBeLessThanOrEqual(sizes.sidebar + 1);
+    expect(sizes.cards).toBeGreaterThan(sizes.strip);
+  }
+  await page.locator('[data-neuron-id="semantic"]').click();
+  await page
+    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
+    .click();
+  const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  await channel.fill("1800");
+  await page.locator("#run-experiment").click();
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  await page.locator('[data-neuron-id="hatch"]').click();
+  await expect(channel).toHaveValue("120");
+  await page.locator('[data-view="saved"]').click();
+  await page
+    .locator(".run-card")
+    .getByRole("button", { name: "Restore", exact: true })
+    .click();
+  await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
+    "mixed_7b",
+  );
+  await expect(channel).toHaveValue("1800");
+  await expect(channel).toHaveAttribute("max", "2047");
+  expect(errors).toEqual([]);
+});
+
 test("advanced inception guidance and state dynamics configure controls cleanly", async ({
   page,
 }) => {
@@ -1566,6 +1772,9 @@ test("advanced inception guidance and state dynamics configure controls cleanly"
   const neuronInput = page.getByLabel("DREAM NEURON exact value", {
     exact: true,
   });
+  await page
+    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
+    .click();
   await expect(neuronInput).toBeVisible();
   await neuronInput.fill("42");
 

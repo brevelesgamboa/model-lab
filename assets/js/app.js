@@ -55,7 +55,6 @@ import { createHqGallery } from "./capture/hq-gallery.js";
 import {
   CLASSIC_FRACTAL_VIEWS,
   FRACTAL_EXPLORE_ROUTE_IDS,
-  FRACTAL_PROCESS_COPY,
   FRACTAL_ROUTE_IDS,
   LEGACY_PANEL_STORAGE_KEY,
   LEGACY_QUALITY_STORAGE_KEY,
@@ -241,6 +240,17 @@ const controlsController = createControlsController({
     setStatus(`${preset.name} loaded`);
   },
   onRange: syncRangeControl,
+  onNeuronPreset(neuron) {
+    applyParameterSet(
+      {
+        ...currentParameters,
+        targetLayer: neuron.layer,
+        targetChannel: neuron.channel,
+        dreamStrength: neuron.strength,
+      },
+      { message: `${neuron.name} selected` },
+    );
+  },
   onValue(definition, value) {
     currentParameters[definition.key] = value;
     if (
@@ -261,6 +271,7 @@ const controlsController = createControlsController({
       const defaults = currentModel.parameterDefaultsForChange?.(
         definition.key,
         value,
+        currentParameters,
       );
       if (defaults) {
         currentParameters = sanitizedStoredParameters(currentModel, {
@@ -378,17 +389,19 @@ const studioController = createStudioController({
   withExclusiveCompute,
 });
 
-const archiveController = createArchiveController({
-  elements,
-  onRestore: restoreRun,
-  onClear: () => invalidateCurrentRun(),
-  setStatus,
-});
-
 const hqGallery = createHqGallery({
   elements,
   isRendering: () => hqRendering,
   setStatus,
+});
+
+const archiveController = createArchiveController({
+  elements,
+  onRestore: restoreRun,
+  onOpenLab: () => navigate("lab"),
+  onClear: () => invalidateCurrentRun(),
+  setStatus,
+  hqGallery,
 });
 
 const visualizerOverlay = new AudioVisualizerOverlay(
@@ -886,6 +899,9 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   const control = controlElements.get(definition.key);
   const next = coerceRangeValue(definition, value);
   currentParameters[definition.key] = next;
+  if (["targetChannel", "dreamStrength"].includes(definition.key)) {
+    controlsController.syncNeuronGallery();
+  }
   if (control) {
     control.slider.value = String(next);
     control.fine.value = String(next);
@@ -1106,6 +1122,7 @@ function applyParameterSet(
   } = {},
 ) {
   currentParameters = sanitizedStoredParameters(currentModel, parameters);
+  controlsController.syncNeuronGallery();
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
   if (selectedLoopPreset().duration)
     loopPresetState.base = deepClone(currentParameters);
@@ -1187,22 +1204,6 @@ function updateFractalTools() {
 
 function isDreamRoute(model = currentModel) {
   return model?.id === "inception-dream";
-}
-
-function setFractalProcessStep(step) {
-  const selected = Object.prototype.hasOwnProperty.call(
-    FRACTAL_PROCESS_COPY,
-    step,
-  )
-    ? step
-    : "fold";
-  elements.fractalProcess.dataset.step = selected;
-  elements.fractalProcessCopy.textContent = FRACTAL_PROCESS_COPY[selected];
-  elements.fractalProcessButtons.forEach((button) => {
-    const active = button.dataset.fractalStep === selected;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
 }
 
 function renderParameterControls() {
@@ -2000,6 +2001,14 @@ function isTypingTarget(target) {
 }
 
 function attachEvents() {
+  document.querySelectorAll("[data-open-model]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      navigate("lab");
+      selectModel(link.dataset.openModel);
+    });
+  });
+
   elements.brandHome.addEventListener("click", () => navigate("lab"));
   document.getElementById("reset-parameters").addEventListener("click", () => {
     if (gifEncoding || hqRendering || playback.isSuspended()) return;
@@ -2013,7 +2022,10 @@ function attachEvents() {
     setStatus("Parameters reset");
   });
   elements.navItems.forEach((button) =>
-    button.addEventListener("click", () => navigate(button.dataset.view)),
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      navigate(button.dataset.view);
+    }),
   );
   elements.qualitySelect.addEventListener("change", () =>
     applyQuality(elements.qualitySelect.value),
@@ -2083,11 +2095,6 @@ function attachEvents() {
   elements.hqViewerClose.addEventListener("click", () =>
     hqGallery.closeViewer(),
   );
-  elements.fractalProcessButtons.forEach((button) => {
-    button.addEventListener("click", () =>
-      setFractalProcessStep(button.dataset.fractalStep),
-    );
-  });
   document.addEventListener("visibilitychange", () => {
     playback.sync();
     if (!document.hidden && currentView === "lab")
@@ -2171,7 +2178,6 @@ function initialize() {
   initializeWorkbenchShell(elements);
   initializeQualityControls();
   initializeFractalToolOptions();
-  setFractalProcessStep("fold");
   studioController.initialize();
   refreshModelOptions(currentModel.id);
   currentParameters = defaultParameters(currentModel);

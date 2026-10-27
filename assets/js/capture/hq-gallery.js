@@ -115,66 +115,87 @@ export function createHqGallery({ elements, isRendering, setStatus }) {
   }
 
   async function closeViewer({ exitFullscreen = true } = {}) {
+    if (!elements.hqViewer) return;
     elements.hqViewer.hidden = true;
-    elements.outputPanel.classList.remove("is-hq-viewer");
-    elements.hqViewerImage.removeAttribute("src");
+    elements.outputPanel?.classList.remove("is-hq-viewer");
+    elements.hqViewerImage?.removeAttribute("src");
     activeRender = null;
-    if (exitFullscreen && document.fullscreenElement === elements.outputPanel) {
+    if (
+      exitFullscreen &&
+      (document.fullscreenElement === elements.hqViewer ||
+        document.fullscreenElement === elements.outputPanel)
+    ) {
       await document.exitFullscreen().catch(() => {});
     }
   }
 
   async function openViewer(record) {
+    if (!elements.hqViewer) return;
     activeRender = record;
     elements.hqViewerImage.src = renderUrl(record);
-    elements.hqViewerLabel.textContent = `${record.modelName.toUpperCase()} · SEED ${record.seed} · ${record.width} × ${record.height}`;
+    const title = (record.modelName || "HQ Export").toUpperCase();
+    elements.hqViewerLabel.textContent = `${title} · SEED ${record.seed} · ${record.width} × ${record.height}`;
     elements.hqViewer.hidden = false;
-    elements.outputPanel.classList.add("is-hq-viewer");
-    if (document.fullscreenElement !== elements.outputPanel) {
-      try {
-        await elements.outputPanel.requestFullscreen();
-      } catch (error) {
-        terminal(
-          "FULLSCREEN",
-          error instanceof Error ? error.message : String(error),
-          "warning",
-        );
-      }
-    }
   }
 
-  async function render() {
+  async function render(filterModel = "") {
+    if (!elements.hqRenders || !elements.hqRenderList) return;
     const records = await read();
-    elements.hqRenders.hidden = records.length === 0 && !isRendering();
+    const filtered = filterModel
+      ? records.filter(
+          (record) =>
+            record.modelId === filterModel ||
+            record.modelName?.toLowerCase() === filterModel.toLowerCase(),
+        )
+      : records;
+    elements.hqRenders.hidden = filtered.length === 0 && !isRendering();
     elements.hqRenderList.replaceChildren();
-    records.forEach((record) => {
+    filtered.forEach((record) => {
       const card = document.createElement("article");
       card.className = "hq-render-card";
+
       const image = document.createElement("img");
       image.src = renderUrl(record);
-      image.alt = `${record.modelName} seed ${record.seed}`;
+      image.alt = `${record.modelName || "HQ Render"} seed ${record.seed}`;
+      image.loading = "lazy";
+
+      const body = document.createElement("div");
+      body.className = "hq-render-card__body";
+
+      const title = document.createElement("h3");
+      title.className = "hq-render-card__title";
+      title.textContent = record.modelName || "High-Res Snapshot";
+
       const info = document.createElement("span");
       info.textContent = `${record.width} × ${record.height} · SEED ${record.seed}`;
+
       const actions = document.createElement("div");
+      actions.className = "hq-render-card__actions";
 
       const view = document.createElement("button");
       view.type = "button";
+      view.className = "action-button mini-button";
       view.textContent = "VIEW";
       view.addEventListener("click", () => openViewer(record));
+
       const save = document.createElement("button");
       save.type = "button";
+      save.className = "action-button mini-button";
       save.textContent = "DOWNLOAD";
       save.addEventListener("click", () => download(record));
+
       const removeButton = document.createElement("button");
       removeButton.type = "button";
+      removeButton.className = "action-button mini-button text-button--danger";
       removeButton.textContent = "DELETE";
       removeButton.addEventListener("click", async () => {
         await remove(record.id);
-        await render();
+        await render(filterModel);
       });
 
       actions.append(view, save, removeButton);
-      card.append(image, info, actions);
+      body.append(title, info, actions);
+      card.append(image, body);
       elements.hqRenderList.append(card);
     });
   }

@@ -60,11 +60,6 @@ export function collectElements() {
     hqViewerLabel: document.getElementById("hq-viewer-label"),
     hqViewerDownload: document.getElementById("hq-viewer-download"),
     hqViewerClose: document.getElementById("hq-viewer-close"),
-    fractalProcess: document.getElementById("fractal-process"),
-    fractalProcessCopy: document.getElementById("fractal-process-copy"),
-    fractalProcessButtons: Array.from(
-      document.querySelectorAll("[data-fractal-step]"),
-    ),
     inputPanel: document.querySelector(".input-panel"),
     terminalPanel: document.querySelector(".terminal-panel"),
     modelSelect: document.getElementById("model-select"),
@@ -117,14 +112,22 @@ export function collectElements() {
     toggleAudioInput: document.getElementById("toggle-audio-input"),
     toggleAudioVisualizer: document.getElementById("toggle-audio-visualizer"),
     openVisualizerSettings: document.getElementById("open-visualizer-settings"),
-    closeVisualizerSettings: document.getElementById("close-visualizer-settings"),
-    visualizerSettingsPopover: document.getElementById("visualizer-settings-popover"),
+    closeVisualizerSettings: document.getElementById(
+      "close-visualizer-settings",
+    ),
+    visualizerSettingsPopover: document.getElementById(
+      "visualizer-settings-popover",
+    ),
     visualizerModeSelect: document.getElementById("visualizer-mode-select"),
     visualizerStyleSelect: document.getElementById("visualizer-style-select"),
-    visualizerInjectionSelect: document.getElementById("visualizer-injection-select"),
+    visualizerInjectionSelect: document.getElementById(
+      "visualizer-injection-select",
+    ),
     visualizerHeightRange: document.getElementById("visualizer-height-range"),
     visualizerHeightVal: document.getElementById("visualizer-height-val"),
-    visualizerPositionRange: document.getElementById("visualizer-position-range"),
+    visualizerPositionRange: document.getElementById(
+      "visualizer-position-range",
+    ),
     visualizerPositionVal: document.getElementById("visualizer-position-val"),
     visualizerOpacityRange: document.getElementById("visualizer-opacity-range"),
     visualizerOpacityVal: document.getElementById("visualizer-opacity-val"),
@@ -203,6 +206,8 @@ export function collectElements() {
     commonsStatus: document.getElementById("commons-status"),
     commonsResults: document.getElementById("commons-results"),
 
+    archiveModelFilter: document.getElementById("archive-model-filter"),
+    archiveStorageStatus: document.getElementById("archive-storage-status"),
     archiveRuns: document.getElementById("archive-runs"),
     archiveModels: document.getElementById("archive-models"),
     archiveResolution: document.getElementById("archive-resolution"),

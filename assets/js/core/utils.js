@@ -46,13 +46,11 @@ export function downloadBlob(blob, filename) {
 }
 
 export function sanitizeModelName(value) {
-  const normalized = String(value || "LOCAL_IMAGE_BASIS_01")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9_\-]+/g, "_")
-    .replace(/_{2,}/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return (normalized || "LOCAL_IMAGE_BASIS_01").slice(0, 32);
+  const normalized = String(value || "My model")
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (normalized || "My model").slice(0, 32);
 }
 
 export function hashString(value) {
@@ -100,7 +98,10 @@ export function hexToRgb(hex) {
   if (typeof hex !== "string") return [0, 0.94, 1];
   let clean = hex.replace("#", "").trim();
   if (clean.length === 3) {
-    clean = clean.split("").map((c) => c + c).join("");
+    clean = clean
+      .split("")
+      .map((c) => c + c)
+      .join("");
   }
   if (clean.length !== 6) return [0, 0.94, 1];
   const num = parseInt(clean, 16);

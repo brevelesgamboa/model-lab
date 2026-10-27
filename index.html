@@ -20,6 +20,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/views.css" />
     <script type="module" src="assets/js/bootstrap.js"></script>
   </head>
   <body>
@@ -49,20 +50,17 @@
             ><span class="brand-subtitle">WEBGL2</span>
           </div>
           <nav class="nav" aria-label="Primary navigation">
-            <button
+            <a
               class="nav__item is-active"
-              type="button"
               data-view="lab"
+              href="#lab"
               aria-current="page"
             >
-              Lab</button
-            ><button class="nav__item" type="button" data-view="saved">
-              Saved Runs</button
-            ><button class="nav__item" type="button" data-view="experiments">
-              Experiments</button
-            ><button class="nav__item" type="button" data-view="about">
-              About
-            </button>
+              Lab</a
+            ><a class="nav__item" data-view="saved" href="#saved"> Saved Runs</a
+            ><a class="nav__item" data-view="experiments" href="#experiments">
+              Experiments</a
+            ><a class="nav__item" data-view="about" href="#about"> About </a>
           </nav>
           <div class="masthead__tools" aria-label="Workbench utilities">
             <button
@@ -376,36 +374,6 @@
                       hidden
                       aria-hidden="true"
                     ></div>
-                  </div>
-                </div>
-
-                <section id="hq-renders" class="hq-renders" hidden>
-                  <div class="hq-renders__head">
-                    <strong>HQ VERSIONS</strong
-                    ><span id="hq-status">READY</span>
-                  </div>
-                  <div id="hq-render-list" class="hq-render-list"></div>
-                </section>
-
-                <div id="hq-viewer" class="hq-viewer" hidden>
-                  <img id="hq-viewer-image" alt="High quality fractal render" />
-                  <div class="hq-viewer__bar">
-                    <span id="hq-viewer-label">HQ FRACTAL</span>
-                    <div>
-                      <button
-                        id="hq-viewer-download"
-                        class="text-button"
-                        type="button"
-                      >
-                        DOWNLOAD</button
-                      ><button
-                        id="hq-viewer-close"
-                        class="text-button"
-                        type="button"
-                      >
-                        CLOSE
-                      </button>
-                    </div>
                   </div>
                 </div>
 
@@ -859,25 +827,711 @@
           </section>
           <section
             id="view-saved"
-            class="view hidden"
+            class="view page-view hidden"
             data-view-panel="saved"
-            aria-label="Saved Runs — coming soon"
+            aria-labelledby="saved-title"
             hidden
-          ></section>
+          >
+            <div class="saved-layout">
+              <aside class="saved-sidebar" aria-label="Saved run filters">
+                <h2>Filter runs</h2>
+                <label class="field" for="archive-model-filter"
+                  ><span>Model</span
+                  ><select id="archive-model-filter">
+                    <option value="">All models</option>
+                  </select></label
+                >
+                <div class="saved-storage">
+                  <h3>Browser storage</h3>
+                  <p id="archive-storage-status">Stored in this browser</p>
+                  <p><span id="archive-storage">0 B</span> used</p>
+                </div>
+                <div class="saved-batch-actions">
+                  <button id="export-csv" class="action-button" type="button">
+                    Export CSV</button
+                  ><button
+                    id="clear-archive"
+                    class="action-button text-button--danger"
+                    type="button"
+                  >
+                    Clear all runs
+                  </button>
+                </div>
+              </aside>
+              <div class="saved-content">
+                <header class="page-heading">
+                  <div>
+                    <h1 id="saved-title" class="page-title">Saved Runs</h1>
+                    <p>Saved frames and the settings used to make them.</p>
+                  </div>
+                </header>
+                <dl class="archive-summary">
+                  <div>
+                    <dt>Runs</dt>
+                    <dd id="archive-runs">0</dd>
+                  </div>
+                  <div>
+                    <dt>Models</dt>
+                    <dd id="archive-models">0</dd>
+                  </div>
+                  <div>
+                    <dt>Largest frame</dt>
+                    <dd id="archive-resolution">—</dd>
+                  </div>
+                </dl>
+                <section id="hq-renders" class="saved-section hq-saved-section" hidden>
+                  <div class="saved-section__head">
+                    <div>
+                      <h2 class="saved-section__title">High-Resolution Snapshots</h2>
+                      <p class="saved-section__desc">Full-detail 2K/4K PNG exports stored in this browser.</p>
+                    </div>
+                    <span id="hq-status" class="panel-code">READY</span>
+                  </div>
+                  <div id="hq-render-list" class="hq-render-list hq-render-grid"></div>
+                </section>
+                <section class="saved-section">
+                  <div class="saved-section__head">
+                    <div>
+                      <h2 class="saved-section__title">Parameter Runs</h2>
+                      <p class="saved-section__desc">Simulation states, bookmarks, and parameters.</p>
+                    </div>
+                  </div>
+                  <div
+                    id="archive-grid"
+                    class="archive-grid"
+                    aria-label="Saved runs"
+                  ></div>
+                </section>
+              </div>
+            </div>
+          </section>
+
           <section
             id="view-experiments"
-            class="view hidden"
+            class="view page-view hidden"
             data-view-panel="experiments"
-            aria-label="Experiments — coming soon"
+            aria-label="Experiments"
             hidden
-          ></section>
+          >
+            <div class="simple-page studio-page">
+              <div class="page-heading">
+                <div>
+                  <h1 class="page-title">Experiments</h1>
+                  <p>
+                    Build an image basis with Quick PCA, or train a small
+                    autoencoder on compatible hardware. Training runs on this
+                    device.
+                  </p>
+                </div>
+                <div class="page-actions">
+                  <button
+                    id="open-datasets-from-studio"
+                    class="action-button action-button--secondary"
+                    type="button"
+                  >
+                    Find open images
+                  </button>
+                  <button
+                    id="launch-custom"
+                    class="action-button action-button--secondary"
+                    type="button"
+                    disabled
+                  >
+                    Open PCA in Lab
+                  </button>
+                  <button
+                    id="launch-neural"
+                    class="action-button"
+                    type="button"
+                    disabled
+                  >
+                    Open neural in Lab
+                  </button>
+                </div>
+              </div>
+
+              <div class="studio-grid studio-grid--neural">
+                <section class="panel studio-panel studio-panel--dataset">
+                  <div class="panel-heading">
+                    <h2 class="panel__title">Dataset</h2>
+                  </div>
+                  <label class="upload-zone" for="image-upload">
+                    <strong>Add image files</strong>
+                    <span
+                      >PNG / JPG / WebP · 3 to 64 files · normalized
+                      locally</span
+                    >
+                  </label>
+                  <input
+                    id="image-upload"
+                    class="visually-hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                  />
+                  <button
+                    id="add-synthetic-set"
+                    class="mini-button synthetic-set-button"
+                    type="button"
+                  >
+                    Generate 32 DigiFace model samples
+                  </button>
+
+                  <div class="draw-lab">
+                    <div class="draw-lab__header">
+                      <span>Draw a training sample</span>
+                      <label
+                        >Color
+                        <input id="draw-color" type="color" value="#ffffff"
+                      /></label>
+                      <label
+                        >Brush
+                        <input
+                          id="brush-size"
+                          type="range"
+                          min="2"
+                          max="30"
+                          value="12"
+                      /></label>
+                    </div>
+                    <canvas
+                      id="draw-canvas"
+                      width="256"
+                      height="256"
+                      aria-label="Drawing pad"
+                    ></canvas>
+                    <div class="draw-lab__actions">
+                      <button
+                        id="clear-drawing"
+                        class="mini-button"
+                        type="button"
+                      >
+                        Clear pad
+                      </button>
+                      <button
+                        id="add-drawing"
+                        class="mini-button mini-button--active"
+                        type="button"
+                      >
+                        Add drawing
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="dataset-count">
+                    Samples <strong id="sample-count">0 / 64</strong>
+                  </div>
+                  <div
+                    id="sample-grid"
+                    class="sample-grid"
+                    aria-live="polite"
+                  ></div>
+                  <button
+                    id="clear-dataset"
+                    class="text-button text-button--danger"
+                    type="button"
+                  >
+                    Clear dataset
+                  </button>
+                </section>
+
+                <section
+                  class="panel studio-panel studio-panel--training studio-panel--training-main"
+                >
+                  <div class="panel-heading">
+                    <h2 class="panel__title">Training</h2>
+                  </div>
+
+                  <label class="field">
+                    <span>Model name</span>
+                    <input
+                      id="custom-model-name"
+                      type="text"
+                      maxlength="32"
+                      value="My model"
+                      spellcheck="false"
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Training engine</span>
+                    <select id="training-engine">
+                      <option value="pca" selected>Quick PCA</option>
+                      <option value="neural">Neural autoencoder</option>
+                    </select>
+                  </label>
+
+                  <div
+                    id="neural-training-controls"
+                    class="neural-training-controls"
+                  >
+                    <dl class="training-configuration">
+                      <div>
+                        <dt>Architecture</dt>
+                        <dd>Convolutional autoencoder</dd>
+                      </div>
+                      <div>
+                        <dt>Input</dt>
+                        <dd>128 × 128 RGB</dd>
+                      </div>
+                      <div>
+                        <dt>Feature dimensions</dt>
+                        <dd>64</dd>
+                      </div>
+                      <div>
+                        <dt>Training limit</dt>
+                        <dd>Up to 5 minutes</dd>
+                      </div>
+                      <div>
+                        <dt>Output treatment</dt>
+                        <dd>Square-pixel displacement</dd>
+                      </div>
+                    </dl>
+
+                    <div class="hardware-benchmark-card">
+                      <div>
+                        <span>Training backend</span>
+                        <strong id="training-backend">Not benchmarked</strong>
+                      </div>
+                      <div>
+                        <span>Speed class</span>
+                        <strong id="training-speed">—</strong>
+                      </div>
+                      <div>
+                        <span>Recommended</span>
+                        <strong id="training-recommended">—</strong>
+                      </div>
+                      <button
+                        id="benchmark-training"
+                        class="mini-button"
+                        type="button"
+                      >
+                        Check neural training access
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    id="pca-training-controls"
+                    class="pca-training-controls"
+                    hidden
+                  >
+                    <label class="field">
+                      <span>PCA input resolution</span>
+                      <input type="text" value="48 × 48 RGB" disabled />
+                    </label>
+                    <label class="field field--range">
+                      <span class="field__heading"
+                        ><span>Principal components</span
+                        ><output id="studio-components-output">4</output></span
+                      >
+                      <input
+                        id="studio-components"
+                        type="range"
+                        min="2"
+                        max="8"
+                        step="1"
+                        value="4"
+                      />
+                    </label>
+                  </div>
+
+                  <div id="training-note" class="training-note">
+                    <strong>Quick PCA path</strong>
+                    <p>
+                      Quick PCA stays available on ordinary devices. The 128px
+                      datamosh autoencoder is a five-minute quality run reserved
+                      for hardware that passes the FAST WebGL check.
+                    </p>
+                  </div>
+
+                  <div class="training-actions-main">
+                    <button
+                      id="train-model"
+                      class="action-button action-button--wide"
+                      type="button"
+                    >
+                      Train quick PCA model
+                    </button>
+                    <button
+                      id="stop-training"
+                      class="mini-button text-button--danger"
+                      type="button"
+                      hidden
+                    >
+                      Stop training
+                    </button>
+                  </div>
+                  <progress
+                    id="training-progress"
+                    class="training-progress"
+                    max="100"
+                    value="0"
+                  ></progress>
+                  <p id="training-status" class="training-status" role="status">
+                    PCA needs at least 3 images.
+                  </p>
+
+                  <div
+                    id="pca-model-file-actions"
+                    class="model-file-actions"
+                    hidden
+                  >
+                    <button
+                      id="export-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      Export PCA JSON
+                    </button>
+                    <label class="mini-button" for="import-model"
+                      >Import PCA JSON</label
+                    >
+                    <input
+                      id="import-model"
+                      class="visually-hidden"
+                      type="file"
+                      accept="application/json,.json"
+                    />
+                    <button
+                      id="delete-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      Delete PCA model
+                    </button>
+                  </div>
+                  <div class="model-file-actions">
+                    <button
+                      id="delete-neural-model"
+                      class="mini-button"
+                      type="button"
+                      disabled
+                    >
+                      Delete neural model
+                    </button>
+                  </div>
+                </section>
+
+                <aside
+                  class="panel studio-panel studio-panel--analysis studio-panel--analysis-main"
+                >
+                  <div class="panel-heading">
+                    <h2 class="panel__title">Analysis</h2>
+                  </div>
+
+                  <section id="neural-analysis-block">
+                    <dl class="stats-list studio-stats">
+                      <div>
+                        <dt>Status</dt>
+                        <dd id="neural-status">Not trained</dd>
+                      </div>
+                      <div>
+                        <dt>Name</dt>
+                        <dd id="neural-id">—</dd>
+                      </div>
+                      <div>
+                        <dt>Profile</dt>
+                        <dd id="neural-profile-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>Objective</dt>
+                        <dd id="neural-objective-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>Training samples</dt>
+                        <dd id="neural-samples">—</dd>
+                      </div>
+                      <div>
+                        <dt>Feature dimensions</dt>
+                        <dd id="neural-latent">—</dd>
+                      </div>
+                      <div>
+                        <dt>Backend</dt>
+                        <dd id="neural-backend-stat">—</dd>
+                      </div>
+                      <div>
+                        <dt>Best loss</dt>
+                        <dd id="neural-loss">—</dd>
+                      </div>
+                      <div>
+                        <dt>Created</dt>
+                        <dd id="neural-created">—</dd>
+                      </div>
+                    </dl>
+
+                    <div class="variance-chart-wrap">
+                      <span>Training loss</span>
+                      <canvas
+                        id="training-loss-chart"
+                        width="360"
+                        height="180"
+                        aria-label="Neural training loss chart"
+                      ></canvas>
+                    </div>
+                  </section>
+
+                  <section id="pca-analysis-block" hidden>
+                    <dl class="stats-list studio-stats">
+                      <div>
+                        <dt>Status</dt>
+                        <dd id="custom-status">Not trained</dd>
+                      </div>
+                      <div>
+                        <dt>Name</dt>
+                        <dd id="custom-id">—</dd>
+                      </div>
+                      <div>
+                        <dt>Training samples</dt>
+                        <dd id="custom-samples">—</dd>
+                      </div>
+                      <div>
+                        <dt>Components</dt>
+                        <dd id="custom-components">—</dd>
+                      </div>
+                      <div>
+                        <dt>Variance retained</dt>
+                        <dd id="custom-variance">—</dd>
+                      </div>
+                      <div>
+                        <dt>Created</dt>
+                        <dd id="custom-created">—</dd>
+                      </div>
+                    </dl>
+                    <div class="variance-chart-wrap">
+                      <span>Explained variance by component</span>
+                      <canvas
+                        id="variance-chart"
+                        width="360"
+                        height="180"
+                        aria-label="Explained variance chart"
+                      ></canvas>
+                    </div>
+                  </section>
+
+                  <div class="studio-explanation">
+                    <strong>About these models</strong>
+                    <p>
+                      PCA is the quick linear baseline. The autoencoder learns a
+                      nonlinear reconstruction space and applies square-pixel
+                      displacement in the Lab. Training and inference remain
+                      local.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+              <details id="dataset-library" class="dataset-library">
+                <summary>Find images on Wikimedia Commons</summary>
+                <p class="field__help">
+                  Optional internet access. Review each image’s source and
+                  license before use.
+                </p>
+                <section class="panel dataset-search-panel">
+                  <div class="panel-heading">
+                    <h2 class="panel__title">Wikimedia Commons Search</h2>
+                  </div>
+                  <form id="commons-search-form" class="dataset-search-form">
+                    <label class="field dataset-query">
+                      <span>Search terms</span>
+                      <input
+                        id="commons-search-input"
+                        type="search"
+                        value="portrait photography"
+                        placeholder="portrait photography"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <label class="field dataset-license">
+                      <span>License filter</span>
+                      <select id="commons-license-filter">
+                        <option value="reusable">Reusable results</option>
+                        <option value="public-domain">
+                          Public domain / CC0
+                        </option>
+                        <option value="cc-by">CC BY</option>
+                        <option value="cc-by-sa">CC BY-SA</option>
+                        <option value="all">Show all metadata</option>
+                      </select>
+                    </label>
+                    <button
+                      id="commons-search-button"
+                      class="action-button"
+                      type="submit"
+                    >
+                      Search
+                    </button>
+                  </form>
+                  <p id="commons-status" class="dataset-status">
+                    Search uses the wikimedia commons mediawiki api. internet
+                    access is required.
+                  </p>
+                  <div id="commons-results" class="commons-results"></div>
+                </section>
+              </details>
+            </div>
+          </section>
           <section
             id="view-about"
-            class="view hidden"
+            class="view page-view hidden"
             data-view-panel="about"
-            aria-label="About — coming soon"
+            aria-labelledby="about-title"
             hidden
-          ></section>
+          >
+            <div class="simple-page about-page">
+              <header class="page-heading">
+                <div>
+                  <h1 id="about-title" class="page-title">About the models</h1>
+                  <p>What each model does and where to start.</p>
+                </div>
+              </header>
+              <div class="about-grid">
+                <article class="about-card">
+                  <h2>Neural Growth</h2>
+                  <p>
+                    A cellular model grows textures across a grid. Try a
+                    pattern, then use the brushes to disturb it and watch it
+                    recover.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="neural-growth"
+                      class="action-button"
+                      >Open in Lab</a
+                    ><a
+                      href="https://distill.pub/selforg/2021/textures/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Read the paper ↗</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Inception Dream</h2>
+                  <p>
+                    Load an image and bring out patterns recognized by
+                    InceptionV3. Adjust the layer, detail, and focus before
+                    running a synthesis.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="inception-dream"
+                      class="action-button"
+                      >Open in Lab</a
+                    ><a
+                      href="https://distill.pub/2017/feature-visualization/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >How it works ↗</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>DigiFace Generator</h2>
+                  <p>
+                    A decoder trained on synthetic faces generates new images.
+                    Explore the controls to see how features change together.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="digiface-vae"
+                      class="action-button"
+                      >Open in Lab</a
+                    ><a
+                      href="models/digiface/README.txt"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Model details ↗</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Chromatic Flow</h2>
+                  <p>
+                    A mathematical color field creates flowing patterns. Change
+                    the palette, scale, and motion to shape the result.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="chromatic-field"
+                      class="action-button"
+                      >Open in Lab</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Folded Fractal</h2>
+                  <p>
+                    Repeated folding, rotation, and inversion build geometric
+                    patterns. Small changes to scale and rotation can reveal
+                    very different shapes.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="folded-fractal"
+                      class="action-button"
+                      >Open in Lab</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Fractal Explorer</h2>
+                  <p>
+                    Explore Mandelbrot, Julia, and related fractals. Pan and
+                    zoom on the canvas, or start from one of the example views.
+                  </p>
+                  <div class="about-actions">
+                    <a
+                      href="#lab"
+                      data-open-model="fractal-functions"
+                      class="action-button"
+                      >Open in Lab</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Your own image model</h2>
+                  <p>
+                    Use images or drawings in Experiments. Quick PCA builds a
+                    linear image model; the neural option learns a
+                    reconstruction model on compatible hardware.
+                  </p>
+                  <div class="about-actions">
+                    <a href="#experiments" class="action-button"
+                      >Open Experiments</a
+                    >
+                  </div>
+                </article>
+                <article class="about-card">
+                  <h2>Modulation and audio</h2>
+                  <p>
+                    Use Mod below a parameter to add an oscillator or audio
+                    response. The blue strip adjusts LFO depth; choose Full or
+                    Kick for audio and use + or − to set its direction.
+                  </p>
+                  <div class="about-actions">
+                    <a href="#lab" class="action-button">Open Lab</a>
+                  </div>
+                </article>
+              </div>
+              <p class="about-notes">
+                Model weights and datasets have their own licenses.
+                <a
+                  href="THIRD_PARTY_NOTICES.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Credits and licenses ↗</a
+                >
+              </p>
+            </div>
+          </section>
+
           <dialog
             id="export-modal"
             class="export-modal"
@@ -1300,701 +1954,6 @@
             SAVE RUN</span
           >
         </div>
-        <div
-          id="deferred-view-controls"
-          class="hidden"
-          hidden
-          aria-hidden="true"
-          inert
-        >
-          <div class="simple-page studio-page">
-            <div class="page-heading">
-              <div>
-                <p class="eyebrow">OPTIONAL LOCAL TRAINING</p>
-                <h1 class="page-title">Experiments</h1>
-                <p>
-                  Build an image basis with Quick PCA, or train a small
-                  autoencoder on compatible hardware. These experiments use
-                  images you select and run on this device.
-                </p>
-              </div>
-              <div class="page-actions">
-                <button
-                  id="open-datasets-from-studio"
-                  class="action-button action-button--secondary"
-                  type="button"
-                >
-                  FIND OPEN IMAGES
-                </button>
-                <button
-                  id="launch-custom"
-                  class="action-button action-button--secondary"
-                  type="button"
-                  disabled
-                >
-                  OPEN PCA IN LAB
-                </button>
-                <button
-                  id="launch-neural"
-                  class="action-button"
-                  type="button"
-                  disabled
-                >
-                  OPEN NEURAL IN LAB
-                </button>
-              </div>
-            </div>
-
-            <div class="studio-grid studio-grid--neural">
-              <section class="panel studio-panel studio-panel--dataset">
-                <div class="panel-heading">
-                  <h2 class="panel__title">01 / Dataset</h2>
-                  <span class="panel-code">128PX RGB</span>
-                </div>
-                <label class="upload-zone" for="image-upload">
-                  <strong>ADD IMAGE FILES</strong>
-                  <span
-                    >PNG / JPG / WEBP · 3 TO 64 FILES · NORMALIZED LOCALLY</span
-                  >
-                </label>
-                <input
-                  id="image-upload"
-                  class="visually-hidden"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  multiple
-                />
-                <button
-                  id="add-synthetic-set"
-                  class="mini-button synthetic-set-button"
-                  type="button"
-                >
-                  GENERATE 32 DIGIFACE MODEL SAMPLES
-                </button>
-
-                <div class="draw-lab">
-                  <div class="draw-lab__header">
-                    <span>DRAW A TRAINING SAMPLE</span>
-                    <label
-                      >COLOR
-                      <input id="draw-color" type="color" value="#ffffff"
-                    /></label>
-                    <label
-                      >BRUSH
-                      <input
-                        id="brush-size"
-                        type="range"
-                        min="2"
-                        max="30"
-                        value="12"
-                    /></label>
-                  </div>
-                  <canvas
-                    id="draw-canvas"
-                    width="256"
-                    height="256"
-                    aria-label="Drawing pad"
-                  ></canvas>
-                  <div class="draw-lab__actions">
-                    <button
-                      id="clear-drawing"
-                      class="mini-button"
-                      type="button"
-                    >
-                      CLEAR PAD
-                    </button>
-                    <button
-                      id="add-drawing"
-                      class="mini-button mini-button--active"
-                      type="button"
-                    >
-                      ADD DRAWING
-                    </button>
-                  </div>
-                </div>
-
-                <div class="dataset-count">
-                  SAMPLES <strong id="sample-count">0 / 64</strong>
-                </div>
-                <div
-                  id="sample-grid"
-                  class="sample-grid"
-                  aria-live="polite"
-                ></div>
-                <button
-                  id="clear-dataset"
-                  class="text-button text-button--danger"
-                  type="button"
-                >
-                  CLEAR DATASET
-                </button>
-              </section>
-
-              <section
-                class="panel studio-panel studio-panel--training studio-panel--training-main"
-              >
-                <div class="panel-heading">
-                  <h2 class="panel__title">02 / Training</h2>
-                  <span class="panel-code">PCA + TF.JS</span>
-                </div>
-
-                <label class="field">
-                  <span>MODEL NAME</span>
-                  <input
-                    id="custom-model-name"
-                    type="text"
-                    maxlength="32"
-                    value="My Local Model"
-                    spellcheck="false"
-                  />
-                </label>
-
-                <label class="field">
-                  <span>TRAINING ENGINE</span>
-                  <select id="training-engine">
-                    <option value="pca" selected>QUICK PCA / WEB WORKER</option>
-                    <option value="neural">
-                      EXPERIMENTAL NEURAL / REQUIRES GPU CHECK
-                    </option>
-                  </select>
-                </label>
-
-                <div
-                  id="neural-training-controls"
-                  class="neural-training-controls"
-                >
-                  <dl class="training-configuration">
-                    <div>
-                      <dt>Architecture</dt>
-                      <dd>Convolutional autoencoder</dd>
-                    </div>
-                    <div>
-                      <dt>Input</dt>
-                      <dd>128 × 128 RGB</dd>
-                    </div>
-                    <div>
-                      <dt>Feature dimensions</dt>
-                      <dd>64</dd>
-                    </div>
-                    <div>
-                      <dt>Training limit</dt>
-                      <dd>Up to 5 minutes</dd>
-                    </div>
-                    <div>
-                      <dt>Output treatment</dt>
-                      <dd>Square-pixel displacement</dd>
-                    </div>
-                  </dl>
-
-                  <div class="hardware-benchmark-card">
-                    <div>
-                      <span>TRAINING BACKEND</span>
-                      <strong id="training-backend">NOT BENCHMARKED</strong>
-                    </div>
-                    <div>
-                      <span>SPEED CLASS</span>
-                      <strong id="training-speed">—</strong>
-                    </div>
-                    <div>
-                      <span>RECOMMENDED</span>
-                      <strong id="training-recommended">—</strong>
-                    </div>
-                    <button
-                      id="benchmark-training"
-                      class="mini-button"
-                      type="button"
-                    >
-                      CHECK NEURAL TRAINING ACCESS
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  id="pca-training-controls"
-                  class="pca-training-controls"
-                  hidden
-                >
-                  <label class="field">
-                    <span>PCA INPUT RESOLUTION</span>
-                    <input type="text" value="48 × 48 RGB" disabled />
-                  </label>
-                  <label class="field field--range">
-                    <span class="field__heading"
-                      ><span>PRINCIPAL COMPONENTS</span
-                      ><output id="studio-components-output">4</output></span
-                    >
-                    <input
-                      id="studio-components"
-                      type="range"
-                      min="2"
-                      max="8"
-                      step="1"
-                      value="4"
-                    />
-                  </label>
-                </div>
-
-                <div id="training-note" class="training-note">
-                  <strong>QUICK PCA PATH</strong>
-                  <p>
-                    Quick PCA stays available on ordinary devices. The 128px
-                    datamosh autoencoder is a five-minute quality run reserved
-                    for hardware that passes the FAST WebGL check.
-                  </p>
-                </div>
-
-                <div class="training-actions-main">
-                  <button
-                    id="train-model"
-                    class="action-button action-button--wide"
-                    type="button"
-                  >
-                    TRAIN QUICK PCA MODEL
-                  </button>
-                  <button
-                    id="stop-training"
-                    class="mini-button text-button--danger"
-                    type="button"
-                    hidden
-                  >
-                    STOP TRAINING
-                  </button>
-                </div>
-                <progress
-                  id="training-progress"
-                  class="training-progress"
-                  max="100"
-                  value="0"
-                ></progress>
-                <p id="training-status" class="training-status">
-                  PCA NEEDS AT LEAST 3 IMAGES.
-                </p>
-
-                <div
-                  id="pca-model-file-actions"
-                  class="model-file-actions"
-                  hidden
-                >
-                  <button
-                    id="export-model"
-                    class="mini-button"
-                    type="button"
-                    disabled
-                  >
-                    EXPORT PCA JSON
-                  </button>
-                  <label class="mini-button" for="import-model"
-                    >IMPORT PCA JSON</label
-                  >
-                  <input
-                    id="import-model"
-                    class="visually-hidden"
-                    type="file"
-                    accept="application/json,.json"
-                  />
-                  <button
-                    id="delete-model"
-                    class="mini-button"
-                    type="button"
-                    disabled
-                  >
-                    DELETE PCA MODEL
-                  </button>
-                </div>
-                <div class="model-file-actions">
-                  <button
-                    id="delete-neural-model"
-                    class="mini-button"
-                    type="button"
-                    disabled
-                  >
-                    DELETE NEURAL MODEL
-                  </button>
-                </div>
-              </section>
-
-              <aside
-                class="panel studio-panel studio-panel--analysis studio-panel--analysis-main"
-              >
-                <div class="panel-heading">
-                  <h2 class="panel__title">03 / Analysis</h2>
-                  <span class="panel-code">MODEL</span>
-                </div>
-
-                <section id="neural-analysis-block">
-                  <dl class="stats-list studio-stats">
-                    <div>
-                      <dt>STATUS</dt>
-                      <dd id="neural-status">NOT TRAINED</dd>
-                    </div>
-                    <div>
-                      <dt>MODEL ID</dt>
-                      <dd id="neural-id">—</dd>
-                    </div>
-                    <div>
-                      <dt>PROFILE</dt>
-                      <dd id="neural-profile-stat">—</dd>
-                    </div>
-                    <div>
-                      <dt>OBJECTIVE</dt>
-                      <dd id="neural-objective-stat">—</dd>
-                    </div>
-                    <div>
-                      <dt>TRAINING SAMPLES</dt>
-                      <dd id="neural-samples">—</dd>
-                    </div>
-                    <div>
-                      <dt>FEATURE DIMENSIONS</dt>
-                      <dd id="neural-latent">—</dd>
-                    </div>
-                    <div>
-                      <dt>BACKEND</dt>
-                      <dd id="neural-backend-stat">—</dd>
-                    </div>
-                    <div>
-                      <dt>BEST LOSS</dt>
-                      <dd id="neural-loss">—</dd>
-                    </div>
-                    <div>
-                      <dt>CREATED</dt>
-                      <dd id="neural-created">—</dd>
-                    </div>
-                  </dl>
-
-                  <div class="variance-chart-wrap">
-                    <span>TRAINING LOSS</span>
-                    <canvas
-                      id="training-loss-chart"
-                      width="360"
-                      height="180"
-                      aria-label="Neural training loss chart"
-                    ></canvas>
-                  </div>
-                </section>
-
-                <section id="pca-analysis-block" hidden>
-                  <dl class="stats-list studio-stats">
-                    <div>
-                      <dt>STATUS</dt>
-                      <dd id="custom-status">NOT TRAINED</dd>
-                    </div>
-                    <div>
-                      <dt>MODEL ID</dt>
-                      <dd id="custom-id">—</dd>
-                    </div>
-                    <div>
-                      <dt>TRAINING SAMPLES</dt>
-                      <dd id="custom-samples">—</dd>
-                    </div>
-                    <div>
-                      <dt>COMPONENTS</dt>
-                      <dd id="custom-components">—</dd>
-                    </div>
-                    <div>
-                      <dt>VARIANCE RETAINED</dt>
-                      <dd id="custom-variance">—</dd>
-                    </div>
-                    <div>
-                      <dt>CREATED</dt>
-                      <dd id="custom-created">—</dd>
-                    </div>
-                  </dl>
-                  <div class="variance-chart-wrap">
-                    <span>EXPLAINED VARIANCE BY COMPONENT</span>
-                    <canvas
-                      id="variance-chart"
-                      width="360"
-                      height="180"
-                      aria-label="Explained variance chart"
-                    ></canvas>
-                  </div>
-                </section>
-
-                <div class="studio-explanation">
-                  <strong>WHAT TO COMPARE</strong>
-                  <p>
-                    PCA is the quick linear baseline. The autoencoder learns a
-                    nonlinear reconstruction space and applies square-pixel
-                    displacement in the Lab. Training and inference remain
-                    local.
-                  </p>
-                </div>
-              </aside>
-            </div>
-            <details id="dataset-library" class="dataset-library">
-              <summary>Find images on Wikimedia Commons</summary>
-              <p class="field__help">
-                Optional internet access. Review each image’s source and license
-                before use.
-              </p>
-              <section class="panel dataset-search-panel">
-                <div class="panel-heading">
-                  <h2 class="panel__title">Wikimedia Commons Search</h2>
-                  <span class="panel-code">LICENSE-AWARE</span>
-                </div>
-                <form id="commons-search-form" class="dataset-search-form">
-                  <label class="field dataset-query">
-                    <span>SEARCH TERMS</span>
-                    <input
-                      id="commons-search-input"
-                      type="search"
-                      value="portrait photography"
-                      placeholder="portrait photography"
-                      autocomplete="off"
-                    />
-                  </label>
-                  <label class="field dataset-license">
-                    <span>LICENSE FILTER</span>
-                    <select id="commons-license-filter">
-                      <option value="reusable">REUSABLE RESULTS</option>
-                      <option value="public-domain">PUBLIC DOMAIN / CC0</option>
-                      <option value="cc-by">CC BY</option>
-                      <option value="cc-by-sa">CC BY-SA</option>
-                      <option value="all">SHOW ALL METADATA</option>
-                    </select>
-                  </label>
-                  <button
-                    id="commons-search-button"
-                    class="action-button"
-                    type="submit"
-                  >
-                    SEARCH
-                  </button>
-                </form>
-                <p id="commons-status" class="dataset-status">
-                  SEARCH USES THE WIKIMEDIA COMMONS MEDIAWIKI API. INTERNET
-                  ACCESS IS REQUIRED.
-                </p>
-                <div id="commons-results" class="commons-results"></div>
-              </section>
-            </details>
-          </div>
-          <section id="view-archive" class="view" hidden>
-            <div class="simple-page archive-page">
-              <section class="panel page-panel">
-                <div class="page-panel__heading">
-                  <div>
-                    <p class="eyebrow">LOCAL GALLERY</p>
-                    <h1 class="page-title page-title--light">Saved Runs</h1>
-                    <p>
-                      Frames you chose to keep, stored with the exact state
-                      needed to recreate them.
-                    </p>
-                  </div>
-                  <div class="page-actions">
-                    <button id="export-csv" class="action-button" type="button">
-                      EXPORT CSV
-                    </button>
-                    <button
-                      id="clear-archive"
-                      class="action-button action-button--secondary"
-                      type="button"
-                    >
-                      CLEAR ALL
-                    </button>
-                  </div>
-                </div>
-                <div class="archive-summary">
-                  <span>RUNS <strong id="archive-runs">0</strong></span>
-                  <span>MODELS <strong id="archive-models">0</strong></span>
-                  <span
-                    >MAX RESOLUTION
-                    <strong id="archive-resolution">—</strong></span
-                  >
-                  <span
-                    >STORAGE <strong id="archive-storage">LOCAL</strong></span
-                  >
-                </div>
-                <div id="archive-grid" class="archive-grid"></div>
-              </section>
-            </div>
-          </section>
-          <div class="simple-page method-page">
-            <div class="page-heading">
-              <div>
-                <p class="eyebrow">LOCAL GENERATIVE GRAPHICS</p>
-                <h1 class="page-title">About gl-bench</h1>
-                <p>
-                  Explore mathematical fields and pretrained image models,
-                  adjust their parameters, and save your results. Image
-                  processing runs locally; dataset search uses Wikimedia
-                  Commons. Start in the Lab with Folded Fractal.
-                </p>
-              </div>
-            </div>
-
-            <div class="method-grid">
-              <section class="panel method-card">
-                <h2 class="panel__title">Inception Dream</h2>
-                <p>
-                  InceptionV3 feature visualization increases Mixed_6a and
-                  Mixed_6c activations through gradient ascent at several image
-                  scales. Quality and Reduced Compute use the same objective
-                  with different compute limits.
-                </p>
-                <code
-                  >image → feature activations → normalized gradients → octave
-                  ascent</code
-                >
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">DigiFace Generator</h2>
-                <p>
-                  A separately trained 48-dimensional beta-VAE decoder runs
-                  locally through ONNX Runtime Web. Feature controls expose the
-                  selected decoder coordinate so users can see when eyes, nose,
-                  mouth, expression, and age-like appearance are entangled
-                  rather than pretending every slider is perfectly semantic.
-                </p>
-                <code
-                  >z → ONNX decoder → 112 × 112 RGB → optional color
-                  transform</code
-                >
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">Chromatic Flow</h2>
-                <p>
-                  A WebGL fragment shader evaluates a warped mathematical signal
-                  for every pixel.
-                </p>
-                <code>color = field(transform(uv, time, parameters))</code>
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">Folded Fractal</h2>
-                <p>
-                  A recursive coordinate field repeatedly applies folding,
-                  rotation, inversion, translation, and symmetry. Ghost Effect
-                  adds offset contours only when it is enabled.
-                </p>
-                <code
-                  >coordinates → fold → rotate → invert → translate →
-                  repeat</code
-                >
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">Fractal Explorer</h2>
-                <p>
-                  Mandelbrot, Julia, Burning Ship, and Tricorn iterations
-                  visualize escape time, orbit traps, zoom, and sensitivity to
-                  complex constants. Click or drag moves through the selected
-                  equation. Right-click or touch-hold starts a small optional
-                  motion while your direct moves stay as the base view.
-                </p>
-                <code>zₙ₊₁ = f(zₙ) + c</code>
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">Quick Local Model</h2>
-                <p>
-                  Model Studio reduces user-selected RGB images to a local color
-                  basis. Training happens in a Web Worker and the model can be
-                  exported as JSON.
-                </p>
-                <code>local images → covariance → color basis</code>
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">MODULATION & MOTION</h2>
-                <p>
-                  Every numeric slider can connect to an internal LFO with
-                  selectable waveforms (sine, triangle, saw, square, noise),
-                  rate, and depth. Audio reactivity lets any parameter dance to
-                  whole-music bass or focused kick transients.
-                </p>
-                <code>base view → LFO oscillator → audio reactivity</code>
-              </section>
-              <section class="panel method-card">
-                <h2 class="panel__title">MODULATION MATRIX</h2>
-                <p>
-                  Any numeric slider can combine an LFO with either a
-                  bass-weighted whole-music envelope or a focused kick
-                  transient. Each audio route has a bipolar depth control, while
-                  the live markers and four-second history graph show the final
-                  effective value.
-                </p>
-                <code>value(t) = base + LFO(t) × depth + audio(t) × depth</code>
-              </section>
-            </div>
-
-            <section
-              id="fractal-process"
-              class="panel fractal-process"
-              data-step="fold"
-            >
-              <div class="fractal-process__intro">
-                <p class="eyebrow">ONE FRAME, FIVE OPERATIONS</p>
-                <h2 class="panel__title">How the Folded Fractal Grows</h2>
-                <p id="fractal-process-copy">
-                  The coordinates mirror at the center, turning one shape into a
-                  balanced pair.
-                </p>
-              </div>
-              <div
-                class="fractal-process__steps"
-                aria-label="Fractal operation explanation"
-              >
-                <button
-                  class="is-active"
-                  type="button"
-                  data-fractal-step="fold"
-                  aria-pressed="true"
-                >
-                  <b>01</b> FOLD
-                </button>
-                <button
-                  type="button"
-                  data-fractal-step="rotate"
-                  aria-pressed="false"
-                >
-                  <b>02</b> ROTATE
-                </button>
-                <button
-                  type="button"
-                  data-fractal-step="invert"
-                  aria-pressed="false"
-                >
-                  <b>03</b> INVERT
-                </button>
-                <button
-                  type="button"
-                  data-fractal-step="translate"
-                  aria-pressed="false"
-                >
-                  <b>04</b> MOVE
-                </button>
-                <button
-                  type="button"
-                  data-fractal-step="repeat"
-                  aria-pressed="false"
-                >
-                  <b>05</b> REPEAT
-                </button>
-              </div>
-              <div class="fractal-process__visual" aria-hidden="true">
-                <span class="fractal-process__grid"></span>
-                <i></i><i></i><i></i><i></i>
-                <strong>FOLD → ROTATE → INVERT → MOVE → REPEAT</strong>
-              </div>
-            </section>
-
-            <section class="panel pipeline-panel">
-              <h2 class="panel__title">Local Pipeline</h2>
-              <div class="pipeline">
-                <span>BASE VIEW</span><b>→</b><span>MODULATION MATRIX</span
-                ><b>→</b><span>MODEL ROUTE</span><b>→</b
-                ><span>GPU / CPU CANVAS</span><b>→</b><span>IMAGE METRICS</span
-                ><b>→</b><span>SAVED RUN</span>
-              </div>
-              <p>
-                Quality mode changes the live square canvas from 384 to 1,536
-                pixels. Fractal routes can separately make screen-shaped 2K or
-                4K stills when the active WebGL limit allows it. The DigiFace
-                VAE itself produces 112 × 112 RGB and is smoothly enlarged for
-                display. ONNX Runtime Web requests WebGPU first and falls back
-                to WASM CPU inference. Browsers and operating systems still
-                decide which physical GPU is used.
-              </p>
-            </section>
-          </div>
-        </div>
       </section>
       <div class="canvas-annotations hidden" hidden aria-hidden="true">
         <div class="panel-heading panel-heading--output">
@@ -2003,6 +1962,27 @@
         <div class="viewport-caption">
           <span class="viewport-crosshair">+</span
           ><span>LOCAL ENGINE <span class="caption-dot">·</span> WEBGL2</span>
+        </div>
+      </div>
+      <div id="hq-viewer" class="hq-viewer" hidden>
+        <img id="hq-viewer-image" alt="High quality render" />
+        <div class="hq-viewer__bar">
+          <span id="hq-viewer-label">HQ EXPORT</span>
+          <div>
+            <button
+              id="hq-viewer-download"
+              class="action-button mini-button"
+              type="button"
+            >
+              DOWNLOAD</button
+            ><button
+              id="hq-viewer-close"
+              class="action-button mini-button"
+              type="button"
+            >
+              CLOSE
+            </button>
+          </div>
         </div>
       </div>
     </div>

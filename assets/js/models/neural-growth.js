@@ -22,7 +22,76 @@ import {
   CameraMotionEngine,
   CAMERA_BREATHING_MODES,
 } from "./neural-growth/camera-motion.js";
-import { DreamGuidanceBridge } from "./neural-growth/dream-guidance.js";
+import {
+  DreamGuidanceBridge,
+  INCEPTION_LAYER_CHANNELS,
+  getInceptionLayerChannels,
+  clampDreamChannel,
+} from "./neural-growth/dream-guidance.js";
+
+// Feature-ascent starting points inspired by https://distill.pub/2017/feature-visualization/.
+// These project presets are visual suggestions, not published identifications
+// of these exact InceptionV3 channels. Channel semantics depend on the checkpoint.
+export const CURATED_NEURONS = Object.freeze(
+  [
+    {
+      id: "ensemble",
+      name: "Full Ensemble",
+      layer: "mixed_6c",
+      channel: -1,
+      strength: 0.15,
+      desc: "All features at once: balanced, multi-scale dream patterns.",
+    },
+    {
+      id: "curve",
+      name: "Curve Detector",
+      layer: "mixed_6c",
+      channel: 144,
+      strength: 0.22,
+      desc: "Circular geometry: concentric rings, loops, and eye-like whorls.",
+    },
+    {
+      id: "gabor",
+      name: "Complex Gabor",
+      layer: "mixed_6c",
+      channel: 215,
+      strength: 0.25,
+      desc: "Directional waves: parallel ribs, arches, and flowing crests.",
+    },
+    {
+      id: "compound",
+      name: "Compound Texture",
+      layer: "mixed_6a",
+      channel: 82,
+      strength: 0.2,
+      desc: "Segmented tessellation: overlapping scales and armor-like plates.",
+    },
+    {
+      id: "surround",
+      name: "Center-Surround",
+      layer: "mixed_5c",
+      channel: 48,
+      strength: 0.18,
+      desc: "Radial pores: fine cellular foam, bubbles, and tiny vesicles.",
+    },
+    {
+      id: "hatch",
+      name: "Hatch Frequency",
+      layer: "mixed_5b",
+      channel: 120,
+      strength: 0.18,
+      desc: "Lattice grid: tight woven lines and orthogonal cross-hatching.",
+    },
+    {
+      id: "semantic",
+      name: "Semantic Parts",
+      layer: "mixed_7b",
+      channel: 312,
+      strength: 0.3,
+      desc: "Macro structures: high-order animal forms, limbs, and complex motifs.",
+    },
+  ].map(Object.freeze),
+);
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -97,7 +166,7 @@ export class NeuralGrowthModel {
     this._lastPaletteTime = null;
     this._acousticEmitter = null;
     this._cameraMotion = new CameraMotionEngine();
-    this._dreamBridge = new DreamGuidanceBridge({ getInceptionModel });
+    this._dreamBridge = new DreamGuidanceBridge({ getInceptionModel, archetypes: CURATED_NEURONS });
     this._dreamStepCounter = 0;
     this._effectiveZoom = 1.0;
     this._effectivePan = [0.0, 0.0];
@@ -159,6 +228,14 @@ export class NeuralGrowthModel {
   }
 
   get controls() {
+    return this.controlsForParameters(this._parameters);
+  }
+
+  get neuronArchetypes() {
+    return CURATED_NEURONS;
+  }
+
+  controlsForParameters(parameters) {
     return [
       {
         key: "pattern",
@@ -1543,32 +1620,13 @@ export class NeuralGrowthModel {
         label: "DREAM LAYER",
         type: "select",
         default: "mixed_6c",
-        options: [
-          {
-            value: "mixed_6c",
-            label: "Mixed_6c · Regional Contours",
-            compute: "balanced",
-            guidance: "Recommended. Intermediate organic contours and circular motifs.",
-          },
-          {
-            value: "mixed_6a",
-            label: "Mixed_6a · Mid-Level Features",
-            compute: "balanced",
-            guidance: "Rich intermediate textural motifs and flowing patterns.",
-          },
-          {
-            value: "mixed_5b",
-            label: "Mixed_5b · Early Lattices",
-            compute: "balanced",
-            guidance: "High-frequency geometric lattices and fine edge details.",
-          },
-          {
-            value: "mixed_7b",
-            label: "Mixed_7b · Deep Semantic Forms",
-            compute: "balanced",
-            guidance: "Macro-scale semantic representations and deep architectural forms.",
-          },
-        ],
+        modulation: false,
+        options: Object.entries(INCEPTION_LAYER_CHANNELS).map(
+          ([value, channels]) => ({
+            value,
+            label: `${value} · ${channels} channels`,
+          }),
+        ),
         help: "InceptionV3 layer depth for perceptual feature ascent guidance.",
       },
       {
@@ -1576,7 +1634,7 @@ export class NeuralGrowthModel {
         label: "DREAM NEURON",
         type: "range",
         min: -1,
-        max: 767,
+        max: getInceptionLayerChannels(parameters?.targetLayer) - 1,
         step: 1,
         default: -1,
         format: "integer",
@@ -1776,7 +1834,15 @@ export class NeuralGrowthModel {
     return this._pending || Promise.resolve();
   }
 
-  parameterDefaultsForChange(key, value) {
+  parameterDefaultsForChange(key, value, parameters = this._parameters) {
+    if (key === "targetLayer") {
+      return {
+        targetChannel: clampDreamChannel(
+          parameters?.targetChannel,
+          value,
+        ),
+      };
+    }
     if (key === "pattern") {
       const startup = getPattern(value).startup;
       if (!startup) return null;
@@ -1841,7 +1907,7 @@ export class NeuralGrowthModel {
     });
   }
 
-  normalizeStoredParameter(key, value) {
+  normalizeStoredParameter(key, value, parameters = this._parameters) {
     if (key === "audioProfile") {
       if (value === "ambient" || value === "rhythm") {
         return "custom";
@@ -2064,16 +2130,11 @@ export class NeuralGrowthModel {
       return 8;
     }
     if (key === "targetLayer") {
-      const valid = ["mixed_5b", "mixed_6a", "mixed_6c", "mixed_7b"];
-      if (valid.includes(value)) return value;
+      if (Object.hasOwn(INCEPTION_LAYER_CHANNELS, value)) return value;
       return "mixed_6c";
     }
     if (key === "targetChannel") {
-      const num = Math.round(Number(value));
-      if (Number.isFinite(num)) {
-        return Math.max(-1, Math.min(767, num));
-      }
-      return -1;
+      return clampDreamChannel(value, parameters?.targetLayer);
     }
     if (key === "dreamJitter") {
       return value === "off" || value === false ? "off" : "on";
@@ -2110,8 +2171,17 @@ export class NeuralGrowthModel {
   }
 
   onParameterChange(key, value) {
+    if (key === "targetLayer" || key === "targetChannel") {
+      value = this.normalizeStoredParameter(key, value);
+    }
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
+    }
+    if (key === "targetLayer") {
+      this._parameters.targetChannel = clampDreamChannel(
+        this._parameters.targetChannel,
+        value,
+      );
     }
     if (
       key === "echoDecay" ||
