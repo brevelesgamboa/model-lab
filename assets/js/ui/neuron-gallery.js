@@ -4,6 +4,7 @@ export function createNeuronGallery({
   neurons,
   parameters,
   onSelect,
+  onSensorSelect,
   onToggleManual,
   manualOpen,
   previewBridge,
@@ -70,6 +71,7 @@ export function createNeuronGallery({
     neurons,
     previewBridge,
     onSelect,
+    onSensorSelect,
   });
   const browse = document.createElement("button");
   browse.type = "button";

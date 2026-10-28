@@ -23,6 +23,7 @@ import {
 } from "./app/controls-controller.js";
 import { createDreamController } from "./app/dream-controller.js";
 import { createGrowthController } from "./app/growth-controller.js";
+import { createCorticalController } from "./app/cortical-controller.js";
 import { createExportController } from "./capture/export-controller.js";
 import { ModelRegistry } from "./core/model-registry.js";
 import { ExperimentStore } from "./core/experiment-store.js";
@@ -33,6 +34,10 @@ import {
   detectCapabilities,
 } from "./core/quality.js";
 import { rhythmController } from "./core/rhythm-controller.js";
+import {
+  inceptionSensor,
+  INCEPTION_SENSOR_DEFAULT_TARGET,
+} from "./models/neural-growth/inception-sensor.js";
 import { terminal } from "./ui/terminal.js";
 import { displayMessage } from "./ui/messages.js";
 import { NEURAL_GROWTH_AUDIO_EFFECTS } from "./models/neural-growth/audio-effects.js";
@@ -69,6 +74,8 @@ import {
   audioMatrixForModel,
   getAudioRoute,
   hasActiveAudioRoute,
+  hasModulationSource,
+  getModulationLevel,
   restoreAudioMatrix,
   setAudioRoute,
   updateModulationBounds,
@@ -91,6 +98,7 @@ import {
 const elements = collectElements();
 
 const registry = new ModelRegistry();
+inceptionSensor.getCanvas = () => elements.canvas;
 const capabilities = detectCapabilities();
 const modelParameterState = new Map();
 const modelLfoState = new Map();
@@ -175,6 +183,7 @@ const navigation = createNavigationController({
   elements,
   onNavigate(view) {
     if (currentView !== view) renderer.invalidate();
+    if (view !== "lab") inceptionSensor.stop();
     currentView = view;
     playback.sync();
     if (view === "saved") archiveController.render();
@@ -185,6 +194,7 @@ const navigation = createNavigationController({
 });
 const withExclusiveCompute = (operation) =>
   playback.withExclusiveCompute(async () => {
+    inceptionSensor.stop();
     await renderer.waitForIdle();
     return operation();
   });
@@ -227,6 +237,17 @@ const growthController = createGrowthController({
     growthController.update();
     renderCurrentFrame({ forceAnalysis: true });
   },
+});
+const corticalController = createCorticalController({
+  elements,
+  getModel: () => currentModel,
+  model: registry.get("cortical-topography"),
+  render: renderCurrentFrame,
+  canInteract: () =>
+    currentView === "lab" &&
+    !gifEncoding &&
+    !hqRendering &&
+    !playback.isSuspended(),
 });
 const controlsController = createControlsController({
   elements,
@@ -308,6 +329,7 @@ const controlsController = createControlsController({
   },
   onInfo: showParameterInfo,
   makeModulationPanel,
+  getNeuronModel: () => registry.get("neural-growth"),
   onModulationOpen: () =>
     requestAnimationFrame(() =>
       updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds)),
@@ -329,9 +351,11 @@ function acceptRenderedFrame({
     : qualityProfile.analysisInterval;
   const shouldAnalyze =
     forceAnalysis || !latestRender || now - lastAnalyzedAt >= interval;
-  const commonMetrics = shouldAnalyze
-    ? analyzeCanvas(elements.canvas)
-    : latestRender.commonMetrics;
+  const commonMetrics = model.getCanvasMetrics
+    ? model.getCanvasMetrics(elements.canvas, shouldAnalyze)
+    : shouldAnalyze
+      ? analyzeCanvas(elements.canvas)
+      : latestRender.commonMetrics;
   if (shouldAnalyze) lastAnalyzedAt = now;
   latestRender = {
     backend: result?.backend || model.backend,
@@ -845,7 +869,7 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
       const audioLevel =
         audioRoute.source === "none"
           ? 0
-          : clamp(Number(audioLevels?.[audioRoute.source]) || 0, 0, 1);
+          : getModulationLevel(audioRoute.source, audioLevels);
       const kickLevel = clamp(Number(audioLevels?.kick) || 0, 0, 1);
       const effectiveValue = applyAudioModulation(
         definition,
@@ -1096,6 +1120,8 @@ function makeModulationPanel(definition, config, supportsLfo) {
     config,
     supportsLfo,
     modelId: currentModel.id,
+    previewBridge: registry.get("neural-growth").dreamBridge,
+    onBrowseSensor: () => controlsController.openSensorNeurons(),
     getVisibleBase: () => controlElements.get(definition.key)?.fine?.value,
     coerceRangeValue,
     onCaptureBase(value) {
@@ -1372,7 +1398,8 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   elements.runExperiment.disabled = !capture.savedRun;
   elements.runExperiment.title = capture.savedRun
     ? "Save parameters and a preview"
-    : "Simulation state is not serialized; use PNG for a snapshot";
+    : currentModel.captureDisabledReason ||
+      "Simulation state is not serialized; use PNG for a snapshot";
   elements.advancedControls.open = true;
   elements.captureNote.disabled = !capture.savedRun;
   elements.saveGif.disabled = !capture.gif;
@@ -1390,6 +1417,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   updateFractalTools();
   dreamController.update();
   growthController.update();
+  corticalController.update();
   updateAudioUi();
   resizeLiveCanvas({ render: false });
 
@@ -1561,6 +1589,7 @@ function renderCurrentFrame(request) {
 
 function modelNeedsAnimation() {
   if (!playback.isActive() || !currentModel?.available) return false;
+  if (hasModulationSource(currentModel.id, "inception")) return true;
   if (
     rhythmController.status === "active" &&
     (hasActiveAudioRoute(currentModel.id) ||
@@ -1579,6 +1608,20 @@ function modelNeedsAnimation() {
 
 function animationLoop(timestamp) {
   rhythmController.update(timestamp);
+  inceptionSensor.setSourceKey(
+    `${currentModel.id}:${currentParameters.pattern || ""}:${currentParameters.seed ?? ""}:${currentParameters.simulationSize || ""}`,
+  );
+  const observeCanvas =
+    currentView === "lab" &&
+    !document.hidden &&
+    playback.isActive() &&
+    !playback.isSuspended() &&
+    !gifEncoding &&
+    !hqRendering &&
+    hasModulationSource(currentModel.id, "inception");
+  if (observeCanvas) inceptionSensor.start();
+  else inceptionSensor.stop();
+  inceptionSensor.update(timestamp);
   if (currentView === "lab") {
     const kickActive =
       rhythmController.status === "active" &&
@@ -1651,6 +1694,7 @@ function updateAnimationButton() {
 
 function setAnimation(enabled, { log = true } = {}) {
   const next = Boolean(enabled);
+  if (!next) inceptionSensor.stop();
   if (next === animationEnabled) {
     playback.sync();
     return;
@@ -1769,6 +1813,7 @@ async function saveCurrentRun() {
     ),
     modulation: deepClone(currentLfoState),
     audioModulation: deepClone(audioMatrixForModel(currentModel.id)),
+    inceptionSensorTarget: inceptionSensor.getTarget(),
     animationRunning: Boolean(animationEnabled),
     frameTimeSeconds: Number(lastTimeSeconds.toFixed(5)),
     qualityMode,
@@ -1981,10 +2026,24 @@ function restoreRun(record) {
       .filter((definition) => supportsModulation(currentModel, definition))
       .map(({ key }) => key),
   );
+  const sensorTarget =
+    record.inceptionSensorTarget || INCEPTION_SENSOR_DEFAULT_TARGET;
+  try {
+    inceptionSensor.setTarget(sensorTarget.layer, sensorTarget.channel);
+  } catch {
+    inceptionSensor.setTarget(
+      INCEPTION_SENSOR_DEFAULT_TARGET.layer,
+      INCEPTION_SENSOR_DEFAULT_TARGET.channel,
+    );
+  }
   lastTimeSeconds = Number(record.frameTimeSeconds || 0);
   animationEpoch = performance.now() - lastTimeSeconds * 1000;
   const hasLfo = hasActiveLfo(currentLfoState);
   const hasAudio = hasActiveAudioRoute(currentModel.id);
+  const hasNeural = hasModulationSource(currentModel.id, "inception");
+  const hasInputAudio =
+    hasModulationSource(currentModel.id, "bass") ||
+    hasModulationSource(currentModel.id, "kick");
   const shouldAnimate = hasLfo || hasAudio || Boolean(record.animationRunning);
   setAnimation(shouldAnimate, { log: false });
   renderParameterControls();
@@ -1999,12 +2058,13 @@ function restoreRun(record) {
   elements.captureNote.value = record.note || "";
   const modulationNotes = [];
   if (hasLfo) modulationNotes.push("LFOs active");
-  if (hasAudio) modulationNotes.push("Audio reactive");
+  if (hasInputAudio) modulationNotes.push("Audio reactive");
+  if (hasNeural) modulationNotes.push("Inception reactive");
   const modSummary = modulationNotes.length
     ? ` (${modulationNotes.join(", ")})`
     : "";
   terminal("RESTORE", `${record.id} / ${record.modelName}${modSummary}`);
-  if (hasAudio && rhythmController.status !== "active") {
+  if (hasInputAudio && rhythmController.status !== "active") {
     terminal(
       "AUDIO",
       "Restored run has audio-reactive parameters. Click [AUDIO: OFF] to connect audio input.",
@@ -2119,6 +2179,7 @@ function attachEvents() {
     hqGallery.closeViewer(),
   );
   document.addEventListener("visibilitychange", () => {
+    if (document.hidden) inceptionSensor.stop();
     playback.sync();
     if (!document.hidden && currentView === "lab")
       renderCurrentFrame({ forceAnalysis: true });
@@ -2233,6 +2294,7 @@ function initialize() {
 initialize();
 
 window.addEventListener("beforeunload", () => {
+  inceptionSensor.dispose();
   currentModel?.cancel?.();
   registry.dispose();
   rhythmController.stop();

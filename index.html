@@ -183,6 +183,78 @@
                     ></label>
                   </div>
                 </div>
+                <section
+                  id="cortical-tools"
+                  class="cortical-tools"
+                  aria-label="Cortical Topography source"
+                  hidden
+                >
+                  <div class="cortical-tools__actions">
+                    <label
+                      class="mini-button mini-button--highlight"
+                      for="cortical-image"
+                      >Choose photo</label
+                    >
+                    <input
+                      id="cortical-image"
+                      class="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      aria-label="Cortical source photo"
+                    />
+                    <button
+                      id="cortical-demo"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Use demo
+                    </button>
+                    <button
+                      id="cortical-reset-camera"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Reset camera
+                    </button>
+                    <button
+                      id="cortical-retry-depth"
+                      class="mini-button"
+                      type="button"
+                      hidden
+                    >
+                      Retry depth
+                    </button>
+                  </div>
+                  <p
+                    id="cortical-status"
+                    class="field__help"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p class="field__help">
+                    Drag to orbit · Shift-drag or right-drag to pan · Scroll to
+                    zoom. Turn the clock on for moving waves.
+                  </p>
+                  <details class="cortical-tools__help">
+                    <summary>About this surface</summary>
+                    <p>
+                      Your photo becomes a raised sheet. One local depth
+                      estimate supplies the relief; analytic waves animate its
+                      surface. Brightness supplies a preview while depth loads
+                      or if estimation is unavailable.
+                    </p>
+                    <p>
+                      Depth is relative, and waves are a log-polar pattern
+                      generator inspired by cortical mapping.
+                    </p>
+                    <a
+                      href="https://depth-anything-v2.github.io/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Depth Anything V2 ↗</a
+                    >
+                  </details>
+                </section>
                 <div id="neural-dream-tools" class="neural-dream-tools" hidden>
                   <div class="neural-dream-tools__source">
                     <label

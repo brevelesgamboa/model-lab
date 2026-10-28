@@ -8,6 +8,8 @@ import { getAudioRoute } from "../core/modulation-matrix.js";
 import { supportsModulation } from "../core/model-contract.js";
 import { modulationIsActive } from "../ui/modulation-panel.js";
 import { createNeuronGallery } from "../ui/neuron-gallery.js";
+import { createNeuronExplorer } from "../ui/neuron-explorer.js";
+import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
 import { isPausedAudioControl } from "../models/neural-growth/audio-effects.js";
 import {
   GROWTH_BRUSH_KEYS,
@@ -136,6 +138,7 @@ export function createControlsController({
   elements,
   controlElements,
   getModel,
+  getNeuronModel = getModel,
   getParameters,
   getLfoState,
   onPreset,
@@ -148,6 +151,7 @@ export function createControlsController({
 }) {
   let presetSelect = null;
   let neuronGallery = null;
+  let sensorExplorer = null;
   let manualChannelOpen = false;
   const sectionsKey = "gl-bench:control-sections";
   let sectionState = {};
@@ -156,6 +160,34 @@ export function createControlsController({
     if (stored && typeof stored === "object") sectionState = stored;
   } catch {
     /* Storage is optional. */
+  }
+
+  function selectSensorNeuron({ layer, channel }) {
+    inceptionSensor.setTarget(layer, channel);
+    for (const control of controlElements.values())
+      control.modulationDrawer?.sync();
+  }
+
+  function openSensorNeurons() {
+    const target = inceptionSensor.getTarget();
+    if (neuronGallery) return neuronGallery.open({ inspectTarget: target });
+    if (!sensorExplorer) {
+      const model = getNeuronModel();
+      sensorExplorer = createNeuronExplorer({
+        parameters: {
+          targetLayer: target.layer,
+          targetChannel: target.channel,
+        },
+        neurons: model.neuronArchetypes,
+        previewBridge: model.dreamBridge,
+        onSensorSelect: selectSensorNeuron,
+      });
+    }
+    sensorExplorer.update({
+      targetLayer: target.layer,
+      targetChannel: target.channel,
+    });
+    return sensorExplorer.open({ inspectTarget: target });
   }
 
   function syncNeuronGallery(options) {
@@ -290,6 +322,10 @@ export function createControlsController({
     const currentParameters = getParameters();
     const currentLfoState = getLfoState();
     neuronGallery?.dispose();
+    sensorExplorer?.dispose();
+    sensorExplorer = null;
+    for (const control of controlElements.values())
+      control.modulationDrawer?.dispose();
     for (const section of elements.parameterControls.querySelectorAll(
       ".control-section",
     )) {
@@ -372,6 +408,7 @@ export function createControlsController({
           neurons: currentModel.neuronArchetypes,
           parameters: currentParameters,
           onSelect: onNeuronPreset,
+          onSensorSelect: selectSensorNeuron,
           manualOpen: manualChannelOpen,
           previewBridge: currentModel.dreamBridge,
           onToggleManual(open) {
@@ -737,6 +774,7 @@ export function createControlsController({
   return {
     render,
     syncNeuronGallery,
+    openSensorNeurons,
     setPreset: (name) => {
       if (presetSelect) presetSelect.value = name;
     },

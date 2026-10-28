@@ -13,6 +13,8 @@ export function makeModulationPanel({
   config,
   supportsLfo,
   modelId,
+  previewBridge,
+  onBrowseSensor,
   getVisibleBase,
   coerceRangeValue,
   onCaptureBase,
@@ -53,6 +55,8 @@ export function makeModulationPanel({
   const drawer = createModulationDrawer({
     definition,
     supportsLfo,
+    previewBridge,
+    onBrowseSensor,
     getLfoConfig: () => config,
     getAudioRoute: () => audioRoute,
     onLfoChange: (key, value) => setLfoConfig({ [key]: value }),

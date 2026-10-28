@@ -14,6 +14,11 @@ import {
 } from "./reference.js";
 import { hexToRgb } from "../../core/utils.js";
 import { ResonanceConfig } from "./resonance-config.js";
+import {
+  MOTION_GRID_SIZE,
+  limitMotionField,
+  motionFieldStats,
+} from "./motion-field.js";
 
 export const SPIRAL_MAX_PITCH_DEGREES = 89;
 export const SPIRAL_MAX_PITCH_RADIANS = (SPIRAL_MAX_PITCH_DEGREES * Math.PI) / 180;
@@ -373,6 +378,12 @@ uniform sampler2D u_barrier;
 uniform int u_flowField;
 uniform float u_flowSpeed;
 uniform float u_flowPhase;
+uniform sampler2D u_velocity;
+uniform int u_velocitySize;
+vec2 motionAt(ivec2 p) {
+  ivec2 wrapped = (p % u_velocitySize + u_velocitySize) % u_velocitySize;
+  return texelFetch(u_velocity, wrapped, 0).rg;
+}
 vec4 sampleGroup(ivec2 cell, int group) {
   ivec2 wrapped = wrapCell(cell);
   return texelFetch(u_state, ivec2(wrapped.x + group * u_size, wrapped.y), 0);
@@ -390,6 +401,14 @@ void main() {
   vec2 velocity = u_flowField == 0
     ? vec2(sin(angle.y), 0.0)
     : vec2(sin(angle.x) * cos(angle.y), -cos(angle.x) * sin(angle.y));
+  if (u_flowField == 2) {
+    vec2 grid = vec2(xy) * float(u_velocitySize) / float(u_size);
+    ivec2 node = ivec2(floor(grid));
+    vec2 f = fract(grid);
+    velocity = mix(mix(motionAt(node), motionAt(node + ivec2(1, 0)), f.x),
+                   mix(motionAt(node + ivec2(0, 1)), motionAt(node + ivec2(1, 1)), f.x), f.y);
+    velocity *= min(1.0, 0.05 / max(length(velocity), 1e-20));
+  }
   vec2 departure = vec2(xy) - u_flowSpeed * velocity;
   ivec2 cell = ivec2(floor(departure));
   vec2 fraction = fract(departure);
@@ -1124,6 +1143,8 @@ export class TextureNcaRuntime {
       this.geometryCenterY = 0.0;
       this.geometrySoftness = 0.25;
       this.resonance = null;
+      this._motionFieldTexture = null;
+      this._motionFieldMax = 0;
       this.restart(seed);
       if (gl.getError() !== gl.NO_ERROR)
         throw new Error("WebGL initialization failed.");
@@ -1296,6 +1317,7 @@ export class TextureNcaRuntime {
           "u_displayFilter",
           "u_stepSeed",
           "u_flowField",
+          "u_velocitySize",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -1373,6 +1395,7 @@ export class TextureNcaRuntime {
         neutralGradient,
       );
     }
+    this.clearMotionField();
     this.steps = 0;
   }
 
@@ -1527,18 +1550,19 @@ export class TextureNcaRuntime {
 
   /**
    * One experimental transport pass, independent of the NCA update count.
-   * Speed is measured in cells per pass; call after each NCA step for the
-   * passive-motion experiment. Ordinary simulation does not call this method.
+   * Analytic speed and uploaded learned vectors use cells per pass. Call once
+   * after each NCA step in the motion experiment; learned vectors are already
+   * scaled and ignore the analytic speed multiplier.
    */
   advect({ field = "wave", speed = 0.05, phase = 0 } = {}) {
     this.assertActive();
-    if (field !== "wave" && field !== "vortex")
-      throw new RangeError("Passive flow must be wave or vortex.");
+    if (!["wave", "vortex", "learned"].includes(field))
+      throw new RangeError("Flow must be wave, vortex, or learned.");
     if (!Number.isFinite(speed) || Math.abs(speed) > 1)
       throw new RangeError("Flow speed must be within one cell per pass.");
     if (!Number.isFinite(phase))
       throw new RangeError("Flow phase must be finite.");
-    if (speed === 0) return;
+    if (field === "learned" ? !this._motionFieldMax : speed === 0) return;
     if (!this.program.advection) {
       const handle = link(this.gl, ADVECTION);
       this.programs.push(handle);
@@ -1547,14 +1571,72 @@ export class TextureNcaRuntime {
     this.run(
       "advection",
       this.nextState,
-      { u_state: this.state, u_barrier: this.barrier },
       {
-        u_flowField: field === "vortex" ? 1 : 0,
-        u_flowSpeed: speed,
+        u_state: this.state,
+        u_barrier: this.barrier,
+        u_velocity: this._motionFieldTexture || this.dreamGradTexture,
+      },
+      {
+        u_flowField: field === "learned" ? 2 : field === "vortex" ? 1 : 0,
+        u_flowSpeed: field === "learned" ? 1 : speed,
         u_flowPhase: phase,
+        u_velocitySize: MOTION_GRID_SIZE,
       },
     );
     [this.state, this.nextState] = [this.nextState, this.state];
+  }
+
+  setMotionField(values) {
+    this.assertActive();
+    const field = limitMotionField(values);
+    const gl = this.gl;
+    if (!this._motionFieldTexture) {
+      const texture = gl.createTexture();
+      if (!texture) throw new Error("Could not allocate the velocity field.");
+      this.textures.push(texture);
+      this._motionFieldTexture = {
+        texture,
+        width: MOTION_GRID_SIZE,
+        height: MOTION_GRID_SIZE,
+      };
+      this.textureBytes += field.byteLength;
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RG32F,
+        MOTION_GRID_SIZE,
+        MOTION_GRID_SIZE,
+        0,
+        gl.RG,
+        gl.FLOAT,
+        field,
+      );
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, this._motionFieldTexture.texture);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        MOTION_GRID_SIZE,
+        MOTION_GRID_SIZE,
+        gl.RG,
+        gl.FLOAT,
+        field,
+      );
+    }
+    this._motionFieldMax = motionFieldStats(field).maxSpeed;
+  }
+
+  clearMotionField() {
+    if (this._motionFieldTexture && !this.disposed && !this.gl.isContextLost())
+      this.setMotionField(new Float32Array(MOTION_GRID_SIZE ** 2 * 2));
+    this._motionFieldMax = 0;
   }
 
   disturb(
@@ -2144,6 +2226,8 @@ export class TextureNcaRuntime {
     this.textureBytes = 0;
     this._phenotypeTarget = null;
     this.dreamGradTexture = null;
+    this._motionFieldTexture = null;
+    this._motionFieldMax = 0;
     this.canvas.width = 1;
     this.canvas.height = 1;
   }

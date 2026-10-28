@@ -153,11 +153,181 @@ async function field(page) {
   }));
 }
 
+test("sensor previews share the neuron gallery, require manual generation, and leave Dream targets and the field intact", async ({
+  page,
+}) => {
+  await installPreviewFixture(page, { bundled: true });
+  await page.evaluate(async () => {
+    const { inceptionSensor } =
+      await import("/assets/js/models/neural-growth/inception-sensor.js");
+    // This test exercises UI/cache wiring; the sensor spec covers the real GPU worker.
+    inceptionSensor.createWorker = () => {
+      const worker = {
+        postMessage(message) {
+          message.bitmap?.close();
+          queueMicrotask(() =>
+            worker.onmessage?.({
+              data:
+                message.type === "init"
+                  ? { type: "ready", backend: "fixture" }
+                  : { type: "sample", id: message.id, raw: 1 },
+            }),
+          );
+        },
+        terminate() {},
+      };
+      return worker;
+    };
+  });
+  await openGrowth(page);
+  const control = page.locator('[data-parameter="rotation"]');
+  await control.evaluate((element) => (element.closest("details").open = true));
+  await control.locator(".modulation-toggle").click();
+  const drawer = control.locator(".modulation-drawer");
+  await drawer.getByRole("button", { name: "Inception", exact: true }).click();
+  await page.locator("#toggle-animation").click();
+  const before = await field(page);
+  const dreamLayer = await page
+    .getByLabel("DREAM LAYER", { exact: true })
+    .inputValue();
+  const dreamChannel = await page
+    .getByLabel("DREAM NEURON exact value", { exact: true })
+    .inputValue();
+  const preview = drawer.locator(".sensor-neuron-preview");
+  await expect(preview.locator("figcaption")).toHaveText(
+    "Conv2d_4a_3x3 · Channel #42",
+  );
+  await expect(preview.locator("img")).toBeHidden();
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  await preview
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
+  await expect(preview.locator("img")).toBeVisible();
+  await expect(preview.locator("img")).toHaveAttribute(
+    "src",
+    await page.evaluate(() => window.__previewResults.Conv2d_4a_3x3_42),
+  );
+
+  await drawer.locator('[data-field="sensorLayer"]').selectOption("mixed_5b");
+  await drawer.locator('[data-field="sensorChannel"]').fill("120");
+  await drawer.locator('[data-field="sensorChannel"]').dispatchEvent("change");
+  await expect(preview.locator("img")).toHaveAttribute(
+    "src",
+    /mixed_5b-120\.webp$/,
+  );
+  await drawer
+    .getByRole("button", { name: "Browse neuron gallery", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Neuron explorer",
+    exact: true,
+  });
+  await expect(dialog.locator(".neuron-explorer__detail h3")).toHaveText(
+    "mixed_5b · Channel #120",
+  );
+  await expect(dialog.locator(".neuron-explorer__detail img")).toBeInViewport();
+  await dialog
+    .getByLabel("Explorer layer", { exact: true })
+    .selectOption("mixed_6c");
+  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("144");
+  await dialog.locator('.neuron-explorer__card[data-channel="144"]').click();
+  await dialog
+    .getByRole("button", { name: "Use as sensor", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(drawer.locator('[data-field="sensorLayer"]')).toHaveValue(
+    "mixed_6c",
+  );
+  await expect(drawer.locator('[data-field="sensorChannel"]')).toHaveValue(
+    "144",
+  );
+  await expect(preview.locator("img")).toHaveAttribute(
+    "src",
+    /mixed_6c-144\.webp$/,
+  );
+  await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
+    dreamLayer,
+  );
+  await expect(
+    page.getByLabel("DREAM NEURON exact value", { exact: true }),
+  ).toHaveValue(dreamChannel);
+
+  await drawer
+    .locator('[data-field="sensorLayer"]')
+    .selectOption("Conv2d_4a_3x3");
+  await drawer.locator('[data-field="sensorChannel"]').fill("42");
+  await drawer.locator('[data-field="sensorChannel"]').dispatchEvent("change");
+  await expect(preview.locator("img")).toBeVisible();
+  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
+    "Conv2d_4a_3x3_42",
+  ]);
+  expect(await field(page)).toEqual(before);
+  expect(await page.evaluate(() => Boolean(window.tf))).toBe(false);
+  const subscriptions = await page.evaluate(
+    () => window.__previewBridge._previewListeners.size,
+  );
+  await drawer
+    .getByRole("button", { name: "Browse neuron gallery", exact: true })
+    .click();
+  await dialog
+    .getByLabel("Explorer layer", { exact: true })
+    .selectOption("mixed_6c");
+  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("");
+  await dialog.locator('.neuron-explorer__card[data-channel="-1"]').click();
+  await expect(
+    dialog.getByRole("button", { name: "Use as sensor", exact: true }),
+  ).toBeDisabled();
+  await dialog
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
+    .click();
+  await expect(drawer.locator('[data-field="sensorChannel"]')).toHaveValue(
+    "42",
+  );
+
+  await page.locator("#model-select").selectOption("folded-fractal");
+  expect(
+    await page.evaluate(() => window.__previewBridge._previewListeners.size),
+  ).toBe(0);
+  const fractalDrawer = page.locator(
+    '[data-parameter="rotation"] .modulation-drawer',
+  );
+  await page.locator('[data-parameter="rotation"] .modulation-toggle').click();
+  await fractalDrawer
+    .getByRole("button", { name: "Inception", exact: true })
+    .click();
+  await fractalDrawer
+    .getByRole("button", { name: "Browse neuron gallery", exact: true })
+    .click();
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Use as Dream target", exact: true }),
+  ).toBeHidden();
+  await dialog
+    .getByLabel("Explorer layer", { exact: true })
+    .selectOption("mixed_5b");
+  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("120");
+  await dialog.locator('.neuron-explorer__card[data-channel="120"]').click();
+  await dialog
+    .getByRole("button", { name: "Use as sensor", exact: true })
+    .click();
+  await expect(
+    fractalDrawer.locator(".sensor-neuron-preview img"),
+  ).toHaveAttribute("src", /mixed_5b-120\.webp$/);
+  await page.locator("#model-select").selectOption("neural-growth");
+  await expect(page.locator("dialog.neuron-explorer")).toHaveCount(1);
+  expect(
+    await page.evaluate(() => window.__previewBridge._previewListeners.size),
+  ).toBe(subscriptions);
+});
+
 test("manual channel previews follow exact layer bounds, reuse cache, and preserve the cellular field", async ({
   page,
 }) => {
   await installPreviewFixture(page);
   await openGrowth(page);
+  const previewListeners = await page.evaluate(
+    () => window.__previewBridge._previewListeners.size,
+  );
   await page.locator("#step-growth").click();
   const before = await field(page);
   await page
@@ -228,7 +398,7 @@ test("manual channel previews follow exact layer bounds, reuse cache, and preser
   await expect(image).toHaveAttribute("src", expected);
   expect(
     await page.evaluate(() => window.__previewBridge._previewListeners.size),
-  ).toBe(2);
+  ).toBe(previewListeners);
   expect(await field(page)).toEqual(before);
 });
 

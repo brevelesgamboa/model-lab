@@ -521,6 +521,42 @@ summary {
   line-height: 10px;
   background: transparent;
 }
+.cortical-tools {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.cortical-tools__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cortical-tools p {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.cortical-tools__help {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.cortical-tools__help summary {
+  cursor: pointer;
+}
+.cortical-tools__help p {
+  margin: 8px 0;
+}
+.has-orbit-camera {
+  cursor: grab;
+  touch-action: none;
+}
+.has-orbit-camera.is-orbiting {
+  cursor: grabbing;
+}
 .control-fine-group {
   flex: 0 0 auto;
   display: grid;
@@ -2187,7 +2223,8 @@ input[type="range"]::-moz-range-progress {
 .neuron-gallery__browse {
   margin-bottom: 10px;
 }
-.neuron-selected-preview {
+.neuron-selected-preview,
+.sensor-neuron-preview {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 12px;
@@ -2197,16 +2234,19 @@ input[type="range"]::-moz-range-progress {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
 }
-.neuron-selected-preview:has(img[hidden]) {
+.neuron-selected-preview:has(img[hidden]),
+.sensor-neuron-preview:has(img[hidden]) {
   grid-template-columns: minmax(0, 1fr);
 }
-.neuron-selected-preview img {
+.neuron-selected-preview img,
+.sensor-neuron-preview img {
   width: 96px;
   height: 96px;
   border-radius: 4px;
   image-rendering: auto;
 }
-.neuron-selected-preview figcaption {
+.neuron-selected-preview figcaption,
+.sensor-neuron-preview figcaption {
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -2215,6 +2255,19 @@ input[type="range"]::-moz-range-progress {
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+.sensor-neuron-preview {
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+}
+.sensor-neuron-preview img {
+  width: 72px;
+  height: 72px;
+}
+.sensor-neuron-preview figcaption {
+  font-size: 9px;
 }
 .neuron-explorer {
   box-sizing: border-box;
@@ -2634,6 +2687,112 @@ input[type="range"]::-moz-range-progress {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
+}
+.drawer-sensor {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.drawer-sensor[hidden] {
+  display: none;
+}
+.drawer-sensor label {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+.drawer-sensor select,
+.drawer-sensor input {
+  min-width: 0;
+  width: 100%;
+  font-size: 9px;
+}
+.drawer-sensor p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.drawer-sensor-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+.drawer-sensor-state button {
+  font-size: 9px;
+}
+.drawer-sensor-help > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.drawer-sensor-help > summary::-webkit-details-marker {
+  display: none;
+}
+.drawer-sensor-help .parameter-info-button {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+}
+.drawer-sensor-help[open] > summary {
+  margin-bottom: 7px;
+}
+.drawer-sensor-help > div {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.drawer-sensor-help a {
+  font-size: 10px;
+  color: var(--accent-mod);
+}
+.sensor-activity {
+  margin: 0;
+}
+.sensor-activity figcaption {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.sensor-activity svg {
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.sensor-activity-grid {
+  fill: none;
+  stroke: var(--border-subtle);
+  stroke-width: 0.5;
+}
+.sensor-activity-line {
+  fill: none;
+  stroke: var(--accent-mod);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sensor-activity-dot {
+  fill: var(--accent-mod);
+}
+.sensor-activity text {
+  fill: var(--text-muted);
+  font-size: 9px;
 }
 .drawer-audio-depth .drawer-range {
   grid-template-columns: 36px minmax(0, 1fr) 34px;

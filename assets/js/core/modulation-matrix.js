@@ -1,9 +1,11 @@
 import { clamp } from "./utils.js";
+import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
 
 export const AUDIO_MODULATION_SOURCES = Object.freeze([
   { value: "none", label: "NONE" },
   { value: "bass", label: "BASS / MUSIC" },
   { value: "kick", label: "KICK" },
+  { value: "inception", label: "NEURAL ENERGY" },
 ]);
 
 const VALID_SOURCES = new Set(
@@ -76,11 +78,28 @@ export function hasActiveAudioRoute(modelId) {
   );
 }
 
+export function hasModulationSource(modelId, source) {
+  const prefix = `${modelId}:`;
+  return [...modulationMatrixState.entries()].some(
+    ([key, route]) => key.startsWith(prefix) && route.source === source,
+  );
+}
+
+export function getModulationLevel(source, levels) {
+  return clamp(
+    Number(
+      source === "inception" ? inceptionSensor.getLevel() : levels?.[source],
+    ) || 0,
+    0,
+    1,
+  );
+}
+
 export function applyAudioModulation(definition, value, route, levels) {
   const config = sanitizeAudioRoute(route);
   if (definition.type !== "range" || config.source === "none")
     return Number(value);
-  const level = clamp(Number(levels?.[config.source]) || 0, 0, 1);
+  const level = getModulationLevel(config.source, levels);
   const minimum = Number(definition.min);
   const maximum = Number(definition.max);
   const range = maximum - minimum;

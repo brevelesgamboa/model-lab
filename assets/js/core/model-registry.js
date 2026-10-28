@@ -5,6 +5,7 @@ import { CustomPcaModel } from "../models/custom-pca.js";
 import { LocalNeuralModel } from "../models/local-neural.js";
 import { InceptionDreamModel } from "../models/inception-dream.js";
 import { NeuralGrowthModel } from "../models/neural-growth.js";
+import { CorticalTopographyModel } from "../models/cortical-topography.js";
 import { validateModelDefinition } from "./model-contract.js";
 
 const MODEL_ALIASES = new Map([
@@ -29,6 +30,7 @@ export class ModelRegistry {
       new DigiFaceVaeModel(),
       inceptionDream,
       neuralGrowth,
+      new CorticalTopographyModel(),
       this.customModel,
       this.neuralModel,
     ];

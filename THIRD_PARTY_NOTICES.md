@@ -48,6 +48,15 @@ The separate Inception and DigiFace release review remains outstanding.
 
 ## Other external resources
 
+3D Cortical Topography optionally downloads Depth Anything V2 Small from
+[ONNX Community](https://huggingface.co/onnx-community/depth-anything-v2-small-ONNX),
+revision `c3b67641fd837b2368757101311e5d21e511441e`, using `model_q4.onnx` and
+`model_q4.onnx_data`. The model repository declares Apache-2.0; upstream code
+and Small checkpoint: [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2).
+These weights are fetched by the browser and are not included in the static
+build. Photos are processed locally. The topography renderer reuses the depth
+map; its moving surface uses analytic log-polar wave patterns.
+
 Google Fonts supplies Gajraj One and IBM Plex Mono/Sans via optional network stylesheets; local system fonts provide fallbacks. Wikimedia Commons search returns individually licensed media; attribution/license metadata must be retained and reviewed per asset. User-provided images and browser-trained models remain the user's responsibility.
 
 Runtime licenses do not grant rights to either model's weights or training data.
