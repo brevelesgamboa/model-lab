@@ -1,5 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { inceptionCheckpointSha256 } from "../../tools/model-assets.mjs";
+import {
+  NEURON_PREVIEW_RECIPE,
+  createFourierImage,
+  previewSeed,
+} from "../../assets/js/models/neural-growth/neuron-preview.js";
 import {
   INCEPTION_LAYERS,
   INCEPTION_LAYER_CHANNELS,
@@ -116,6 +124,75 @@ test("preview ensemble uses the bundled graph's own input normalization and no c
   assert.equal(tf.memory().numTensors, baseline);
 });
 
+test("Fourier examples are reproducible by seed and release optimizer state", async (context) => {
+  const { tf, rendered } = await previewEnvironment(context);
+  const baseline = tf.memory().numTensors;
+  const model = { execute: (input) => input.square() };
+  for (const seed of [11, 11, 23]) {
+    await generateNeuronPreview(model, "mixed_6c", 1, 8, 3, {
+      seed,
+      beforeStep: async () => {},
+    });
+    assert.equal(tf.memory().numTensors, baseline);
+  }
+  assert.deepEqual(rendered[0].pixels, rendered[1].pixels);
+  assert.notDeepEqual(rendered[0].pixels, rendered[2].pixels);
+});
+
+test("the Fourier luminance coordinate moves RGB channels together", async (context) => {
+  const { tf } = await previewEnvironment(context);
+  const baseline = tf.memory().numTensors;
+  const image = createFourierImage(tf, 4, 11);
+  const coefficients = new Float32Array(3 * 4 * 4);
+  coefficients[0] = 4;
+  const pixels = tf.tidy(() =>
+    Array.from(image.render(tf.tensor3d(coefficients, [3, 4, 4])).dataSync()),
+  );
+  assert.ok(
+    pixels.every((value) => Number.isFinite(value) && value > 0.8 && value < 1),
+  );
+  assert.ok(Math.max(...pixels) - Math.min(...pixels) < 0.03);
+  image.dispose();
+  assert.equal(tf.memory().numTensors, baseline);
+});
+
+test("bundled previews match the app checkpoint, recipe, channels, and build assets", async () => {
+  const catalog = JSON.parse(
+    await readFile(
+      new URL("../../models/inception/previews/catalog.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const manifest = JSON.parse(
+    await readFile(
+      new URL("../../tools/model-assets.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const graph = manifest.find(
+    (entry) => entry.path === "models/inception/model.json",
+  );
+  assert.equal(catalog.modelSha256, graph.sha256);
+  assert.equal(catalog.checkpointSha256, inceptionCheckpointSha256(manifest));
+  assert.equal(catalog.recipe, NEURON_PREVIEW_RECIPE);
+  assert.deepEqual(
+    new Set(catalog.entries.map((entry) => `${entry.layer}_${entry.channel}`)),
+    new Set(CURATED_NEURONS.map((entry) => `${entry.layer}_${entry.channel}`)),
+  );
+  for (const entry of catalog.entries) {
+    assert.equal(entry.seed, previewSeed(entry.layer, entry.channel));
+    const path = `models/inception/previews/${entry.file}`;
+    const bytes = await readFile(new URL(`../../${path}`, import.meta.url));
+    assert.equal(bytes.subarray(8, 12).toString(), "WEBP");
+    const asset = manifest.find((item) => item.path === path);
+    assert.ok(asset, `Missing production preview: ${path}`);
+    assert.equal(
+      createHash("sha256").update(bytes).digest("hex"),
+      asset.sha256,
+    );
+  }
+});
+
 test("preview failures, encoding failures and cancellation dispose variables and intermediates", async (context) => {
   const { tf } = await previewEnvironment(context);
   const baseline = tf.memory().numTensors;
@@ -161,7 +238,7 @@ test("preview cache deduplicates concurrent requests, survives resets and notifi
     generatePreview: async (model, layer, channel, size, steps) => {
       assert.equal(model, graph);
       assert.equal(size, 96);
-      assert.equal(steps, 30);
+      assert.equal(steps, 96);
       calls.push(`${layer}_${channel}`);
       return `data:image/webp;base64,${channel}`;
     },
@@ -188,7 +265,7 @@ test("preview cache deduplicates concurrent requests, survives resets and notifi
   assert.equal(bridge._previewListeners.size, 0);
 });
 
-test("model-ready warming yields to foreground guidance and disposal cancels a waiting preview", async () => {
+test("requested previews yield to foreground guidance and disposal cancels a waiting preview", async () => {
   let steps = 0;
   let entered;
   const started = new Promise((resolve) => {
@@ -213,7 +290,8 @@ test("model-ready warming yields to foreground guidance and disposal cancels a w
     },
   });
   bridge.onModelReady(owner.model);
-  const task = bridge._previewTask;
+  assert.equal(bridge._previewTask, null);
+  const task = bridge.warmArchetypePreviews(CURATED_NEURONS.slice(0, 1));
   await started;
   assert.equal(steps, 0);
   owner.isRunning = false;
@@ -222,6 +300,119 @@ test("model-ready warming yields to foreground guidance and disposal cancels a w
   await task;
   assert.equal(steps, 0);
   assert.equal(bridge.previewCache.size, 0);
+});
+
+test("preview requests share work while each consumer can cancel independently", async (context) => {
+  let entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  const bridge = new DreamGuidanceBridge({
+    getInceptionModel: () => ({ model: {} }),
+    generatePreview: async () => {
+      calls += 1;
+      entered();
+      await gate;
+      return "shared-preview";
+    },
+  });
+  context.after(() => bridge.dispose());
+  const abort = new AbortController();
+  const first = bridge.requestPreview("mixed_7b", 1800, {
+    signal: abort.signal,
+  });
+  const rejected = assert.rejects(first, { name: "AbortError" });
+  const second = bridge.requestPreview("mixed_7b", 1800);
+  await started;
+  abort.abort();
+  await rejected;
+  release();
+  assert.equal(await second, "shared-preview");
+  assert.equal(await bridge.requestPreview("mixed_7b", 1800), "shared-preview");
+  assert.equal(calls, 1);
+});
+
+test("a selected channel preempts background generation and resumes its consumers", async (context) => {
+  let entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const calls = [];
+  const completed = [];
+  const bridge = new DreamGuidanceBridge({
+    getInceptionModel: () => ({ model: {} }),
+    generatePreview: async (
+      _model,
+      _layer,
+      channel,
+      _size,
+      _steps,
+      { signal },
+    ) => {
+      calls.push(channel);
+      if (calls.length === 1) {
+        entered();
+        await new Promise((_resolve, reject) =>
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          }),
+        );
+      }
+      return `preview-${channel}`;
+    },
+  });
+  context.after(() => bridge.dispose());
+  bridge.subscribePreviews((key) => completed.push(key));
+  const background = bridge.requestPreview("mixed_6c", 1, { priority: false });
+  await started;
+  const selected = bridge.requestPreview("mixed_6c", 2);
+  assert.equal(await selected, "preview-2");
+  assert.equal(await background, "preview-1");
+  assert.deepEqual(calls, [1, 2, 1]);
+  assert.deepEqual(completed, ["mixed_6c_2", "mixed_6c_1"]);
+});
+
+test("failed channel previews can retry and disposal settles queued requests", async (context) => {
+  let calls = 0;
+  const bridge = new DreamGuidanceBridge({
+    getInceptionModel: () => ({ model: {} }),
+    generatePreview: async () => {
+      if (++calls === 1) throw new Error("temporary failure");
+      return "recovered";
+    },
+  });
+  context.after(() => bridge.dispose());
+  await assert.rejects(
+    bridge.requestPreview("mixed_5b", 255),
+    /temporary failure/,
+  );
+  await assert.rejects(
+    bridge.requestPreview("mixed_5b", 255),
+    /temporary failure/,
+  );
+  assert.equal(calls, 1);
+  assert.equal(
+    await bridge.requestPreview("mixed_5b", 255, { retry: true }),
+    "recovered",
+  );
+  await assert.rejects(
+    bridge.requestPreview("mixed_5b", 256),
+    /Unknown InceptionV3/,
+  );
+  await assert.rejects(
+    bridge.requestPreview("mixed4a", 144),
+    /Unknown InceptionV3/,
+  );
+  const pending = bridge.requestPreview("mixed_7c", 2047);
+  const cancelled = assert.rejects(pending, { name: "AbortError" });
+  bridge.dispose();
+  await cancelled;
+  assert.equal(bridge._previewEntries.size, 0);
 });
 
 test("every Inception endpoint has its exact channel depth and a selectable control", () => {

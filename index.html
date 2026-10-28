@@ -111,7 +111,8 @@
                   <select id="model-select" aria-label="Model route"></select>
                 </label>
 
-                <div class="model-readout">
+                <details class="model-readout">
+                  <summary>Model details</summary>
                   <span class="section-caption">ARCHITECTURE</span>
                   <span id="model-family">MODEL FAMILY: —</span>
                   <span id="model-backend">BACKEND: —</span>
@@ -124,7 +125,7 @@
                       class="model-info__content"
                     ></div>
                   </details>
-                </div>
+                </details>
 
                 <section
                   id="growth-tools"
@@ -660,8 +661,8 @@
 
                 <details id="brush-settings" class="brush-settings">
                   <summary
-                    title="Brush size — expand controls below"
-                    aria-label="Brush size — expand controls below"
+                    title="Brush settings"
+                    aria-label="Brush settings"
                   >
                     <span
                       id="brush-diameter-preview"
@@ -672,8 +673,15 @@
                     >
                   </summary>
                   <div id="growth-brush-options" class="growth-brush-options">
+                    <label class="growth-option-label-select">
+                      <span>Brush</span>
+                      <select
+                        id="growth-brush-mode"
+                        aria-label="Brush mode"
+                      ></select>
+                    </label>
                     <div class="growth-option-group">
-                      <span class="growth-option-label">SIZE</span>
+                      <span class="growth-option-label">Size</span>
                       <input
                         id="growth-brush-radius"
                         type="range"
@@ -689,7 +697,7 @@
                       class="growth-option-group"
                       hidden
                     >
-                      <span class="growth-option-label">COLOR</span>
+                      <span class="growth-option-label">Color</span>
                       <div id="growth-color-pills" class="growth-color-pills">
                         <button
                           class="color-preset-pill is-active"
@@ -767,7 +775,7 @@
                           data-freeze-lock="mask"
                           title="Mask: locked barrier, nothing can draw or grow over it"
                         >
-                          MASK
+                          Mask
                         </button>
                         <button
                           id="growth-freeze-lock-draw"
@@ -776,11 +784,11 @@
                           data-freeze-lock="draw"
                           title="Draw: editable barrier, draw on frozen cells then unfreeze"
                         >
-                          DRAW
+                          Draw
                         </button>
                       </div>
                       <label class="growth-option-label-select">
-                        <span>OUTLINE</span>
+                        <span>Outline</span>
                         <select
                           id="growth-outline-select"
                           aria-label="Barrier outline visibility"
@@ -798,7 +806,7 @@
                         aria-label="Unfreeze"
                         aria-pressed="false"
                       >
-                        THAW
+                        Unfreeze
                       </button>
                     </div>
                   </div>

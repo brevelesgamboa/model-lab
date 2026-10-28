@@ -648,7 +648,7 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(runtimes[0].disposed, false);
 });
 
-test("audio-reactive profiles and beat shockwaves map routes and dispatch optical kick ripples", async (context) => {
+test("audio settings retain their schema while beat effects stay paused and manual ripples work", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
   await model.render(canvas, params, 0);
 
@@ -863,24 +863,17 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
     "custom",
   );
 
-  // Optical beat shockwave tests: purely visual ripple, zero cell disturbance
+  // Legacy values and direct calls cannot re-enable the paused beat effect.
   assert.equal(model.triggerBeatShockwave("off"), false);
-  assert.equal(model.triggerBeatShockwave("on"), true);
-  assert.ok(model.hasActiveRipples);
-  assert.equal(model._activeRipples.length, 1);
-  const centerPulse = model._activeRipples[0];
-  assert.equal(centerPulse.x, 64);
-  assert.equal(centerPulse.y, 64);
-  assert.equal(centerPulse.amplitude, 0.30);
+  assert.equal(model.triggerBeatShockwave("on"), false);
+  assert.equal(model.triggerBeatShockwave("on", { x: 30, y: 40 }), false);
+  assert.equal(model.triggerKickInput(1, 1000), false);
+  assert.equal(model.hasActiveRipples, false);
   assert.equal(model._queuedDisturbances.length, 0);
 
-  // Pointer position shockwave
-  assert.equal(
-    model.triggerBeatShockwave("on", { x: 30, y: 40 }),
-    true,
-  );
-  assert.equal(model._activeRipples.length, 2);
-  const pointerPulse = model._activeRipples[1];
+  // The direct brush ripple stays independent of audio.
+  assert.equal(model.triggerRipple(30, 40, 16), true);
+  const pointerPulse = model._activeRipples[0];
   assert.equal(pointerPulse.x, 30);
   assert.equal(pointerPulse.y, 40);
 
@@ -888,11 +881,10 @@ test("audio-reactive profiles and beat shockwaves map routes and dispatch optica
   model.step();
   assert.equal(runtimes[0].disturbances.length, 0);
 
-  // Intensity parameter test
+  // Keep the stored intensity without letting it activate the effect.
   model.onParameterChange("shockwaveIntensity", 0.65);
-  assert.equal(model.triggerBeatShockwave("on"), true);
-  const intensePulse = model._activeRipples[model._activeRipples.length - 1];
-  assert.equal(intensePulse.amplitude, 0.65);
+  assert.equal(model.parameters.shockwaveIntensity, 0.65);
+  assert.equal(model.triggerBeatShockwave("on"), false);
 
   await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
   assert.equal(runtimes[0].lastDrawOptions.channelView, "phenotype");
@@ -1650,7 +1642,7 @@ test("acoustic field injection configures controls, normalizes values and dispat
   );
 });
 
-test("audio-reactive camera breathing configures controls, normalizes values and updates viewport", () => {
+test("camera breathing retains saved settings but does not move the viewport", () => {
   const model = new NeuralGrowthModel();
 
   // Controls
@@ -1679,9 +1671,34 @@ test("audio-reactive camera breathing configures controls, normalizes values and
   model._parameters = { ...model.parameters, zoom: 2 };
   Object.defineProperty(model, "ready", { value: true, configurable: true });
   const moving = model.processCameraMotion({ hasSignal: true, kickOnset: 0.9, bass: 0.5 }, 1000);
-  assert.equal(moving, true);
-  assert.ok(model.effectiveZoom > 2.0);
-  assert.ok(Array.isArray(model.effectivePan));
+  assert.equal(moving, false);
+  assert.equal(model.effectiveZoom, 2);
+  assert.deepEqual(model.effectivePan, [0, 0]);
+});
+
+test("restored audio effects cannot inject state or override manual zoom", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const restored = {
+    ...params, audioProfile: "dynamic", beatShockwave: "on",
+    acousticInjection: "dye", cameraBreathing: "punchy", zoom: 2,
+  };
+  await model.render(canvas, restored, 0);
+  const snapshot = { ...model.parameters };
+  model._acousticEmitter = { process() { throw new Error("Coupling must stay paused"); } };
+  model._cameraMotion.update = () => { throw new Error("Camera must stay paused"); };
+  model._effectiveZoom = 7;
+  model._effectivePan = [0.5, 0.5];
+  const levels = { hasSignal: true, kickOnset: 1, kick: 1, bass: 1 };
+  assert.equal(model.processAcousticInjection(new Uint8Array(512).fill(255), levels, 1000), 0);
+  assert.equal(model.processCameraMotion(levels, 1000), false);
+  assert.equal(model.triggerBeatShockwave("on"), false);
+  assert.equal(model.triggerKickInput(1, 1000), false);
+  await model.render(canvas, restored, 0.1);
+  assert.deepEqual(model.parameters, snapshot);
+  assert.deepEqual(runtimes[0].disturbances, []);
+  assert.equal(runtimes[0].lastDrawOptions.zoom, 2);
+  assert.deepEqual(runtimes[0].lastDrawOptions.pan, [0, 0]);
+  assert.equal(model.hasActiveRipples, false);
 });
 
 

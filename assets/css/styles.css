@@ -2184,6 +2184,186 @@ input[type="range"]::-moz-range-progress {
 .neuron-gallery__manual {
   margin-top: 4px;
 }
+.neuron-gallery__browse {
+  margin-bottom: 10px;
+}
+.neuron-selected-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin: 4px 0 16px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.neuron-selected-preview:has(img[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.neuron-selected-preview img {
+  width: 96px;
+  height: 96px;
+  border-radius: 4px;
+  image-rendering: auto;
+}
+.neuron-selected-preview figcaption {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.neuron-selected-preview__status {
+  margin: 6px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.neuron-explorer {
+  box-sizing: border-box;
+  width: min(960px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: 90dvh;
+  margin: auto;
+  padding: 20px;
+  color: var(--text-primary);
+  background: var(--bg-panel, #11151b);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+.neuron-explorer[open] {
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+}
+.neuron-explorer::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.neuron-explorer header,
+.neuron-explorer__pagination,
+.neuron-explorer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.neuron-explorer h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.neuron-explorer__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.neuron-explorer__toolbar {
+  flex-wrap: wrap;
+}
+.neuron-explorer__cache {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.neuron-explorer__cache label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.neuron-explorer__cache input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent-primary, #88c9ff);
+}
+.neuron-explorer__cache button {
+  margin-left: auto;
+}
+.neuron-explorer__toolbar label {
+  font-size: 12px;
+}
+.neuron-explorer input,
+.neuron-explorer select,
+.neuron-explorer__pagination button {
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-input, #1b2029);
+  color: var(--text-primary);
+}
+.neuron-explorer__toolbar input {
+  flex: 1 1 180px;
+}
+.neuron-explorer__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 160px;
+  max-height: 58dvh;
+  padding: 3px;
+}
+.neuron-explorer__card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 190px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-input, #1b2029);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.neuron-explorer__layer-heading,
+.neuron-explorer__empty {
+  grid-column: 1 / -1;
+  margin: 2px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.neuron-explorer__card[aria-pressed="true"] {
+  border-color: var(--accent-mod);
+}
+.neuron-explorer__card:focus-visible {
+  outline: 2px solid var(--accent-mod);
+  outline-offset: 1px;
+}
+.neuron-explorer__card img {
+  flex-shrink: 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  image-rendering: auto;
+}
+.neuron-explorer__card strong {
+  font-size: 12px;
+}
+.neuron-explorer__card-status,
+.neuron-explorer__layer,
+.neuron-explorer__curated,
+.neuron-explorer__pagination {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+@media (max-width: 600px) {
+  .neuron-explorer {
+    padding: 14px;
+  }
+  .neuron-explorer__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 .growth-gallery__card-badge {
   font: 8px var(--ui);
@@ -2607,6 +2787,65 @@ input[type="range"]::-moz-range-progress {
 .parameter-controls {
   gap: 20px;
 }
+.advanced-controls.is-grouped > summary {
+  display: none;
+}
+.advanced-controls.is-grouped .parameter-controls {
+  gap: 0;
+}
+.control-section {
+  min-width: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.control-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 2px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.control-section > summary::-webkit-details-marker {
+  display: none;
+}
+.control-section > summary::after {
+  content: "+";
+  color: var(--text-muted);
+}
+.control-section[open] > summary::after {
+  content: "−";
+}
+.control-section > summary:focus-visible {
+  outline: 1px solid var(--text-secondary);
+  outline-offset: -1px;
+}
+.control-section__content {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding-bottom: 16px;
+}
+.control-section .control-block > .field__help {
+  display: none;
+}
+.control-section .growth-tools {
+  margin: 0;
+  padding: 0;
+}
+.browse-neurons {
+  justify-self: start;
+}
+.model-readout > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.model-readout[open] > summary {
+  margin-bottom: 10px;
+}
 .input-panel .fractal-tools,
 .input-panel .neural-dream-tools {
   position: static;
@@ -2707,6 +2946,10 @@ input[type="range"]::-moz-range-progress {
   scrollbar-width: thin;
   scrollbar-color: var(--border-active) transparent;
 }
+.tool-rail:has(.brush-settings[open]) {
+  flex-basis: 104px;
+  width: 104px;
+}
 .growth-canvas-tools__row {
   flex: 0 0 auto;
   width: 100%;
@@ -2781,7 +3024,7 @@ input[type="range"]::-moz-range-progress {
   margin: 0;
 }
 .growth-brush-options .growth-option-label {
-  font-size: 7px;
+  font-size: 10px;
 }
 #growth-brush-radius {
   writing-mode: vertical-lr;
@@ -2812,36 +3055,36 @@ input[type="range"]::-moz-range-progress {
   padding: 1px;
 }
 .growth-brush-options .growth-color-hex {
-  width: 34px;
-  padding: 4px 1px;
-  font-size: 7px;
+  width: 82px;
+  padding: 4px;
+  font-size: 10px;
   text-align: center;
 }
 .growth-brush-options .growth-freeze-lock-group {
-  display: grid;
+  display: flex;
   gap: 4px;
 }
 .growth-brush-options .growth-freeze-lock-group button,
 .growth-thaw-button {
-  width: 32px;
+  min-width: 40px;
   min-height: 23px;
   height: auto;
   padding: 3px 1px;
   border: 1px solid var(--border-subtle);
-  font-size: 7px;
+  font-size: 9px;
 }
 .growth-brush-options .growth-option-label-select {
   display: grid;
   gap: 5px;
   width: 100%;
-  font-size: 6px;
+  font-size: 10px;
   text-align: center;
 }
 .growth-brush-options select {
   width: 100%;
   min-height: 25px;
-  padding: 3px 0;
-  font-size: 7px;
+  padding: 3px;
+  font-size: 10px;
 }
 #growth-clear-barrier-btn {
   flex: 0 0 auto;

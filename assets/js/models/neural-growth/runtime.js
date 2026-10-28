@@ -15,6 +15,23 @@ import {
 import { hexToRgb } from "../../core/utils.js";
 import { ResonanceConfig } from "./resonance-config.js";
 
+export const SPIRAL_MAX_PITCH_DEGREES = 89;
+export const SPIRAL_MAX_PITCH_RADIANS = (SPIRAL_MAX_PITCH_DEGREES * Math.PI) / 180;
+
+// Guard the combined manual, audio and LFO values at the runtime boundary.
+export function clampGeometryTwist(transform, value) {
+  const angle = Number(value);
+  if (!Number.isFinite(angle)) return 0;
+  return transform === "spiral"
+    ? Math.max(-SPIRAL_MAX_PITCH_RADIANS, Math.min(SPIRAL_MAX_PITCH_RADIANS, angle))
+    : angle;
+}
+
+export function clampGeometryStrength(value) {
+  const strength = Number(value);
+  return Number.isFinite(strength) ? Math.max(0, Math.min(1, strength)) : 1;
+}
+
 const VERTEX = `#version 300 es
 precision highp float;
 out vec2 v_uv;
@@ -70,7 +87,9 @@ void main() {
   }
   float effectiveAngle = u_angle + u_perceptionPhase;
   float theta = effectiveAngle;
-  if (u_transform != 0 && u_geometryStrength > 0.0001) {
+  float activeStrength = 0.0;
+  float geometryStrength = clamp(u_geometryStrength, 0.0, 1.0);
+  if (u_transform != 0 && geometryStrength > 0.0) {
     vec2 centerOffset = vec2(u_geometryCenterX, u_geometryCenterY);
     vec2 pos = ((vec2(xy) + 0.5) / (float(u_size) * 0.5) - 1.0) - centerOffset;
     float r = length(pos);
@@ -80,7 +99,8 @@ void main() {
     if (u_transform == 1) {
       transTheta = phi + 1.5707963 + u_twist + effectiveAngle;
     } else if (u_transform == 2) {
-      transTheta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(u_twist) + effectiveAngle;
+      float pitch = clamp(u_twist, -${SPIRAL_MAX_PITCH_RADIANS}, ${SPIRAL_MAX_PITCH_RADIANS});
+      transTheta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(pitch) + effectiveAngle;
     } else if (u_transform == 3) {
       vec2 z = pos * 1.25;
       vec2 c = vec2(-0.8, 0.156);
@@ -174,15 +194,8 @@ void main() {
       transTheta = baseAngle + radialBlend * 1.5707963 + effectiveAngle;
     }
     float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
-    float activeStrength = clamp(u_geometryStrength * edgeFalloff, 0.0, 1.0);
-    vec2 vBase = vec2(cos(effectiveAngle), sin(effectiveAngle));
-    vec2 vTrans = vec2(cos(transTheta), sin(transTheta));
-    vec2 vBlend = mix(vBase, vTrans, activeStrength);
-    if (length(vBlend) > 0.0001) {
-      theta = atan(vBlend.y, vBlend.x);
-    } else {
-      theta = transTheta;
-    }
+    activeStrength = clamp(geometryStrength * edgeFalloff, 0.0, 1.0);
+    theta = transTheta;
   }
   vec4 orient = texelFetch(u_orientation, xy, 0);
   if (orient.b > 0.05) {
@@ -192,6 +205,16 @@ void main() {
   }
   float cosA = cos(theta);
   float sinA = sin(theta);
+  if (u_transform != 0 && geometryStrength > 0.0 && activeStrength < 1.0) {
+    // Blend perception coefficients directly, retaining grooming in both branches.
+    float baseTheta = effectiveAngle;
+    if (orient.b > 0.05) {
+      vec2 dir = orient.rg * 2.0 - 1.0;
+      baseTheta = mix(baseTheta, atan(dir.y, dir.x), orient.b);
+    }
+    cosA = mix(cos(baseTheta), cosA, activeStrength);
+    sinA = mix(sin(baseTheta), sinA, activeStrength);
+  }
   vec4 result = vec4(0.0);
   if (u_topology == 0) {
     for (int y = 0; y < 3; y++) {
@@ -813,7 +836,8 @@ void main() {
       theta = phi + 1.5707963 + u_twist + u_angle;
     } else if (u_transform == 2) {
       float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
-      theta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(u_twist) + u_angle;
+      float pitch = clamp(u_twist, -${SPIRAL_MAX_PITCH_RADIANS}, ${SPIRAL_MAX_PITCH_RADIANS});
+      theta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(pitch) + u_angle;
     } else if (u_transform == 5) {
       float waveFreq = 6.2831853;
       float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + u_angle;
@@ -1338,7 +1362,7 @@ export class TextureNcaRuntime {
     this.rotation = Number(rotation) || 0;
     this.topology = topology === "hexagonal" ? "hexagonal" : "square";
     this.coordinateTransform = coordinateTransform || "cartesian";
-    this.twist = Number(twist) || 0;
+    this.twist = clampGeometryTwist(this.coordinateTransform, twist);
     this.foldCount = Number.isFinite(Number(foldCount))
       ? Math.max(3.0, Math.min(12.0, Number(foldCount)))
       : 6.0;
@@ -1351,9 +1375,7 @@ export class TextureNcaRuntime {
     this.dreamChroma = Number.isFinite(Number(dreamChroma))
       ? Math.max(0.0, Math.min(1.0, Number(dreamChroma)))
       : 0.0;
-    this.geometryStrength = Number.isFinite(Number(geometryStrength))
-      ? Math.max(0.0, Math.min(1.0, Number(geometryStrength)))
-      : 1.0;
+    this.geometryStrength = clampGeometryStrength(geometryStrength);
     this.geometryCenterX = Number.isFinite(Number(geometryCenterX))
       ? Math.max(-1.0, Math.min(1.0, Number(geometryCenterX)))
       : 0.0;
@@ -1784,9 +1806,9 @@ export class TextureNcaRuntime {
           u_mode: echoModeCode,
           u_style: echoStyleCode,
           u_transform: transformCode,
-          u_twist: this.twist,
+          u_twist: clampGeometryTwist(this.coordinateTransform, this.twist),
           u_angle: this.rotation,
-          u_geometryStrength: this.geometryStrength,
+          u_geometryStrength: clampGeometryStrength(this.geometryStrength),
           u_geometryCenterX: this.geometryCenterX,
           u_geometryCenterY: this.geometryCenterY,
           u_geometrySoftness: this.geometrySoftness,

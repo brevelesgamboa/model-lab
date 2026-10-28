@@ -1,4 +1,5 @@
 // Reuse the pattern cards; previews come from the shared Inception model.
+import { createNeuronExplorer } from "./neuron-explorer.js";
 export function createNeuronGallery({
   neurons,
   parameters,
@@ -11,11 +12,11 @@ export function createNeuronGallery({
   section.className = "neuron-gallery";
   section.setAttribute("aria-label", "Neuron Archetype Gallery");
   const title = document.createElement("h3");
-  title.textContent = "Neuron archetypes";
+  title.textContent = "Neuron previews";
   const note = document.createElement("p");
   note.className = "neuron-gallery__note";
   note.append(
-    "Suggested visual starting points; channel results vary. Previews appear after Inception loads. ",
+    "InceptionV3 shortcuts with curated names. Explore each channel’s actual feature preview. ",
   );
   const source = document.createElement("a");
   source.href = "https://distill.pub/2017/feature-visualization/";
@@ -64,6 +65,18 @@ export function createNeuronGallery({
     onToggleManual(manualOpen);
   });
   section.append(title, note, strip, toggle);
+  const explorer = createNeuronExplorer({
+    parameters,
+    neurons,
+    previewBridge,
+    onSelect,
+  });
+  const browse = document.createElement("button");
+  browse.type = "button";
+  browse.className = "mini-button neuron-gallery__browse";
+  browse.textContent = "Browse neuron previews";
+  browse.addEventListener("click", explorer.open);
+  section.insertBefore(browse, strip);
 
   function setPreview(key, url) {
     for (const { neuron, image } of cards) {
@@ -76,7 +89,8 @@ export function createNeuronGallery({
     setPreview(key, url);
   const unsubscribe = previewBridge?.subscribePreviews(setPreview);
 
-  function update(values) {
+  function update(values, options) {
+    explorer.update(values, options);
     for (const { card, neuron } of cards) {
       const selected =
         values.targetLayer === neuron.layer &&
@@ -87,5 +101,15 @@ export function createNeuronGallery({
     }
   }
   update(parameters);
-  return { element: section, update, dispose: () => unsubscribe?.() };
+  void previewBridge?.loadPreviews?.();
+  return {
+    element: section,
+    selectedPreview: explorer.selectedPreview,
+    open: explorer.open,
+    update,
+    dispose() {
+      unsubscribe?.();
+      explorer.dispose();
+    },
+  };
 }

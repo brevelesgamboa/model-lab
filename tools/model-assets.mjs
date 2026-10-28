@@ -8,7 +8,19 @@ const manifestPath = path.join(
   "model-assets.json",
 );
 
-export async function verifyModelAssets(root) {
+export function inceptionCheckpointSha256(manifest) {
+  const assets = manifest
+    .filter(
+      (entry) =>
+        entry.path.startsWith("models/inception/") &&
+        !entry.path.startsWith("models/inception/previews/"),
+    )
+    .map(({ path, sha256 }) => [path, sha256])
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return createHash("sha256").update(JSON.stringify(assets)).digest("hex");
+}
+
+export async function verifyModelAssets(root, { verifyPreviews = true } = {}) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   for (const entry of manifest) {
     if (!entry.path.startsWith("models/") || entry.path.includes(".."))
@@ -31,4 +43,17 @@ export async function verifyModelAssets(root) {
         throw new Error("Unrecorded Inception shard: " + shard);
     }
   }
+  const previews = JSON.parse(
+    await readFile(
+      path.join(root, "models/inception/previews/catalog.json"),
+      "utf8",
+    ),
+  );
+  if (
+    verifyPreviews &&
+    previews.checkpointSha256 !== inceptionCheckpointSha256(manifest)
+  )
+    throw new Error(
+      "Neuron preview checkpoint identity is stale; regenerate the preview library.",
+    );
 }

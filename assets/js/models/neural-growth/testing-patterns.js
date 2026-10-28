@@ -295,7 +295,7 @@ export const TESTING_PATTERNS = Object.freeze(
         import.meta.url,
       ),
       previewUrl: new URL(
-        `../../../../models/neural-growth/previews/${id}.png`,
+        `../../../../models/neural-growth/previews/${id}.gif`,
         import.meta.url,
       ),
       technicalInfo: Object.freeze({

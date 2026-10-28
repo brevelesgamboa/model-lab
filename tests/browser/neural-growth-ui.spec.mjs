@@ -39,14 +39,89 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function selectGrowth(page) {
+async function selectGrowth(page, { expandSections = true } = {}) {
   await page.locator("#model-select").selectOption("neural-growth");
   await expect(page.locator("#step-growth")).toBeEnabled({ timeout: 30_000 });
   await expect(page.locator("#growth-status")).toHaveAttribute(
     "data-size",
     "256",
   );
+  if (expandSections) {
+    for (const section of await page.locator(".control-section").all()) {
+      if ((await section.getAttribute("open")) === null) {
+        await section.locator(":scope > summary").click();
+      }
+    }
+  }
 }
+
+test("growth sections default to Pattern and keep brush settings in the right rail", async ({
+  page,
+}) => {
+  await selectGrowth(page, { expandSections: false });
+  await expect(page.locator(".control-section > summary")).toHaveText([
+    "Pattern",
+    "Geometry",
+    "Temporal",
+    "Dream",
+    "Display",
+    "Simulation",
+  ]);
+  await expect(page.locator(".control-section[open] > summary")).toHaveText([
+    "Pattern",
+  ]);
+  await expect(page.locator(".model-readout")).not.toHaveAttribute("open");
+  await expect(page.getByLabel("GROWTH SPEED", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("ROTATION", { exact: true })).toBeHidden();
+  for (const key of [
+    "brushRadius",
+    "disturbanceMode",
+    "dyeColor",
+    "barrierOutline",
+    "barrierLock",
+  ]) {
+    await expect(
+      page.locator(`#parameter-controls [data-parameter="${key}"]`),
+    ).toHaveCount(0);
+  }
+  await page.locator("#step-growth").click();
+  const before = await state(page);
+  await page.locator('[data-section="geometry"] > summary').click();
+  await page.getByLabel("ROTATION exact value", { exact: true }).fill("60");
+  await page
+    .getByRole("button", { name: "Browse neurons", exact: true })
+    .click();
+  await expect(page.locator(".neuron-gallery")).toBeVisible();
+  await page.getByRole("button", { name: "Close neuron explorer", exact: true }).click();
+  await page.locator('[data-section="dream"] > summary').click();
+  await page.locator("#brush-settings > summary").click();
+  const brush = page.getByLabel("Brush mode", { exact: true });
+  await expect(brush.locator("option")).toHaveCount(10);
+  for (const mode of ["invert", "infuse", "prune", "freeze", "dye"]) {
+    await brush.selectOption(mode);
+    await expect(brush).toHaveValue(mode);
+    await expect(page.locator('[data-section="geometry"]')).toHaveAttribute(
+      "open",
+      "",
+    );
+    await expect(page.locator('[data-section="dream"]')).not.toHaveAttribute(
+      "open",
+    );
+  }
+  await page.locator("#growth-brush-radius").fill("24");
+  await expect(page.locator("#growth-brush-radius-val")).toHaveText("24px");
+  expect(await state(page)).toEqual(before);
+  await page.reload();
+  await expect(page.locator("#status-message")).toContainText("ready");
+  await selectGrowth(page, { expandSections: false });
+  await expect(page.locator('[data-section="geometry"]')).toHaveAttribute(
+    "open",
+    "",
+  );
+  await expect(page.locator('[data-section="dream"]')).not.toHaveAttribute(
+    "open",
+  );
+});
 
 test("growth uploads fractional pan and integer step uniforms without WebGL errors", async ({
   page,
@@ -423,7 +498,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(18);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(15);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -650,6 +725,7 @@ test("failed checkpoint loading latches once and Restart retries cleanly", async
   await expect(page.locator("#growth-status")).toContainText(
     "Checkpoint request failed (503)",
   );
+  await page.locator('[data-section="display"] > summary').click();
   await page
     .getByLabel("DISPLAY PALETTE", { exact: true })
     .selectOption("spectral");
@@ -848,7 +924,7 @@ test("pattern gallery opens, filters by tab, searches, bookmarks favorites, and 
 
   const dialog = page.locator("#growth-gallery-dialog");
   await expect(dialog).toBeVisible();
-  await expect(page.locator("#growth-gallery-count")).toContainText("159");
+  await expect(page.locator("#growth-gallery-count")).toContainText("161");
 
   // Testing models show their bundled previews and load from gallery selection.
   await page.locator(".growth-gallery__tab[data-filter='testing']").click();
@@ -1164,119 +1240,48 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   ).toBe(false);
 });
 
-test("audio-reactive presets configure modulation routes and synchronize with MOD panels", async ({
+test("paused audio controls leave manual Full/Kick routes and LFOs available", async ({
   page,
 }) => {
   await selectGrowth(page);
-
-  const audioSelect = page.getByLabel("AUDIO REACT", { exact: true });
-  await expect(audioSelect).toBeVisible();
-  await expect(audioSelect).toHaveValue("off");
-
-  const shockwaveSelect = page.getByLabel("BEAT SHOCKWAVE", { exact: true });
-  await expect(shockwaveSelect).toBeVisible();
-  await expect(shockwaveSelect).toHaveValue("on");
-
-  const intensityInput = page.locator(
-    'input.control-slider[aria-label="SHOCKWAVE INTENSITY"]',
-  );
-  await expect(intensityInput).toBeVisible();
-
-  const geometrySelect = page.getByLabel("COORDINATE GEOMETRY", {
-    exact: true,
-  });
-  await expect(geometrySelect).toHaveValue("cartesian");
-
-  // Select Continuous preset: switches Cartesian geometry to Vortex, sets base values and LFOs
-  await audioSelect.selectOption("continuous");
-  await expect(shockwaveSelect).toHaveValue("on");
-  await expect(geometrySelect).toHaveValue("vortex");
-
-  // Check animation starts immediately without audio
-  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
-
-  // Check rotation MOD toggle is active
-  const rotationModToggle = page.locator(
-    'button.modulation-toggle[data-key="rotation"]',
-  );
-  await expect(rotationModToggle).toHaveClass(/is-active/);
-
-  // Open rotation MOD drawer if not already open
-  const rotationSource = page.locator(
-    '[data-parameter="rotation"] .drawer-audio',
-  );
-  if (await rotationSource.isHidden()) {
-    await rotationModToggle.click();
+  for (const key of [
+    "audioProfile",
+    "beatShockwave",
+    "shockwaveIntensity",
+    "acousticInjection",
+    "acousticThreshold",
+    "acousticPosition",
+    "cameraBreathing",
+    "cameraReactivity",
+  ]) {
+    await expect(page.locator(`[data-parameter="${key}"]`)).toHaveCount(0);
   }
-  await expect(rotationSource).toBeVisible();
-  await expect(rotationSource).toHaveAttribute("data-source", "kick");
-
-  const rotationLfoCheckbox = page.locator(
-    '.control-block[data-parameter="rotation"] input[aria-label="ROTATION modulation enabled"]',
+  const control = page.locator('[data-parameter="rotation"]');
+  await control.locator(".modulation-toggle").click();
+  const drawer = control.locator(".modulation-drawer");
+  await drawer.getByRole("button", { name: "Full", exact: true }).click();
+  await expect(drawer.locator(".drawer-audio")).toHaveAttribute(
+    "data-source",
+    "bass",
   );
-  await expect(rotationLfoCheckbox).toBeChecked();
-
-  const rotationDrawer = page.locator(
-    '[data-parameter="rotation"] .modulation-drawer',
+  await drawer.getByRole("button", { name: "Kick", exact: true }).click();
+  await drawer.locator('[data-field="audioDepth"]').fill("0.3");
+  await drawer.locator('[data-field="enabled"]').check();
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
+  await page.locator("#toggle-animation").click();
+  await page.locator("#run-experiment").click();
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  const record = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
   );
-  await expect(rotationDrawer.locator('[data-field="enabled"]')).toBeChecked();
-  await expect(
-    rotationDrawer.getByRole("button", { name: "Kick", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-
-  // Changing shockwave mode independently preserves audio preset
-  await shockwaveSelect.selectOption("off");
-  await expect(shockwaveSelect).toHaveValue("off");
-  await expect(audioSelect).toHaveValue("continuous");
-
-  // Switch to Subtle preset: sets shockwave to on and preserves current non-Cartesian geometry (Vortex)
-  await audioSelect.selectOption("subtle");
-  await expect(shockwaveSelect).toHaveValue("on");
-  await expect(geometrySelect).toHaveValue("vortex");
-  await expect(rotationSource).toHaveAttribute("data-source", "kick");
-  await expect(rotationLfoCheckbox).not.toBeChecked();
-  await expect(
-    rotationDrawer.locator('[data-field="enabled"]'),
-  ).not.toBeChecked();
-
-  // Verify twist LFO is active in Subtle
-  const twistModToggle = page.locator(
-    'button.modulation-toggle[data-key="twist"]',
-  );
-  await expect(twistModToggle).toHaveClass(/is-active/);
-
-  // Switch to Dynamic preset: verifies dynamic configuration and LFO activation
-  await audioSelect.selectOption("dynamic");
-  await expect(shockwaveSelect).toHaveValue("on");
-  await expect(geometrySelect).toHaveValue("vortex");
-  await expect(rotationSource).toHaveAttribute("data-source", "kick");
-  await expect(rotationLfoCheckbox).toBeChecked();
-  await expect(rotationDrawer.locator('[data-field="enabled"]')).toBeChecked();
-
-  // Verify growth speed base value for dynamic is 45 (calm baseline)
-  const growthSpeedInput = page.locator(
-    '.control-block[data-parameter="growthSpeed"] input.fine-input',
-  );
-  await expect(growthSpeedInput).toHaveValue("45");
-
-  // Tweak audio depth on rotation to trigger custom profile detection
-  const depthInput = page.locator(
-    '.control-block[data-parameter="rotation"] .modulation-drawer [data-field="audioDepth"]',
-  );
-  await depthInput.fill("0.85");
-  await depthInput.dispatchEvent("input");
-  await expect(
-    page.locator('[data-parameter="rotation"] .drawer-audio output'),
-  ).toHaveText("85%");
-
-  // Verify AUDIO REACT select dynamically transitioned to custom
-  await expect(audioSelect).toHaveValue("custom");
-
-  // Save run to archive and verify
-  await page.keyboard.press("Control+Enter");
-  await expect(page.locator("#status-message")).toContainText("saved");
-  await page.locator('[data-view="saved"]').click();
-  await expect(page.locator(".run-card")).toHaveCount(1);
+  expect(record.audioModulation.rotation).toMatchObject({
+    source: "kick",
+    depth: 0.3,
+  });
+  expect(record.modulation.rotation.enabled).toBe(true);
+  expect(record.parameters.audioProfile).toBe("off");
+  await expect(page.locator("#toggle-audio-input")).toBeEnabled();
+  await expect(page.locator("#audio-meter")).toBeVisible();
 });
 
 test("channel inspector exposes hidden channel modes and preserves simulation state", async ({
@@ -1375,11 +1380,12 @@ test("contextual guidance pills render beneath key controls and tap recovery spr
   );
 
   // 4. Disturbance mode guidance
-  const modeSelect = page.getByLabel("DISTURBANCE MODE", { exact: true });
+  await page.locator("#brush-settings > summary").click();
+  const modeSelect = page.getByLabel("Brush mode", { exact: true });
   await modeSelect.selectOption("noise");
-  const modeBlock = page.locator(".control-block", { has: modeSelect });
-  await expect(modeBlock.locator(".control-guidance__tag")).toHaveText(
-    "RE-SEED",
+  await expect(page.locator('[data-brush="noise"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
 
   // 5. Channel inspector guidance
@@ -1503,51 +1509,114 @@ test("temporal echoes configure decay, drift and flow dynamics cleanly", async (
   ).toBe(false);
 });
 
-test("acoustic field injection configures coupling modes and synchronizes with popover", async ({
+test("visualizer settings hide disabled coupling while keeping the display controls", async ({
   page,
 }) => {
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-
-  // In Neural Growth model controls:
-  const injectSelect = page.locator('select[aria-label="AUDIO COUPLING"]');
-  await expect(injectSelect).toHaveValue("off");
-  await injectSelect.selectOption("dye");
-  await expect(injectSelect).toHaveValue("dye");
-
-  // Open visualizer settings popover and verify coupling select syncs
   await page.locator("#open-visualizer-settings").click();
-  const popoverInjection = page.locator("#visualizer-injection-select");
-  await expect(popoverInjection).toBeVisible();
-  await expect(popoverInjection).toHaveValue("dye");
-
-  // Change from popover and verify model control syncs
-  await popoverInjection.selectOption("shockwave");
-  await expect(injectSelect).toHaveValue("shockwave");
-
-  // Close popover
+  await expect(page.locator("#visualizer-injection-select")).toBeHidden();
+  await expect(page.locator("#visualizer-injection-select")).toBeDisabled();
+  await expect(page.locator("#visualizer-mode-select")).toBeVisible();
+  await expect(page.locator("#visualizer-style-select")).toBeVisible();
   await page.locator("#close-visualizer-settings").click();
-
-  expect(errors).toEqual([]);
 });
 
-test("camera breathing configures modes and updates viewport cleanly", async ({
+test("restoring old audio settings preserves values and manual routes without preset overrides", async ({
   page,
 }) => {
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-
-  const breathSelect = page.locator('select[aria-label="CAMERA BREATH"]');
-  await expect(breathSelect).toHaveValue("off");
-  await breathSelect.selectOption("punchy");
-  await expect(breathSelect).toHaveValue("punchy");
-
-  await breathSelect.selectOption("drift");
-  await expect(breathSelect).toHaveValue("drift");
-
-  expect(errors).toEqual([]);
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    const render = NeuralGrowthModel.prototype.render;
+    NeuralGrowthModel.prototype.render = function (
+      canvas,
+      parameters,
+      ...args
+    ) {
+      window.__effectiveGrowthParameters = { ...parameters };
+      window.__growthModel = this;
+      return render.call(this, canvas, parameters, ...args);
+    };
+    const { TextureNcaRuntime } =
+      await import("/assets/js/models/neural-growth/runtime.js");
+    const draw = TextureNcaRuntime.prototype.draw;
+    TextureNcaRuntime.prototype.draw = function (canvas, options) {
+      window.__growthDrawOptions = options;
+      return draw.call(this, canvas, options);
+    };
+  });
+  await page.locator("#run-experiment").click();
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  await page.evaluate(() => {
+    const key = "latent-field-saved-runs-v1";
+    const records = JSON.parse(localStorage.getItem(key));
+    Object.assign(records[0].parameters, {
+      audioProfile: "dynamic",
+      beatShockwave: "on",
+      shockwaveIntensity: 0.7,
+      acousticInjection: "dye",
+      cameraBreathing: "punchy",
+      cameraReactivity: 0.8,
+      growthSpeed: 7,
+      zoom: 2,
+    });
+    records[0].audioModulation.rotation = { source: "kick", depth: 0.3 };
+    records[0].modulation.rotation = {
+      enabled: true,
+      waveform: "sine",
+      rate: 0.01,
+      depth: 0.1,
+      phase: 0,
+      polarity: "positive",
+    };
+    localStorage.setItem(key, JSON.stringify(records));
+  });
+  await page.locator('[data-view="saved"]').click();
+  await page
+    .locator(".run-card")
+    .getByRole("button", { name: "Restore", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__effectiveGrowthParameters?.growthSpeed),
+    )
+    .toBe(7);
+  await expect
+    .poll(() => page.evaluate(() => window.__growthDrawOptions?.zoom))
+    .toBe(2);
+  const stored = await page.evaluate(() => window.__growthModel.parameters);
+  expect(stored).toMatchObject({
+    audioProfile: "dynamic",
+    beatShockwave: "on",
+    shockwaveIntensity: 0.7,
+    acousticInjection: "dye",
+    cameraBreathing: "punchy",
+    cameraReactivity: 0.8,
+  });
+  const control = page.locator('[data-parameter="rotation"]');
+  await control.locator(".modulation-toggle").click();
+  await expect(control.locator(".drawer-audio")).toHaveAttribute(
+    "data-source",
+    "kick",
+  );
+  await expect(control.locator('[data-field="enabled"]')).toBeChecked();
+  await expect(control.locator('[data-field="audioDepth"]')).toHaveValue("0.3");
+  await page.locator("#toggle-animation").click();
+  await page.locator("#run-experiment").click();
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  const resaved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
+  );
+  expect(resaved.parameters).toMatchObject({
+    audioProfile: "dynamic",
+    acousticInjection: "dye",
+    cameraBreathing: "punchy",
+  });
+  expect(resaved.audioModulation.rotation).toMatchObject({
+    source: "kick",
+    depth: 0.3,
+  });
 });
 
 test("neuron archetype cards update all three targets without changing the cellular field", async ({
@@ -1581,7 +1650,7 @@ test("neuron archetype cards update all three targets without changing the cellu
     await expect(
       page.getByLabel("DREAM STRENGTH exact value", { exact: true }),
     ).toHaveValue(String(neuron.strength));
-    await expect(page.locator(".modulation-toggle:visible")).toHaveCount(18);
+    await expect(page.locator(".modulation-toggle:visible")).toHaveCount(15);
     expect(await state(page)).toEqual(before);
   }
   expect(
