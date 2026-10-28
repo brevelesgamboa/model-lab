@@ -557,6 +557,16 @@ summary {
 .has-orbit-camera.is-orbiting {
   cursor: grabbing;
 }
+.has-dome-camera {
+  cursor: grab;
+  touch-action: none;
+}
+.has-dome-camera.is-looking {
+  cursor: grabbing;
+}
+.output-panel:fullscreen > .dome-tools {
+  display: none;
+}
 .control-fine-group {
   flex: 0 0 auto;
   display: grid;

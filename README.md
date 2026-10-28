@@ -11,6 +11,7 @@ Built with vanilla JavaScript modules, Canvas/WebGL2, ONNX Runtime Web, and Tens
 * **Fractals and Shaders:** Chromatic Flow, Folded Fractal, and Fractal Explorer with high-res export support.
 * **Neural Growth:** Interactive Neural Cellular Automata (NCA) that simulate organic textures (Membrane Field, Filament Network, Xeno Reef, and Vesicle Study).
 * **Inception Dream:** DeepDream-style feature ascent on custom images using InceptionV3 feature layers.
+* **Cortical Dream Dome:** Look around inside a photo shaped by relative depth, a selected Inception channel, and animated cortical waves. The separate 3D Cortical Topography route remains available.
 * **Neuron explorer:** Browse InceptionV3 channels, inspect feature previews, bookmark favorites, and choose Dream targets. Generate previews explicitly or start a background batch for a page, layer, or channel range.
 * **DigiFace VAE:** Interactive face decoder explorer running through an ONNX decoder.
 * **Workbench shell:** Persistent Lab canvas, model controls, brush tools, capture actions, and the existing local audio EQ. Saved Runs, Experiments, and About are empty route placeholders in this frontend pass.
@@ -56,6 +57,14 @@ npm run test:browser
 * **Resolution:** Preview sizes start conservative (384 to 768px) to keep frame rates smooth. Use the export button when you want high-resolution captures.
 * **Neuron previews:** Opening the explorer, browsing, and selecting a channel do not start optimization. Use **Generate neuron preview**, **Preview selected neuron**, or **Start background cache**. A background batch runs sequentially and yields to live guidance. It continues after the explorer closes while this tab remains open; closing the tab or switching away from Neural Growth stops it. Saved images are reused after reload; unfinished batches require another explicit start.
 * **Preview storage:** The optional local preview cache keeps up to 4,096 images within a 64 MiB image-data budget, evicting the oldest used entries when full. Favorites, recently viewed neurons, and explorer filters are remembered separately for each checkpoint. Pausing, resuming, cancelling, or clearing a batch never changes the simulation's field or Dream settings.
+
+### Cortical Dream Dome
+
+Choose **Cortical Dream Dome (360)** in **Model Route**, upload a photo, and turn the clock on. Drag or use arrow keys to look around; **Full** fills the screen and **Reset view** returns to the front. The front 140° shows the photo, with a mirrored continuation around the rear.
+
+**Depth Scale** controls relief, **Neural Swell** raises areas that activate the selected channel, and **Wave Gain** controls moving rings, rays, spirals or honeycomb. Each photo runs depth and forward-only Inception mapping once. Changing the feature target refreshes only that map. These are feature responses and analytic waves, rather than DeepDream ascent or a cortical neural-field solver. The **?** help links to the papers.
+
+Maps and camera state remain in the current tab; PNG and GIF export the view. A missing model leaves brightness relief and waves usable, with an explicit retry button. For the hardware benchmark: `node tools/verify-cortical-dream-dome.mjs path/to/photo.jpg` with the development server running on port 8081 (or pass its URL as the second argument).
 
 ### Cortical Stack export handoff
 

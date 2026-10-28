@@ -24,6 +24,7 @@ import {
 import { createDreamController } from "./app/dream-controller.js";
 import { createGrowthController } from "./app/growth-controller.js";
 import { createCorticalController } from "./app/cortical-controller.js";
+import { createDomeController } from "./app/dome-controller.js";
 import { createExportController } from "./capture/export-controller.js";
 import { ModelRegistry } from "./core/model-registry.js";
 import { ExperimentStore } from "./core/experiment-store.js";
@@ -242,6 +243,17 @@ const corticalController = createCorticalController({
   elements,
   getModel: () => currentModel,
   model: registry.get("cortical-topography"),
+  render: renderCurrentFrame,
+  canInteract: () =>
+    currentView === "lab" &&
+    !gifEncoding &&
+    !hqRendering &&
+    !playback.isSuspended(),
+});
+const domeController = createDomeController({
+  elements,
+  getModel: () => currentModel,
+  model: registry.get("cortical-dream-dome"),
   render: renderCurrentFrame,
   canInteract: () =>
     currentView === "lab" &&
@@ -1418,6 +1430,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   dreamController.update();
   growthController.update();
   corticalController.update();
+  domeController.update();
   updateAudioUi();
   resizeLiveCanvas({ render: false });
 

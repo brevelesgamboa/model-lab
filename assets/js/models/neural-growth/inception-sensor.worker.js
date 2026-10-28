@@ -5,13 +5,11 @@ let busy = false;
 
 async function load({ runtimeUrl, modelUrl, node, size }) {
   const started = performance.now();
-  self.importScripts(runtimeUrl);
-  const tf = self.tf;
-  tf.env().set("WEBGL_CPU_FORWARD", false);
-  if (!(await tf.setBackend("webgl")))
-    throw new Error("GPU inference is unavailable.");
-  await tf.ready();
-  model = await tf.loadGraphModel(modelUrl, { streamWeights: true });
+  const { loadInceptionForward } =
+    await import("./inception-forward-loader.js");
+  const loaded = await loadInceptionForward({ runtimeUrl, modelUrl });
+  const { tf } = loaded;
+  model = loaded.model;
   // Warm the selected forward path without publishing the synthetic input.
   const warm = tf.tidy(() =>
     model.execute(tf.zeros([1, size, size, 3]), node).mean(),
