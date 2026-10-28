@@ -2,8 +2,8 @@ import { previewSeed } from "./neuron-preview.js";
 
 const DATABASE = "latent-field-neuron-previews";
 const PREFERENCE = "latent-field-save-neuron-previews";
-const MAX_ENTRIES = 192;
-const MAX_BYTES = 4 * 1024 * 1024;
+export const NEURON_PREVIEW_CACHE_LIMIT = 4096;
+const MAX_BYTES = 64 * 1024 * 1024;
 
 function transactionDone(transaction) {
   return new Promise((resolve, reject) => {
@@ -31,7 +31,11 @@ function validRecord(record, namespace) {
 // A separate database keeps clearing previews independent of saved runs/models.
 // All writes are serialized; an epoch prevents queued saves from undoing Clear.
 export class NeuronPreviewCache {
-  constructor() {
+  constructor({ maxEntries = NEURON_PREVIEW_CACHE_LIMIT } = {}) {
+    this._maxEntries =
+      Number.isInteger(maxEntries) && maxEntries > 0
+        ? Math.min(maxEntries, NEURON_PREVIEW_CACHE_LIMIT)
+        : NEURON_PREVIEW_CACHE_LIMIT;
     this.enabled = true;
     try {
       this.enabled = globalThis.localStorage?.getItem(PREFERENCE) !== "off";
@@ -56,7 +60,7 @@ export class NeuronPreviewCache {
       enabled: this.enabled,
       available: this.available,
       count: this._records.size,
-      limit: MAX_ENTRIES,
+      limit: this._maxEntries,
     };
   }
 
@@ -133,7 +137,7 @@ export class NeuronPreviewCache {
           )) {
             if (
               validRecord(record, namespace) &&
-              records.length < MAX_ENTRIES &&
+              records.length < this._maxEntries &&
               bytes + record.url.length * 2 <= MAX_BYTES
             ) {
               bytes += record.url.length * 2;
@@ -192,7 +196,7 @@ export class NeuronPreviewCache {
           store.put(record);
           for (const [index, item] of ordered.entries()) {
             bytes += item.url.length * 2;
-            if (index >= MAX_ENTRIES || bytes > MAX_BYTES) {
+            if (index >= this._maxEntries || bytes > MAX_BYTES) {
               store.delete(item.key);
               records.delete(item.key);
             }

@@ -249,7 +249,9 @@ const controlsController = createControlsController({
         ...currentParameters,
         targetLayer: neuron.layer,
         targetChannel: neuron.channel,
-        ...(neuron.strength === undefined ? {} : { dreamStrength: neuron.strength }),
+        ...(neuron.strength === undefined
+          ? {}
+          : { dreamStrength: neuron.strength }),
       },
       { message: `${neuron.name} selected` },
     );
@@ -285,7 +287,7 @@ const controlsController = createControlsController({
       }
     }
     if (definition.key === "targetLayer")
-      controlsController.syncNeuronGallery({ requestPreview: true });
+      controlsController.syncNeuronGallery();
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     invalidateCurrentRun("PARAMETERS CHANGED");
@@ -906,7 +908,7 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   const next = coerceRangeValue(definition, value);
   currentParameters[definition.key] = next;
   if (["targetChannel", "dreamStrength"].includes(definition.key)) {
-    controlsController.syncNeuronGallery({ requestPreview: definition.key === "targetChannel" });
+    controlsController.syncNeuronGallery();
   }
   if (control) {
     control.slider.value = String(next);

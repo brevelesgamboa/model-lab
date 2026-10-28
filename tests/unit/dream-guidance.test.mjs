@@ -337,6 +337,125 @@ test("preview requests share work while each consumer can cancel independently",
   assert.equal(calls, 1);
 });
 
+function backgroundBridge(context, generatePreview) {
+  const previewStorage = {
+    enabled: true,
+    available: true,
+    save: async () => {},
+    clear: async () => true,
+    dispose() {},
+  };
+  const bridge = new DreamGuidanceBridge({
+    getInceptionModel: () => ({ model: {} }),
+    generatePreview,
+    previewStorage,
+  });
+  bridge.loadPreviews = async () => bridge.previewCache;
+  context.after(() => bridge.dispose());
+  return bridge;
+}
+
+test("explicit background batches deduplicate targets, pause, and yield to foreground requests", async (context) => {
+  const calls = [];
+  const bridge = backgroundBridge(
+    context,
+    async (_model, _layer, channel, _size, _steps, { beforeStep }) => {
+      await beforeStep();
+      calls.push(channel);
+      return `preview-${channel}`;
+    },
+  );
+  assert.deepEqual(calls, []);
+  bridge.previewCache.set("mixed_6c_0", "already-cached");
+  const job = bridge.startBackgroundPreviews(
+    [0, 1, 1, 2].map((channel) => ({ layer: "mixed_6c", channel })),
+  );
+  bridge.pauseBackgroundPreviews();
+  assert.equal(await bridge.requestPreview("mixed_6c", 3), "preview-3");
+  assert.deepEqual(calls, [3]);
+  assert.equal(bridge.backgroundPreviewStatus.phase, "paused");
+  bridge.pauseBackgroundPreviews(false);
+  await job;
+  assert.deepEqual(calls, [3, 1, 2]);
+  assert.equal(bridge.backgroundPreviewStatus.total, 3);
+  assert.equal(bridge.backgroundPreviewStatus.completed, 3);
+  assert.equal(bridge.backgroundPreviewStatus.phase, "complete");
+});
+
+test("cancelling a background batch releases its active consumer and never starts later targets", async (context) => {
+  let entered;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const calls = [];
+  const bridge = backgroundBridge(
+    context,
+    async (_model, _layer, channel, _size, _steps, { signal }) => {
+      calls.push(channel);
+      entered();
+      await new Promise((_resolve, reject) =>
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        }),
+      );
+    },
+  );
+  const job = bridge.startBackgroundPreviews(
+    [0, 1, 2].map((channel) => ({ layer: "mixed_6c", channel })),
+  );
+  await started;
+  bridge.cancelBackgroundPreviews();
+  await job;
+  await bridge._previewTask;
+  assert.deepEqual(calls, [0]);
+  assert.equal(bridge.backgroundPreviewStatus.phase, "cancelled");
+  assert.equal(bridge._previewEntries.size, 0);
+  assert.equal(bridge._previewQueue.size, 0);
+});
+
+test("background batches record failed targets, continue, and clear stops paused work", async (context) => {
+  const bridge = backgroundBridge(context, async (_model, _layer, channel) => {
+    if (channel === 1) throw new Error("one bad target");
+    return `preview-${channel}`;
+  });
+  await bridge.startBackgroundPreviews(
+    [0, 1, 2].map((channel) => ({ layer: "mixed_6c", channel })),
+  );
+  assert.equal(bridge.backgroundPreviewStatus.phase, "complete");
+  assert.equal(bridge.backgroundPreviewStatus.failed, 1);
+  assert.equal(bridge.previewCache.get("mixed_6c_2"), "preview-2");
+  const second = bridge.startBackgroundPreviews([
+    { layer: "mixed_6c", channel: 4 },
+  ]);
+  bridge.pauseBackgroundPreviews();
+  await bridge.clearSavedPreviews();
+  await second;
+  assert.equal(bridge.backgroundPreviewStatus.phase, "cancelled");
+  assert.equal(bridge.previewCache.has("mixed_6c_4"), false);
+});
+
+test("a background batch stops after one failed model load", async (context) => {
+  let loads = 0;
+  let generated = 0;
+  const bridge = backgroundBridge(context, async () => {
+    generated += 1;
+  });
+  bridge.ensureModel = async () => {
+    loads += 1;
+    throw new Error("Model download failed");
+  };
+  await bridge.startBackgroundPreviews(
+    Array.from({ length: 256 }, (_, channel) => ({
+      layer: "mixed_5b",
+      channel,
+    })),
+  );
+  assert.equal(loads, 1);
+  assert.equal(generated, 0);
+  assert.equal(bridge.backgroundPreviewStatus.phase, "error");
+  assert.equal(bridge._previewEntries.size, 0);
+});
+
 test("a selected channel preempts background generation and resumes its consumers", async (context) => {
   let entered;
   const started = new Promise((resolve) => {

@@ -2230,7 +2230,7 @@ input[type="range"]::-moz-range-progress {
 }
 .neuron-explorer[open] {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
   gap: 14px;
 }
 .neuron-explorer::backdrop {
@@ -2306,6 +2306,81 @@ input[type="range"]::-moz-range-progress {
   min-height: 160px;
   max-height: 58dvh;
   padding: 3px;
+}
+.neuron-explorer__background-options,
+.neuron-background-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.neuron-explorer__background summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.neuron-explorer__background-options {
+  margin-top: 10px;
+}
+.neuron-background-progress {
+  grid-column: 1 / -1;
+}
+.neuron-explorer__background p {
+  flex-basis: 100%;
+  margin: 0;
+  line-height: 1.4;
+}
+.neuron-explorer__batch-range input {
+  width: 76px;
+}
+.neuron-explorer__tile {
+  position: relative;
+  min-width: 0;
+}
+.neuron-explorer__tile > .neuron-explorer__card {
+  width: 100%;
+  height: 100%;
+}
+.neuron-explorer__favorite {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 5px;
+  background: var(--bg-panel, #11151b);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.neuron-explorer__favorite[aria-pressed="true"] {
+  color: var(--accent-mod);
+}
+.neuron-explorer__detail {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.neuron-explorer__detail h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.neuron-explorer__detail img {
+  display: block;
+  width: min(256px, 100%);
+  height: auto;
+  border-radius: 4px;
+}
+.neuron-explorer__detail p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.neuron-explorer__detail > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .neuron-explorer__card {
   display: flex;

@@ -16,7 +16,7 @@ export function createNeuronGallery({
   const note = document.createElement("p");
   note.className = "neuron-gallery__note";
   note.append(
-    "InceptionV3 shortcuts with curated names. Explore each channel’s actual feature preview. ",
+    "InceptionV3 feature previews and Dream targets. Curated names describe suggested appearances; trained growth patterns are in the Growth gallery. ",
   );
   const source = document.createElement("a");
   source.href = "https://distill.pub/2017/feature-visualization/";
