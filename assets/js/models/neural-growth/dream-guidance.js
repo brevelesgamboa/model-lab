@@ -5,7 +5,10 @@
  */
 import { ensureTensorFlow } from "../../training/tf-runtime.js";
 import { calcTvLoss } from "../inception-dream.js";
-import { NeuronPreviewCache } from "./neuron-preview-cache.js";
+import {
+  NeuronPreviewCache,
+  NEURON_PREVIEW_CACHE_LIMIT,
+} from "./neuron-preview-cache.js";
 import {
   createFourierImage,
   transformPreview,
@@ -387,6 +390,7 @@ export class DreamGuidanceBridge {
     getInceptionModel = null,
     archetypes = [],
     generatePreview = generateNeuronPreview,
+    previewStorage = new NeuronPreviewCache(),
   } = {}) {
     this._getInceptionModel = getInceptionModel;
     this._isBusy = false;
@@ -408,13 +412,19 @@ export class DreamGuidanceBridge {
     this._savedPreviewTask = null;
     this._previewNamespace = null;
     this._previewCacheEpoch = 0;
-    this.previewStorage = new NeuronPreviewCache();
+    this.previewStorage = previewStorage;
+    this._backgroundPreviewJob = null;
+    this._backgroundPreviewListeners = new Set();
     this.disposed = false;
   }
 
   subscribePreviews(listener) {
     this._previewListeners.add(listener);
     return () => this._previewListeners.delete(listener);
+  }
+
+  get previewCheckpointId() {
+    return this._previewNamespace?.split(":")[0] || "inception-v3";
   }
 
   // The model is shared with live guidance; previews are requested on demand.
@@ -512,6 +522,7 @@ export class DreamGuidanceBridge {
   }
 
   async setSavePreviews(enabled) {
+    if (!enabled) this.cancelBackgroundPreviews();
     this._previewCacheEpoch += 1;
     this._savedPreviewTask = null;
     this.previewStorage.setEnabled(enabled);
@@ -528,8 +539,140 @@ export class DreamGuidanceBridge {
   }
 
   clearSavedPreviews() {
+    this.cancelBackgroundPreviews();
     this._previewCacheEpoch += 1;
     return this.previewStorage.clear();
+  }
+
+  get backgroundPreviewStatus() {
+    const job = this._backgroundPreviewJob;
+    return job
+      ? {
+          phase: job.phase,
+          completed: job.completed,
+          total: job.total,
+          failed: job.failed,
+          current: job.currentKey,
+          progress: job.progress,
+        }
+      : {
+          phase: "idle",
+          completed: 0,
+          total: 0,
+          failed: 0,
+          current: null,
+          progress: 0,
+        };
+  }
+
+  subscribeBackgroundPreviews(listener) {
+    this._backgroundPreviewListeners.add(listener);
+    return () => this._backgroundPreviewListeners.delete(listener);
+  }
+
+  _notifyBackgroundPreviews() {
+    for (const listener of this._backgroundPreviewListeners)
+      listener(this.backgroundPreviewStatus);
+  }
+
+  pauseBackgroundPreviews(paused = true) {
+    const job = this._backgroundPreviewJob;
+    if (!job || !["running", "paused"].includes(job.phase)) return;
+    job.phase = paused ? "paused" : "running";
+    this._notifyBackgroundPreviews();
+  }
+
+  cancelBackgroundPreviews() {
+    const job = this._backgroundPreviewJob;
+    if (!job || !["running", "paused"].includes(job.phase)) return;
+    job.phase = "cancelled";
+    job.controller.abort();
+    this._notifyBackgroundPreviews();
+  }
+
+  // Only this explicit user action creates a batch. Jobs belong to the bridge,
+  // so closing/rebuilding the explorer does not cancel authorized background work.
+  startBackgroundPreviews(neurons) {
+    const active = this._backgroundPreviewJob;
+    if (active && ["running", "paused"].includes(active.phase))
+      return active.task;
+    if (this.disposed) return Promise.resolve();
+    const unique = new Map();
+    for (const { layer, channel } of neurons) {
+      if (
+        Object.hasOwn(INCEPTION_LAYER_CHANNELS, layer) &&
+        Number.isInteger(channel) &&
+        channel >= -1 &&
+        channel < INCEPTION_LAYER_CHANNELS[layer]
+      )
+        unique.set(`${layer}_${channel}`, { layer, channel });
+    }
+    if (unique.size > NEURON_PREVIEW_CACHE_LIMIT)
+      throw new RangeError("Choose a batch within the preview cache limit.");
+    const job = {
+      phase: "running",
+      controller: new AbortController(),
+      completed: 0,
+      total: unique.size,
+      failed: 0,
+      currentKey: null,
+      progress: 0,
+    };
+    this._backgroundPreviewJob = job;
+    job.task = (async () => {
+      await this.loadPreviews();
+      if (!this.previewStorage.enabled || !this.previewStorage.available)
+        throw new Error(
+          "Enable preview saving before starting a background batch.",
+        );
+      if ([...unique.keys()].some((key) => !this.previewCache.has(key))) {
+        while (job.phase === "paused")
+          await previewDelay(job.controller.signal);
+        job.controller.signal.throwIfAborted();
+        // A failed model download stops the batch once, rather than retrying it
+        // separately for every channel in a large range.
+        await this.ensureModel();
+      }
+      for (const [key, { layer, channel }] of unique) {
+        const signal = job.controller.signal;
+        signal.throwIfAborted();
+        while (job.phase === "paused") await previewDelay(signal);
+        job.currentKey = key;
+        job.progress = 0;
+        this._notifyBackgroundPreviews();
+        try {
+          await this.requestPreview(layer, channel, {
+            signal,
+            priority: false,
+            retry: true,
+            onProgress: (step, total) => {
+              job.progress = step / total;
+              this._notifyBackgroundPreviews();
+            },
+          });
+          signal.throwIfAborted();
+          if (!this.previewStorage.available)
+            throw new Error("Preview storage became unavailable.");
+        } catch (error) {
+          if (signal.aborted || !this.previewStorage.available) throw error;
+          job.failed += 1;
+        }
+        job.completed += 1;
+        this._notifyBackgroundPreviews();
+      }
+      job.phase = "complete";
+    })()
+      .catch(() => {
+        job.phase = job.controller.signal.aborted ? "cancelled" : "error";
+      })
+      .finally(() => {
+        job.currentKey = null;
+        job.progress = 0;
+        if (this._backgroundPreviewJob === job)
+          this._notifyBackgroundPreviews();
+      });
+    this._notifyBackgroundPreviews();
+    return job.task;
   }
 
   _previewEntry(layer, channel, background = false) {
@@ -677,7 +820,11 @@ export class DreamGuidanceBridge {
                   this._isBusy ||
                   this._getInceptionModel?.()?.isRunning ||
                   this._getInceptionModel?.()?.isOctaveRunning ||
-                  globalThis.document?.hidden
+                  (this._backgroundPreviewJob?.currentKey === entry.key &&
+                    this._backgroundPreviewJob.phase === "paused" &&
+                    !entry.priority) ||
+                  (globalThis.document?.hidden &&
+                    this._backgroundPreviewJob?.currentKey !== entry.key)
                 );
               },
             },
@@ -691,7 +838,7 @@ export class DreamGuidanceBridge {
             );
           signal.throwIfAborted();
           this.previewCache.set(entry.key, url);
-          while (this.previewCache.size > 192)
+          while (this.previewCache.size > NEURON_PREVIEW_CACHE_LIMIT)
             this.previewCache.delete(this.previewCache.keys().next().value);
           this._previewAttempts.add(entry.key);
           for (const listener of this._previewListeners)
@@ -884,6 +1031,7 @@ export class DreamGuidanceBridge {
   }
 
   dispose() {
+    this.cancelBackgroundPreviews();
     this.disposed = true;
     this._previewAbort.abort();
     this._previewQueue.clear();
@@ -897,6 +1045,7 @@ export class DreamGuidanceBridge {
     this.previewErrors.clear();
     this._previewAttempts.clear();
     this._previewListeners.clear();
+    this._backgroundPreviewListeners.clear();
     this.previewStorage.dispose();
     this.previewCache.clear();
     this._model = null;

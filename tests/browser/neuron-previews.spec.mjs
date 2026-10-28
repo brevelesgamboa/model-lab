@@ -111,6 +111,7 @@ async function installPreviewFixture(page, { bundled = false } = {}) {
         window.__previewCalls.push(`${layer}_${channel}`);
         if (channel === window.__slowChannel)
           await new Promise((resolve) => setTimeout(resolve, 1200));
+        await beforeStep();
         if (channel === window.__failChannel && !window.__previewFailed) {
           window.__previewFailed = true;
           throw new Error("Temporary preview failure");
@@ -180,6 +181,14 @@ test("manual channel previews follow exact layer bounds, reuse cache, and preser
   await expect(page.locator(".neuron-selected-preview figcaption")).toHaveText(
     "mixed_7b · Channel #1800",
   );
+  expect(
+    await page.evaluate(() =>
+      window.__previewBridge.previewCache.has("mixed_7b_1800"),
+    ),
+  ).toBe(false);
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -254,6 +263,12 @@ test("layer-grouped gallery searches every channel and selects without changing 
   await dialog.getByLabel("Find neuron channel").fill("2047");
   const card = dialog.locator('.neuron-explorer__card[data-channel="2047"]');
   await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(1);
+  await expect(card.locator("img")).toBeHidden();
+  await card.click();
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Generate neuron preview", exact: true })
+    .click();
   await expect(card.locator("img")).toBeVisible();
   expect(await field(page)).toEqual(before);
   for (const width of [360, 900, 1440]) {
@@ -264,7 +279,9 @@ test("layer-grouped gallery searches every channel and selects without changing 
       ),
     ).toBe(true);
   }
-  await card.click();
+  await dialog
+    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
     "mixed_7b",
@@ -311,6 +328,9 @@ test("obsolete previews stay hidden and failed previews offer a working retry", 
     window.__slowChannel = 21;
   });
   await channel.fill("21");
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   await expect
     .poll(() =>
       page.evaluate(() => window.__previewCalls?.includes("mixed_6c_21")),
@@ -319,6 +339,9 @@ test("obsolete previews stay hidden and failed previews offer a working retry", 
   await channel.fill("22");
   const image = page.locator(".neuron-selected-preview img");
   await expect(image).toBeHidden();
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -339,6 +362,9 @@ test("obsolete previews stay hidden and failed previews offer a working retry", 
     window.__failChannel = 23;
   });
   await channel.fill("23");
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   const retry = page.getByRole("button", {
     name: "Retry neuron preview",
     exact: true,
@@ -404,12 +430,18 @@ test("bundled Fourier previews render without downloading Inception weights", as
 });
 
 async function generateManualPreview(page, channel) {
-  await page
-    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
-    .click();
+  const manual = page.getByRole("button", {
+    name: "Manual Channel Explorer",
+    exact: true,
+  });
+  if ((await manual.getAttribute("aria-expanded")) !== "true")
+    await manual.click();
   await page
     .getByLabel("DREAM NEURON exact value", { exact: true })
     .fill(String(channel));
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   await expect(page.locator(".neuron-selected-preview img")).toBeVisible();
   await expect(page.locator(".neuron-selected-preview figcaption")).toHaveText(
     `mixed_6c · Channel #${channel}`,
@@ -461,6 +493,9 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
   await expect(card.locator("img")).toHaveAttribute("src", original);
   await card.locator("img").evaluate((image) => image.decode());
   await card.click();
+  await dialog
+    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .click();
   await expect(page.locator(".neuron-selected-preview img")).toHaveAttribute(
     "src",
     original,
@@ -517,6 +552,9 @@ test("clearing saved previews also fences saves from generation already in fligh
   await page
     .getByLabel("DREAM NEURON exact value", { exact: true })
     .fill("502");
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
   await expect
     .poll(() =>
       page.evaluate(() => window.__previewCalls?.includes("mixed_6c_502")),
@@ -554,7 +592,7 @@ test("persistent previews evict least recently used records and reject stale or 
       await import("/assets/js/models/neural-growth/neuron-preview-cache.js");
     const { previewSeed } =
       await import("/assets/js/models/neural-growth/neuron-preview.js");
-    const cache = new NeuronPreviewCache();
+    const cache = new NeuronPreviewCache({ maxEntries: 192 });
     const url = document.createElement("canvas").toDataURL("image/webp");
     await cache.load("checkpoint-and-recipe-a");
     for (let channel = 0; channel < 193; channel++)
@@ -663,4 +701,260 @@ test("restricted storage and quota failures keep session previews usable", async
     dialog.locator(".neuron-explorer__cache [role=status]"),
   ).toContainText("Saving unavailable");
   expect(errors).toEqual([]);
+});
+
+test("browsing, inspecting, favorites and restored filters never generate without a click", async ({
+  page,
+}) => {
+  const weights = [];
+  page.on("request", (request) => {
+    if (/models\/inception\/.*\.bin/.test(request.url()))
+      weights.push(request.url());
+  });
+  await installPreviewFixture(page, { bundled: true });
+  await openGrowth(page);
+  await page
+    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
+    .click();
+  await page
+    .getByLabel("DREAM NEURON exact value", { exact: true })
+    .fill("400");
+  const before = await field(page);
+  let dialog = await browsePreviews(page);
+  await dialog.getByLabel("Preview collection").selectOption("all");
+  await dialog.getByLabel("Explorer layer").selectOption("mixed_7b");
+  await dialog.getByLabel("Find neuron channel").fill("1000");
+  const card = dialog.locator('.neuron-explorer__card[data-channel="1000"]');
+  await expect(card).toBeVisible();
+  await card.click();
+  await expect(dialog.locator(".neuron-explorer__detail img")).toBeHidden();
+  await expect(
+    dialog.getByRole("button", {
+      name: "Generate neuron preview",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Save neuron favorite", exact: true })
+    .click();
+  await dialog.getByLabel("Preview collection").selectOption("favorites");
+  await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(1);
+  await dialog.getByLabel("Preview collection").selectOption("recent");
+  await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(1);
+  // Observe beyond the former automatic 250 ms generation debounce.
+  await page.waitForTimeout(350);
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  expect(await field(page)).toEqual(before);
+  await expect(
+    page.getByLabel("DREAM NEURON exact value", { exact: true }),
+  ).toHaveValue("400");
+  await dialog
+    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("DREAM NEURON exact value", { exact: true }),
+  ).toHaveValue("1000");
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  expect(await field(page)).toEqual(before);
+
+  await page.reload();
+  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+  await installPreviewFixture(page, { bundled: true });
+  await openGrowth(page);
+  dialog = await browsePreviews(page);
+  await expect(dialog.getByLabel("Explorer layer")).toHaveValue("mixed_7b");
+  await expect(dialog.getByLabel("Preview collection")).toHaveValue("recent");
+  await expect(dialog.getByLabel("Find neuron channel")).toHaveValue("1000");
+  await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(1);
+  await expect(
+    dialog.getByRole("button", {
+      name: "Favorite mixed_7b Channel #1000",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  expect(weights).toEqual([]);
+});
+
+test("background ranges span pages, pause for user control, prioritize selected previews, and survive panel closure", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await installPreviewFixture(page);
+  await openGrowth(page);
+  await page.locator("#step-growth").click();
+  const before = await field(page);
+  let dialog = await browsePreviews(page);
+  await dialog.locator(".neuron-explorer__background > summary").click();
+  await dialog.getByLabel("Preview collection").selectOption("all");
+  await dialog.getByLabel("Explorer layer").selectOption("mixed_7b");
+  await dialog.getByLabel("Background batch scope").selectOption("layer");
+  await expect(
+    dialog.getByText("2049 uncached previews", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByLabel("Explorer layer").selectOption("mixed_5b");
+  await dialog.getByLabel("Background batch scope").selectOption("range");
+  await dialog.getByLabel("First background channel").fill("0");
+  await dialog.getByLabel("Last background channel").fill("23");
+  await expect(
+    dialog.getByText("24 uncached previews", { exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  await page.evaluate(() => {
+    window.__slowChannel = 0;
+  });
+  await dialog
+    .getByRole("button", { name: "Start background cache", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__previewCalls?.includes("mixed_5b_0")),
+    )
+    .toBe(true);
+  await dialog
+    .getByRole("button", { name: "Pause background cache", exact: true })
+    .click();
+  await expect(
+    dialog.locator(".neuron-explorer__background [role=status]"),
+  ).toContainText("paused");
+  await page.keyboard.press("Escape");
+  const compact = page.locator(".neuron-background-progress");
+  await expect(compact).toBeVisible();
+  await generateManualPreview(page, 31);
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.backgroundPreviewStatus.phase,
+    ),
+  ).toBe("paused");
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.backgroundPreviewStatus.completed,
+    ),
+  ).toBe(0);
+  expect(await field(page)).toEqual(before);
+  await page.locator("#toggle-animation").click();
+  await compact
+    .getByRole("button", { name: "Resume background cache", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => window.__previewRuntime.steps))
+    .toBeGreaterThan(before.steps);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.__previewBridge.backgroundPreviewStatus.completed,
+      ),
+    )
+    .toBeGreaterThan(0);
+  // Software WebGL is deliberately slow; verify concurrent progress, then let
+  // the remaining batch finish without requiring a hardware-specific deadline.
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => window.__previewBridge.backgroundPreviewStatus.phase,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe("complete");
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.backgroundPreviewStatus.completed,
+    ),
+  ).toBe(24);
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.previewStorage.status.count,
+    ),
+  ).toBe(25);
+  await expect(compact).toBeHidden();
+
+  await page.reload();
+  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+  await installPreviewFixture(page);
+  await openGrowth(page);
+  dialog = await browsePreviews(page);
+  await expect(dialog.getByLabel("Background batch scope")).toHaveValue(
+    "range",
+  );
+  await expect(dialog.getByLabel("Last background channel")).toHaveValue("23");
+  await expect(
+    dialog.getByText("0 uncached previews", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Start background cache", exact: true }),
+  ).toBeDisabled();
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.backgroundPreviewStatus.phase,
+    ),
+  ).toBe("idle");
+});
+
+test("cancelling or clearing a background batch prevents further generation and persistence", async ({
+  page,
+}) => {
+  await installPreviewFixture(page);
+  await openGrowth(page);
+  const dialog = await browsePreviews(page);
+  await dialog.locator(".neuron-explorer__background > summary").click();
+  await dialog.getByLabel("Background batch scope").selectOption("range");
+  await dialog.getByLabel("First background channel").fill("30");
+  await dialog.getByLabel("Last background channel").fill("60");
+  await page.evaluate(() => {
+    window.__slowChannel = 30;
+  });
+  await dialog
+    .getByRole("button", { name: "Start background cache", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__previewCalls?.includes("mixed_6c_30")),
+    )
+    .toBe(true);
+  await dialog
+    .getByRole("button", { name: "Cancel background cache", exact: true })
+    .click();
+  await page.evaluate(async () => {
+    await window.__previewBridge._backgroundPreviewJob.task;
+    await window.__previewBridge._previewTask;
+  });
+  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
+    "mixed_6c_30",
+  ]);
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.previewStorage.status.count,
+    ),
+  ).toBe(0);
+  await dialog
+    .getByRole("button", { name: "Start background cache", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => window.__previewCalls.length))
+    .toBe(2);
+  await page.evaluate(() => window.__previewBridge.clearSavedPreviews());
+  await page.evaluate(async () => {
+    await window.__previewBridge._backgroundPreviewJob.task;
+    await window.__previewBridge._previewTask;
+  });
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.backgroundPreviewStatus.phase,
+    ),
+  ).toBe("cancelled");
+  expect(
+    await page.evaluate(
+      () => window.__previewBridge.previewStorage.status.count,
+    ),
+  ).toBe(0);
+  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
+    "mixed_6c_30",
+    "mixed_6c_30",
+  ]);
+  await expect(
+    dialog.getByRole("button", { name: "Start background cache", exact: true }),
+  ).toBeEnabled();
 });
