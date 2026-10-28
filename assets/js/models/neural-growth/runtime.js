@@ -365,6 +365,41 @@ void main() {
   out_color = encodeState(clamp(targetState, -2.0, 2.0));
 }`;
 
+// Experimental passive transport. Every packed RGBA group uses the same
+// departure point, so RGB and all nine hidden channels move together.
+const ADVECTION = `${PREFIX}
+uniform sampler2D u_state;
+uniform sampler2D u_barrier;
+uniform int u_flowField;
+uniform float u_flowSpeed;
+uniform float u_flowPhase;
+vec4 sampleGroup(ivec2 cell, int group) {
+  ivec2 wrapped = wrapCell(cell);
+  return texelFetch(u_state, ivec2(wrapped.x + group * u_size, wrapped.y), 0);
+}
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  int group = p.x / u_size;
+  ivec2 xy = ivec2(p.x % u_size, p.y);
+  if (texelFetch(u_barrier, xy, 0).r > 0.5) {
+    out_color = texelFetch(u_state, p, 0);
+    return;
+  }
+  vec2 angle = (vec2(xy) + 0.5) * (6.28318530718 / float(u_size)) + u_flowPhase;
+  // Both fields are periodic and divergence-free in continuous space.
+  vec2 velocity = u_flowField == 0
+    ? vec2(sin(angle.y), 0.0)
+    : vec2(sin(angle.x) * cos(angle.y), -cos(angle.x) * sin(angle.y));
+  vec2 departure = vec2(xy) - u_flowSpeed * velocity;
+  ivec2 cell = ivec2(floor(departure));
+  vec2 fraction = fract(departure);
+  // Explicit group-local bilinear sampling prevents hidden/RGB band leakage
+  // at the horizontal packing seams and wraps both spatial axes.
+  vec4 lower = mix(sampleGroup(cell, group), sampleGroup(cell + ivec2(1, 0), group), fraction.x);
+  vec4 upper = mix(sampleGroup(cell + ivec2(0, 1), group), sampleGroup(cell + ivec2(1, 1), group), fraction.x);
+  out_color = mix(lower, upper, fraction.y);
+}`;
+
 const BARRIER_PASS = `${PREFIX}
 uniform sampler2D u_barrier;
 uniform ivec2 u_center;
@@ -1260,6 +1295,7 @@ export class TextureNcaRuntime {
           "u_channelView",
           "u_displayFilter",
           "u_stepSeed",
+          "u_flowField",
         ].includes(key)
       )
         gl.uniform1i(location(key), value);
@@ -1487,6 +1523,38 @@ export class TextureNcaRuntime {
       [this.state, this.nextState] = [this.nextState, this.state];
       this.steps += 1;
     }
+  }
+
+  /**
+   * One experimental transport pass, independent of the NCA update count.
+   * Speed is measured in cells per pass; call after each NCA step for the
+   * passive-motion experiment. Ordinary simulation does not call this method.
+   */
+  advect({ field = "wave", speed = 0.05, phase = 0 } = {}) {
+    this.assertActive();
+    if (field !== "wave" && field !== "vortex")
+      throw new RangeError("Passive flow must be wave or vortex.");
+    if (!Number.isFinite(speed) || Math.abs(speed) > 1)
+      throw new RangeError("Flow speed must be within one cell per pass.");
+    if (!Number.isFinite(phase))
+      throw new RangeError("Flow phase must be finite.");
+    if (speed === 0) return;
+    if (!this.program.advection) {
+      const handle = link(this.gl, ADVECTION);
+      this.programs.push(handle);
+      this.program.advection = { handle, locations: new Map() };
+    }
+    this.run(
+      "advection",
+      this.nextState,
+      { u_state: this.state, u_barrier: this.barrier },
+      {
+        u_flowField: field === "vortex" ? 1 : 0,
+        u_flowSpeed: speed,
+        u_flowPhase: phase,
+      },
+    );
+    [this.state, this.nextState] = [this.nextState, this.state];
   }
 
   disturb(
