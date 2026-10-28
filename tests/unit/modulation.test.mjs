@@ -80,7 +80,7 @@ test("the playhead phase uses the same clock, offset and rate limits as the osci
   assert.equal(lfoPhaseAt({ ...config, rate: 100, phase: 0 }, 0.03125), 0.25);
 });
 
-test("the production audio handler debounces kicks, injects state and respects pause", (context) => {
+test("the production audio handler ignores paused effects even when saved parameters enable them", (context) => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   globalThis.document = new EventTarget();
@@ -93,6 +93,9 @@ test("the production audio handler debounces kicks, injects state and respects p
   });
   const shockwaves = [];
   const inputs = [];
+  const coupled = [];
+  const camera = [];
+  const spectrumReads = [];
   const model = {
     id: "neural-growth",
     ready: true,
@@ -103,6 +106,8 @@ test("the production audio handler debounces kicks, injects state and respects p
       inputs.push([strength, time]);
       return true;
     },
+    processAcousticInjection: (...args) => coupled.push(args),
+    processCameraMotion: (...args) => camera.push(args),
   };
   const controller = createGrowthController({
     elements: {},
@@ -110,23 +115,23 @@ test("the production audio handler debounces kicks, injects state and respects p
     getView: () => "lab",
   });
   context.after(() => controller.dispose());
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1000);
+  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1000, {
+    getFrequencyData: () => spectrumReads.push(true),
+  });
   controller.onAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1050);
-  assert.deepEqual(inputs, [[0.8, 1000]]);
-  assert.deepEqual(shockwaves, ["on"]);
   controller.onAudioFrame({ hasSignal: false }, 1200);
   controller.onAudioFrame({ hasSignal: true, kickOnset: 0.75 }, 1300);
-  assert.equal(inputs.length, 2);
-  assert.equal(shockwaves.length, 2);
   model.parameters.beatShockwave = "off";
   controller.onAudioFrame({ hasSignal: false }, 1500);
   controller.onAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1600);
-  assert.equal(inputs.length, 3);
-  assert.equal(shockwaves.length, 2);
   model.isClockRunning = false;
   controller.onAudioFrame({ hasSignal: false }, 1800);
   controller.onAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1900);
-  assert.equal(inputs.length, 3);
+  assert.deepEqual(inputs, []);
+  assert.deepEqual(shockwaves, []);
+  assert.deepEqual(coupled, []);
+  assert.deepEqual(camera, []);
+  assert.deepEqual(spectrumReads, []);
 });
 
 test("one-sided LFOs stay on the selected side and match their displayed bounds", () => {

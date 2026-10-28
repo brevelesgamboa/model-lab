@@ -8,6 +8,11 @@ import { getAudioRoute } from "../core/modulation-matrix.js";
 import { supportsModulation } from "../core/model-contract.js";
 import { modulationIsActive } from "../ui/modulation-panel.js";
 import { createNeuronGallery } from "../ui/neuron-gallery.js";
+import { isPausedAudioControl } from "../models/neural-growth/audio-effects.js";
+import {
+  GROWTH_BRUSH_KEYS,
+  GROWTH_CONTROL_SECTIONS,
+} from "../ui/growth-control-sections.js";
 
 export function formatControlValue(definition, value) {
   const numeric = Number(value);
@@ -144,11 +149,19 @@ export function createControlsController({
   let presetSelect = null;
   let neuronGallery = null;
   let manualChannelOpen = false;
+  const sectionsKey = "gl-bench:control-sections";
+  let sectionState = {};
+  try {
+    const stored = JSON.parse(localStorage.getItem(sectionsKey));
+    if (stored && typeof stored === "object") sectionState = stored;
+  } catch {
+    /* Storage is optional. */
+  }
 
-  function syncNeuronGallery() {
+  function syncNeuronGallery(options) {
     if (!neuronGallery) return;
     const parameters = getParameters();
-    neuronGallery.update(parameters);
+    neuronGallery.update(parameters, options);
     const channel = controlElements.get("targetChannel");
     const definition = getModel()
       .controlsForParameters(parameters)
@@ -277,6 +290,15 @@ export function createControlsController({
     const currentParameters = getParameters();
     const currentLfoState = getLfoState();
     neuronGallery?.dispose();
+    for (const section of elements.parameterControls.querySelectorAll(
+      ".control-section",
+    )) {
+      sectionState[section.dataset.section] = section.open;
+    }
+    // Keep the static actions and their existing listeners when rebuilding controls.
+    if (elements.growthTools && elements.advancedControls) {
+      elements.advancedControls.before(elements.growthTools);
+    }
     elements.parameterControls.replaceChildren();
     controlElements.clear();
     presetSelect = null;
@@ -284,10 +306,67 @@ export function createControlsController({
 
     renderPresetControl();
 
+    const grouped = currentModel.id === "neural-growth";
+    const sectionContents = new Map();
+    elements.advancedControls?.classList.toggle("is-grouped", grouped);
+    if (grouped) {
+      elements.advancedControls.open = true;
+      for (const { id, label } of GROWTH_CONTROL_SECTIONS) {
+        const section = document.createElement("details");
+        section.className = "control-section";
+        section.dataset.section = id;
+        section.open =
+          typeof sectionState[id] === "boolean"
+            ? sectionState[id]
+            : id === "pattern";
+        const summary = document.createElement("summary");
+        summary.textContent = label;
+        const content = document.createElement("div");
+        content.className = "control-section__content";
+        section.append(summary, content);
+        section.addEventListener("toggle", () => {
+          if (!section.isConnected) return;
+          sectionState[id] = section.open;
+          try {
+            localStorage.setItem(sectionsKey, JSON.stringify(sectionState));
+          } catch {
+            /* Storage is optional. */
+          }
+          if (section.open) onModulationOpen();
+        });
+        elements.parameterControls.append(section);
+        sectionContents.set(id, content);
+      }
+      sectionContents.get("pattern").append(elements.growthTools);
+      const browseNeurons = document.createElement("button");
+      browseNeurons.type = "button";
+      browseNeurons.className = "mini-button browse-neurons";
+      browseNeurons.textContent = "Browse neurons";
+      browseNeurons.addEventListener("click", () => {
+        sectionContents.get("dream").parentElement.open = true;
+        neuronGallery?.open();
+      });
+      sectionContents.get("pattern").append(browseNeurons);
+    }
+
     const definitions =
       currentModel.controlsForParameters?.(currentParameters) ??
       currentModel.controls;
     definitions.forEach((definition) => {
+      if (
+        grouped &&
+        (GROWTH_BRUSH_KEYS.includes(definition.key) ||
+          isPausedAudioControl(definition.key))
+      )
+        return;
+      const section = grouped
+        ? GROWTH_CONTROL_SECTIONS.find(({ keys }) =>
+            keys.includes(definition.key),
+          )?.id || "simulation"
+        : null;
+      const parent = grouped
+        ? sectionContents.get(section)
+        : elements.parameterControls;
       if (definition.key === "targetLayer" && currentModel.neuronArchetypes) {
         neuronGallery = createNeuronGallery({
           neurons: currentModel.neuronArchetypes,
@@ -300,7 +379,7 @@ export function createControlsController({
             controlElements.get("targetChannel").block.hidden = !open;
           },
         });
-        elements.parameterControls.append(neuronGallery.element);
+        parent.append(neuronGallery.element);
       }
       const block = document.createElement("div");
       block.className = "control-block";
@@ -452,6 +531,7 @@ export function createControlsController({
 
         controlElements.set(definition.key, {
           block,
+          sectionElement: grouped ? parent.parentElement : null,
           definition,
           slider,
           fine,
@@ -645,7 +725,9 @@ export function createControlsController({
         help.textContent = definition.help;
         block.append(help);
       }
-      elements.parameterControls.append(block);
+      parent.append(block);
+      if (definition.key === "targetChannel" && neuronGallery)
+        parent.append(neuronGallery.selectedPreview);
       block
         .querySelectorAll('input[type="range"]')
         .forEach(updateRangeProgress);

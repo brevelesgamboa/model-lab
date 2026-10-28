@@ -88,6 +88,7 @@ export function collectElements() {
     growthCanvasTools: document.getElementById("growth-canvas-tools"),
     growthBrushBtns: Array.from(document.querySelectorAll(".growth-brush-btn")),
     growthBrushRadius: document.getElementById("growth-brush-radius"),
+    growthBrushMode: document.getElementById("growth-brush-mode"),
     growthBrushRadiusVal: document.getElementById("growth-brush-radius-val"),
     growthColorOptions: document.getElementById("growth-color-options"),
     growthColorPills: document.getElementById("growth-color-pills"),

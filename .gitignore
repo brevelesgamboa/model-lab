@@ -10,6 +10,10 @@ node_modules/
 !/models/neural-growth/previews/
 !/models/neural-growth/organic-structures/
 !/models/neural-growth/custom/
+!/models/neural-growth/features/
+!/models/inception/
+/models/inception/*
+!/models/inception/previews/
 /models/neural-growth/organic-structures/*
 !/models/neural-growth/organic-structures/membrane-field.json
 !/models/neural-growth/organic-structures/filament-network.json

@@ -5,6 +5,15 @@
  */
 import { ensureTensorFlow } from "../../training/tf-runtime.js";
 import { calcTvLoss } from "../inception-dream.js";
+import { NeuronPreviewCache } from "./neuron-preview-cache.js";
+import {
+  createFourierImage,
+  transformPreview,
+  previewSeed,
+  NEURON_PREVIEW_SIZE,
+  NEURON_PREVIEW_STEPS,
+  NEURON_PREVIEW_RECIPE,
+} from "./neuron-preview.js";
 
 // TensorFlow Slim InceptionV3 endpoint depths (depth_multiplier = 1).
 // https://github.com/tensorflow/models/blob/master/research/slim/nets/inception_v3.py
@@ -77,16 +86,33 @@ function previewDelay(signal) {
   });
 }
 
-/** Optimize RGB pixels in memory; no simulation state or image files are used. */
+/** Optimize a feature example without reading or changing the simulation. */
 export async function generateNeuronPreview(
-  model, layerName, channelIndex, size = 64, steps = 30,
-  { signal, beforeStep = () => previewDelay(signal) } = {},
+  model,
+  layerName,
+  channelIndex,
+  size = NEURON_PREVIEW_SIZE,
+  steps = NEURON_PREVIEW_STEPS,
+  {
+    signal,
+    beforeStep = () => previewDelay(signal),
+    seed = previewSeed(layerName, channelIndex),
+    recipe = "fourier",
+    onProgress = () => {},
+  } = {},
 ) {
-  if (!Number.isInteger(size) || size < 2 || !Number.isInteger(steps) || steps < 1) {
-    throw new RangeError("Preview size and steps must be positive integers (size >= 2).");
+  if (
+    !Number.isInteger(size) ||
+    size < 2 ||
+    !Number.isInteger(steps) ||
+    steps < 1
+  ) {
+    throw new RangeError(
+      "Preview size and steps must be positive integers (size >= 2).",
+    );
   }
   signal?.throwIfAborted();
-  const tf = globalThis.tf || await ensureTensorFlow();
+  const tf = globalThis.tf || (await ensureTensorFlow());
   await tf.ready();
   const nodeName = INCEPTION_LAYERS[layerName] || layerName;
   // This bundled TF Hub graph accepts [0, 1] and contains its own Mul/Sub.
@@ -96,37 +122,82 @@ export async function generateNeuronPreview(
   );
   // Valid-padding reduction blocks need at least 75px to reach Mixed_7b/7c.
   const inferenceSize = Math.max(96, size);
-  let img = null;
+  let parameterization = null;
+  let optimizer = null;
   let pixels = null;
   try {
-    img = tf.tidy(() => tf.variable(tf.randomUniform([1, size, size, 3], 0.4, 0.6)));
+    if (recipe !== "fourier" && recipe !== "pixels")
+      throw new RangeError("Unknown neuron preview recipe.");
+    parameterization =
+      recipe === "fourier"
+        ? createFourierImage(tf, size, seed)
+        : {
+            variable: tf.tidy(() =>
+              tf.variable(
+                tf.randomUniform([1, size, size, 3], 0.4, 0.6, "float32", seed),
+              ),
+            ),
+            render: (input) => input,
+            dispose() {
+              this.variable.dispose();
+            },
+          };
+    if (recipe === "fourier") optimizer = tf.train.adam(0.05);
+    const variable = parameterization.variable;
+    let iteration = 0;
     const valueAndGrad = tf.valueAndGrad((input) => {
-      const resized = size === inferenceSize ? input : tf.image.resizeBilinear(input, [inferenceSize, inferenceSize]);
-      const raw = model.execute(internalPreprocessing ? resized : resized.mul(2).sub(1), nodeName);
+      const image = parameterization.render(input);
+      const transformed =
+        recipe === "fourier"
+          ? transformPreview(tf, image, size, iteration, seed)
+          : image;
+      const resized =
+        size === inferenceSize
+          ? transformed
+          : tf.image.resizeBilinear(transformed, [
+              inferenceSize,
+              inferenceSize,
+            ]);
+      const raw = model.execute(
+        internalPreprocessing ? resized : resized.mul(2).sub(1),
+        nodeName,
+      );
       const act = Array.isArray(raw) ? raw[0] : raw;
-      const safeCh = Math.max(0, Math.min(Math.floor(channelIndex), act.shape[3] - 1));
-      const feature = channelIndex < 0
-        ? act.square().mean().add(1e-8).sqrt()
-        : act.slice([0, 0, 0, safeCh], [-1, -1, -1, 1]).mean();
-      return feature.sub(calcTvLoss(tf, input).mul(0.005));
+      const safeCh = Math.max(
+        0,
+        Math.min(Math.floor(channelIndex), act.shape[3] - 1),
+      );
+      const feature =
+        channelIndex < 0
+          ? act.square().mean().add(1e-8).sqrt()
+          : act.slice([0, 0, 0, safeCh], [-1, -1, -1, 1]).mean();
+      return feature.sub(calcTvLoss(tf, image).mul(0.005));
     });
     for (let step = 0; step < steps; step += 1) {
-      await beforeStep();
+      iteration = step;
+      await beforeStep(step, steps);
       signal?.throwIfAborted();
       const fence = tf.tidy(() => {
         const engine = tf.engine();
         const ownsTape = engine.state.gradientDepth === 0;
         try {
-          const { grad } = valueAndGrad(img);
-          const std = tf.moments(grad).variance.sqrt().add(1e-6);
-          img.assign(img.add(grad.div(std).mul(0.06)).clipByValue(0, 1));
+          const { grad } = valueAndGrad(variable);
+          if (optimizer) {
+            optimizer.applyGradients({ [variable.name]: grad.neg() });
+          } else {
+            const std = tf.moments(grad).variance.sqrt().add(1e-6);
+            variable.assign(
+              variable.add(grad.div(std).mul(0.06)).clipByValue(0, 1),
+            );
+          }
           // Read a scalar after assignment so GPU work cannot accumulate while yielding.
-          return img.mean();
+          return variable.mean();
         } catch (error) {
           // TF.js 4.22 retains kept tape tensors when a gradient throws.
           // Only this synchronous, non-nested step owns the tape being freed.
           if (ownsTape && engine.state.gradientDepth === 0) {
-            for (const node of engine.state.activeTape || []) tf.dispose(node.saved);
+            for (const node of engine.state.activeTape || [])
+              tf.dispose(node.saved);
             engine.state.activeTape = null;
           }
           throw error;
@@ -134,21 +205,24 @@ export async function generateNeuronPreview(
       });
       try {
         const [mean] = await fence.data();
-        if (!Number.isFinite(mean)) throw new Error("Preview optimization produced non-finite pixels.");
+        if (!Number.isFinite(mean))
+          throw new Error("Preview optimization produced non-finite pixels.");
       } finally {
         fence.dispose();
       }
+      onProgress(step + 1, steps);
     }
     signal?.throwIfAborted();
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
-    pixels = img.squeeze([0]);
+    pixels = tf.tidy(() => parameterization.render(variable).squeeze([0]));
     await tf.browser.toPixels(pixels, canvas);
     signal?.throwIfAborted();
     return canvas.toDataURL("image/webp", 0.85);
   } finally {
     pixels?.dispose();
-    img?.dispose();
+    optimizer?.dispose();
+    parameterization?.dispose();
   }
 }
 
@@ -176,9 +250,9 @@ export function phenotypeBytesToFloatRgb(bytes, width, height, dx = 0, dy = 0) {
     return floatRgb;
   }
   for (let y = 0; y < height; y++) {
-    const sy = ((y - shiftY) % height + height) % height;
+    const sy = (((y - shiftY) % height) + height) % height;
     for (let x = 0; x < width; x++) {
-      const sx = ((x - shiftX) % width + width) % width;
+      const sx = (((x - shiftX) % width) + width) % width;
       const srcIdx = (sy * width + sx) * 4;
       const dstIdx = (y * width + x) * 3;
       const r = (bytes[srcIdx] - 127) * (2 / 255) + 0.5;
@@ -206,8 +280,8 @@ export function applySpatialGradientSmoothing(flatGrad, width, height) {
   for (let y = 0; y < height; y++) {
     const yOff = y * width;
     for (let x = 0; x < width; x++) {
-      const xm2 = ((x - 2) % width + width) % width;
-      const xm1 = ((x - 1) % width + width) % width;
+      const xm2 = (((x - 2) % width) + width) % width;
+      const xm1 = (((x - 1) % width) + width) % width;
       const xp1 = (x + 1) % width;
       const xp2 = (x + 2) % width;
       const di = (yOff + x) * 3;
@@ -230,8 +304,8 @@ export function applySpatialGradientSmoothing(flatGrad, width, height) {
 
   // Vertical pass: 5-tap kernel [1, 4, 6, 4, 1] / 16 with circular wrapping
   for (let y = 0; y < height; y++) {
-    const ym2 = (((y - 2) % height + height) % height) * width;
-    const ym1 = (((y - 1) % height + height) % height) * width;
+    const ym2 = ((((y - 2) % height) + height) % height) * width;
+    const ym1 = ((((y - 1) % height) + height) % height) * width;
     const y0 = y * width;
     const yp1 = ((y + 1) % height) * width;
     const yp2 = ((y + 2) % height) * width;
@@ -262,12 +336,19 @@ export function applySpatialGradientSmoothing(flatGrad, width, height) {
  * with optional circular spatial reverse unroll (dx, dy).
  * Accepts both normalized Float32 values in [-1, 1] and direct byte values in [0, 255].
  */
-export function gradientDataToRgbaBytes(flatGrad, width, height, dx = 0, dy = 0) {
+export function gradientDataToRgbaBytes(
+  flatGrad,
+  width,
+  height,
+  dx = 0,
+  dy = 0,
+) {
   const pixelCount = width * height;
   const rgba = new Uint8Array(pixelCount * 4);
   const shiftX = Math.round(dx) || 0;
   const shiftY = Math.round(dy) || 0;
-  const isFloat = flatGrad instanceof Float32Array || flatGrad instanceof Float64Array;
+  const isFloat =
+    flatGrad instanceof Float32Array || flatGrad instanceof Float64Array;
 
   const toByte = (v) => {
     if (isFloat) {
@@ -287,9 +368,9 @@ export function gradientDataToRgbaBytes(flatGrad, width, height, dx = 0, dy = 0)
     return rgba;
   }
   for (let y = 0; y < height; y++) {
-    const gy = ((y + shiftY) % height + height) % height;
+    const gy = (((y + shiftY) % height) + height) % height;
     for (let x = 0; x < width; x++) {
-      const gx = ((x + shiftX) % width + width) % width;
+      const gx = (((x + shiftX) % width) + width) % width;
       const srcIdx = (gy * width + gx) * 3;
       const dstIdx = (y * width + x) * 4;
       rgba[dstIdx] = toByte(flatGrad[srcIdx]);
@@ -302,7 +383,11 @@ export function gradientDataToRgbaBytes(flatGrad, width, height, dx = 0, dy = 0)
 }
 
 export class DreamGuidanceBridge {
-  constructor({ getInceptionModel = null, archetypes = [], generatePreview = generateNeuronPreview } = {}) {
+  constructor({
+    getInceptionModel = null,
+    archetypes = [],
+    generatePreview = generateNeuronPreview,
+  } = {}) {
     this._getInceptionModel = getInceptionModel;
     this._isBusy = false;
     this._model = null;
@@ -312,10 +397,18 @@ export class DreamGuidanceBridge {
     this._archetypes = archetypes;
     this._generatePreview = generatePreview;
     this._previewQueue = new Map();
+    this._previewEntries = new Map();
+    this._previewActive = null;
+    this.previewErrors = new Map();
     this._previewAttempts = new Set();
     this._previewListeners = new Set();
     this._previewAbort = new AbortController();
     this._previewTask = null;
+    this._bundledPreviewTask = null;
+    this._savedPreviewTask = null;
+    this._previewNamespace = null;
+    this._previewCacheEpoch = 0;
+    this.previewStorage = new NeuronPreviewCache();
     this.disposed = false;
   }
 
@@ -324,54 +417,317 @@ export class DreamGuidanceBridge {
     return () => this._previewListeners.delete(listener);
   }
 
-  // Called for both standalone guidance loads and the shared Inception model.
+  // The model is shared with live guidance; previews are requested on demand.
   onModelReady(model) {
-    if (this.disposed) return;
-    this._model = model;
-    void this.warmArchetypePreviews(this._archetypes);
+    if (!this.disposed) this._model = model;
+  }
+
+  loadBundledPreviews() {
+    if (this.disposed || !globalThis.location?.href)
+      return Promise.resolve(this.previewCache);
+    if (this._bundledPreviewTask) return this._bundledPreviewTask;
+    this._bundledPreviewTask = (async () => {
+      const base = new URL(
+        "../../../../models/inception/previews/",
+        import.meta.url,
+      );
+      const graphUrl = new URL("../model.json", base);
+      const [catalogResponse, graphResponse] = await Promise.all([
+        fetch(new URL("catalog.json", base)),
+        fetch(graphUrl),
+      ]);
+      if (!catalogResponse.ok || !graphResponse.ok) return this.previewCache;
+      const [catalog, graph] = await Promise.all([
+        catalogResponse.json(),
+        graphResponse.arrayBuffer(),
+      ]);
+      if (
+        catalog.schema !== "inception-v3-preview-catalog-v1" ||
+        catalog.recipe !== NEURON_PREVIEW_RECIPE
+      )
+        return this.previewCache;
+      const digest = await crypto.subtle.digest("SHA-256", graph);
+      const sha256 = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+      if (catalog.modelSha256 !== sha256 || this.disposed)
+        return this.previewCache;
+      if (/^[a-f0-9]{64}$/.test(catalog.checkpointSha256))
+        this._previewNamespace = [
+          catalog.checkpointSha256,
+          sha256,
+          NEURON_PREVIEW_RECIPE,
+          NEURON_PREVIEW_SIZE,
+          NEURON_PREVIEW_STEPS,
+        ].join(":");
+      for (const entry of catalog.entries) {
+        if (
+          !Object.hasOwn(INCEPTION_LAYER_CHANNELS, entry.layer) ||
+          !Number.isInteger(entry.channel) ||
+          entry.channel < -1 ||
+          entry.channel >= INCEPTION_LAYER_CHANNELS[entry.layer] ||
+          entry.file !== `${entry.layer}-${entry.channel}.webp`
+        )
+          continue;
+        const key = `${entry.layer}_${entry.channel}`;
+        if (this.previewCache.has(key)) continue;
+        const url = new URL(entry.file, base).href;
+        this.previewCache.set(key, url);
+        for (const listener of this._previewListeners) listener(key, url);
+      }
+      return this.previewCache;
+    })().catch(() => this.previewCache);
+    return this._bundledPreviewTask;
+  }
+
+  async loadPreviews() {
+    await this.loadBundledPreviews();
+    if (this.disposed || !this.previewStorage.enabled) return this.previewCache;
+    if (!this._savedPreviewTask) {
+      const epoch = this._previewCacheEpoch;
+      this._savedPreviewTask = (async () => {
+        if (!this._previewNamespace) {
+          this.previewStorage.unavailable();
+          return;
+        }
+        const records = await this.previewStorage.load(this._previewNamespace);
+        if (this.disposed || epoch !== this._previewCacheEpoch) return;
+        for (const { key, url } of records) {
+          const split = key.lastIndexOf("_");
+          const layer = key.slice(0, split);
+          const channel = Number(key.slice(split + 1));
+          if (
+            !Object.hasOwn(INCEPTION_LAYER_CHANNELS, layer) ||
+            channel >= INCEPTION_LAYER_CHANNELS[layer] ||
+            this.previewCache.has(key)
+          )
+            continue;
+          this.previewCache.set(key, url);
+          for (const listener of this._previewListeners) listener(key, url);
+        }
+      })();
+    }
+    await this._savedPreviewTask;
+    return this.previewCache;
+  }
+
+  async setSavePreviews(enabled) {
+    this._previewCacheEpoch += 1;
+    this._savedPreviewTask = null;
+    this.previewStorage.setEnabled(enabled);
+    if (!enabled) return;
+    await this.loadPreviews();
+    for (const [key, url] of this.previewCache) {
+      const split = key.lastIndexOf("_");
+      await this.previewStorage.save(
+        key,
+        url,
+        previewSeed(key.slice(0, split), Number(key.slice(split + 1))),
+      );
+    }
+  }
+
+  clearSavedPreviews() {
+    this._previewCacheEpoch += 1;
+    return this.previewStorage.clear();
+  }
+
+  _previewEntry(layer, channel, background = false) {
+    const key = `${layer}_${channel}`;
+    let entry = this._previewEntries.get(key);
+    if (!entry || (entry.controller?.signal.aborted && !entry.preempted)) {
+      entry = {
+        key,
+        layer,
+        channel,
+        background,
+        priority: false,
+        cacheEpoch: this._previewCacheEpoch,
+        waiters: new Set(),
+      };
+      this._previewEntries.set(key, entry);
+      this._previewQueue.set(key, entry);
+    }
+    entry.background ||= background;
+    return entry;
+  }
+
+  async requestPreview(
+    layer,
+    channel,
+    { signal, priority = true, retry = false, onProgress } = {},
+  ) {
+    if (this.disposed || signal?.aborted)
+      return Promise.reject(
+        signal?.reason || new DOMException("Preview cancelled", "AbortError"),
+      );
+    if (
+      !Object.hasOwn(INCEPTION_LAYER_CHANNELS, layer) ||
+      !Number.isInteger(channel) ||
+      channel < -1 ||
+      channel >= INCEPTION_LAYER_CHANNELS[layer]
+    )
+      return Promise.reject(
+        new RangeError("Unknown InceptionV3 layer or channel."),
+      );
+    const key = `${layer}_${channel}`;
+    if (!this.previewCache.has(key)) await this.loadPreviews();
+    if (this.disposed || signal?.aborted)
+      throw (
+        signal?.reason || new DOMException("Preview cancelled", "AbortError")
+      );
+    if (this.previewCache.has(key)) {
+      const url = this.previewCache.get(key);
+      this.previewCache.delete(key);
+      this.previewCache.set(key, url);
+      void this.previewStorage.save(key, url, previewSeed(layer, channel));
+      return Promise.resolve(url);
+    }
+    if (this.previewErrors.has(key) && !retry)
+      return Promise.reject(new Error(this.previewErrors.get(key)));
+    this.previewErrors.delete(key);
+    const entry = this._previewEntry(layer, channel);
+    entry.priority ||= priority;
+    const result = new Promise((resolve, reject) => {
+      const waiter = { resolve, reject, signal, priority, onProgress };
+      waiter.abort = () => {
+        entry.waiters.delete(waiter);
+        entry.priority = [...entry.waiters].some((item) => item.priority);
+        signal?.removeEventListener("abort", waiter.abort);
+        reject(
+          signal?.reason || new DOMException("Preview cancelled", "AbortError"),
+        );
+        if (!entry.waiters.size && !entry.background) {
+          this._previewQueue.delete(key);
+          if (this._previewEntries.get(key) === entry)
+            this._previewEntries.delete(key);
+          entry.controller?.abort();
+        }
+      };
+      entry.waiters.add(waiter);
+      signal?.addEventListener("abort", waiter.abort, { once: true });
+    });
+    const active = this._previewActive;
+    if (priority && active && active !== entry && !active.priority) {
+      active.preempted = true;
+      active.controller.abort();
+    }
+    this._startPreviewQueue();
+    return result;
   }
 
   warmArchetypePreviews(archetypes) {
     if (this.disposed) return Promise.resolve(this.previewCache);
     for (const neuron of archetypes) {
       const key = `${neuron.layer}_${neuron.channel}`;
-      if (!this.previewCache.has(key) && !this._previewAttempts.has(key)) {
-        this._previewQueue.set(key, neuron);
-      }
+      if (!this.previewCache.has(key) && !this._previewAttempts.has(key))
+        this._previewEntry(neuron.layer, neuron.channel, true);
     }
+    return this._startPreviewQueue();
+  }
+
+  _finishPreview(entry, url, error) {
+    if (this._previewEntries.get(entry.key) === entry)
+      this._previewEntries.delete(entry.key);
+    for (const waiter of entry.waiters) {
+      waiter.signal?.removeEventListener("abort", waiter.abort);
+      if (error) waiter.reject(error);
+      else waiter.resolve(url);
+    }
+    entry.waiters.clear();
+  }
+
+  _startPreviewQueue() {
     if (this._previewTask) return this._previewTask;
-    if (!this._previewQueue.size) return Promise.resolve(this.previewCache);
-    const signal = this._previewAbort.signal;
+    if (!this._previewQueue.size || this.disposed)
+      return Promise.resolve(this.previewCache);
     this._previewTask = (async () => {
-      // Defer all model/GPU work until the foreground initialization returns.
-      await previewDelay(signal);
+      await previewDelay(this._previewAbort.signal);
       const model = await this.ensureModel();
-      while (this._previewQueue.size && !signal.aborted) {
-        const [key, neuron] = this._previewQueue.entries().next().value;
-        this._previewQueue.delete(key);
-        this._previewAttempts.add(key);
+      while (this._previewQueue.size && !this.disposed) {
+        const entry =
+          [...this._previewQueue.values()].find((item) => item.priority) ||
+          this._previewQueue.values().next().value;
+        this._previewQueue.delete(entry.key);
+        this._previewActive = entry;
+        entry.preempted = false;
+        entry.controller = new AbortController();
+        const signal = entry.controller.signal;
+        const abort = () => entry.controller.abort();
+        this._previewAbort.signal.addEventListener("abort", abort, {
+          once: true,
+        });
         try {
-          const url = await this._generatePreview(model, neuron.layer, neuron.channel, 96, 30, {
-            signal,
-            beforeStep: async () => {
-              do {
-                await previewDelay(signal);
-              } while (this._isBusy || this._getInceptionModel?.()?.isRunning || this._getInceptionModel?.()?.isOctaveRunning || globalThis.document?.hidden);
+          const url = await this._generatePreview(
+            model,
+            entry.layer,
+            entry.channel,
+            NEURON_PREVIEW_SIZE,
+            NEURON_PREVIEW_STEPS,
+            {
+              signal,
+              onProgress: (step, total) => {
+                for (const waiter of entry.waiters)
+                  waiter.onProgress?.(step, total);
+              },
+              beforeStep: async () => {
+                do {
+                  await previewDelay(signal);
+                } while (
+                  this._isBusy ||
+                  this._getInceptionModel?.()?.isRunning ||
+                  this._getInceptionModel?.()?.isOctaveRunning ||
+                  globalThis.document?.hidden
+                );
+              },
             },
-          });
-          if (signal.aborted) break;
-          this.previewCache.set(key, url);
-          for (const listener of this._previewListeners) listener(key, url);
+          );
+          signal.throwIfAborted();
+          if (entry.cacheEpoch === this._previewCacheEpoch)
+            await this.previewStorage.save(
+              entry.key,
+              url,
+              previewSeed(entry.layer, entry.channel),
+            );
+          signal.throwIfAborted();
+          this.previewCache.set(entry.key, url);
+          while (this.previewCache.size > 192)
+            this.previewCache.delete(this.previewCache.keys().next().value);
+          this._previewAttempts.add(entry.key);
+          for (const listener of this._previewListeners)
+            listener(entry.key, url);
+          this._finishPreview(entry, url);
         } catch (error) {
-          if (signal.aborted) break;
-          // An unavailable channel preview must not affect guidance or other cards.
-          console.warn("Neuron preview unavailable:", neuron.id, error);
+          if (
+            entry.preempted &&
+            !this.disposed &&
+            (entry.waiters.size || entry.background)
+          ) {
+            this._previewQueue.set(entry.key, entry);
+          } else {
+            if (!signal.aborted) {
+              this.previewErrors.set(entry.key, error.message);
+              this._previewAttempts.add(entry.key);
+            }
+            this._finishPreview(entry, null, error);
+          }
+        } finally {
+          this._previewAbort.signal.removeEventListener("abort", abort);
+          this._previewActive = null;
         }
-        await previewDelay(signal);
       }
-    })().catch((error) => {
-      if (!signal.aborted) console.warn("Neuron previews unavailable:", error);
-    }).then(() => this.previewCache).finally(() => { this._previewTask = null; });
+    })()
+      .catch((error) => {
+        for (const entry of this._previewEntries.values())
+          this._finishPreview(entry, null, error);
+        this._previewQueue.clear();
+      })
+      .then(() => this.previewCache)
+      .finally(() => {
+        this._previewTask = null;
+        if (this._previewQueue.size && !this.disposed)
+          this._startPreviewQueue();
+      });
     return this._previewTask;
   }
 
@@ -448,8 +804,15 @@ export class DreamGuidanceBridge {
       const tf = await this.getTensorFlow();
       const dx = jitter ? Math.floor(Math.random() * 17) - 8 : 0;
       const dy = jitter ? Math.floor(Math.random() * 17) - 8 : 0;
-      const floatRgb = phenotypeBytesToFloatRgb(rgbBytes, width, height, dx, dy);
-      const nodeName = INCEPTION_LAYERS[targetLayer] || INCEPTION_LAYERS.mixed_6c;
+      const floatRgb = phenotypeBytesToFloatRgb(
+        rgbBytes,
+        width,
+        height,
+        dx,
+        dy,
+      );
+      const nodeName =
+        INCEPTION_LAYERS[targetLayer] || INCEPTION_LAYERS.mixed_6c;
 
       const saturatedTensor = tf.tidy(() => {
         const input = tf.tensor4d(floatRgb, [1, height, width, 3]);
@@ -508,7 +871,11 @@ export class DreamGuidanceBridge {
       }
 
       // Spatial Gaussian low-pass smoothing (5x5 separable blur)
-      const smoothedGrad = applySpatialGradientSmoothing(blendedGrad, width, height);
+      const smoothedGrad = applySpatialGradientSmoothing(
+        blendedGrad,
+        width,
+        height,
+      );
 
       return gradientDataToRgbaBytes(smoothedGrad, width, height, dx, dy);
     } finally {
@@ -520,12 +887,20 @@ export class DreamGuidanceBridge {
     this.disposed = true;
     this._previewAbort.abort();
     this._previewQueue.clear();
+    for (const entry of this._previewEntries.values())
+      this._finishPreview(
+        entry,
+        null,
+        new DOMException("Preview cancelled", "AbortError"),
+      );
+    this._previewEntries.clear();
+    this.previewErrors.clear();
     this._previewAttempts.clear();
     this._previewListeners.clear();
+    this.previewStorage.dispose();
     this.previewCache.clear();
     this._model = null;
     this._loadingPromise = null;
     this._prevGrad = null;
   }
 }
-

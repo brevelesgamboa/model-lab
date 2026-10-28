@@ -1,0 +1,73 @@
+{
+  "schema": "inception-v3-preview-catalog-v1",
+  "model": "InceptionV3",
+  "modelSha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849",
+  "recipe": "inception-v3-fourier-v2",
+  "method": "Fourier image coordinates, color decorrelation, jitter and scale; generated from the bundled checkpoint",
+  "entries": [
+    {
+      "layer": "mixed_6c",
+      "channel": -1,
+      "seed": 3672426732,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_6c--1.webp"
+    },
+    {
+      "layer": "mixed_6c",
+      "channel": 144,
+      "seed": 1824846165,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_6c-144.webp"
+    },
+    {
+      "layer": "mixed_6c",
+      "channel": 215,
+      "seed": 2704926198,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_6c-215.webp"
+    },
+    {
+      "layer": "mixed_6a",
+      "channel": 82,
+      "seed": 1863150370,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_6a-82.webp"
+    },
+    {
+      "layer": "mixed_5c",
+      "channel": 48,
+      "seed": 1893347327,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_5c-48.webp"
+    },
+    {
+      "layer": "mixed_5b",
+      "channel": 120,
+      "seed": 1346509591,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_5b-120.webp"
+    },
+    {
+      "layer": "mixed_7b",
+      "channel": 312,
+      "seed": 1881466150,
+      "recipe": "inception-v3-fourier-v2",
+      "size": 96,
+      "steps": 96,
+      "file": "mixed_7b-312.webp"
+    }
+  ],
+  "checkpointSha256": "eef6ad9f4d37464e46082ffe72cc6f5b429efb81ecf39422a7d38d31c0a31099"
+}

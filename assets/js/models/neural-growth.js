@@ -9,6 +9,7 @@ import {
   getPattern,
 } from "./neural-growth/patterns.js";
 import { AUDIO_PROFILES } from "./neural-growth/audio-profiles.js";
+import { NEURAL_GROWTH_AUDIO_EFFECTS } from "./neural-growth/audio-effects.js";
 import {
   ResonanceConfig,
   RESONANCE_PRESETS,
@@ -28,6 +29,8 @@ import {
   getInceptionLayerChannels,
   clampDreamChannel,
 } from "./neural-growth/dream-guidance.js";
+
+const STILL_PAN = Object.freeze([0, 0]);
 
 // Feature-ascent starting points inspired by https://distill.pub/2017/feature-visualization/.
 // These project presets are visual suggestions, not published identifications
@@ -181,11 +184,15 @@ export class NeuralGrowthModel {
   }
 
   get effectiveZoom() {
-    return this._effectiveZoom;
+    return NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath
+      ? this._effectiveZoom
+      : Number(this._parameters.zoom) || 1;
   }
 
   get effectivePan() {
-    return this._effectivePan;
+    return NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath
+      ? this._effectivePan
+      : STILL_PAN;
   }
 
   get cameraMotion() {
@@ -1801,7 +1808,8 @@ export class NeuralGrowthModel {
         this.hasActiveRipples ||
         Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001 ||
         Number(parameters?.echoDecay || 0) > 0.01 ||
-        (parameters?.cameraBreathing !== "off" &&
+        (NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath &&
+          parameters?.cameraBreathing !== "off" &&
           Boolean(this._cameraMotion?.isMoving)))
     );
   }
@@ -2473,12 +2481,14 @@ export class NeuralGrowthModel {
         );
       }
       const effectiveZoom =
-        this._effectiveZoom > 0 ? this._effectiveZoom : parameters.zoom;
+        NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath && this._effectiveZoom > 0
+          ? this._effectiveZoom
+          : parameters.zoom;
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         palettePhase: effectivePhaseRad,
         zoom: effectiveZoom,
-        pan: this._effectivePan || [0, 0],
+        pan: this.effectivePan,
         displayFilter: parameters.displayFilter,
         showBarrier,
         ripples: this._activeRipples || [],
@@ -2804,6 +2814,7 @@ export class NeuralGrowthModel {
     coords = null,
     customRadius = null,
   ) {
+    if (!NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave) return false;
     if (!this.ready || !mode || mode === "off") return false;
     const currentEnabled = this._parameters?.beatShockwave || "on";
     if (currentEnabled === "off" && mode !== "on" && mode !== "center") return false;
@@ -2834,6 +2845,7 @@ export class NeuralGrowthModel {
     timestamp,
     rhythmController = null,
   ) {
+    if (!NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling) return 0;
     if (!this.ready || !this._parameters) return 0;
     const mode = this._parameters.acousticInjection || "off";
     if (mode === "off" || !levels?.hasSignal) return 0;
@@ -2862,6 +2874,7 @@ export class NeuralGrowthModel {
   }
 
   processCameraMotion(levels, timestamp) {
+    if (!NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath) return false;
     if (!this.ready || !this._parameters) return false;
     if (!this._cameraMotion) {
       this._cameraMotion = new CameraMotionEngine();
@@ -2877,6 +2890,7 @@ export class NeuralGrowthModel {
   }
 
   triggerKickInput(strength = 1.0, timestamp = null) {
+    if (!NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave) return false;
     if (!this.ready) return false;
     const impact = this._parameters?.shockwaveImpact || "color";
     if (impact === "none") return false;

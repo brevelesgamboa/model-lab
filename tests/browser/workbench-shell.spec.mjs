@@ -522,9 +522,7 @@ test("brush settings expand below the tools and scroll within the rail", async (
   await page.locator("#growth-brush-radius").scrollIntoViewIfNeeded();
   await page.locator("#growth-brush-radius").fill("24");
   await expect(page.locator("#growth-brush-radius-val")).toHaveText("24px");
-  await expect(
-    page.locator('[data-parameter="brushRadius"] .fine-input'),
-  ).toHaveValue("24");
+  await expect(page.locator('[data-parameter="brushRadius"]')).toHaveCount(0);
   await page.locator('#growth-color-options [data-color="#ff00a0"]').click();
   await expect(page.locator("#growth-color-picker")).toHaveValue("#ff00a0");
   await page.locator('[data-brush="freeze"]').click();

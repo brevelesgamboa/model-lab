@@ -5,6 +5,7 @@ import {
 } from "../ui/workbench-shell.js";
 import { renderModelTechnicalInfo } from "./controls-controller.js";
 import { PATTERNS } from "../models/neural-growth/patterns.js";
+import { NEURAL_GROWTH_AUDIO_EFFECTS } from "../models/neural-growth/audio-effects.js";
 
 const FAVORITES_KEY = "latent-field:growth-favorites";
 const RECENTS_KEY = "latent-field:growth-recents";
@@ -236,6 +237,7 @@ export function createGrowthController({
       card.type = "button";
       card.className = "growth-gallery__card";
       card.dataset.patternId = pattern.id;
+      if (pattern.description) card.title = pattern.description;
       if (pattern.id === activePatternId) {
         card.classList.add("is-selected");
         card.setAttribute("aria-selected", "true");
@@ -377,6 +379,21 @@ export function createGrowthController({
       setBrushRailVisible(elements.growthCanvasTools, Boolean(model));
       if (model) {
         const currentMode = model.parameters?.disturbanceMode || "erase";
+        if (elements.growthBrushMode) {
+          const select = elements.growthBrushMode;
+          if (!select.options.length) {
+            const definition = model.controls.find(
+              ({ key }) => key === "disturbanceMode",
+            );
+            for (const { value, label } of definition.options) {
+              const option = document.createElement("option");
+              option.value = value;
+              option.textContent = label;
+              select.append(option);
+            }
+          }
+          select.value = currentMode;
+        }
         for (const btn of elements.growthBrushBtns) {
           const isActive = btn.dataset.brush === currentMode;
           btn.classList.toggle("is-active", isActive);
@@ -585,7 +602,11 @@ export function createGrowthController({
       model.queueDisturbance(coords.gx, coords.gy, radius, "noise");
     }
     model.queueDisturbance(coords.gx, coords.gy, radius, mode);
-    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+    if (
+      mode === "shockwave" ||
+      (NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave &&
+        model.parameters?.beatShockwave === "pointer")
+    ) {
       lastPointerRippleTime = performance.now();
       model.triggerRipple(coords.gx, coords.gy, radius);
     }
@@ -619,7 +640,11 @@ export function createGrowthController({
     } else {
       model.queueDisturbance(coords.gx, coords.gy, radius, mode);
     }
-    if (mode === "shockwave" || model.parameters?.beatShockwave === "pointer") {
+    if (
+      mode === "shockwave" ||
+      (NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave &&
+        model.parameters?.beatShockwave === "pointer")
+    ) {
       const now = performance.now();
       if (now - lastPointerRippleTime >= 90) {
         lastPointerRippleTime = now;
@@ -749,6 +774,13 @@ export function createGrowthController({
     });
   }
 
+  listen(elements.growthBrushMode, "change", (event) => {
+    if (!activeModel()) return;
+    onParameterChange?.("disturbanceMode", event.target.value);
+    schedulePausedRender();
+    update();
+  });
+
   if (elements.growthColorPicker) {
     listen(elements.growthColorPicker, "input", (e) => {
       const hex = e.target.value;
@@ -868,19 +900,30 @@ export function createGrowthController({
   let beatArmed = true;
 
   function onAudioFrame(levels, timestamp, rhythmController = null) {
+    if (
+      !NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath &&
+      !NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling &&
+      !NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave
+    )
+      return;
     const model = activeModel();
     if (!model?.ready || !levels) return;
 
     let needsRender = false;
 
-    if (typeof model.processCameraMotion === "function") {
+    if (
+      NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath &&
+      typeof model.processCameraMotion === "function"
+    ) {
       const cameraMoving = model.processCameraMotion(levels, timestamp);
       if (cameraMoving) {
         needsRender = true;
       }
     }
 
-    const spectrum = rhythmController?.getFrequencyData();
+    const spectrum = NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling
+      ? rhythmController?.getFrequencyData()
+      : null;
     if (spectrum && typeof model.processAcousticInjection === "function") {
       const injected = model.processAcousticInjection(
         spectrum,
@@ -909,7 +952,7 @@ export function createGrowthController({
       lastBeatTime = timestamp;
       beatArmed = false;
       const shockwave = model.parameters?.beatShockwave ?? "on";
-      if (shockwave !== "off") {
+      if (NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave && shockwave !== "off") {
         if (typeof model.triggerBeatShockwave === "function") {
           model.triggerBeatShockwave("on");
           needsRender = true;
@@ -917,6 +960,7 @@ export function createGrowthController({
       }
       // State injection follows the clock; pausing must retain the cellular field.
       if (
+        NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave &&
         model.isClockRunning &&
         typeof model.triggerKickInput === "function"
       ) {
