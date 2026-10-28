@@ -97,6 +97,7 @@ export function createNeuronExplorer({
   allLayers.textContent = "All layers";
   layerSelect.append(allLayers);
   for (const [name, prefix] of [
+    ["Stem layers", "Conv2d_"],
     ["Earlier layers", "mixed_5"],
     ["Middle layers", "mixed_6"],
     ["Later layers", "mixed_7"],
@@ -717,11 +718,13 @@ export function createNeuronExplorer({
       page * PAGE_SIZE,
       (page + 1) * PAGE_SIZE,
     )) {
-      const group = layer.startsWith("mixed_5")
-        ? "Earlier layers"
-        : layer.startsWith("mixed_6")
-          ? "Middle layers"
-          : "Later layers";
+      const group = layer.startsWith("Conv2d_")
+        ? "Stem layers"
+        : layer.startsWith("mixed_5")
+          ? "Earlier layers"
+          : layer.startsWith("mixed_6")
+            ? "Middle layers"
+            : "Later layers";
       if (layerSelect.value === "all" && group !== previousGroup) {
         const heading = document.createElement("h3");
         heading.className = "neuron-explorer__layer-heading";

@@ -21,6 +21,9 @@ import {
 // TensorFlow Slim InceptionV3 endpoint depths (depth_multiplier = 1).
 // https://github.com/tensorflow/models/blob/master/research/slim/nets/inception_v3.py
 export const INCEPTION_LAYER_CHANNELS = Object.freeze({
+  Conv2d_2b_3x3: 64,
+  Conv2d_3b_1x1: 80,
+  Conv2d_4a_3x3: 192,
   mixed_5b: 256,
   mixed_5c: 288,
   mixed_5d: 288,
@@ -49,6 +52,12 @@ export function clampDreamChannel(channel, layer = "mixed_6c") {
 }
 
 export const INCEPTION_LAYERS = Object.freeze({
+  Conv2d_2b_3x3:
+    "module_apply_default/InceptionV3/InceptionV3/Conv2d_2b_3x3/Relu",
+  Conv2d_3b_1x1:
+    "module_apply_default/InceptionV3/InceptionV3/Conv2d_3b_1x1/Relu",
+  Conv2d_4a_3x3:
+    "module_apply_default/InceptionV3/InceptionV3/Conv2d_4a_3x3/Relu",
   mixed_5b: "module_apply_default/InceptionV3/InceptionV3/Mixed_5b/concat",
   mixed_5c: "module_apply_default/InceptionV3/InceptionV3/Mixed_5c/concat",
   mixed_5d: "module_apply_default/InceptionV3/InceptionV3/Mixed_5d/concat",
@@ -73,6 +82,10 @@ export const DREAM_GUIDANCE_DEFAULTS = Object.freeze({
   chroma: 0.0,
   resolution: 192,
 });
+
+// Five samples, truncated at radius two; sigma 1.25 balances pixel suppression
+// with the directional structures in the stem and early Mixed layers.
+export const DREAM_GRADIENT_SIGMA = 1.25;
 
 function previewDelay(signal) {
   signal?.throwIfAborted();
@@ -273,13 +286,26 @@ export function phenotypeBytesToFloatRgb(bytes, width, height, dx = 0, dy = 0) {
  * Applies a separable 5-tap Gaussian spatial low-pass filter across a 3-channel flat float array.
  * Strips high-frequency checkerboard noise while preserving macro feature contours.
  */
-export function applySpatialGradientSmoothing(flatGrad, width, height) {
-  if (!flatGrad || width < 5 || height < 5) return flatGrad;
+export function applySpatialGradientSmoothing(
+  flatGrad,
+  width,
+  height,
+  sigma = DREAM_GRADIENT_SIGMA,
+) {
+  if (!flatGrad || width < 1 || height < 1) return flatGrad;
+  const calibratedSigma = Number.isFinite(sigma)
+    ? Math.max(1, Math.min(1.5, sigma))
+    : DREAM_GRADIENT_SIGMA;
+  const kernel = Array.from({ length: 5 }, (_, i) =>
+    Math.exp(-0.5 * ((i - 2) / calibratedSigma) ** 2),
+  );
+  const sum = kernel.reduce((total, value) => total + value, 0);
+  for (let i = 0; i < kernel.length; i++) kernel[i] /= sum;
   const pixelCount = width * height;
   const temp = new Float32Array(pixelCount * 3);
   const smoothed = new Float32Array(pixelCount * 3);
 
-  // Horizontal pass: 5-tap kernel [1, 4, 6, 4, 1] / 16 with circular wrapping
+  // Circular wrapping matches the toroidal simulation and avoids border seams.
   for (let y = 0; y < height; y++) {
     const yOff = y * width;
     for (let x = 0; x < width; x++) {
@@ -295,17 +321,16 @@ export function applySpatialGradientSmoothing(flatGrad, width, height) {
       const i4 = (yOff + xp2) * 3;
       for (let c = 0; c < 3; c++) {
         temp[di + c] =
-          (flatGrad[i0 + c] +
-            4 * flatGrad[i1 + c] +
-            6 * flatGrad[i2 + c] +
-            4 * flatGrad[i3 + c] +
-            flatGrad[i4 + c]) *
-          0.0625;
+          kernel[0] * flatGrad[i0 + c] +
+          kernel[1] * flatGrad[i1 + c] +
+          kernel[2] * flatGrad[i2 + c] +
+          kernel[3] * flatGrad[i3 + c] +
+          kernel[4] * flatGrad[i4 + c];
       }
     }
   }
 
-  // Vertical pass: 5-tap kernel [1, 4, 6, 4, 1] / 16 with circular wrapping
+  // Vertical pass of the same separable Gaussian.
   for (let y = 0; y < height; y++) {
     const ym2 = ((((y - 2) % height) + height) % height) * width;
     const ym1 = ((((y - 1) % height) + height) % height) * width;
@@ -321,17 +346,35 @@ export function applySpatialGradientSmoothing(flatGrad, width, height) {
       const i4 = (yp2 + x) * 3;
       for (let c = 0; c < 3; c++) {
         smoothed[di + c] =
-          (temp[i0 + c] +
-            4 * temp[i1 + c] +
-            6 * temp[i2 + c] +
-            4 * temp[i3 + c] +
-            temp[i4 + c]) *
-          0.0625;
+          kernel[0] * temp[i0 + c] +
+          kernel[1] * temp[i1 + c] +
+          kernel[2] * temp[i2 + c] +
+          kernel[3] * temp[i3 + c] +
+          kernel[4] * temp[i4 + c];
       }
     }
   }
 
   return smoothed;
+}
+
+/** Undo input jitter in floating point, before temporal history or encoding. */
+export function unrollGradient(flat, width, height, dx = 0, dy = 0) {
+  const aligned = new Float32Array(flat.length);
+  const shiftX = Math.round(dx) || 0;
+  const shiftY = Math.round(dy) || 0;
+  for (let y = 0; y < height; y++) {
+    const sy = (((y + shiftY) % height) + height) % height;
+    for (let x = 0; x < width; x++) {
+      const sx = (((x + shiftX) % width) + width) % width;
+      const source = (sy * width + sx) * 3;
+      const target = (y * width + x) * 3;
+      aligned[target] = flat[source];
+      aligned[target + 1] = flat[source + 1];
+      aligned[target + 2] = flat[source + 2];
+    }
+  }
+  return aligned;
 }
 
 /**
@@ -391,12 +434,18 @@ export class DreamGuidanceBridge {
     archetypes = [],
     generatePreview = generateNeuronPreview,
     previewStorage = new NeuronPreviewCache(),
+    random = Math.random,
+    gradientSigma = DREAM_GRADIENT_SIGMA,
   } = {}) {
     this._getInceptionModel = getInceptionModel;
     this._isBusy = false;
     this._model = null;
     this._loadingPromise = null;
     this._prevGrad = null;
+    this._gradientTarget = null;
+    this._gradientSequence = 0;
+    this._random = random;
+    this._gradientSigma = gradientSigma;
     this.previewCache = new Map();
     this._archetypes = archetypes;
     this._generatePreview = generatePreview;
@@ -930,6 +979,8 @@ export class DreamGuidanceBridge {
 
   resetMomentum() {
     this._prevGrad = null;
+    this._gradientTarget = null;
+    this._gradientSequence += 1;
   }
 
   async computeGradient(
@@ -941,16 +992,25 @@ export class DreamGuidanceBridge {
     jitter = true,
     tvWeight = 0.005,
   ) {
-    if (this._isBusy || this.disposed) return null;
+    if (this.disposed) return null;
+    const target = `${targetLayer}:${targetChannel}:${width}:${height}:${jitter}:${tvWeight}`;
+    if (target !== this._gradientTarget) {
+      this.resetMomentum();
+      this._gradientTarget = target;
+    }
+    if (this._isBusy) return null;
+    const sequence = ++this._gradientSequence;
+    const stale = () => this.disposed || sequence !== this._gradientSequence;
     this._isBusy = true;
 
     try {
       const model = await this.ensureModel();
-      if (!model || this.disposed) return null;
+      if (!model || stale()) return null;
 
       const tf = await this.getTensorFlow();
-      const dx = jitter ? Math.floor(Math.random() * 17) - 8 : 0;
-      const dy = jitter ? Math.floor(Math.random() * 17) - 8 : 0;
+      if (stale()) return null;
+      const dx = jitter ? Math.floor(this._random() * 17) - 8 : 0;
+      const dy = jitter ? Math.floor(this._random() * 17) - 8 : 0;
       const floatRgb = phenotypeBytesToFloatRgb(
         rgbBytes,
         width,
@@ -1001,20 +1061,26 @@ export class DreamGuidanceBridge {
         return saturated.squeeze([0]); // [height, width, 3] in [-1, 1]
       });
 
-      const rawGrad = await saturatedTensor.data();
-      saturatedTensor.dispose();
+      let rawGrad;
+      try {
+        rawGrad = await saturatedTensor.data();
+      } finally {
+        saturatedTensor.dispose();
+      }
+      if (stale()) return null;
+      const alignedGrad = unrollGradient(rawGrad, width, height, dx, dy);
 
       // Temporal EMA blending (70% previous gradient momentum + 30% new gradient)
       let blendedGrad;
-      if (this._prevGrad && this._prevGrad.length === rawGrad.length) {
-        blendedGrad = new Float32Array(rawGrad.length);
-        for (let i = 0; i < rawGrad.length; i++) {
-          blendedGrad[i] = this._prevGrad[i] * 0.7 + rawGrad[i] * 0.3;
+      if (this._prevGrad && this._prevGrad.length === alignedGrad.length) {
+        blendedGrad = new Float32Array(alignedGrad.length);
+        for (let i = 0; i < alignedGrad.length; i++) {
+          blendedGrad[i] = this._prevGrad[i] * 0.7 + alignedGrad[i] * 0.3;
         }
         this._prevGrad.set(blendedGrad);
       } else {
-        blendedGrad = new Float32Array(rawGrad);
-        this._prevGrad = new Float32Array(rawGrad);
+        blendedGrad = new Float32Array(alignedGrad);
+        this._prevGrad = new Float32Array(alignedGrad);
       }
 
       // Spatial Gaussian low-pass smoothing (5x5 separable blur)
@@ -1022,15 +1088,17 @@ export class DreamGuidanceBridge {
         blendedGrad,
         width,
         height,
+        this._gradientSigma,
       );
 
-      return gradientDataToRgbaBytes(smoothedGrad, width, height, dx, dy);
+      return gradientDataToRgbaBytes(smoothedGrad, width, height);
     } finally {
       this._isBusy = false;
     }
   }
 
   dispose() {
+    this.resetMomentum();
     this.cancelBackgroundPreviews();
     this.disposed = true;
     this._previewAbort.abort();

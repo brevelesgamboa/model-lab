@@ -252,7 +252,7 @@ test("layer-grouped gallery searches every channel and selects without changing 
   await expect(dialog).toBeVisible();
   await expect(
     dialog.getByLabel("Explorer layer").locator("optgroup"),
-  ).toHaveCount(3);
+  ).toHaveCount(4);
   await dialog.getByLabel("Preview collection").selectOption("all");
   await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(12);
   await dialog.getByRole("button", { name: "Next neuron page" }).click();
@@ -538,6 +538,49 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
     dialog.locator(".neuron-explorer__cache [role=status]"),
   ).toContainText("0 saved");
   expect(weights).toEqual([]);
+});
+
+test("stem channels use exact bounds and saved previews survive reload", async ({
+  page,
+}) => {
+  await installPreviewFixture(page, { bundled: true });
+  await openGrowth(page);
+  await page
+    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
+    .click();
+  const layer = page.getByLabel("DREAM LAYER", { exact: true });
+  const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  for (const [name, lastChannel] of [
+    ["Conv2d_4a_3x3", 191],
+    ["Conv2d_3b_1x1", 79],
+    ["Conv2d_2b_3x3", 63],
+  ]) {
+    await layer.selectOption(name);
+    await expect(channel).toHaveAttribute("max", String(lastChannel));
+    await channel.fill(String(lastChannel));
+  }
+  await page
+    .getByRole("button", { name: "Preview selected neuron", exact: true })
+    .click();
+  const image = page.locator(".neuron-selected-preview img");
+  await expect(image).toBeVisible();
+  const original = await image.getAttribute("src");
+  const dialog = await browsePreviews(page);
+  await expect(
+    dialog.locator(".neuron-explorer__cache [role=status]"),
+  ).toContainText("1 saved");
+  await page.reload();
+  await expect(page.locator("#render-state")).toHaveText("FRAME READY");
+  await installPreviewFixture(page, { bundled: true });
+  await openGrowth(page);
+  const restored = await browsePreviews(page);
+  await expect(
+    restored.locator(".neuron-explorer__layer-heading"),
+  ).toContainText(["Stem layers"]);
+  await expect(
+    restored.locator('[data-layer="Conv2d_2b_3x3"][data-channel="63"] img'),
+  ).toHaveAttribute("src", original);
+  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
 });
 
 test("clearing saved previews also fences saves from generation already in flight", async ({

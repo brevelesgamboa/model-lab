@@ -171,6 +171,7 @@ export class NeuralGrowthModel {
     this._cameraMotion = new CameraMotionEngine();
     this._dreamBridge = new DreamGuidanceBridge({ getInceptionModel, archetypes: CURATED_NEURONS });
     this._dreamStepCounter = 0;
+    this._dreamRequestId = 0;
     this._effectiveZoom = 1.0;
     this._effectivePan = [0.0, 0.0];
     this._capabilities = capabilities;
@@ -1827,6 +1828,7 @@ export class NeuralGrowthModel {
   }
 
   cancel() {
+    this._invalidateDreamGuidance();
     this._epoch += 1;
     this._abort?.abort();
     this._abort = null;
@@ -2182,6 +2184,21 @@ export class NeuralGrowthModel {
     if (key === "targetLayer" || key === "targetChannel") {
       value = this.normalizeStoredParameter(key, value);
     }
+    const previous = this._parameters?.[key];
+    if (
+      previous !== value &&
+      [
+        "targetLayer",
+        "targetChannel",
+        "dreamJitter",
+        "dreamTvWeight",
+        "dreamEnabled",
+        "pattern",
+        "seed",
+        "simulationSize",
+      ].includes(key)
+    )
+      this._invalidateDreamGuidance();
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
     }
@@ -2286,6 +2303,16 @@ export class NeuralGrowthModel {
 
   async _render(canvas, parameters, timeSeconds, advance, epoch) {
     if (this._disposed) return null;
+    if (
+      [
+        "targetLayer",
+        "targetChannel",
+        "dreamJitter",
+        "dreamTvWeight",
+        "dreamEnabled",
+      ].some((key) => parameters[key] !== this._parameters[key])
+    )
+      this._invalidateDreamGuidance();
     const configuration = `${parameters.pattern}:${parameters.simulationSize}:${parameters.seed}`;
     let candidate = null;
     let runtimeOperation = false;
@@ -2387,6 +2414,7 @@ export class NeuralGrowthModel {
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
         });
+        this._invalidateDreamGuidance({ clearTexture: false });
         this._runtime?.dispose();
         this._runtime = candidate;
         this._activePattern = pattern.id;
@@ -2396,6 +2424,7 @@ export class NeuralGrowthModel {
         candidate = null;
       } else if (this._runtime.seed !== parameters.seed) {
         runtimeOperation = true;
+        this._invalidateDreamGuidance({ clearTexture: false });
         this._runtime.restart(parameters.seed);
         this._lastTick = null;
         this._accumulator = 0;
@@ -2513,6 +2542,7 @@ export class NeuralGrowthModel {
     configuration = `${this._parameters.pattern}:${this._parameters.simulationSize}:${this._parameters.seed}`,
     { invalidateRuntime = true } = {},
   ) {
+    this._invalidateDreamGuidance({ clearTexture: false });
     this.lastError = error instanceof Error ? error.message : String(error);
     this._failedConfiguration = configuration;
     this._needsRuntime ||= invalidateRuntime;
@@ -2603,25 +2633,54 @@ export class NeuralGrowthModel {
     this._kickInputIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
-    this._dreamStepCounter = 0;
-    this._dreamBridge?.resetMomentum();
+    this._invalidateDreamGuidance({ clearTexture: false });
   }
 
-  _dispatchDreamGuidance(targetLayer, targetChannel = -1, jitter = true, tvWeight = 0.005) {
+  _invalidateDreamGuidance({ clearTexture = true } = {}) {
+    this._dreamRequestId += 1;
+    this._dreamStepCounter = 0;
+    this._dreamBridge?.resetMomentum?.();
+    if (clearTexture) this._runtime?.clearDreamGradient?.();
+  }
+
+  _dispatchDreamGuidance(
+    targetLayer,
+    targetChannel = -1,
+    jitter = true,
+    tvWeight = 0.005,
+  ) {
     if (!this._runtime || !this._dreamBridge || this._dreamBridge.isBusy) {
       return;
     }
+    const runtime = this._runtime;
+    const requestId = ++this._dreamRequestId;
+    const epoch = this._epoch;
+    const current = () =>
+      !this._disposed &&
+      runtime === this._runtime &&
+      !runtime.disposed &&
+      requestId === this._dreamRequestId &&
+      epoch === this._epoch;
     try {
-      const rgbBytes = this._runtime.readPhenotypeRgb(192, 192);
-      this._dreamBridge
-        .computeGradient(rgbBytes, 192, 192, targetLayer, targetChannel, jitter, tvWeight)
+      const rgbBytes = runtime.readPhenotypeRgb(192, 192);
+      return this._dreamBridge
+        .computeGradient(
+          rgbBytes,
+          192,
+          192,
+          targetLayer,
+          targetChannel,
+          jitter,
+          tvWeight,
+        )
         .then((gradBytes) => {
-          if (gradBytes && this._runtime && !this._runtime.disposed) {
-            this._runtime.updateDreamGradient(gradBytes, 192, 192);
+          if (gradBytes && current()) {
+            runtime.updateDreamGradient(gradBytes, 192, 192);
           }
         })
         .catch((error) => {
-          console.warn("[DreamGuidance] Gradient evaluation error:", error);
+          if (current())
+            console.warn("[DreamGuidance] Gradient evaluation error:", error);
         });
     } catch (err) {
       console.warn("[DreamGuidance] Phenotype read error:", err);

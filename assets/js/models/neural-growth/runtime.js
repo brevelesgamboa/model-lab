@@ -1857,6 +1857,17 @@ export class TextureNcaRuntime {
     context.drawImage(this.canvas, drawX, drawY, extent, extent);
   }
 
+  clearDreamGradient() {
+    if (this.disposed || !this.dreamGradTexture || this.gl.isContextLost())
+      return;
+    const { width, height } = this.dreamGradTexture;
+    this.updateDreamGradient(
+      new Uint8Array(width * height * 4).fill(127),
+      width,
+      height,
+    );
+  }
+
   updateDreamGradient(uint8Array, width = 192, height = 192) {
     this.assertActive();
     if (!uint8Array || uint8Array.length !== width * height * 4) return;

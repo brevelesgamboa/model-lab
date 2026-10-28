@@ -14,7 +14,10 @@ function transactionDone(transaction) {
 }
 
 function validRecord(record, namespace) {
-  const match = /^(mixed_[567][a-e])_(-?\d+)$/.exec(record?.key);
+  const match =
+    /^(mixed_[567][a-e]|Conv2d_(?:2b_3x3|3b_1x1|4a_3x3))_(-?\d+)$/.exec(
+      record?.key,
+    );
   return (
     match &&
     record.namespace === namespace &&
