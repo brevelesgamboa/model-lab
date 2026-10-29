@@ -3834,27 +3834,3 @@ input[type="range"]::-moz-range-progress {
 .dome-synthesis-panel[hidden] {
   display: none !important;
 }
-
-.dome-manual-channel-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  background: var(--surface-2, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-  border-radius: 6px;
-}
-
-.channel-input-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.channel-input-group input[type="range"] {
-  flex: 1;
-}
-
-.channel-input-group input[type="number"] {
-  width: 68px;
-}

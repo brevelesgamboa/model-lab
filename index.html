@@ -311,27 +311,6 @@
                         <option value="-1" hidden>Custom neuron target</option>
                       </select>
                     </label>
-                    <div id="dome-neuron-gallery-mount" class="dome-neuron-gallery-mount"></div>
-                    <div id="dome-manual-channel-panel" class="dome-manual-channel-panel" hidden>
-                      <label class="field">Inception Layer
-                        <select id="dome-neuron-layer" aria-label="Neuron Layer"></select>
-                      </label>
-                      <div class="field">
-                        <div class="field__header">
-                          <label for="dome-neuron-channel-slider">Channel Index</label>
-                          <span id="dome-neuron-channel-max" class="field__limit">/ 255</span>
-                        </div>
-                        <div class="channel-input-group">
-                          <input id="dome-neuron-channel-slider" type="range" min="0" max="255" value="120" />
-                          <div class="stepper-group">
-                            <button id="dome-neuron-channel-prev" class="nudge-button" type="button" title="Previous channel" aria-label="Previous channel">−</button>
-                            <input id="dome-neuron-channel-number" type="number" min="0" max="255" value="120" />
-                            <button id="dome-neuron-channel-next" class="nudge-button" type="button" title="Next channel" aria-label="Next channel">+</button>
-                          </div>
-                          <button id="dome-neuron-random" class="mini-button" type="button" title="Select random neuron channel">🎲 Random</button>
-                        </div>
-                      </div>
-                    </div>
                     <button
                       id="dome-generate"
                       class="mini-button mini-button--highlight"

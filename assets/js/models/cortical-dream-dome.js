@@ -26,7 +26,7 @@ import {
   uploadDream360,
 } from "./inception-dream-bake.js";
 
-const range = (key, label, max, value, help, min = 0) => ({
+const range = (key, label, max, value, help, min = 0, modulation = true) => ({
   key,
   label,
   type: "range",
@@ -36,6 +36,7 @@ const range = (key, label, max, value, help, min = 0) => ({
   default: value,
   format: "decimal2",
   help,
+  modulation,
 });
 export const DOME_ARCHETYPES = Object.freeze([
   {
@@ -113,6 +114,8 @@ const CONTROLS = [
     1,
     1,
     "At 1, Dream changes brightness only and preserves the source palette. Lower values allow color changes. Applies to the next synthesis and current lighting.",
+    0,
+    false,
   ),
   range(
     "depthScale",
