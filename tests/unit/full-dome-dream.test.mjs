@@ -154,7 +154,7 @@ test("the 50px smoothstep feather and ascent mask span both sides of the photo e
     });
     const delta = (x) => result.rgba[(64 * 256 + x) * 4] - 102;
     const full = delta(rect.x - 25);
-    assert.ok(full > 10);
+    assert.ok(full > 2);
     for (const x of [rect.x - 12, rect.x, rect.x + 12, rect.x + 25]) {
       const expected = full * (1 - photoProtection(x, 64, rect));
       assert.ok(

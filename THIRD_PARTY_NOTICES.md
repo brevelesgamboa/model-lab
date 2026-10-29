@@ -60,8 +60,9 @@ map; its moving surface uses analytic log-polar wave patterns.
 Cortical Dream Dome reuses the same depth service and the existing bundled
 Inception graph. It runs one forward pass for a selected channel and displaces
 an inward-facing sphere with the normalized activation map. Its manual
-full-dome mode additionally runs multi-step DeepDream gradient ascent in a dedicated worker, anchored to a protected region of the uploaded
-photo. Downloaded model files may be retained in browser Cache Storage; photos
+Dream mode additionally runs multi-step gradient ascent in a dedicated worker.
+It defaults to luminance-only updates and mirrored spherical wrapping. Optional
+MI-GAN mode protects the central photo while synthesizing its surroundings. Downloaded model files may be retained in browser Cache Storage; photos
 and Dream textures are not persisted by that cache. Its rings, rays, spirals
 and honeycomb are analytic
 log-polar patterns inspired by
@@ -71,3 +72,19 @@ not a numerical implementation of their cortical neural-field equations.
 Google Fonts supplies Gajraj One and IBM Plex Mono/Sans via optional network stylesheets; local system fonts provide fallbacks. Wikimedia Commons search returns individually licensed media; attribution/license metadata must be retained and reviewed per asset. User-provided images and browser-trained models remain the user's responsibility.
 
 Runtime licenses do not grant rights to either model's weights or training data.
+
+## Optional MI-GAN inpainter
+
+The optional `models/inpainting/migan_pipeline_v2.onnx` comes from
+[the author's model repository](https://huggingface.co/andraniksargsyan/migan/blob/main/migan_pipeline_v2.onnx),
+SHA-256 `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b`.
+Upstream [MI-GAN](https://github.com/Picsart-AI-Research/MI-GAN) and its weights
+are MIT-licensed; see `licenses/migan-MIT.txt` and upstream `LICENSE-WEIGHTS`.
+The model is not committed here or downloaded automatically. A build includes
+it only if that exact file has been installed locally. The file picker also
+accepts compatible pipeline exports, stores successfully compiled weights in
+IndexedDB when available, and processes photos locally in a worker.
+The pipeline takes uint8 NCHW RGB and a uint8 mask (255 known, 0 missing), not
+normalized floats. It was designed for flat-image inpainting; a large 360 fill
+may repeat textures or invent implausible content. The renderer enforces rear
+and pole continuity separately.

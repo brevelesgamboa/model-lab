@@ -13,9 +13,13 @@ import {
   FEATURE_TARGETS,
   FeatureHeatmapEstimator,
   emptyFeatureMap,
+  validateFeatureTarget,
 } from "./inception-feature-map.js";
+import { CURATED_NEURONS } from "./neural-growth.js";
+import { DreamGuidanceBridge } from "./neural-growth/dream-guidance.js";
 
-import { create360Canvas, projectPhotoMap } from "./equirectangular-canvas.js";
+import { MiganInpainter } from "./migan-inpainter.js";
+import { projectPhotoMap } from "./equirectangular-canvas.js";
 import {
   DomeDreamBaker,
   bakeFullDome360,
@@ -36,15 +40,22 @@ const range = (key, label, max, value, help, min = 0) => ({
 const CONTROLS = [
   {
     key: "featureTarget",
-    label: "NEURAL FEATURE TARGET",
+    label: "DREAM TARGET",
     type: "select",
     default: 0,
     options: FEATURE_TARGETS.map(({ layer, channel }, value) => ({
       value,
-      label: `${layer} · channel ${channel}`,
+      label: `${{ Conv2d_4a_3x3: "Conv2d_4a: Webbing", mixed_5b: "Mixed_5b: Cellular", mixed_6a: "Mixed_6a: Arches" }[layer]} · channel ${channel}`,
     })),
-    help: "Chooses the neuron for photo relief and the next 360 dream bake. Changing it refreshes relief once; click Generate to bake a new field.",
+    help: "Chooses the neuron for photo relief and the next 360 dream bake. Changing it refreshes relief once; click Synthesize Dream to bake a new field. Labels suggest motifs; individual channels do not guarantee these structures.",
   },
+  range(
+    "colorRetention",
+    "COLOR RETENTION",
+    1,
+    1,
+    "At 1, Dream changes brightness only and preserves the source palette. Lower values allow color changes. Applies to the next synthesis and current lighting.",
+  ),
   range(
     "depthScale",
     "DEPTH SCALE",
@@ -103,7 +114,64 @@ const CONTROLS = [
     step: 0.005,
     fineStep: 0.001,
   },
+  range(
+    "edgeCoupling",
+    "EDGE REFRACTION",
+    1,
+    0.35,
+    "Bends photo detail along wave gradients.",
+  ),
+  range(
+    "chromaticDispersion",
+    "CHROMATIC DISPERSION",
+    0.01,
+    0.0025,
+    "Optical spectral dispersion along wave bends.",
+  ),
+  {
+    ...range(
+      "specularShininess",
+      "SPECULAR SHININESS",
+      64,
+      32,
+      "Tightness of the camera spotlight specular reflection.",
+      4,
+    ),
+    step: 2,
+    fineStep: 1,
+  },
+  range(
+    "fogDensity",
+    "VOID FOG DENSITY",
+    1,
+    0.35,
+    "Density of darkness fading into the distance.",
+  ),
 ];
+
+class LazyDomeDreamBridge extends DreamGuidanceBridge {
+  constructor(options) {
+    super(options);
+    this._previewsActive = false;
+  }
+  loadPreviews() {
+    if (!this._previewsActive) {
+      return Promise.resolve(this.previewCache);
+    }
+    return super.loadPreviews();
+  }
+  activatePreviews() {
+    if (!this._previewsActive) {
+      this._previewsActive = true;
+      return super.loadPreviews();
+    }
+    return Promise.resolve(this.previewCache);
+  }
+  requestPreview(layer, channel, options) {
+    this._previewsActive = true;
+    return super.requestPreview(layer, channel, options);
+  }
+}
 
 export class CorticalDreamDomeModel {
   constructor() {
@@ -135,10 +203,22 @@ export class CorticalDreamDomeModel {
     this.estimator = new DepthEstimator();
     this.featureEstimator = new FeatureHeatmapEstimator();
     this.baker = new DomeDreamBaker();
+    this.inpainter = new MiganInpainter();
+    this.outpaintingMode = "mirrored";
+    this.inpaintState = "idle";
+    this.inpaintVersion = 0;
+    this.aiDepthMap = null;
+    this.aiDepthAbort = null;
+    this.aiDepthEstimator = new DepthEstimator();
+    this.colorRetention = 1;
     this.bakeState = "idle";
     this.bakeProgress = 0;
     this.bakeStatus = "Generate a 360 dream field when ready";
     this.selectedTarget = 0;
+    this.selectedLayer = "mixed_5b";
+    this.selectedChannel = 120;
+    this.neuronArchetypes = CURATED_NEURONS;
+    this.dreamBridge = new LazyDomeDreamBridge({ archetypes: CURATED_NEURONS });
     this.sourceVersion = 0;
     this.graphicsEpoch = 0;
     this.onStateChange = () => {};
@@ -212,9 +292,7 @@ export class CorticalDreamDomeModel {
     this.depthStatus = "Brightness relief";
     this.featureStatus = "Upload a photo to map a neuron";
     this.depthError = this.featureError = null;
-    this.seed360 = create360Canvas(this.source);
-    this.panorama = this.seed360;
-    this.photoRect = this.seed360.photoRect;
+    this.prepareSurround();
     this.bakeState = "idle";
     this.bakeStatus =
       "Upload a photo, then generate the surrounding dream field";
@@ -224,34 +302,177 @@ export class CorticalDreamDomeModel {
     this.uploadSource();
     this.onStateChange();
   }
+  prepareSurround() {
+    if (this.aiDepthAbort) {
+      this.aiDepthAbort.abort();
+      this.aiDepthAbort = null;
+    }
+    this.aiDepthEstimator?.cancel();
+    this.aiDepthMap = null;
+    // Instant mirror texture: the full photo, without peripheral noise.
+    this.mirrorSeed = new OffscreenCanvas(1024, 512);
+    this.mirrorSeed.getContext("2d").drawImage(this.source, 0, 0, 1024, 512);
+    this.mirrorSeed.photoRect = null;
+    this.aiSeed = null;
+    this.outpaintingMode = "mirrored";
+    this.seed360 = this.panorama = this.mirrorSeed;
+    this.photoRect = null;
+    this.inpaintState = "idle";
+    this.inpaintNotice = "";
+    this.inpaintInfo = null;
+  }
+  useMirrored(message = "") {
+    this.inpaintVersion++;
+    if (this.inpainter.pending) this.inpainter.cancel();
+    if (this.aiDepthAbort) {
+      this.aiDepthAbort.abort();
+      this.aiDepthAbort = null;
+    }
+    this.aiDepthEstimator?.cancel();
+    this.aiDepthMap = null;
+    this.cancelDream();
+    this.outpaintingMode = "mirrored";
+    this.inpaintState = "idle";
+    this.inpaintInfo = null;
+    this.inpaintNotice = message;
+    this.seed360 = this.panorama = this.mirrorSeed;
+    this.photoRect = null;
+    this.bakeState = "idle";
+    this.bakeProgress = 0;
+    this.bakeStatus = "Mirrored photo · synthesize when ready";
+    this.uploadSource();
+    this.onStateChange();
+  }
+  async prepareInpainting(file) {
+    this.cancelDream();
+    const version = ++this.inpaintVersion;
+    const sourceVersion = this.sourceVersion;
+    this.inpaintState = "loading";
+    this.inpaintNotice = "Loading / compiling MI-GAN…";
+    this.onStateChange();
+    try {
+      const ready = await this.inpainter.prepare(file);
+      if (
+        version !== this.inpaintVersion ||
+        sourceVersion !== this.sourceVersion
+      )
+        return;
+      if (ready.type === "missing") {
+        this.inpaintState = "missing";
+        this.inpaintNotice = "Choose the optional model or use Mirrored Wrap.";
+        this.onStateChange();
+        return;
+      }
+      this.inpaintInfo = ready;
+      this.inpaintNotice = "Outpainting panorama…";
+      this.onStateChange();
+      const panorama =
+        this.aiSeed ?? (await this.inpainter.inpaint(this.source));
+      if (
+        version !== this.inpaintVersion ||
+        sourceVersion !== this.sourceVersion
+      )
+        return;
+      this.cancelDream();
+      if (this.aiDepthAbort) {
+        this.aiDepthAbort.abort();
+        this.aiDepthAbort = null;
+      }
+      this.aiDepthEstimator?.cancel();
+      this.aiSeed = panorama;
+      this.seed360 = this.panorama = panorama;
+      this.photoRect = panorama.photoRect;
+      this.outpaintingMode = "migan";
+      this.inpaintState = "ready";
+      this.inpaintNotice = "";
+      this.bakeState = "idle";
+      this.bakeProgress = 0;
+      this.bakeStatus = "AI panorama ready";
+      this.aiDepthMap = luminanceDepth(panorama);
+      this.uploadSource();
+      this.onStateChange();
+      void this.estimateAiPanoramaDepth(panorama, version);
+    } catch (error) {
+      if (version === this.inpaintVersion && error.name !== "AbortError") {
+        this.inpainter.cancel();
+        this.useMirrored(
+          `MI-GAN unavailable · ${error.message} · Mirrored Wrap active`,
+        );
+      }
+    }
+  }
+  async estimateAiPanoramaDepth(panorama, version) {
+    if (this.aiDepthAbort) this.aiDepthAbort.abort();
+    const abort = new AbortController();
+    this.aiDepthAbort = abort;
+    try {
+      const result = await this.aiDepthEstimator.estimate(panorama, {
+        signal: abort.signal,
+      });
+      if (
+        abort.signal.aborted ||
+        version !== this.inpaintVersion ||
+        this.outpaintingMode !== "migan"
+      ) {
+        return;
+      }
+      this.aiDepthMap = {
+        depth: result.depth,
+        width: result.width,
+        height: result.height,
+        kind: "estimated",
+      };
+      this.uploadGeometry();
+      this.onStateChange();
+    } catch (error) {
+      if (error.name !== "AbortError" && !abort.signal.aborted) {
+        // Luminance depth relief remains active fallback
+      }
+    } finally {
+      if (this.aiDepthAbort === abort) this.aiDepthAbort = null;
+    }
+  }
   uploadSource() {
     if (!this.graphics || !this.available) return;
     const gl = this.gl,
       g = this.graphics;
     gl.activeTexture(gl.TEXTURE0);
     uploadDream360(gl, g.textures[0], this.panorama);
+    if (this.outpaintingMode === "mirrored")
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     this.uploadGeometry();
   }
   uploadGeometry() {
-    if (!this.graphics || !this.available || !this.photoRect) return;
+    if (!this.graphics || !this.available) return;
     const gl = this.gl,
       g = this.graphics;
     const project = (values, width, height) =>
-      projectPhotoMap(
-        values,
-        width,
-        height,
-        this.photoRect,
-        this.panorama.width,
-        this.panorama.height,
-      );
+      this.outpaintingMode === "mirrored"
+        ? { depth: values, width, height }
+        : projectPhotoMap(
+            values,
+            width,
+            height,
+            this.photoRect,
+            this.panorama.width,
+            this.panorama.height,
+          );
     gl.activeTexture(gl.TEXTURE1);
-    uploadDepthTexture(
-      gl,
-      g.textures[1],
-      project(this.depthMap.depth, this.depthMap.width, this.depthMap.height),
-    );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    if (this.outpaintingMode === "migan" && this.aiDepthMap) {
+      uploadDepthTexture(gl, g.textures[1], this.aiDepthMap);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    } else {
+      uploadDepthTexture(
+        gl,
+        g.textures[1],
+        project(this.depthMap.depth, this.depthMap.width, this.depthMap.height),
+      );
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_WRAP_S,
+        this.outpaintingMode === "mirrored" ? gl.CLAMP_TO_EDGE : gl.REPEAT,
+      );
+    }
     gl.activeTexture(gl.TEXTURE2);
     uploadDepthTexture(
       gl,
@@ -262,7 +483,11 @@ export class CorticalDreamDomeModel {
         this.featureMap.height,
       ),
     );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_WRAP_S,
+      this.outpaintingMode === "mirrored" ? gl.CLAMP_TO_EDGE : gl.REPEAT,
+    );
   }
   async ensureGraphics() {
     if (this.graphics) return this.graphics;
@@ -300,9 +525,7 @@ export class CorticalDreamDomeModel {
       this.hasPhoto = true;
       this.depthMap = luminanceDepth(this.source);
       this.featureMap = emptyFeatureMap();
-      this.seed360 = create360Canvas(this.source);
-      this.panorama = this.seed360;
-      this.photoRect = this.seed360.photoRect;
+      this.prepareSurround();
       this.bakeState = "idle";
       this.bakeStatus =
         "Photo preserved in front · generate the surrounding dream field when ready";
@@ -364,22 +587,54 @@ export class CorticalDreamDomeModel {
       if (this.depthAbort === abort) this.depthAbort = null;
     }
   }
+  setNeuronTarget(layer, channel) {
+    const validated = validateFeatureTarget(layer, channel);
+    if (
+      this.selectedLayer === validated.layer &&
+      this.selectedChannel === validated.channel &&
+      this.featureState === "ready"
+    )
+      return;
+    this.selectedLayer = validated.layer;
+    this.selectedChannel = validated.channel;
+    const idx = FEATURE_TARGETS.findIndex(
+      (t) => t.layer === validated.layer && t.channel === validated.channel,
+    );
+    this.selectedTarget = idx >= 0 ? idx : -1;
+    this.cancelDream();
+    this.featureAbort?.abort();
+    this.featureMap = emptyFeatureMap();
+    this.uploadGeometry();
+    if (this.hasPhoto)
+      void this.buildMaps({ depth: false }).catch((error) => {
+        if (error.name !== "AbortError") {
+          this.featureError = error.message;
+          this.featureState = "fallback";
+          this.featureStatus = "Neuron map unavailable · try again";
+          this.onStateChange();
+        }
+      });
+    this.onStateChange();
+  }
   async estimateFeature(_g, version) {
     this.featureAbort?.abort();
     const abort = new AbortController();
     this.featureAbort = abort;
-    const target = FEATURE_TARGETS[this.selectedTarget];
+    const layer = this.selectedLayer || "mixed_5b";
+    const channel = Number.isInteger(this.selectedChannel)
+      ? this.selectedChannel
+      : 120;
     this.featureState = "loading";
     this.featureError = null;
     this.featureMap = emptyFeatureMap();
-    this.featureStatus = `Mapping ${target.layer}:${target.channel}…`;
+    this.featureStatus = `Mapping ${layer}:${channel}…`;
     this.uploadGeometry();
     this.onStateChange();
     try {
       const result = await this.featureEstimator.estimate(
         this.source,
-        target.layer,
-        target.channel,
+        layer,
+        channel,
         {
           signal: abort.signal,
           onStatus: (message) => {
@@ -393,7 +648,7 @@ export class CorticalDreamDomeModel {
       if (abort.signal.aborted || version !== this.sourceVersion) return;
       this.featureMap = result;
       this.featureState = "ready";
-      this.featureStatus = `${target.layer}:${target.channel} ready · ${result.width}×${result.height} map · model released`;
+      this.featureStatus = `${layer}:${channel} ready · ${result.width}×${result.height} map · model released`;
       this.uploadGeometry();
       this.onStateChange();
     } catch (error) {
@@ -411,9 +666,18 @@ export class CorticalDreamDomeModel {
     }
   }
   async generateDream(iterations = 15) {
-    if (!this.hasPhoto || this.bakeState === "baking") return;
+    if (
+      !this.hasPhoto ||
+      this.bakeState === "baking" ||
+      this.outpaintingMode === "migan" ||
+      ["loading", "missing"].includes(this.inpaintState)
+    )
+      return;
     const version = this.sourceVersion,
-      target = FEATURE_TARGETS[this.selectedTarget];
+      layer = this.selectedLayer || "mixed_5b",
+      channel = Number.isInteger(this.selectedChannel)
+        ? this.selectedChannel
+        : 120;
     const abort = new AbortController();
     this.bakeAbort = abort;
     this.bakeState = "baking";
@@ -427,8 +691,8 @@ export class CorticalDreamDomeModel {
       const result = await bakeFullDome360(
         this.gl,
         this.seed360,
-        target.layer,
-        target.channel,
+        layer,
+        channel,
         iterations,
         (percent, message) => {
           if (abort.signal.aborted || version !== this.sourceVersion) return;
@@ -437,10 +701,16 @@ export class CorticalDreamDomeModel {
             message || `Synthesizing 360 Universe: ${percent}%…`;
           this.onStateChange();
         },
-        { baker: this.baker, texture: g.textures[0], signal: abort.signal },
+        {
+          baker: this.baker,
+          texture: g.textures[0],
+          signal: abort.signal,
+          colorRetention: this.colorRetention,
+        },
       );
       if (abort.signal.aborted || version !== this.sourceVersion) return;
       this.panorama = result.canvas;
+      this.uploadSource();
       const { canvas: _canvas, texture: _texture, ...stats } = result;
       this.bakeMetrics = stats;
       this.bakeState = "ready";
@@ -469,26 +739,22 @@ export class CorticalDreamDomeModel {
     }
   }
   onParameterChange(key, value) {
-    if (
-      key !== "featureTarget" ||
-      value === this.selectedTarget ||
-      !FEATURE_TARGETS[value]
-    )
+    if (key === "colorRetention" && Number.isFinite(value)) {
+      if (value !== this.colorRetention) this.cancelDream();
+      this.colorRetention = Math.max(0, Math.min(1, value));
       return false;
-    this.cancelDream();
-    this.selectedTarget = value;
-    this.featureAbort?.abort();
-    this.featureMap = emptyFeatureMap();
-    this.uploadGeometry();
-    if (this.hasPhoto)
-      void this.buildMaps({ depth: false }).catch((error) => {
-        if (error.name !== "AbortError") {
-          this.featureError = error.message;
-          this.featureState = "fallback";
-          this.featureStatus = "Neuron map unavailable · try again";
-          this.onStateChange();
-        }
-      });
+    }
+    if (
+      key === "featureTarget" &&
+      Number.isInteger(value) &&
+      FEATURE_TARGETS[value]
+    ) {
+      if (value !== this.selectedTarget) {
+        const target = FEATURE_TARGETS[value];
+        this.setNeuronTarget(target.layer, target.channel);
+      }
+      return false;
+    }
     return false;
   }
   retryMaps() {
@@ -499,6 +765,17 @@ export class CorticalDreamDomeModel {
   }
   cancel() {
     this.sourceVersion++;
+    this.inpaintVersion++;
+    this.inpainter.cancel();
+    if (this.aiDepthAbort) {
+      this.aiDepthAbort.abort();
+      this.aiDepthAbort = null;
+    }
+    this.aiDepthEstimator?.cancel();
+    if (["loading", "missing"].includes(this.inpaintState)) {
+      this.inpaintState = "idle";
+      this.inpaintNotice = "Inpainting cancelled · previous view preserved";
+    }
     this.cancelDream();
     this.depthAbort?.abort();
     this.featureAbort?.abort();
@@ -518,6 +795,7 @@ export class CorticalDreamDomeModel {
   async render(target, p, timeSeconds = 0) {
     // Parameter resets/presets also reach this path, outside individual UI events.
     this.onParameterChange("featureTarget", p.featureTarget);
+    this.onParameterChange("colorRetention", p.colorRetention ?? 1);
     const version = this.sourceVersion;
     const g = await this.ensureGraphics(),
       gl = this.gl;
@@ -552,7 +830,12 @@ export class CorticalDreamDomeModel {
     gl.uniform2f(g.uniforms.aspect, 1, 1);
     gl.uniform2f(g.uniforms.fovea, 0.5, 0.5);
     gl.uniform1i(g.uniforms.wave_mode, p.waveMode);
+    gl.uniform1i(
+      g.uniforms.mirrored_wrap,
+      this.outpaintingMode === "mirrored" ? 1 : 0,
+    );
     for (const [name, value] of Object.entries({
+      color_retention: this.colorRetention,
       time: timeSeconds,
       frequency: p.frequency,
       speed: p.speed,
@@ -560,6 +843,10 @@ export class CorticalDreamDomeModel {
       depth_extrude: p.depthScale,
       neural_extrude: p.neuralSwell,
       eccentricity: p.eccentricity,
+      edge_coupling: p.edgeCoupling ?? 0.35,
+      dispersion: p.chromaticDispersion ?? 0.0025,
+      shininess: p.specularShininess ?? 32,
+      fog_density: p.fogDensity ?? 0.35,
     }))
       gl.uniform1f(g.uniforms[name], value);
     gl.drawElements(gl.TRIANGLES, g.count, gl.UNSIGNED_SHORT, 0);

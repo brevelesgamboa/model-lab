@@ -174,7 +174,7 @@ try {
   const targets = [];
   for (const selected of [1, 2]) {
     await page
-      .getByLabel("NEURAL FEATURE TARGET", { exact: true })
+      .getByLabel("DREAM TARGET", { exact: true })
       .selectOption(String(selected));
     await expect
       .poll(() => page.evaluate(() => window.dome.featureState), {

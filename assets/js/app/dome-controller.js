@@ -1,3 +1,7 @@
+import {
+  createDomeOutpaintingControls,
+  createDomeNeuronControls,
+} from "../ui/dome-controls.js";
 import { createLocalModelCacheControls } from "../ui/local-model-cache.js";
 
 export function createDomeController({
@@ -11,6 +15,18 @@ export function createDomeController({
   let cacheKey = null;
   const cache = createLocalModelCacheControls(elements);
   const isActive = () => getModel() === model;
+  const outpainting = createDomeOutpaintingControls(
+    elements,
+    model,
+    isActive,
+    canInteract,
+  );
+  const neuronControls = createDomeNeuronControls(
+    elements,
+    model,
+    isActive,
+    canInteract,
+  );
   const redraw = () => {
     if (isActive()) void render();
   };
@@ -23,6 +39,8 @@ export function createDomeController({
   }
   function update() {
     const active = isActive();
+    outpainting.update();
+    neuronControls.update();
     elements.domeTools.hidden = !active;
     elements.domeBakeOverlay.hidden = !active || model.bakeState !== "baking";
     elements.canvas.classList.toggle("has-dome-camera", active);
@@ -34,7 +52,16 @@ export function createDomeController({
     }
     if (model.bakeState === "baking") endGesture();
     elements.domeStatus.textContent = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
+    const isMigan =
+      model.outpaintingMode === "migan" ||
+      ["loading", "missing"].includes(model.inpaintState);
+    if (elements.dreamSynthesisSection) {
+      elements.dreamSynthesisSection.hidden = isMigan;
+      elements.dreamSynthesisSection.style.display = isMigan ? "none" : "block";
+    }
+    elements.domeGenerate.hidden = isMigan;
     elements.domeGenerate.disabled =
+      isMigan ||
       !model.hasPhoto ||
       model.bakeState === "baking" ||
       [model.depthState, model.featureState].includes("loading");

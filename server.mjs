@@ -34,6 +34,7 @@ function isPublic(relative) {
       "build-info.json",
       "THIRD_PARTY_NOTICES.md",
       "LICENSE",
+      "models/inpainting/migan_pipeline_v2.onnx",
     ].includes(relative) ||
     [
       "assets/css/",
@@ -77,7 +78,9 @@ export async function createStaticServer(directory) {
         response.writeHead(403).end("Forbidden");
         return;
       }
-      const body = await readFile(filepath);
+      const info = await stat(filepath);
+      if (!info.isFile()) throw new Error("Not a file.");
+      const body = request.method === "HEAD" ? null : await readFile(filepath);
       response.writeHead(200, {
         "Content-Type":
           (relative === "LICENSE" && "text/plain; charset=utf-8") ||
@@ -85,7 +88,7 @@ export async function createStaticServer(directory) {
           "application/octet-stream",
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
-        "Content-Length": body.length,
+        "Content-Length": body?.length ?? info.size,
       });
       response.end(request.method === "HEAD" ? undefined : body);
     } catch {

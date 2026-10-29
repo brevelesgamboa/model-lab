@@ -262,34 +262,209 @@
                   hidden
                 >
                   <div class="cortical-tools__actions">
-                    <label class="mini-button mini-button--highlight" for="dome-image"
-                      >Upload image</label>
-                    <input id="dome-image" class="visually-hidden" type="file"
-                      accept="image/png,image/jpeg,image/webp" aria-label="Dream Dome photo" />
-                    <button id="dome-demo" class="mini-button" type="button">Use demo</button>
-                    <button id="dome-reset-view" class="mini-button" type="button">Reset view</button>
-                    <button id="dome-retry" class="mini-button" type="button" hidden>Retry missing maps</button>
-                    <button id="dome-generate" class="mini-button mini-button--highlight" type="button" disabled>Generate Full 360 Dream Field</button>
+                    <label
+                      class="mini-button mini-button--highlight"
+                      for="dome-image"
+                      >Upload image</label
+                    >
+                    <input
+                      id="dome-image"
+                      class="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      aria-label="Dream Dome photo"
+                    />
+                    <button id="dome-demo" class="mini-button" type="button">
+                      Use demo
+                    </button>
+                    <button
+                      id="dome-reset-view"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Reset view
+                    </button>
+                    <button
+                      id="dome-retry"
+                      class="mini-button"
+                      type="button"
+                      hidden
+                    >
+                      Retry missing maps
+                    </button>
                   </div>
-                  <p id="dome-status" class="field__help" role="status" aria-live="polite"></p>
-                  <p class="field__help">Drag or use arrow keys to look around · Turn the clock on for moving waves · Fullscreen fills your view.</p>
+                  <label class="field"
+                    >Outpainting mode
+                    <select id="dome-outpainting">
+                      <option value="mirrored">Mirrored Wrap (Built-in)</option>
+                      <option value="migan">AI Inpainter (MI-GAN)</option>
+                    </select>
+                  </label>
+                  <div id="dream-synthesis-section" class="dome-synthesis-panel">
+                    <label class="field visually-hidden">Neuron Target
+                      <select id="dome-archetypes" aria-label="Curated Archetypes">
+                        <option value="0">Cellular &amp; Ocular Nodes (mixed_5b · ch 120)</option>
+                        <option value="1">Ribbed Arches &amp; Terraces (mixed_6a · ch 42)</option>
+                        <option value="2">Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)</option>
+                        <option value="3">Biological Lattices (mixed_6d · ch 182)</option>
+                        <option value="4">Crystalline Spires (mixed_7b · ch 314)</option>
+                      </select>
+                    </label>
+                    <div id="dome-neuron-gallery-mount" class="dome-neuron-gallery-mount"></div>
+                    <div id="dome-manual-channel-panel" class="dome-manual-channel-panel" hidden>
+                      <label class="field">Inception Layer
+                        <select id="dome-neuron-layer" aria-label="Neuron Layer"></select>
+                      </label>
+                      <div class="field">
+                        <div class="field__header">
+                          <label for="dome-neuron-channel-slider">Channel Index</label>
+                          <span id="dome-neuron-channel-max" class="field__limit">/ 255</span>
+                        </div>
+                        <div class="channel-input-group">
+                          <input id="dome-neuron-channel-slider" type="range" min="0" max="255" value="120" />
+                          <input id="dome-neuron-channel-number" type="number" min="0" max="255" value="120" />
+                          <button id="dome-neuron-random" class="mini-button" type="button" title="Select random neuron channel">🎲 Random</button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      id="dome-generate"
+                      class="mini-button mini-button--highlight"
+                      type="button"
+                      disabled
+                    >
+                      Synthesize Dream
+                    </button>
+                  </div>
+                  <p
+                    id="dome-migan-status"
+                    class="dome-model-status"
+                    role="status"
+                  >
+                    Mirrored Wrap Active
+                  </p>
+                  <p id="dome-migan-busy" class="field__help" hidden>
+                    <span class="dome-spinner" aria-hidden="true"></span>
+                    Preparing optional MI-GAN model…
+                  </p>
+                  <div id="dome-migan-card" class="dome-model-card" hidden>
+                    <p>
+                      MI-GAN Inpainter Model (~28 MB) required for generative
+                      360 outpainting.
+                    </p>
+                    <p>
+                      Place 'migan_pipeline_v2.onnx' in './models/inpainting/'
+                      or select the file below.
+                    </p>
+                    <label class="mini-button" for="dome-migan-file"
+                      >Choose .onnx File</label
+                    >
+                    <input
+                      id="dome-migan-file"
+                      class="visually-hidden"
+                      type="file"
+                      accept=".onnx"
+                      aria-label="MI-GAN model file"
+                    />
+                    <p>
+                      Or drop the .onnx file here.
+                      <a
+                        href="https://huggingface.co/andraniksargsyan/migan/blob/main/migan_pipeline_v2.onnx"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Get the optional model ↗</a
+                      >
+                    </p>
+                  </div>
+                  <button
+                    id="dome-migan-cancel"
+                    class="mini-button"
+                    type="button"
+                    hidden
+                  >
+                    Cancel / Use Mirrored
+                  </button>
+                  <p
+                    id="dome-migan-notice"
+                    class="field__help"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p
+                    id="dome-status"
+                    class="field__help"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p class="field__help">
+                    Drag or use arrow keys to look around · Turn the clock on
+                    for moving waves · Fullscreen fills your view.
+                  </p>
                   <details class="cortical-tools__help">
                     <summary>? What shapes the dome?</summary>
-                    <p>Your photo stays in front. Generate Full 360 Dream Field lets Inception grow feature patterns in the extended photo edges with a gentle noise seed. The photo's center is protected during synthesis.</p>
-                    <p>Depth and Neural Swell raise details in the photo; rings, rays, spirals and honeycomb waves animate the whole sphere. The image wraps around the rear without reflected copies.</p>
-                    <p>Dream generation starts only when you click the button. You can cancel and keep the previous view. A new neuron target takes effect on the next bake. Maps stay in this tab; PNG and GIF export the view.</p>
-                    <a href="https://distill.pub/2017/feature-visualization/" target="_blank" rel="noopener noreferrer">Feature visualization ↗</a>
-                    · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1088430/" target="_blank" rel="noopener noreferrer">Cortical pattern paper ↗</a>
+                    <p>
+                      Mirrored Wrap reflects your photo around the dome
+                      instantly. Optional MI-GAN fills the surroundings from the
+                      photo; it may invent textures rather than a realistic
+                      landscape. Its model loads only after you choose that
+                      mode.
+                    </p>
+                    <p>
+                      Depth and Neural Swell raise details in the photo; rings,
+                      rays, spirals and honeycomb waves animate the whole
+                      sphere. Both modes wrap continuously around the rear.
+                      Mirrored Wrap repeats reflected details.
+                    </p>
+                    <p>
+                      Synthesize Dream starts only when you click. Color
+                      Retention at 1 changes brightness while preserving the
+                      palette; lowering it allows color changes. Webbing,
+                      Cellular and Arches describe possible motifs, not
+                      guaranteed shapes. You can cancel and keep the previous
+                      view. A new neuron target takes effect on the next bake.
+                      Maps stay in this tab; PNG and GIF export the view.
+                    </p>
+                    <a
+                      href="https://distill.pub/2017/feature-visualization/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Feature visualization ↗</a
+                    >
+                    ·
+                    <a
+                      href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1088430/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >Cortical pattern paper ↗</a
+                    >
                   </details>
                   <details id="model-cache-drawer" class="cortical-tools__help">
                     <summary>Dome settings · Local Model Cache</summary>
                     <p id="model-cache-inception">Inception: checking…</p>
                     <p id="model-cache-depth">Depth: checking…</p>
-                    <button id="model-cache-download" class="mini-button" type="button">Cache model files</button>
-                    <p><label><input id="model-cache-persist" type="checkbox" /> Persist Offline</label></p>
+                    <button
+                      id="model-cache-download"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Cache model files
+                    </button>
+                    <p>
+                      <label
+                        ><input id="model-cache-persist" type="checkbox" />
+                        Persist Offline</label
+                      >
+                    </p>
                     <p id="model-cache-persistence"></p>
-                    <p>Stores model files on this device. Keep the app open or the local server running to use its other assets.</p>
-                    <p id="model-cache-status" role="status" aria-live="polite"></p>
+                    <p>
+                      Stores model files on this device. Keep the app open or
+                      the local server running to use its other assets.
+                    </p>
+                    <p
+                      id="model-cache-status"
+                      role="status"
+                      aria-live="polite"
+                    ></p>
                   </details>
                 </section>
                 <div id="neural-dream-tools" class="neural-dream-tools" hidden>

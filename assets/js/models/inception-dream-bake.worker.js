@@ -1,6 +1,14 @@
 self.onmessage = async ({ data }) => {
-  const { bitmap, runtimeUrl, modelUrl, node, channel, iterations, photoRect } =
-    data;
+  const {
+    bitmap,
+    runtimeUrl,
+    modelUrl,
+    node,
+    channel,
+    iterations,
+    photoRect,
+    colorRetention,
+  } = data;
   let model, seed;
   try {
     const { loadInceptionForward } =
@@ -22,6 +30,7 @@ self.onmessage = async ({ data }) => {
       channel,
       iterations,
       photoRect,
+      colorRetention,
       onProgress: (percent) => self.postMessage({ type: "progress", percent }),
     });
     seed.dispose();

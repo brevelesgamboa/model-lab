@@ -8,6 +8,8 @@ export const FEATURE_TARGETS = Object.freeze([
   { layer: "mixed_5b", channel: 120 },
   { layer: "mixed_6a", channel: 42 },
   { layer: "Conv2d_4a_3x3", channel: 42 },
+  { layer: "mixed_6d", channel: 182 },
+  { layer: "mixed_7b", channel: 314 },
 ]);
 
 export function validateFeatureTarget(layer, channel) {

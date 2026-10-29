@@ -27,7 +27,7 @@ float domeRadius(vec2 uv) {
   vec2 scalarUV = vec2(mapped.x, 1.0 - mapped.y);
   return max(1.0, 5.0 - texture(u_depth, scalarUV).r * u_depth_extrude
     - texture(u_neural, scalarUV).r * u_neural_extrude
-    - domeWave(mapped) * u_gain * 0.4);
+    - domeWave(uv) * u_gain * 0.4);
 }
 vec3 domePoint(vec2 uv) {
   float longitude = (uv.x - 0.5) * 2.0 * PI;
@@ -37,13 +37,13 @@ vec3 domePoint(vec2 uv) {
   return direction * domeRadius(uv);
 }
 void main() {
-  vec2 mapUV = domePhotoUV(a_uv);
+  vec2 mapUV = domePhotoUV(domeSphereUV(a_position));
   // CPU float maps have their first row at the top; photo textures are flipped
   // on upload so all three inputs align with the bottom-up spherical UVs.
   vec2 scalarUV = vec2(mapUV.x, 1.0 - mapUV.y);
   float d = texture(u_depth, scalarUV).r;
   float n = texture(u_neural, scalarUV).r;
-  float waveVal = domeWave(mapUV);
+  float waveVal = domeWave(a_uv);
   float radius = max(1.0, 5.0 - d * u_depth_extrude
     - n * u_neural_extrude - waveVal * u_gain * 0.4);
   vec3 worldPos = a_position * radius;

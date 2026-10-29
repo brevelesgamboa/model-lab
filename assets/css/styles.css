@@ -577,8 +577,12 @@ summary {
   color: var(--text-primary);
   text-align: center;
 }
-.dome-bake-overlay[hidden] { display: none; }
-.dome-bake-overlay progress { width: min(280px, 70vw); }
+.dome-bake-overlay[hidden] {
+  display: none;
+}
+.dome-bake-overlay progress {
+  width: min(280px, 70vw);
+}
 .output-panel:fullscreen > .dome-tools {
   display: none;
 }
@@ -3653,4 +3657,76 @@ input[type="range"]::-moz-range-progress {
   .footer-tools #toggle-audio-visualizer::after {
     right: 5px;
   }
+}
+
+.dome-model-status {
+  color: var(--text-muted, #929aa8);
+  font-size: 0.75rem;
+}
+.dome-model-status.is-ready {
+  color: #7fcca7;
+}
+.dome-model-card {
+  padding: 12px;
+  border: 1px dashed #626d7d;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.dome-model-card p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+.dome-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: dome-spin 1s linear infinite;
+}
+@keyframes dome-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dome-spinner {
+    animation: none;
+  }
+}
+
+.dome-synthesis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.dome-synthesis-panel[hidden] {
+  display: none !important;
+}
+
+.dome-manual-channel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+}
+
+.channel-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-input-group input[type="range"] {
+  flex: 1;
+}
+
+.channel-input-group input[type="number"] {
+  width: 68px;
 }

@@ -9,6 +9,7 @@ export function photoPlacement(
   sourceHeight,
   width = 1024,
   height = 512,
+  { coverage = "standard" } = {},
 ) {
   if (
     ![sourceWidth, sourceHeight, width, height].every(
@@ -21,9 +22,12 @@ export function photoPlacement(
     throw new RangeError(
       "The panorama must be 2:1 and the photo must have positive dimensions.",
     );
+  const isImmersive = coverage === "immersive";
+  const maxWidth = isImmersive ? width * 0.52 : width / 3;
+  const maxHeight = isImmersive ? height * 0.82 : height * 0.68;
   const scale = Math.min(
-    width / 3 / sourceWidth,
-    (height * 0.68) / sourceHeight,
+    maxWidth / sourceWidth,
+    maxHeight / sourceHeight,
   );
   const w = Math.max(1, Math.round(sourceWidth * scale)),
     h = Math.max(1, Math.round(sourceHeight * scale));
@@ -218,10 +222,15 @@ export function prepare360Pixels(
   return { data, width, height, photoRect: rect, border: stats };
 }
 
-export function create360Canvas(imageElement, width = 1024, height = 512) {
+export function create360Canvas(
+  imageElement,
+  width = 1024,
+  height = 512,
+  options = {},
+) {
   const iw = imageElement.naturalWidth || imageElement.width,
     ih = imageElement.naturalHeight || imageElement.height;
-  const rect = photoPlacement(iw, ih, width, height);
+  const rect = photoPlacement(iw, ih, width, height, options);
   const makeCanvas = (w, h) =>
     typeof OffscreenCanvas === "function"
       ? new OffscreenCanvas(w, h)

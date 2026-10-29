@@ -198,7 +198,7 @@ test("photo/target replacements reject stale maps; controls, navigation, camera 
     "photo-96.png",
   );
   const depthRuns = await page.evaluate(() => window.__dome.estimator.runs);
-  const target = page.getByLabel("NEURAL FEATURE TARGET", { exact: true });
+  const target = page.getByLabel("DREAM TARGET", { exact: true });
   await target.selectOption("1");
   await expect
     .poll(() => page.evaluate(() => window.__dome.featureState))
@@ -512,16 +512,18 @@ test("actual dome vertex displacement closes rear/pole seams and aligns depth an
     const depth = draw(1.5, 0, 0),
       neural = draw(0, 1, 0);
     const modes = [0, 1, 2, 3].map((mode) => draw(1.5, 1, 1, mode));
+    gl.uniform1i(loc("mirrored_wrap"), 1);
+    const mirrored = [0, 1, 2, 3].map((mode) => draw(1.5, 1, 1, mode));
     const error = gl.getError();
     gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return { depth, neural, modes, error };
+    return { depth, neural, modes, mirrored, error };
   });
   const radius = (row) => Math.hypot(...row.slice(0, 3));
   expect(radius(result.depth[6])).toBeCloseTo(5);
   expect(radius(result.depth[7])).toBeCloseTo(3.5);
   expect(radius(result.neural[8])).toBeCloseTo(5);
   expect(radius(result.neural[9])).toBeCloseTo(4);
-  for (const rows of result.modes)
+  for (const rows of [...result.modes, ...result.mirrored])
     for (const [a, b] of [
       [0, 1],
       [2, 3],

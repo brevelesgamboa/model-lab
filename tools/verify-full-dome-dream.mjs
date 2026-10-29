@@ -1,3 +1,4 @@
+// Legacy border-smear panorama verification (independent of optional MI-GAN).
 // npm run dev; node tools/verify-full-dome-dream.mjs [photo] [url] [output]
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -76,6 +77,17 @@ try {
       if (window.dome.bakeState === "baking")
         window.domeProgress.push(window.dome.bakeProgress);
     };
+  });
+  // This report checks the original protected-photo equirectangular path.
+  // The interactive default now uses mirrored wrapping instead.
+  await page.evaluate(async () => {
+    const { create360Canvas } =
+      await import("/assets/js/models/equirectangular-canvas.js");
+    const d = window.dome;
+    d.outpaintingMode = "migan";
+    d.seed360 = d.panorama = create360Canvas(d.source);
+    d.photoRect = d.seed360.photoRect;
+    d.uploadSource();
   });
   const started = Date.now();
   await page.locator("#dome-generate").click();

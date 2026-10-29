@@ -1,5 +1,49 @@
 import { photoProtection } from "./equirectangular-canvas.js";
 
+const luma = (tf, rgb) =>
+  rgb.mul(tf.tensor1d([0.299, 0.587, 0.114])).sum(3, true);
+
+// BT.601, with no 128-byte offset in the signed chroma channels.
+export function applyDomeColorStep(tf, image, gradient, step, retention = 1) {
+  return tf.tidy(() => {
+    const dy = luma(tf, gradient).mul(step);
+    const cb = gradient
+      .mul(tf.tensor1d([-0.168736, -0.331264, 0.5]))
+      .sum(3, true)
+      .mul(step * (1 - retention));
+    const cr = gradient
+      .mul(tf.tensor1d([0.5, -0.418688, -0.081312]))
+      .sum(3, true)
+      .mul(step * (1 - retention));
+    return image.add(
+      tf.concat(
+        [
+          dy.add(cr.mul(1.402)),
+          dy.sub(cb.mul(0.344136)).sub(cr.mul(0.714136)),
+          dy.add(cb.mul(1.772)),
+        ],
+        3,
+      ),
+    );
+  });
+}
+
+export function constrainDomeColor(tf, candidate, base, retention = 1) {
+  return tf.tidy(() => {
+    // Preserve source chroma even across octaves, seam smoothing and gamut
+    // limits. Independent RGB clipping would change hue at saturated pixels.
+    const source = retention === 1 ? base : candidate;
+    let chroma = source.sub(luma(tf, source));
+    const span = chroma.max(3, true).sub(chroma.min(3, true));
+    chroma = chroma.div(tf.maximum(span, 1));
+    const y = tf.minimum(
+      tf.maximum(luma(tf, candidate), chroma.min(3, true).neg()),
+      tf.sub(1, chroma.max(3, true)),
+    );
+    return chroma.add(y).clipByValue(0, 1);
+  });
+}
+
 export function rollDomeX(tf, image, shift) {
   const width = image.shape[2],
     dx = ((shift % width) + width) % width;
@@ -52,11 +96,13 @@ function constraints(tf, width, height, sourceWidth, sourceHeight, rect) {
       Math.min(y, height - 1 - y) / Math.max(2, height * 0.025),
     );
     for (let x = 0; x < width; x++)
-      protect[y * width + x] = photoProtection(
-        (x / (width - 1)) * (sourceWidth - 1),
-        (y / (height - 1)) * (sourceHeight - 1),
-        rect,
-      );
+      protect[y * width + x] = rect
+        ? photoProtection(
+            (x / (width - 1)) * (sourceWidth - 1),
+            (y / (height - 1)) * (sourceHeight - 1),
+            rect,
+          )
+        : 0;
   }
   for (let x = 0; x < width; x++)
     seam[x] = cosine(Math.min(x, width - 1 - x) / Math.max(4, width * 0.016));
@@ -94,10 +140,17 @@ export async function optimizeDomeDream(
     onProgress = () => {},
     signal,
     stepSize = 0.04,
+    colorRetention = 1,
   } = {},
 ) {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > 100)
     throw new RangeError("Use between 1 and 100 dream iterations.");
+  if (
+    !Number.isFinite(colorRetention) ||
+    colorRetention < 0 ||
+    colorRetention > 1
+  )
+    throw new RangeError("Color retention must be between zero and one.");
   const [, sourceHeight, sourceWidth] = seed.shape;
   const sizes =
     iterations >= 4 && sourceHeight > 128
@@ -121,7 +174,8 @@ export async function optimizeDomeDream(
         ? tf.image.resizeBilinear(image, [height, width])
         : base.clone();
       image?.dispose();
-      image = initial;
+      image = constrainDomeColor(tf, initial, base, colorRetention);
+      initial.dispose();
       c = constraints(tf, width, height, sourceWidth, sourceHeight, photoRect);
       const count =
         sizes.length === 1
@@ -171,10 +225,19 @@ export async function optimizeDomeDream(
             const normalized = smooth.div(
               tf.moments(smooth).variance.sqrt().add(1e-7),
             );
-            const updated = image
-              .add(normalized.mul(stepSize))
-              .clipByValue(0.02, 0.98);
-            const next = project(tf, updated, base, c);
+            const updated = applyDomeColorStep(
+              tf,
+              image,
+              normalized,
+              stepSize,
+              colorRetention,
+            );
+            const next = constrainDomeColor(
+              tf,
+              project(tf, updated, base, c),
+              base,
+              colorRetention,
+            );
             return { next, fence: tf.stack([result.value, next.mean()]) };
           });
           next = output.next;

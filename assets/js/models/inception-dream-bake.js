@@ -17,12 +17,22 @@ export class DomeDreamBaker {
     layer,
     channel,
     iterations = 15,
-    { signal, onProgress = () => {}, photoRect = canvas.photoRect } = {},
+    {
+      signal,
+      onProgress = () => {},
+      photoRect = canvas.photoRect,
+      colorRetention = 1,
+    } = {},
   ) {
     const target = validateFeatureTarget(layer, channel);
     if (!Number.isInteger(iterations) || iterations < 1 || iterations > 100)
       throw new RangeError("Invalid dream iteration count.");
-    if (!photoRect) throw new Error("The panorama has no photo placement.");
+    if (
+      !Number.isFinite(colorRetention) ||
+      colorRetention < 0 ||
+      colorRetention > 1
+    )
+      throw new RangeError("Invalid color retention.");
     this.cancel();
     if (signal?.aborted) return Promise.reject(cancelled());
     return new Promise((resolve, reject) => {
@@ -72,6 +82,7 @@ export class DomeDreamBaker {
                 ...target,
                 iterations,
                 photoRect,
+                colorRetention,
                 runtimeUrl: new URL(
                   "../../vendor/tensorflow/tf.min.js",
                   import.meta.url,
@@ -116,14 +127,14 @@ export async function bakeFullDome360(
   channelIndex,
   iterations = 15,
   onProgress = () => {},
-  { baker = new DomeDreamBaker(), texture, signal } = {},
+  { baker = new DomeDreamBaker(), texture, signal, colorRetention = 1 } = {},
 ) {
   const result = await baker.bake(
     equirectCanvas,
     layerName,
     channelIndex,
     iterations,
-    { signal, onProgress },
+    { signal, onProgress, colorRetention },
   );
   try {
     if (signal?.aborted) throw cancelled();
