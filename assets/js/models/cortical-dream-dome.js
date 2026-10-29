@@ -37,16 +37,74 @@ const range = (key, label, max, value, help, min = 0) => ({
   format: "decimal2",
   help,
 });
+export const DOME_ARCHETYPES = Object.freeze([
+  {
+    id: "cellular-nodes",
+    name: "Cellular & Ocular Nodes",
+    layer: "mixed_5b",
+    channel: 120,
+    strength: 0.2,
+    desc: "Eye-like centers, organic rings, and cell clusters with biological relief.",
+  },
+  {
+    id: "ribbed-arches",
+    name: "Ribbed Arches & Terraces",
+    layer: "mixed_6a",
+    channel: 42,
+    strength: 0.2,
+    desc: "Architectural ribbing, stepped terraces, and structural lattice curves.",
+  },
+  {
+    id: "webbing-filaments",
+    name: "Webbing & Micro-filaments",
+    layer: "Conv2d_4a_3x3",
+    channel: 42,
+    strength: 0.2,
+    desc: "High-frequency lace, filamentous mesh, and delicate geometric webbing.",
+  },
+  {
+    id: "biological-lattices",
+    name: "Biological Lattices",
+    layer: "mixed_6d",
+    channel: 182,
+    strength: 0.2,
+    desc: "Dense vesicular lattice networks and organic sponge-like scaffolding.",
+  },
+  {
+    id: "crystalline-spires",
+    name: "Crystalline Spires",
+    layer: "mixed_7b",
+    channel: 314,
+    strength: 0.2,
+    desc: "Faceted mineral columns, prismatic facets, and spire-like geometry.",
+  },
+]);
+
+export const DOME_NEURON_ARCHETYPES = Object.freeze([
+  ...DOME_ARCHETYPES,
+  ...CURATED_NEURONS,
+]);
+
+export const FEATURE_TARGET_DESCRIPTIONS = Object.fromEntries(
+  DOME_ARCHETYPES.map((a) => [a.layer, a.name]),
+);
+
 const CONTROLS = [
   {
     key: "featureTarget",
     label: "DREAM TARGET",
     type: "select",
     default: 0,
-    options: FEATURE_TARGETS.map(({ layer, channel }, value) => ({
-      value,
-      label: `${{ Conv2d_4a_3x3: "Conv2d_4a: Webbing", mixed_5b: "Mixed_5b: Cellular", mixed_6a: "Mixed_6a: Arches" }[layer]} · channel ${channel}`,
-    })),
+    options: [
+      ...FEATURE_TARGETS.map(({ layer, channel }, value) => ({
+        value,
+        label: `${FEATURE_TARGET_DESCRIPTIONS[layer] || layer} (${layer} · #${channel})`,
+      })),
+      {
+        value: -1,
+        label: "Custom neuron target",
+      },
+    ],
     help: "Chooses the neuron for photo relief and the next 360 dream bake. Changing it refreshes relief once; click Synthesize Dream to bake a new field. Labels suggest motifs; individual channels do not guarantee these structures.",
   },
   range(
@@ -217,8 +275,10 @@ export class CorticalDreamDomeModel {
     this.selectedTarget = 0;
     this.selectedLayer = "mixed_5b";
     this.selectedChannel = 120;
-    this.neuronArchetypes = CURATED_NEURONS;
-    this.dreamBridge = new LazyDomeDreamBridge({ archetypes: CURATED_NEURONS });
+    this._lastSeenParamFeatureTarget = null;
+    this._isCustomNeuron = false;
+    this.neuronArchetypes = DOME_NEURON_ARCHETYPES;
+    this.dreamBridge = new LazyDomeDreamBridge({ archetypes: DOME_NEURON_ARCHETYPES });
     this.sourceVersion = 0;
     this.graphicsEpoch = 0;
     this.onStateChange = () => {};
@@ -299,6 +359,11 @@ export class CorticalDreamDomeModel {
     this.bakeMetrics = null;
     this.bakeError = null;
     this.bakeProgress = 0;
+    this.selectedTarget = 0;
+    this.selectedLayer = "mixed_5b";
+    this.selectedChannel = 120;
+    this._lastSeenParamFeatureTarget = 0;
+    this._isCustomNeuron = false;
     this.uploadSource();
     this.onStateChange();
   }
@@ -601,6 +666,8 @@ export class CorticalDreamDomeModel {
       (t) => t.layer === validated.layer && t.channel === validated.channel,
     );
     this.selectedTarget = idx >= 0 ? idx : -1;
+    this._isCustomNeuron = idx < 0;
+    this._lastSeenParamFeatureTarget = this.selectedTarget;
     this.cancelDream();
     this.featureAbort?.abort();
     this.featureMap = emptyFeatureMap();
@@ -744,16 +811,22 @@ export class CorticalDreamDomeModel {
       this.colorRetention = Math.max(0, Math.min(1, value));
       return false;
     }
-    if (
-      key === "featureTarget" &&
-      Number.isInteger(value) &&
-      FEATURE_TARGETS[value]
-    ) {
-      if (value !== this.selectedTarget) {
-        const target = FEATURE_TARGETS[value];
-        this.setNeuronTarget(target.layer, target.channel);
+    if (key === "featureTarget" && Number.isInteger(value)) {
+      if (value === -1) {
+        this._isCustomNeuron = true;
+        this._lastSeenParamFeatureTarget = -1;
+        this.selectedTarget = -1;
+        return false;
       }
-      return false;
+      if (FEATURE_TARGETS[value]) {
+        this._isCustomNeuron = false;
+        this._lastSeenParamFeatureTarget = value;
+        if (value !== this.selectedTarget) {
+          const target = FEATURE_TARGETS[value];
+          this.setNeuronTarget(target.layer, target.channel);
+        }
+        return false;
+      }
     }
     return false;
   }
@@ -793,8 +866,19 @@ export class CorticalDreamDomeModel {
     }
   }
   async render(target, p, timeSeconds = 0) {
-    // Parameter resets/presets also reach this path, outside individual UI events.
-    this.onParameterChange("featureTarget", p.featureTarget);
+    // Parameter resets/presets reach this path outside individual UI events.
+    if (
+      p.featureTarget !== undefined &&
+      p.featureTarget !== this._lastSeenParamFeatureTarget
+    ) {
+      this._lastSeenParamFeatureTarget = p.featureTarget;
+      if (p.featureTarget >= 0 && FEATURE_TARGETS[p.featureTarget]) {
+        this._isCustomNeuron = false;
+        this.onParameterChange("featureTarget", p.featureTarget);
+      } else if (p.featureTarget === -1) {
+        this._isCustomNeuron = true;
+      }
+    }
     this.onParameterChange("colorRetention", p.colorRetention ?? 1);
     const version = this.sourceVersion;
     const g = await this.ensureGraphics(),

@@ -18,6 +18,8 @@ export function createDomeNeuronControls(
     domeNeuronLayer: layerSelect,
     domeNeuronChannelSlider: channelSlider,
     domeNeuronChannelNumber: channelNumber,
+    domeNeuronChannelPrev: channelPrev,
+    domeNeuronChannelNext: channelNext,
     domeNeuronChannelMax: channelMax,
     domeNeuronRandom: randomBtn,
   } = elements;
@@ -39,6 +41,44 @@ export function createDomeNeuronControls(
     return max;
   }
 
+  function syncCustomTarget(layer, ch) {
+    const idx = FEATURE_TARGETS.findIndex(
+      (t) => t.layer === layer && t.channel === ch,
+    );
+    const paramSelect = elements.parameterControls?.querySelector(
+      '.control-block[data-parameter="featureTarget"] select',
+    );
+    for (const sel of [archetypes, paramSelect]) {
+      if (!sel) continue;
+      let customOpt = sel.querySelector('option[value="-1"]');
+      if (!customOpt) {
+        customOpt = document.createElement("option");
+        customOpt.value = "-1";
+        sel.append(customOpt);
+      }
+      if (idx >= 0) {
+        sel.value = String(idx);
+        customOpt.hidden = true;
+      } else {
+        const matched = model.neuronArchetypes?.find(
+          (n) =>
+            n.layer === layer && (n.channel === ch || (n.channel < 0 && ch === 0)),
+        );
+        customOpt.textContent = matched
+          ? `Custom: ${matched.name} (${layer} · #${ch})`
+          : `Custom: ${layer} · #${ch}`;
+        customOpt.hidden = false;
+        sel.value = "-1";
+      }
+    }
+    if (paramSelect) {
+      const targetVal = String(idx >= 0 ? idx : -1);
+      if (paramSelect.value !== targetVal) {
+        paramSelect.value = targetVal;
+      }
+    }
+  }
+
   const triggerActivation = () => {
     model.dreamBridge?.activatePreviews?.();
   };
@@ -56,6 +96,7 @@ export function createDomeNeuronControls(
             dreamStrength: 0.2,
           },
           previewBridge: model.dreamBridge,
+          showStrip: false,
           onSelect(neuron) {
             if (!isActive() || !canInteract()) return;
             const ch = neuron.channel < 0 ? 0 : neuron.channel;
@@ -64,15 +105,23 @@ export function createDomeNeuronControls(
             if (channelSlider) channelSlider.value = String(ch);
             if (channelNumber) channelNumber.value = String(ch);
             model.setNeuronTarget(neuron.layer, ch);
-          },
-          onSensorSelect(neuron) {
-            if (!isActive() || !canInteract()) return;
-            const ch = neuron.channel < 0 ? 0 : neuron.channel;
-            if (layerSelect) layerSelect.value = neuron.layer;
-            syncChannelBounds(neuron.layer);
-            if (channelSlider) channelSlider.value = String(ch);
-            if (channelNumber) channelNumber.value = String(ch);
-            model.setNeuronTarget(neuron.layer, ch);
+            syncCustomTarget(neuron.layer, ch);
+            if (gallery) {
+              gallery.update(
+                { targetLayer: neuron.layer, targetChannel: ch, dreamStrength: 0.2 },
+                {},
+              );
+            }
+            const idx = FEATURE_TARGETS.findIndex(
+              (t) => t.layer === neuron.layer && t.channel === ch,
+            );
+            const paramSelect = elements.parameterControls?.querySelector(
+              '.control-block[data-parameter="featureTarget"] select',
+            );
+            if (paramSelect && paramSelect.value !== String(idx >= 0 ? idx : -1)) {
+              paramSelect.value = String(idx >= 0 ? idx : -1);
+              paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            }
           },
           manualOpen: false,
           onToggleManual(open) {
@@ -85,32 +134,87 @@ export function createDomeNeuronControls(
     mount.replaceChildren(gallery.element);
   }
 
+  let channelDebounce = null;
+  const commitChannel = (layer, ch) => {
+    if (!isActive() || !canInteract()) return;
+    model.setNeuronTarget(layer, ch);
+    syncCustomTarget(layer, ch);
+    if (gallery) {
+      gallery.update(
+        { targetLayer: layer, targetChannel: ch, dreamStrength: 0.2 },
+        {},
+      );
+    }
+    const idx = FEATURE_TARGETS.findIndex(
+      (t) => t.layer === layer && t.channel === ch,
+    );
+    const paramSelect = elements.parameterControls?.querySelector(
+      '.control-block[data-parameter="featureTarget"] select',
+    );
+    if (paramSelect && paramSelect.value !== String(idx >= 0 ? idx : -1)) {
+      paramSelect.value = String(idx >= 0 ? idx : -1);
+      paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  const onChannelInput = (value, immediate = false) => {
+    if (!isActive() || !canInteract()) return;
+    const layer = layerSelect?.value || model.selectedLayer;
+    const max = getInceptionLayerChannels(layer);
+    const ch = Math.max(0, Math.min(Number(value) || 0, max - 1));
+    if (channelSlider && Number(channelSlider.value) !== ch) {
+      channelSlider.value = String(ch);
+    }
+    if (channelNumber && Number(channelNumber.value) !== ch) {
+      channelNumber.value = String(ch);
+    }
+    syncCustomTarget(layer, ch);
+    if (gallery) {
+      gallery.update(
+        { targetLayer: layer, targetChannel: ch, dreamStrength: 0.2 },
+        {},
+      );
+    }
+    clearTimeout(channelDebounce);
+    if (immediate) {
+      commitChannel(layer, ch);
+    } else {
+      channelDebounce = setTimeout(() => {
+        commitChannel(layer, ch);
+      }, 150);
+    }
+  };
+
   layerSelect?.addEventListener("change", () => {
     if (!isActive() || !canInteract()) return;
     const layer = layerSelect.value;
     const max = syncChannelBounds(layer);
     const ch = Math.min(Number(channelSlider?.value || 0), max - 1);
-    if (channelSlider) channelSlider.value = String(ch);
-    if (channelNumber) channelNumber.value = String(ch);
-    model.setNeuronTarget(layer, ch);
+    onChannelInput(ch, true);
   });
 
-  const onChannelInput = (value) => {
-    if (!isActive() || !canInteract()) return;
-    const layer = layerSelect?.value || model.selectedLayer;
-    const max = getInceptionLayerChannels(layer);
-    const ch = Math.max(0, Math.min(Number(value) || 0, max - 1));
-    if (channelSlider) channelSlider.value = String(ch);
-    if (channelNumber) channelNumber.value = String(ch);
-    model.setNeuronTarget(layer, ch);
-  };
-
   channelSlider?.addEventListener("input", () => {
-    onChannelInput(channelSlider.value);
+    onChannelInput(channelSlider.value, false);
+  });
+  channelSlider?.addEventListener("change", () => {
+    onChannelInput(channelSlider.value, true);
   });
 
   channelNumber?.addEventListener("input", () => {
-    onChannelInput(channelNumber.value);
+    onChannelInput(channelNumber.value, false);
+  });
+  channelNumber?.addEventListener("change", () => {
+    onChannelInput(channelNumber.value, true);
+  });
+
+  channelPrev?.addEventListener("click", () => {
+    const cur = Number(channelSlider?.value || 0);
+    onChannelInput(cur - 1, true);
+  });
+
+  channelNext?.addEventListener("click", () => {
+    const cur = Number(channelSlider?.value || 0);
+    onChannelInput(cur + 1, true);
   });
 
   randomBtn?.addEventListener("click", () => {
@@ -118,23 +222,52 @@ export function createDomeNeuronControls(
     const layer = layerSelect?.value || model.selectedLayer;
     const max = getInceptionLayerChannels(layer);
     const randomCh = Math.floor(Math.random() * max);
-    if (channelSlider) channelSlider.value = String(randomCh);
-    if (channelNumber) channelNumber.value = String(randomCh);
-    model.setNeuronTarget(layer, randomCh);
+    onChannelInput(randomCh, true);
   });
 
   archetypes?.addEventListener("change", () => {
     if (!isActive() || !canInteract()) return;
     const idx = Number(archetypes.value);
-    const target = FEATURE_TARGETS[idx];
-    if (target) {
+    if (idx >= 0 && FEATURE_TARGETS[idx]) {
+      const target = FEATURE_TARGETS[idx];
       if (layerSelect) layerSelect.value = target.layer;
       syncChannelBounds(target.layer);
       if (channelSlider) channelSlider.value = String(target.channel);
       if (channelNumber) channelNumber.value = String(target.channel);
       model.setNeuronTarget(target.layer, target.channel);
+      syncCustomTarget(target.layer, target.channel);
+      if (gallery) {
+        gallery.update(
+          { targetLayer: target.layer, targetChannel: target.channel, dreamStrength: 0.2 },
+          {},
+        );
+      }
+      const paramSelect = elements.parameterControls?.querySelector(
+        '.control-block[data-parameter="featureTarget"] select',
+      );
+      if (paramSelect && paramSelect.value !== String(idx)) {
+        paramSelect.value = String(idx);
+        paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     }
   });
+
+  // Initial synchronization with model's initial state
+  syncChannelBounds(model.selectedLayer);
+  if (layerSelect) layerSelect.value = model.selectedLayer;
+  if (channelSlider) channelSlider.value = String(model.selectedChannel);
+  if (channelNumber) channelNumber.value = String(model.selectedChannel);
+  syncCustomTarget(model.selectedLayer, model.selectedChannel);
+  if (gallery) {
+    gallery.update(
+      {
+        targetLayer: model.selectedLayer,
+        targetChannel: model.selectedChannel,
+        dreamStrength: 0.2,
+      },
+      {},
+    );
+  }
 
   function update() {
     const layer = model.selectedLayer;
@@ -149,9 +282,7 @@ export function createDomeNeuronControls(
     if (channelNumber && Number(channelNumber.value) !== channel) {
       channelNumber.value = String(channel);
     }
-    if (archetypes && model.selectedTarget >= 0) {
-      archetypes.value = String(model.selectedTarget);
-    }
+    syncCustomTarget(layer, channel);
     if (gallery) {
       gallery.update(
         { targetLayer: layer, targetChannel: channel, dreamStrength: 0.2 },

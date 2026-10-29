@@ -56,6 +56,8 @@ export function collectElements() {
     domeNeuronLayer: document.getElementById("dome-neuron-layer"),
     domeNeuronChannelSlider: document.getElementById("dome-neuron-channel-slider"),
     domeNeuronChannelNumber: document.getElementById("dome-neuron-channel-number"),
+    domeNeuronChannelPrev: document.getElementById("dome-neuron-channel-prev"),
+    domeNeuronChannelNext: document.getElementById("dome-neuron-channel-next"),
     domeNeuronChannelMax: document.getElementById("dome-neuron-channel-max"),
     domeNeuronRandom: document.getElementById("dome-neuron-random"),
     domeBakeOverlay: document.getElementById("dome-bake-overlay"),

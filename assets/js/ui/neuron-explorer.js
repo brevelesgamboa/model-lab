@@ -104,6 +104,7 @@ export function createNeuronExplorer({
   const collection = document.createElement("select");
   collection.setAttribute("aria-label", "Preview collection");
   for (const [value, text] of [
+    ["curated", "Sample neuron previews"],
     ["available", "Available previews"],
     ["all", "All channels"],
     ["favorites", "Favorite neurons"],
@@ -410,11 +411,15 @@ export function createNeuronExplorer({
       layerSelect.value = Object.hasOwn(INCEPTION_LAYER_CHANNELS, saved.layer)
         ? saved.layer
         : "all";
-      collection.value = ["available", "all", "favorites", "recent"].includes(
-        saved.collection,
-      )
+      collection.value = [
+        "curated",
+        "available",
+        "all",
+        "favorites",
+        "recent",
+      ].includes(saved.collection)
         ? saved.collection
-        : "available";
+        : "curated";
       if (collection.value === "all" && layerSelect.value === "all")
         layerSelect.value = values.targetLayer;
       allLayers.disabled = collection.value === "all";
@@ -486,8 +491,13 @@ export function createNeuronExplorer({
     detailImage.src = url;
     detailImage.hidden = false;
     generateDetail.hidden = true;
-    detailStatus.textContent =
-      "Cached feature visualization · InceptionV3 · 96 × 96. This is an optimized example, not a live view of the canvas.";
+    const neuronMeta = neurons.find(
+      (n) =>
+        n.layer === detailTarget?.layer && n.channel === detailTarget?.channel,
+    );
+    detailStatus.textContent = neuronMeta
+      ? `${neuronMeta.desc} · Cached feature visualization · InceptionV3 · 96 × 96.`
+      : "Cached feature visualization · InceptionV3 · 96 × 96. This is an optimized example, not a live view of the canvas.";
   }
 
   function inspect(layer, channel) {
@@ -502,12 +512,18 @@ export function createNeuronExplorer({
     const key = previewKey(layer, channel);
     recents = [key, ...recents.filter((item) => item !== key)].slice(0, 24);
     saveLibrary();
-    detailHeading.textContent = `${layer} · ${channelName(channel)}`;
+    const neuronMeta = neurons.find(
+      (n) => n.layer === layer && n.channel === channel,
+    );
+    detailHeading.textContent = neuronMeta
+      ? `${neuronMeta.name} (${layer} · ${channelName(channel)})`
+      : `${layer} · ${channelName(channel)}`;
     detailImage.alt = `Feature visualization · ${detailHeading.textContent}`;
     detailImage.hidden = true;
     detailImage.removeAttribute("src");
-    detailStatus.textContent =
-      "No preview yet. Generate one here or include this channel in a background batch.";
+    detailStatus.textContent = neuronMeta
+      ? `${neuronMeta.desc} · No preview yet. Generate one here or include this channel in a background batch.`
+      : "No preview yet. Generate one here or include this channel in a background batch.";
     generateDetail.textContent = "Generate neuron preview";
     generateDetail.hidden = false;
     generateDetail.disabled = false;
@@ -604,34 +620,47 @@ export function createNeuronExplorer({
 
   function renderPage() {
     const query = search.value.trim().toLowerCase().replace(/^#/, "");
-    const choices = Object.entries(INCEPTION_LAYER_CHANNELS)
-      .filter(
-        ([layer]) => layerSelect.value === "all" || layerSelect.value === layer,
-      )
-      .flatMap(([layer, count]) =>
-        Array.from({ length: count + 1 }, (_, i) => ({
-          layer,
-          channel: i - 1,
-        })),
-      )
-      .filter(
-        ({ layer, channel }) =>
-          collection.value === "all" ||
-          (collection.value === "favorites"
-            ? favorites.has(previewKey(layer, channel))
-            : collection.value === "recent"
-              ? recents.includes(previewKey(layer, channel))
-              : previewBridge?.previewCache.has(previewKey(layer, channel))),
-      )
-      .filter(
-        ({ layer, channel }) =>
-          !query ||
-          (/^\d+$/.test(query)
-            ? channel === Number(query)
-            : `${channelName(channel)} ${layer} ${labels.get(previewKey(layer, channel)) || ""}`
-                .toLowerCase()
-                .includes(query)),
-      );
+    let choices;
+    if (collection.value === "curated") {
+      choices = neurons
+        .filter(
+          (n) => layerSelect.value === "all" || layerSelect.value === n.layer,
+        )
+        .map((n) => ({
+          layer: n.layer,
+          channel: n.channel,
+        }));
+    } else {
+      choices = Object.entries(INCEPTION_LAYER_CHANNELS)
+        .filter(
+          ([layer]) =>
+            layerSelect.value === "all" || layerSelect.value === layer,
+        )
+        .flatMap(([layer, count]) =>
+          Array.from({ length: count + 1 }, (_, i) => ({
+            layer,
+            channel: i - 1,
+          })),
+        )
+        .filter(
+          ({ layer, channel }) =>
+            collection.value === "all" ||
+            (collection.value === "favorites"
+              ? favorites.has(previewKey(layer, channel))
+              : collection.value === "recent"
+                ? recents.includes(previewKey(layer, channel))
+                : previewBridge?.previewCache.has(previewKey(layer, channel))),
+        );
+    }
+    choices = choices.filter(
+      ({ layer, channel }) =>
+        !query ||
+        (/^\d+$/.test(query)
+          ? channel === Number(query)
+          : `${channelName(channel)} ${layer} ${labels.get(previewKey(layer, channel)) || ""}`
+              .toLowerCase()
+              .includes(query)),
+    );
     if (collection.value === "recent")
       choices.sort(
         (a, b) =>
@@ -685,16 +714,26 @@ export function createNeuronExplorer({
       image.width = image.height = 128;
       image.alt = `Feature visualization · ${layer} · ${channelName(channel)}`;
       image.hidden = true;
+      const neuronMeta = neurons.find(
+        (n) => n.layer === layer && n.channel === channel,
+      );
       const caption = document.createElement("strong");
-      caption.textContent = channelName(channel);
+      caption.textContent = neuronMeta ? neuronMeta.name : channelName(channel);
       const layerBadge = document.createElement("span");
       layerBadge.className = "neuron-explorer__layer";
-      layerBadge.textContent = layer;
+      layerBadge.textContent = neuronMeta
+        ? `${layer} · ${channelName(channel)}`
+        : layer;
       const status = document.createElement("span");
       status.className = "neuron-explorer__card-status";
       status.textContent = "Preview not generated · select to inspect";
       card.append(image, layerBadge, caption, status);
-      if (labels.has(key)) {
+      if (neuronMeta?.desc) {
+        const desc = document.createElement("span");
+        desc.className = "neuron-explorer__desc";
+        desc.textContent = neuronMeta.desc;
+        card.append(desc);
+      } else if (labels.has(key)) {
         const label = document.createElement("span");
         label.className = "neuron-explorer__curated";
         label.textContent = `Curated suggestion: ${labels.get(key)}`;

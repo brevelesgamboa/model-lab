@@ -59,6 +59,23 @@ export function createDomeController({
       elements.dreamSynthesisSection.hidden = isMigan;
       elements.dreamSynthesisSection.style.display = isMigan ? "none" : "block";
     }
+    const targetBlock = elements.parameterControls?.querySelector(
+      '.control-block[data-parameter="featureTarget"]',
+    );
+    if (targetBlock) {
+      targetBlock.hidden = true;
+      targetBlock.style.display = "none";
+      const dupSelect = targetBlock.querySelector("select");
+      if (dupSelect) {
+        dupSelect.removeAttribute("aria-label");
+        dupSelect.setAttribute("aria-hidden", "true");
+        dupSelect.tabIndex = -1;
+      }
+    }
+    const colorBlock = elements.parameterControls?.querySelector(
+      '.control-block[data-parameter="colorRetention"]',
+    );
+    if (colorBlock) colorBlock.hidden = isMigan;
     elements.domeGenerate.hidden = isMigan;
     elements.domeGenerate.disabled =
       isMigan ||

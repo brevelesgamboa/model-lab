@@ -2252,6 +2252,134 @@ input[type="range"]::-moz-range-progress {
 .neuron-gallery__browse {
   margin-bottom: 10px;
 }
+.neuron-gallery__preview-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  background: var(--bg-surface-elevated, #161822);
+  border: 1px solid var(--border-subtle, #282c3f);
+  border-radius: var(--radius-sm, 6px);
+}
+.neuron-gallery__thumb-wrapper {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-surface, #0d0f17);
+  border: 1px solid var(--border-subtle, #282c3f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.neuron-gallery__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.neuron-gallery__thumb-placeholder {
+  font-size: 10px;
+  color: var(--text-muted, #62677b);
+  text-align: center;
+  padding: 4px;
+}
+.neuron-gallery__target-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+  flex: 1;
+}
+.neuron-gallery__target-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.neuron-gallery__target-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent-mod, #38bdf8);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.neuron-gallery__target-name {
+  color: var(--text-primary, #f0f2f8);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.neuron-gallery__target-desc {
+  margin: 0;
+  color: var(--text-secondary, #9499ad);
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.neuron-gallery__target-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.neuron-gallery__preview-status {
+  font-size: 10px;
+  color: var(--text-muted, #72778e);
+}
+.stepper-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stepper-group .nudge-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #282c3f);
+  background: var(--bg-surface-elevated, #1c202e);
+  color: var(--text-primary, #f0f2f8);
+  cursor: pointer;
+}
+.stepper-group .nudge-button:hover {
+  background: var(--bg-surface-hover, #282e42);
+}
+.neuron-gallery__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.neuron-gallery__actions .mini-button {
+  margin: 0;
+}
+.neuron-explorer__desc {
+  font-size: 11px;
+  color: var(--text-secondary, #9499ad);
+  line-height: 1.35;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .neuron-selected-preview,
 .sensor-neuron-preview {
   display: grid;
