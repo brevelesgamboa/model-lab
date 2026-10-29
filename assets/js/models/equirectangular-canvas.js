@@ -1,5 +1,8 @@
 const clamp = (n, lo = 0, hi = 255) => Math.max(lo, Math.min(hi, n));
-const cosine = (t) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1));
+const smoothstep = (t) => {
+  const value = clamp(t, 0, 1);
+  return value * value * (3 - 2 * value);
+};
 
 export function photoPlacement(
   sourceWidth,
@@ -29,7 +32,9 @@ export function photoPlacement(
     y: Math.round((height - h) / 2),
     width: w,
     height: h,
-    feather: Math.min(20, w / 4, h / 4),
+    // Total transition width, centered on the edge. Tiny preview photos retain
+    // a protected core rather than letting the feather cover the entire photo.
+    feather: Math.min(50, w / 2, h / 2),
   };
 }
 
@@ -40,7 +45,8 @@ export function photoProtection(x, y, rect) {
     y - rect.y,
     rect.y + rect.height - 1 - y,
   );
-  return cosine(distance / Math.max(1, rect.feather));
+  const feather = Math.max(1, rect.feather);
+  return smoothstep((distance + feather / 2) / feather);
 }
 
 export function borderStatistics(rgba, width, height) {
@@ -73,8 +79,56 @@ export function borderStatistics(rgba, width, height) {
   };
 }
 
-// Pure pixels make the wrapping, palette and protected photo independently
-// verifiable. Noise is evaluated on a coarse periodic lattice, then interpolated.
+// Extend the nearest border row/column. Across the distant rear, blend the two
+// side columns so the equirectangular wrap has no color discontinuity. At the
+// poles converge to the corresponding row mean to avoid a longitude pinwheel.
+function borderSmear(photoRgba, photoWidth, photoHeight, rect, width, height) {
+  const top = [0, 0, 0],
+    bottom = [0, 0, 0];
+  for (let x = 0; x < photoWidth; x++)
+    for (let c = 0; c < 3; c++) {
+      top[c] += photoRgba[x * 4 + c] / photoWidth;
+      bottom[c] +=
+        photoRgba[((photoHeight - 1) * photoWidth + x) * 4 + c] / photoWidth;
+    }
+  const right = rect.x + rect.width - 1,
+    lower = rect.y + rect.height - 1;
+  const period = width - 1,
+    gap = period - (rect.width - 1);
+  const outside = rect.feather / 2;
+  return (x, y, px, py, c) => {
+    let value;
+    if (x < rect.x || x > right) {
+      const distance = (((x - right) % period) + period) % period;
+      const blend = smoothstep(
+        (distance - outside) / Math.max(1, gap - 2 * outside),
+      );
+      value =
+        photoRgba[(py * photoWidth + photoWidth - 1) * 4 + c] * (1 - blend) +
+        photoRgba[py * photoWidth * 4 + c] * blend;
+    } else {
+      // Keep photo detail within the rectangle. Its outermost row/column is
+      // exactly the start of the smear; noise fades through both sides using
+      // photoProtection, without introducing a second boundary in the image.
+      value = photoRgba[(py * photoWidth + px) * 4 + c];
+    }
+    if (y < rect.y) {
+      const cap = smoothstep(
+        (rect.y - y - outside) / Math.max(1, rect.y - outside),
+      );
+      value = value * (1 - cap) + top[c] * cap;
+    } else if (y > lower) {
+      const cap = smoothstep(
+        (y - lower - outside) / Math.max(1, height - 1 - lower - outside),
+      );
+      value = value * (1 - cap) + bottom[c] * cap;
+    }
+    return value;
+  };
+}
+
+// Noise is a coarse, periodic scalar field: bounded ±12.5% brightness variation
+// preserves the smeared edge's RGB ratios, including dark/bright edge colors.
 export function prepare360Pixels(
   photoRgba,
   photoWidth,
@@ -98,25 +152,24 @@ export function prepare360Pixels(
   }));
   const gridWidth = 65,
     gridHeight = 33,
-    grid = new Float32Array(gridWidth * gridHeight * 3);
+    grid = new Float32Array(gridWidth * gridHeight);
   for (let y = 0; y < gridHeight; y++)
     for (let x = 0; x < gridWidth; x++) {
       const u = x / (gridWidth - 1),
         v = y / (gridHeight - 1);
-      for (let c = 0; c < 3; c++) {
-        let sum = 0;
-        for (const wave of waves)
-          sum += Math.cos(
-            Math.PI * 2 * (wave.kx * u + wave.ky * v) + wave.phase + c * 0.42,
-          );
-        const sigma = Math.max(16, Math.min(60, Math.sqrt(stats.variance[c])));
-        grid[(y * gridWidth + x) * 3 + c] = clamp(
-          stats.mean[c] + 4 + (sum / 4) * sigma * Math.sin(Math.PI * v),
-          10,
-          245,
-        );
-      }
+      let sum = 0;
+      for (const wave of waves)
+        sum += Math.cos(Math.PI * 2 * (wave.kx * u + wave.ky * v) + wave.phase);
+      grid[y * gridWidth + x] = (sum / waves.length) * Math.sin(Math.PI * v);
     }
+  const smear = borderSmear(
+    photoRgba,
+    photoWidth,
+    photoHeight,
+    rect,
+    width,
+    height,
+  );
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
@@ -144,17 +197,22 @@ export function prepare360Pixels(
         0,
         photoHeight - 1,
       );
-      for (let c = 0; c < 3; c++) {
-        const a =
-          grid[(y0 * gridWidth + x0) * 3 + c] * (1 - fx) +
-          grid[(y0 * gridWidth + x1) * 3 + c] * fx;
-        const b =
-          grid[(y1 * gridWidth + x0) * 3 + c] * (1 - fx) +
-          grid[(y1 * gridWidth + x1) * 3 + c] * fx;
+      const a =
+        grid[y0 * gridWidth + x0] * (1 - fx) + grid[y0 * gridWidth + x1] * fx;
+      const b =
+        grid[y1 * gridWidth + x0] * (1 - fx) + grid[y1 * gridWidth + x1] * fx;
+      const noise = (a * (1 - fy) + b * fy) * 0.125;
+      const red = smear(x, y, px, py, 0),
+        green = smear(x, y, px, py, 1),
+        blue = smear(x, y, px, py, 2);
+      // Clamp the shared brightness multiplier, not individual RGB channels,
+      // so a saturated edge keeps its hue rather than clipping one channel.
+      const peak = Math.max(red, green, blue);
+      const gain = Math.min(1 + noise, peak ? 255 / peak : 1);
+      for (let c = 0; c < 3; c++)
         data[offset + c] =
-          (a * (1 - fy) + b * fy) * (1 - alpha) +
+          (c === 0 ? red : c === 1 ? green : blue) * gain * (1 - alpha) +
           photoRgba[(py * photoWidth + px) * 4 + c] * alpha;
-      }
       data[offset + 3] = 255;
     }
   return { data, width, height, photoRect: rect, border: stats };

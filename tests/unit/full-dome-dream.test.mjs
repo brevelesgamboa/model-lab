@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as tf from "@tensorflow/tfjs";
 import {
   prepare360Pixels,
+  photoPlacement,
   photoProtection,
   projectPhotoMap,
 } from "../../assets/js/models/equirectangular-canvas.js";
@@ -73,6 +74,99 @@ test("border-seeded panoramas are deterministic, low frequency, opaque, feathere
       projected.depth[y * projected.width],
       projected.depth[(y + 1) * projected.width - 1],
     );
+});
+
+test("smearing preserves each local edge palette with bounded brightness noise", () => {
+  const w = 64,
+    h = 48,
+    input = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) input.set([80, 80, 80, 255], i * 4);
+  const colors = {
+    left: [160, 40, 20],
+    right: [20, 80, 160],
+    top: [20, 160, 40],
+    bottom: [100, 60, 180],
+  };
+  for (let y = 0; y < h; y++)
+    for (const [x, color] of [
+      [0, colors.left],
+      [w - 1, colors.right],
+    ])
+      input.set([...color, 255], (y * w + x) * 4);
+  for (let x = 0; x < w; x++)
+    for (const [y, color] of [
+      [0, colors.top],
+      [h - 1, colors.bottom],
+    ])
+      input.set([...color, 255], (y * w + x) * 4);
+  const p = prepare360Pixels(input, w, h),
+    r = p.photoRect;
+  assert.equal(r.feather, 50);
+  for (const [x, y, color] of [
+    [r.x - 12, 256, colors.left],
+    [r.x + r.width - 1 + 12, 256, colors.right],
+    [512, r.y - 12, colors.top],
+    [512, r.y + r.height - 1 + 12, colors.bottom],
+  ]) {
+    const rgb = [...p.data.slice((y * 1024 + x) * 4, (y * 1024 + x) * 4 + 3)];
+    for (let c = 0; c < 3; c++)
+      assert.ok(Math.abs(rgb[c] - color[c]) <= color[c] * 0.125 + 1);
+    const gains = rgb.map((n, c) => n / color[c]);
+    assert.ok(Math.max(...gains) - Math.min(...gains) < 0.06);
+  }
+  // Zero-valued edges stay black instead of being lifted to an arbitrary gray.
+  const black = new Uint8ClampedArray(w * h * 4);
+  for (let i = 3; i < black.length; i += 4) black[i] = 255;
+  const dark = prepare360Pixels(black, w, h, 192, 96);
+  for (let i = 0; i < dark.data.length; i += 4)
+    assert.deepEqual([...dark.data.slice(i, i + 3)], [0, 0, 0]);
+});
+
+test("the 50px smoothstep feather and ascent mask span both sides of the photo edge exactly once", async () => {
+  const r = photoPlacement(640, 480),
+    cy = r.y + (r.height - 1) / 2;
+  for (const [d, expected] of [
+    [-25, 0],
+    [-12.5, 0.15625],
+    [0, 0.5],
+    [12.5, 0.84375],
+    [25, 1],
+  ]) {
+    assert.equal(photoProtection(r.x + d, cy, r), expected);
+    assert.equal(photoProtection(r.x + r.width - 1 - d, cy, r), expected);
+    assert.equal(photoProtection(r.x + r.width / 2, r.y + d, r), expected);
+    assert.equal(
+      photoProtection(r.x + r.width / 2, r.y + r.height - 1 - d, r),
+      expected,
+    );
+  }
+  await tf.setBackend("cpu");
+  await tf.ready();
+  const rect = { x: 78, y: 24, width: 100, height: 80, feather: 50 };
+  const seed = tf.fill([1, 128, 256, 3], 0.4),
+    count = tf.memory().numTensors;
+  try {
+    const result = await optimizeDomeDream(tf, { execute: (x) => x }, seed, {
+      node: "linear",
+      channel: 0,
+      photoRect: rect,
+      iterations: 1,
+    });
+    const delta = (x) => result.rgba[(64 * 256 + x) * 4] - 102;
+    const full = delta(rect.x - 25);
+    assert.ok(full > 10);
+    for (const x of [rect.x - 12, rect.x, rect.x + 12, rect.x + 25]) {
+      const expected = full * (1 - photoProtection(x, 64, rect));
+      assert.ok(
+        Math.abs(delta(x) - expected) <= 1.5,
+        `gradient at ${x}: ${delta(x)} vs ${expected}`,
+      );
+    }
+    assert.equal(delta(rect.x + 25), 0);
+    assert.equal(tf.memory().numTensors, count);
+  } finally {
+    seed.dispose();
+  }
 });
 
 test("periodic ascent changes the surrounding field, preserves the photo, closes seams and disposes all iteration tensors", async () => {

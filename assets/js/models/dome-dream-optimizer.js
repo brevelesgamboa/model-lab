@@ -75,6 +75,8 @@ function project(tf, image, base, c) {
     .add(blurGradient(tf, image).mul(c.seam));
   const rowMean = result.mean(2, true);
   result = result.mul(tf.sub(1, c.poles)).add(rowMean.mul(c.poles));
+  // Apply the bidirectional photo feather once: 0 ascent in the protected
+  // core, half strength at the edge, full strength outside the 50px band.
   return result.mul(tf.sub(1, c.protect)).add(base.mul(c.protect));
 }
 
@@ -170,7 +172,7 @@ export async function optimizeDomeDream(
               tf.moments(smooth).variance.sqrt().add(1e-7),
             );
             const updated = image
-              .add(normalized.mul(stepSize).mul(tf.sub(1, c.protect)))
+              .add(normalized.mul(stepSize))
               .clipByValue(0.02, 0.98);
             const next = project(tf, updated, base, c);
             return { next, fence: tf.stack([result.value, next.mean()]) };
@@ -199,18 +201,9 @@ export async function optimizeDomeDream(
       c = null;
     }
     signal?.throwIfAborted();
-    const pixels = tf.tidy(() =>
-      project(tf, image, seed, {
-        ...constraints(
-          tf,
-          sourceWidth,
-          sourceHeight,
-          sourceWidth,
-          sourceHeight,
-          photoRect,
-        ),
-      }).squeeze([0]),
-    );
+    // The last iteration already applies all constraints at full resolution.
+    // Re-projecting here would attenuate the feathered gradient a second time.
+    const pixels = image.squeeze([0]);
     try {
       const rgba = await tf.browser.toPixels(pixels);
       return {

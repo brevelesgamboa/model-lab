@@ -153,7 +153,8 @@ test("the cache drawer counts actual files, requests persistence only on click a
     "Incomplete",
   );
   expect(await page.evaluate(() => window.__persistRequests)).toBe(0);
-  await page.locator("#model-cache-persist").check();
+  // A denied request may reset the checkbox before check() verifies its state.
+  await page.locator("#model-cache-persist").click();
   await expect(page.locator("#model-cache-status")).toContainText(
     "did not grant",
   );

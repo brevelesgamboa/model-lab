@@ -60,9 +60,9 @@ npm run test:browser
 
 ### Cortical Dream Dome
 
-Choose **Cortical Dream Dome (360)** in **Model Route**, upload a photo, then click **Generate Full 360 Dream Field**. The photo occupies about 120° in front. Border-matched, low-frequency noise fills the remaining sphere until a manual bake grows Inception features there. Drag or use arrow keys to look around; **Full** fills the screen and **Reset view** returns to the front.
+Choose **Cortical Dream Dome (360)** in **Model Route**, upload a photo, then click **Generate Full 360 Dream Field**. The photo occupies about 120° in front. The photo’s border rows and columns extend into the remaining sphere with at most ±12.5% low-frequency brightness noise until a manual bake grows Inception features there. Drag or use arrow keys to look around; **Full** fills the screen and **Reset view** returns to the front.
 
-The 15-step bake runs in a worker at two scales, with periodic horizontal jitter, smooth gradients, a protected photo center, and constraints around the rear join and poles. Progress and cancellation are available while the camera is temporarily disabled. This produces abstract feature patterns; it is not a scene reconstruction or generative outpainting model. Changing the target refreshes the relief map once and selects the neuron for the next manual bake.
+The 15-step bake runs in a worker at two scales, with periodic horizontal jitter, smooth gradients, a protected photo center, and constraints around the rear join and poles. A 50px smoothstep band straddles the photo edge (25px inside and outside), and the Dream gradient fades across that same band. Progress and cancellation are available while the camera is temporarily disabled. This produces abstract feature patterns; it is not a scene reconstruction or generative outpainting model. Changing the target refreshes the relief map once and selects the neuron for the next manual bake.
 
 **Depth Scale** and **Neural Swell** control photo relief. **Wave Gain** controls log-polar rings, rays, spirals or honeycomb on the full sphere; turn the clock on to animate. Waves remain an analytic pattern generator inspired by cortical mapping.
 
