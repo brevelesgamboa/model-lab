@@ -15,12 +15,19 @@ out vec2 v_uv;
 out vec3 v_worldPos;
 out vec3 v_normal;
 out float v_waveVal;
+float domeWave(vec2 uv) {
+  float longitude = (uv.x - 0.5) * 2.0 * PI;
+  float latitude = (uv.y - 0.5) * PI;
+  // Periodic projection into the shared log-polar wave generator. Rear values
+  // and slopes match; every longitude converges to the same value at a pole.
+  return corticalWave(0.5 + 0.5 * vec2(sin(longitude)*cos(latitude), sin(latitude)));
+}
 float domeRadius(vec2 uv) {
   vec2 mapped = domePhotoUV(uv);
   vec2 scalarUV = vec2(mapped.x, 1.0 - mapped.y);
   return max(1.0, 5.0 - texture(u_depth, scalarUV).r * u_depth_extrude
     - texture(u_neural, scalarUV).r * u_neural_extrude
-    - corticalWave(mapped) * u_gain * 0.4);
+    - domeWave(mapped) * u_gain * 0.4);
 }
 vec3 domePoint(vec2 uv) {
   float longitude = (uv.x - 0.5) * 2.0 * PI;
@@ -36,7 +43,7 @@ void main() {
   vec2 scalarUV = vec2(mapUV.x, 1.0 - mapUV.y);
   float d = texture(u_depth, scalarUV).r;
   float n = texture(u_neural, scalarUV).r;
-  float waveVal = corticalWave(mapUV);
+  float waveVal = domeWave(mapUV);
   float radius = max(1.0, 5.0 - d * u_depth_extrude
     - n * u_neural_extrude - waveVal * u_gain * 0.4);
   vec3 worldPos = a_position * radius;

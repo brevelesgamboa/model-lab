@@ -451,8 +451,10 @@ test("actual dome vertex displacement closes rear/pole seams and aligns depth an
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
     for (const [i, values] of [
-      [0, [0, 1, 0, 1]],
-      [1, [1, 1, 0, 0]],
+      // Full-panorama fields have zero relief outside the photo, including
+      // poles. Sampling wraps in longitude, matching the production textures.
+      [0, [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0]],
+      [1, [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]],
     ]) {
       gl.activeTexture(gl.TEXTURE0 + i);
       const tex = gl.createTexture();
@@ -461,12 +463,13 @@ test("actual dome vertex displacement closes rear/pole seams and aligns depth an
         gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST);
       for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
         gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
         gl.R16F,
-        2,
-        2,
+        4,
+        4,
         0,
         gl.RED,
         gl.FLOAT,

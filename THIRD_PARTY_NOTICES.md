@@ -59,8 +59,11 @@ map; its moving surface uses analytic log-polar wave patterns.
 
 Cortical Dream Dome reuses the same depth service and the existing bundled
 Inception graph. It runs one forward pass for a selected channel and displaces
-an inward-facing sphere with the normalized activation map. It does not run
-DeepDream gradient ascent. Its rings, rays, spirals and honeycomb are analytic
+an inward-facing sphere with the normalized activation map. Its manual
+full-dome mode additionally runs multi-step DeepDream gradient ascent in a dedicated worker, anchored to a protected region of the uploaded
+photo. Downloaded model files may be retained in browser Cache Storage; photos
+and Dream textures are not persisted by that cache. Its rings, rays, spirals
+and honeycomb are analytic
 log-polar patterns inspired by
 [Bressloff et al. (2001)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1088430/),
 not a numerical implementation of their cortical neural-field equations.

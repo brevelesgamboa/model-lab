@@ -269,16 +269,27 @@
                     <button id="dome-demo" class="mini-button" type="button">Use demo</button>
                     <button id="dome-reset-view" class="mini-button" type="button">Reset view</button>
                     <button id="dome-retry" class="mini-button" type="button" hidden>Retry missing maps</button>
+                    <button id="dome-generate" class="mini-button mini-button--highlight" type="button" disabled>Generate Full 360 Dream Field</button>
                   </div>
                   <p id="dome-status" class="field__help" role="status" aria-live="polite"></p>
                   <p class="field__help">Drag or use arrow keys to look around · Turn the clock on for moving waves · Fullscreen fills your view.</p>
                   <details class="cortical-tools__help">
                     <summary>? What shapes the dome?</summary>
-                    <p>Your photo surrounds you. Depth pulls nearby parts inward, and Neural Swell raises areas that activate the selected neuron. This highlights features already in the photo; it does not paint new objects.</p>
-                    <p>Rings, rays, spirals and honeycomb waves move across the surface. These are analytic patterns inspired by cortical mapping. The photo covers 140° in front and reflects around the back.</p>
-                    <p>Each upload runs depth and feature mapping once. Target changes refresh only the neuron map. Maps and the camera stay in this tab; PNG and GIF keep the current view.</p>
+                    <p>Your photo stays in front. Generate Full 360 Dream Field lets Inception grow feature patterns in the surrounding color-matched noise. The photo's center is protected during synthesis.</p>
+                    <p>Depth and Neural Swell raise details in the photo; rings, rays, spirals and honeycomb waves animate the whole sphere. The image wraps around the rear without reflected copies.</p>
+                    <p>Dream generation starts only when you click the button. You can cancel and keep the previous view. A new neuron target takes effect on the next bake. Maps stay in this tab; PNG and GIF export the view.</p>
                     <a href="https://distill.pub/2017/feature-visualization/" target="_blank" rel="noopener noreferrer">Feature visualization ↗</a>
                     · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1088430/" target="_blank" rel="noopener noreferrer">Cortical pattern paper ↗</a>
+                  </details>
+                  <details id="model-cache-drawer" class="cortical-tools__help">
+                    <summary>Dome settings · Local Model Cache</summary>
+                    <p id="model-cache-inception">Inception: checking…</p>
+                    <p id="model-cache-depth">Depth: checking…</p>
+                    <button id="model-cache-download" class="mini-button" type="button">Cache model files</button>
+                    <p><label><input id="model-cache-persist" type="checkbox" /> Persist Offline</label></p>
+                    <p id="model-cache-persistence"></p>
+                    <p>Stores model files on this device. Keep the app open or the local server running to use its other assets.</p>
+                    <p id="model-cache-status" role="status" aria-live="polite"></p>
                   </details>
                 </section>
                 <div id="neural-dream-tools" class="neural-dream-tools" hidden>
@@ -452,6 +463,11 @@
                       height="512"
                       aria-label="Model output"
                     ></canvas>
+                    <div id="dome-bake-overlay" class="dome-bake-overlay" hidden>
+                      <p id="dome-bake-label" role="status" aria-live="polite">Synthesizing 360 Universe: 0%…</p>
+                      <progress id="dome-bake-progress" max="100" value="0" aria-label="360 dream generation progress"></progress>
+                      <button id="dome-cancel-bake" class="mini-button" type="button">Cancel synthesis</button>
+                    </div>
                     <canvas
                       id="mask-overlay-canvas"
                       class="mask-overlay-canvas"

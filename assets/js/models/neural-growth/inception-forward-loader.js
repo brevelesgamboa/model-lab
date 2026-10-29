@@ -7,6 +7,10 @@ export async function loadInceptionForward({ runtimeUrl, modelUrl }) {
   if (!(await tf.setBackend("webgl")))
     throw new Error("GPU inference is unavailable.");
   await tf.ready();
-  const model = await tf.loadGraphModel(modelUrl, { streamWeights: true });
+  const model = await tf.loadGraphModel(modelUrl, {
+    streamWeights: true,
+    fetchFunc: cachedModelFetch,
+  });
   return { tf, model };
 }
+import { cachedModelFetch } from "../../core/local-model-cache.js";

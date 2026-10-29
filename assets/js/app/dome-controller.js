@@ -1,3 +1,5 @@
+import { createLocalModelCacheControls } from "../ui/local-model-cache.js";
+
 export function createDomeController({
   elements,
   getModel,
@@ -6,6 +8,8 @@ export function createDomeController({
   canInteract,
 }) {
   let gesture = null;
+  let cacheKey = null;
+  const cache = createLocalModelCacheControls(elements);
   const isActive = () => getModel() === model;
   const redraw = () => {
     if (isActive()) void render();
@@ -20,6 +24,7 @@ export function createDomeController({
   function update() {
     const active = isActive();
     elements.domeTools.hidden = !active;
+    elements.domeBakeOverlay.hidden = !active || model.bakeState !== "baking";
     elements.canvas.classList.toggle("has-dome-camera", active);
     if (active) elements.canvas.setAttribute("tabindex", "0");
     else elements.canvas.removeAttribute("tabindex");
@@ -27,8 +32,24 @@ export function createDomeController({
       endGesture();
       return;
     }
-    elements.domeStatus.textContent = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus}`;
-    elements.domeStatus.title = [model.depthError, model.featureError]
+    if (model.bakeState === "baking") endGesture();
+    elements.domeStatus.textContent = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
+    elements.domeGenerate.disabled =
+      !model.hasPhoto ||
+      model.bakeState === "baking" ||
+      [model.depthState, model.featureState].includes("loading");
+    elements.domeBakeLabel.textContent = model.bakeStatus;
+    elements.domeBakeProgress.value = model.bakeProgress;
+    const nextKey = `${model.depthState}:${model.featureState}:${model.bakeState}`;
+    if (nextKey !== cacheKey) {
+      cacheKey = nextKey;
+      void cache.refresh();
+    }
+    elements.domeStatus.title = [
+      model.depthError,
+      model.featureError,
+      model.bakeError,
+    ]
       .filter(Boolean)
       .join(" · ");
     elements.domeRetry.hidden =
@@ -38,6 +59,7 @@ export function createDomeController({
       model.depthState,
       model.featureState,
     ].includes("loading");
+    elements.domeResetView.disabled = model.bakeState === "baking";
   }
   model.onStateChange = () => {
     update();
@@ -65,8 +87,18 @@ export function createDomeController({
   elements.domeRetry.addEventListener("click", () => {
     if (isActive() && canInteract()) void model.retryMaps().catch(report);
   });
+  elements.domeGenerate.addEventListener("click", () => {
+    if (isActive() && canInteract()) void model.generateDream().catch(report);
+  });
+  elements.domeCancelBake.addEventListener("click", () => model.cancelDream());
   elements.canvas.addEventListener("pointerdown", (event) => {
-    if (!isActive() || !canInteract() || event.button !== 0) return;
+    if (
+      !isActive() ||
+      !canInteract() ||
+      model.bakeState === "baking" ||
+      event.button !== 0
+    )
+      return;
     event.preventDefault();
     gesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
     elements.canvas.focus({ preventScroll: true });
@@ -78,6 +110,7 @@ export function createDomeController({
       !gesture ||
       event.pointerId !== gesture.id ||
       !isActive() ||
+      model.bakeState === "baking" ||
       !canInteract()
     )
       return;
@@ -90,7 +123,7 @@ export function createDomeController({
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
     elements.canvas.addEventListener(name, endGesture);
   elements.canvas.addEventListener("keydown", (event) => {
-    if (!isActive() || !canInteract()) return;
+    if (!isActive() || !canInteract() || model.bakeState === "baking") return;
     const direction = {
       ArrowLeft: [12, 0],
       ArrowRight: [-12, 0],

@@ -1,0 +1,170 @@
+{
+  "hardware": {
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "webgpu": {
+      "vendor": "amd",
+      "isFallbackAdapter": false
+    }
+  },
+  "photoSource": "https://github.com/DepthAnything/Depth-Anything-V2/blob/main/assets/examples/demo01.jpg",
+  "totalBakeMs": 3895,
+  "verification": {
+    "size": [
+      1024,
+      512
+    ],
+    "protectedError": 0,
+    "protectedPixels": 56287,
+    "emptyPeripheralPixels": 0,
+    "meanPeripheralChange": 32.72549085257199,
+    "wrapRms": 5.739176860985089,
+    "nearWrapRms": 13.643180680328431,
+    "mirroredRearDifference": 52.34468332926432,
+    "progress": [
+      0,
+      0,
+      0,
+      7,
+      7,
+      13,
+      20,
+      27,
+      33,
+      40,
+      47,
+      47,
+      53,
+      60,
+      60,
+      67,
+      73,
+      73,
+      80,
+      87,
+      87,
+      93,
+      100,
+      100
+    ],
+    "bake": {
+      "type": "result",
+      "width": 1024,
+      "height": 512,
+      "iterations": 15,
+      "scoreStart": -0.5485096573829651,
+      "scoreEnd": 7.599806308746338,
+      "bakeMs": 2972.7999999821186,
+      "sizes": [
+        [
+          256,
+          512
+        ],
+        [
+          512,
+          1024
+        ]
+      ],
+      "backend": "webgl",
+      "retainedTensors": 0
+    },
+    "depthRuns": 1,
+    "featureRuns": 1,
+    "dreamRuns": 1,
+    "workerActive": false,
+    "cache": {
+      "available": true,
+      "inception": {
+        "ready": true,
+        "count": 24,
+        "total": 24
+      },
+      "depth": {
+        "ready": true,
+        "count": 2,
+        "total": 2
+      }
+    },
+    "glError": 0
+  },
+  "conditions": [
+    {
+      "label": "Cached 360 field",
+      "elapsedMs": 8010,
+      "longTasks": [],
+      "draws": 489,
+      "canvas": [
+        768,
+        768
+      ],
+      "glError": 0,
+      "dreamRuns": 1,
+      "workerActive": false,
+      "fps": 60.04993757802747,
+      "drawFps": 61.048689138576776,
+      "p99Ms": 16.900000005960464,
+      "maxMs": 17
+    },
+    {
+      "label": "360 mouselook",
+      "elapsedMs": 8009.9000000059605,
+      "longTasks": [],
+      "draws": 489,
+      "canvas": [
+        768,
+        768
+      ],
+      "glError": 0,
+      "dreamRuns": 1,
+      "workerActive": false,
+      "fps": 60.050687274453125,
+      "drawFps": 61.04945130396586,
+      "p99Ms": 16.900000005960464,
+      "maxMs": 16.900000005960464
+    },
+    {
+      "label": "Fullscreen 360 mouselook",
+      "elapsedMs": 8014.800000011921,
+      "longTasks": [],
+      "draws": 488,
+      "canvas": [
+        1440,
+        1000
+      ],
+      "glError": 0,
+      "dreamRuns": 1,
+      "workerActive": false,
+      "fps": 60.01397414773726,
+      "drawFps": 60.88735838689352,
+      "p99Ms": 16.899999976158142,
+      "maxMs": 17
+    }
+  ],
+  "offline": {
+    "iterations": 1,
+    "retainedTensors": 0,
+    "depthFileBytes": [
+      159342,
+      27466240
+    ]
+  },
+  "blockedRequests": 0,
+  "errors": [],
+  "notes": [
+    "Native GPU benchmark uses Vulkan/unsafe WebGPU Chromium flags; default browser backends can differ.",
+    "60 Hz display cadence; higher refresh rates are not verified.",
+    "The surrounding field contains abstract neuron features, rather than reconstructed streets/buildings.",
+    "Photo center is anchored; wraps use circular filtering and jitter; pole colors converge.",
+    "Model cache was tested with model-network requests blocked. App assets still require the local server.",
+    "All timing conditions run after the one-shot bake; inference is not part of the render loop."
+  ],
+  "validation": {
+    "unitTestsPassed": 182,
+    "browserChecksPassed": 13,
+    "check": "passed",
+    "build": "passed",
+    "branch": "feature/cortical-dream-dome",
+    "baseline": "9fc695a",
+    "protectedBaselineFiles": "unchanged"
+  },
+  "artifacts": "test-results/full-dome-dream-hardware/index.html; regenerate with tools/verify-full-dome-dream.mjs"
+}

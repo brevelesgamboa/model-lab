@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 precision highp int;
-uniform sampler2D u_source;
+uniform sampler2D u_dream_360;
 uniform vec3 u_viewDir;
 uniform float u_gain;
 uniform float u_time;
@@ -11,7 +11,7 @@ in vec3 v_worldPos;
 in vec3 v_normal;
 in float v_waveVal;
 out vec4 out_color;
-vec3 photo(vec2 uv) { return texture(u_source, mirrorDomeUV(uv)).rgb; }
+vec3 photo(vec2 uv) { return texture(u_dream_360, uv).rgb; }
 void main() {
   vec3 toEye = -normalize(v_worldPos);
   vec3 area = cross(dFdx(v_worldPos), dFdy(v_worldPos));
@@ -22,7 +22,7 @@ void main() {
   vec3 N = normalize(mix(smoothNormal, faceNormal, 0.08));
   if (dot(N, toEye) < 0.0) N = -N;
   float facing = max(0.0, dot(N, toEye));
-  vec2 uv = domePhotoUV(v_uv);
+  vec2 uv = domeSphereUV(v_worldPos);
   vec2 bend = N.xy * u_gain * v_waveVal * 0.006;
   vec2 dispersion = N.xy * u_gain * 0.0025;
   vec3 color = vec3(photo(uv + bend + dispersion).r,

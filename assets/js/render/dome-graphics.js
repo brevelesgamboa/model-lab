@@ -67,7 +67,7 @@ export async function createDomeGraphics(gl, isCurrent) {
       [
         "view",
         "proj",
-        "source",
+        "dream_360",
         "depth",
         "neural",
         "viewDir",

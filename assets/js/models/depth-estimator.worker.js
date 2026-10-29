@@ -1,4 +1,5 @@
 import { ensureOnnxRuntime, onnxRuntimeMode } from "../core/ort-runtime.js";
+import { cachedModelFetch } from "../core/local-model-cache.js";
 import {
   DEPTH_MODEL_ROOT,
   depthInputSize,
@@ -12,7 +13,7 @@ self.onmessage = async ({ data: { bitmap } }) => {
     const status = (message) => self.postMessage({ type: "status", message });
     status("Downloading depth model… Brightness preview is available.");
     const fetchBytes = async (name) => {
-      const response = await fetch(DEPTH_MODEL_ROOT + name, {
+      const response = await cachedModelFetch(DEPTH_MODEL_ROOT + name, {
         cache: "force-cache",
       });
       if (!response.ok)

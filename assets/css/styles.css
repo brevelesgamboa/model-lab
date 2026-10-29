@@ -564,6 +564,21 @@ summary {
 .has-dome-camera.is-looking {
   cursor: grabbing;
 }
+.dome-bake-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  background: rgb(8 8 12 / 80%);
+  color: var(--text-primary);
+  text-align: center;
+}
+.dome-bake-overlay[hidden] { display: none; }
+.dome-bake-overlay progress { width: min(280px, 70vw); }
 .output-panel:fullscreen > .dome-tools {
   display: none;
 }
