@@ -10,6 +10,7 @@ export function createDomeNeuronControls(
   model,
   isActive,
   canInteract,
+  onParameterChange,
 ) {
   const {
     domeNeuronGalleryMount: mount,
@@ -96,7 +97,7 @@ export function createDomeNeuronControls(
             dreamStrength: 0.2,
           },
           previewBridge: model.dreamBridge,
-          showStrip: false,
+          showStrip: true,
           onSelect(neuron) {
             if (!isActive() || !canInteract()) return;
             const ch = neuron.channel < 0 ? 0 : neuron.channel;
@@ -104,6 +105,11 @@ export function createDomeNeuronControls(
             syncChannelBounds(neuron.layer);
             if (channelSlider) channelSlider.value = String(ch);
             if (channelNumber) channelNumber.value = String(ch);
+            const idx = FEATURE_TARGETS.findIndex(
+              (t) => t.layer === neuron.layer && t.channel === ch,
+            );
+            const targetVal = idx >= 0 ? idx : -1;
+            onParameterChange?.("featureTarget", targetVal);
             model.setNeuronTarget(neuron.layer, ch);
             syncCustomTarget(neuron.layer, ch);
             if (gallery) {
@@ -111,16 +117,6 @@ export function createDomeNeuronControls(
                 { targetLayer: neuron.layer, targetChannel: ch, dreamStrength: 0.2 },
                 {},
               );
-            }
-            const idx = FEATURE_TARGETS.findIndex(
-              (t) => t.layer === neuron.layer && t.channel === ch,
-            );
-            const paramSelect = elements.parameterControls?.querySelector(
-              '.control-block[data-parameter="featureTarget"] select',
-            );
-            if (paramSelect && paramSelect.value !== String(idx >= 0 ? idx : -1)) {
-              paramSelect.value = String(idx >= 0 ? idx : -1);
-              paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
             }
           },
           manualOpen: false,
@@ -137,6 +133,11 @@ export function createDomeNeuronControls(
   let channelDebounce = null;
   const commitChannel = (layer, ch) => {
     if (!isActive() || !canInteract()) return;
+    const idx = FEATURE_TARGETS.findIndex(
+      (t) => t.layer === layer && t.channel === ch,
+    );
+    const targetVal = idx >= 0 ? idx : -1;
+    onParameterChange?.("featureTarget", targetVal);
     model.setNeuronTarget(layer, ch);
     syncCustomTarget(layer, ch);
     if (gallery) {
@@ -144,16 +145,6 @@ export function createDomeNeuronControls(
         { targetLayer: layer, targetChannel: ch, dreamStrength: 0.2 },
         {},
       );
-    }
-    const idx = FEATURE_TARGETS.findIndex(
-      (t) => t.layer === layer && t.channel === ch,
-    );
-    const paramSelect = elements.parameterControls?.querySelector(
-      '.control-block[data-parameter="featureTarget"] select',
-    );
-    if (paramSelect && paramSelect.value !== String(idx >= 0 ? idx : -1)) {
-      paramSelect.value = String(idx >= 0 ? idx : -1);
-      paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   };
 
@@ -234,6 +225,7 @@ export function createDomeNeuronControls(
       syncChannelBounds(target.layer);
       if (channelSlider) channelSlider.value = String(target.channel);
       if (channelNumber) channelNumber.value = String(target.channel);
+      onParameterChange?.("featureTarget", idx);
       model.setNeuronTarget(target.layer, target.channel);
       syncCustomTarget(target.layer, target.channel);
       if (gallery) {
@@ -241,13 +233,6 @@ export function createDomeNeuronControls(
           { targetLayer: target.layer, targetChannel: target.channel, dreamStrength: 0.2 },
           {},
         );
-      }
-      const paramSelect = elements.parameterControls?.querySelector(
-        '.control-block[data-parameter="featureTarget"] select',
-      );
-      if (paramSelect && paramSelect.value !== String(idx)) {
-        paramSelect.value = String(idx);
-        paramSelect.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }
   });

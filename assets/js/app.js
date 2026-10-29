@@ -260,6 +260,11 @@ const domeController = createDomeController({
     !gifEncoding &&
     !hqRendering &&
     !playback.isSuspended(),
+  onParameterChange: (key, value) => {
+    currentParameters[key] = value;
+    modelParameterState.set(currentModel.id, deepClone(currentParameters));
+    markPresetCustom();
+  },
 });
 const controlsController = createControlsController({
   elements,

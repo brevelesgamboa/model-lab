@@ -10,6 +10,7 @@ export function createDomeController({
   model,
   render,
   canInteract,
+  onParameterChange,
 }) {
   let gesture = null;
   let cacheKey = null;
@@ -26,6 +27,7 @@ export function createDomeController({
     model,
     isActive,
     canInteract,
+    onParameterChange,
   );
   const redraw = () => {
     if (isActive()) void render();
@@ -105,7 +107,16 @@ export function createDomeController({
     ].includes("loading");
     elements.domeResetView.disabled = model.bakeState === "baking";
   }
+  let lastSyncedTarget = null;
   model.onStateChange = () => {
+    if (
+      onParameterChange &&
+      model.selectedTarget !== undefined &&
+      model.selectedTarget !== lastSyncedTarget
+    ) {
+      lastSyncedTarget = model.selectedTarget;
+      onParameterChange("featureTarget", model.selectedTarget);
+    }
     update();
     redraw();
   };
