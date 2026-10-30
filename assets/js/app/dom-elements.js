@@ -51,6 +51,7 @@ export function collectElements() {
     domeGenerate: document.getElementById("dome-generate"),
     dreamSynthesisSection: document.getElementById("dream-synthesis-section"),
     domeArchetypes: document.getElementById("dome-archetypes"),
+    domeBrowseNeurons: document.getElementById("dome-browse-neurons"),
     domeBakeOverlay: document.getElementById("dome-bake-overlay"),
     domeBakeLabel: document.getElementById("dome-bake-label"),
     domeBakeProgress: document.getElementById("dome-bake-progress"),

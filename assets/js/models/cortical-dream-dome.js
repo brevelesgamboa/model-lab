@@ -109,15 +109,6 @@ const CONTROLS = [
     help: "Chooses the neuron for photo relief and the next 360 dream bake. Changing it refreshes relief once; click Synthesize Dream to bake a new field. Labels suggest motifs; individual channels do not guarantee these structures.",
   },
   range(
-    "colorRetention",
-    "COLOR RETENTION",
-    1,
-    1,
-    "At 1, Dream changes brightness only and preserves the source palette. Lower values allow color changes. Applies to the next synthesis and current lighting.",
-    0,
-    false,
-  ),
-  range(
     "depthScale",
     "DEPTH SCALE",
     1.5,

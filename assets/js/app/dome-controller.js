@@ -74,10 +74,6 @@ export function createDomeController({
         dupSelect.tabIndex = -1;
       }
     }
-    const colorBlock = elements.parameterControls?.querySelector(
-      '.control-block[data-parameter="colorRetention"]',
-    );
-    if (colorBlock) colorBlock.hidden = isMigan;
     elements.domeGenerate.hidden = isMigan;
     elements.domeGenerate.disabled =
       isMigan ||

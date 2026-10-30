@@ -69,9 +69,6 @@ test("optional model prompt, bad-file fallback, cancellation and late worker res
   expect(await page.evaluate(() => window.__dome.outpaintingMode)).toBe(
     "mirrored",
   );
-  await expect(page.getByLabel("COLOR RETENTION", { exact: true })).toHaveValue(
-    "1",
-  );
   await page.locator("#dome-outpainting").selectOption("migan");
   await expect(page.locator("#dome-migan-card")).toBeVisible();
   await expect(page.locator("#dome-generate")).toBeDisabled();

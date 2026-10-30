@@ -532,3 +532,41 @@ test("actual dome vertex displacement closes rear/pole seams and aligns depth an
       for (let i = 0; i < 4; i++) expect(rows[a][i]).toBeCloseTo(rows[b][i], 4);
   expect(result.error).toBe(0);
 });
+
+test("dome browse button connects neuron explorer, supports custom neurons, and color retention control is absent", async ({
+  page,
+}) => {
+  await openDome(page);
+  // Verify color retention control is not present under MODEL CONTROLS
+  await expect(page.locator('[data-parameter="colorRetention"]')).toHaveCount(0);
+
+  // Verify browse button opens explorer dialog
+  const browseBtn = page.locator("#dome-browse-neurons");
+  await expect(browseBtn).toBeVisible();
+  await browseBtn.click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Neuron explorer",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+
+  // Search and select a neuron
+  await dialog.getByLabel("Explorer layer", { exact: true }).selectOption("mixed_6c");
+  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("215");
+  await dialog.locator('.neuron-explorer__card[data-channel="215"]').click();
+  await dialog.getByRole("button", { name: "Use as Dream target", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+
+  // Verify custom target updated on dome select and model
+  const select = page.locator("#dome-archetypes");
+  await expect(select).toHaveValue("-1");
+  const option = select.locator('option[value="-1"]');
+  await expect(option).not.toHaveAttribute("hidden");
+  await expect(option).toContainText("mixed_6c");
+  await expect(option).toContainText("215");
+
+  expect(await page.evaluate(() => window.__dome.selectedLayer)).toBe("mixed_6c");
+  expect(await page.evaluate(() => window.__dome.selectedChannel)).toBe(215);
+  expect(await page.evaluate(() => window.__dome._isCustomNeuron)).toBe(true);
+});

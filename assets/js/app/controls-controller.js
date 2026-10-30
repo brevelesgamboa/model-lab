@@ -409,12 +409,7 @@ export function createControlsController({
           parameters: currentParameters,
           onSelect: onNeuronPreset,
           onSensorSelect: selectSensorNeuron,
-          manualOpen: manualChannelOpen,
           previewBridge: currentModel.dreamBridge,
-          onToggleManual(open) {
-            manualChannelOpen = open;
-            controlElements.get("targetChannel").block.hidden = !open;
-          },
         });
         parent.append(neuronGallery.element);
       }
@@ -423,7 +418,8 @@ export function createControlsController({
       block.dataset.parameter = definition.key;
       if (definition.key === "targetChannel" && currentModel.neuronArchetypes) {
         block.id = "dream-channel-control";
-        block.hidden = !manualChannelOpen;
+        block.hidden = true;
+        block.style.display = "none";
       }
 
       if (definition.type === "range") {
@@ -763,7 +759,7 @@ export function createControlsController({
         block.append(help);
       }
       parent.append(block);
-      if (definition.key === "targetChannel" && neuronGallery)
+      if (definition.key === "targetChannel" && neuronGallery?.selectedPreview)
         parent.append(neuronGallery.selectedPreview);
       block
         .querySelectorAll('input[type="range"]')
