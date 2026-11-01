@@ -1,0 +1,552 @@
+{
+  "baselineRevision": "4c0308d4b9d1250c12594bbe6ded7ef5aababfd9",
+  "branch": "experiment/dream-drift",
+  "input": {
+    "id": "photo-1",
+    "name": "images.jpg",
+    "sha256": "40c995fe845080b9ac198465920eada3cbe14908e2b83beba82c9279ced4c82c"
+  },
+  "hardware": {
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "webgpu": {
+      "vendor": "amd",
+      "isFallbackAdapter": false
+    }
+  },
+  "modelIdentity": {
+    "miganPipelineSha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+    "inceptionGraphSha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849"
+  },
+  "method": {
+    "configuration": {
+      "experimentMode": "calibrated",
+      "requestedMiganBackend": "automatic",
+      "baselineOnly": false,
+      "panorama": [
+        1024,
+        512
+      ],
+      "dreamStepSize": 0.012,
+      "calibratedPlan": {
+        "stagesPerRecipe": 10,
+        "advancePerStage": 0.08,
+        "dreamSteps": 4,
+        "targets": [
+          {
+            "id": "arches",
+            "label": "Arches candidate",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          {
+            "id": "organic",
+            "label": "Organic forms candidate",
+            "layer": "mixed_6c",
+            "channel": 144
+          }
+        ],
+        "control": "Same direct panoramic warp, with no Dream synthesis",
+        "generation": "MI-GAN supplies the initial panorama only; later stages warp and optionally Dream it. No new area outpainting yet."
+      },
+      "colorRetention": 1,
+      "effects": {
+        "waves": 0,
+        "refraction": 0,
+        "dispersion": 0,
+        "depthRelief": 0,
+        "neuralRelief": 0,
+        "cameraDolly": 0
+      },
+      "notes": [
+        "Uses the installed MI-GAN pipeline v2 and local InceptionV3 workers without stubs.",
+        "Mirrored textures require the dome's mirrored mapping; their flat texture is not a full panorama.",
+        "Raw MI-GAN output is saved before the existing photo/seam/pole compositor.",
+        "Dream-on-MI-GAN is an experiment harness combination, not a newly enabled application mode.",
+        "Progression releases photo protection; all independent strengths start from the same MI-GAN panorama.",
+        "Legacy recursive outpainting reanchors a 60-degree view. The forward mode crops 8% from a front perspective view and reanchors it; neither reconstructs a 3D world.",
+        "Gentle modes use the actual optimizer at step size 0.012 through an experiment-only worker; target names are hypotheses, not guaranteed motifs.",
+        "Six-view captures use the actual dome renderer with all relief and optical effects disabled.",
+        "Timing includes real inference but does not establish simultaneous-generation frame rate.",
+        "Calibrated mode samples the prior panorama through a sphere-ray intersection; it does not paste a perspective screenshot into a flat photo rectangle. The dome camera remains at the origin."
+      ]
+    },
+    "projection": "For each destination sphere ray, intersect a unit sphere from an observer offset 0.08 radii toward -Z, then bilinearly sample the prior panorama with longitude wrapping and latitude clamping. Actual stage captures keep the camera at the origin.",
+    "changedFromPriorTest": "The experimental motion path no longer repastes rendered perspective screenshots into planar photo rectangles.",
+    "synthesis": "One MI-GAN starting panorama, ten motion-only control stages, ten arches stages, and ten organic stages. Each model stage uses four Dream iterations at step 0.012 with palette retention 1.",
+    "newAreaOutpaintingAfterSeed": false
+  },
+  "validation": {
+    "unitTestsPassed": 200,
+    "projectionBrowserChecksPassed": 1,
+    "sourceImportsModelIntegrityAndLint": "passed",
+    "modelStagesCompleted": 20,
+    "motionOnlyStagesCompleted": 10,
+    "dreamWorkersWithZeroRetainedTensors": 20,
+    "glErrors": 0,
+    "applicationFilesChanged": false,
+    "zeroMotion": [
+      {
+        "input": "photo-1",
+        "zeroMotionPasses": 20,
+        "maximumByteError": 0
+      }
+    ],
+    "gallery": {
+      "images": 93,
+      "recipes": 3,
+      "stagesPerRecipe": 10,
+      "playback": "passed",
+      "pause": "passed",
+      "errors": [],
+      "legacyStagePlayer": "passed"
+    }
+  },
+  "rendererCalibration": {
+    "fixture": "Smooth procedural spherical color field, 512x256 texture and 384x256 view; all relief and optical effects off",
+    "reference": "Actual dome observer translated 5 * advance world units in a fixed -Z direction while the source panorama stays unchanged",
+    "measurements": {
+      "rows": [
+        {
+          "advance": 0,
+          "yaw": 0,
+          "pitch": 0,
+          "meanAbsoluteRgbByte": 0,
+          "maxAbsoluteRgbByte": 0
+        },
+        {
+          "advance": 0,
+          "yaw": 0.5,
+          "pitch": 0,
+          "meanAbsoluteRgbByte": 0,
+          "maxAbsoluteRgbByte": 0
+        },
+        {
+          "advance": 0,
+          "yaw": -0.3,
+          "pitch": 0.25,
+          "meanAbsoluteRgbByte": 0,
+          "maxAbsoluteRgbByte": 0
+        },
+        {
+          "advance": 0.08,
+          "yaw": 0,
+          "pitch": 0,
+          "meanAbsoluteRgbByte": 0.12343004014756945,
+          "maxAbsoluteRgbByte": 1
+        },
+        {
+          "advance": 0.08,
+          "yaw": 0.5,
+          "pitch": 0,
+          "meanAbsoluteRgbByte": 0.1376003689236111,
+          "maxAbsoluteRgbByte": 1
+        },
+        {
+          "advance": 0.08,
+          "yaw": -0.3,
+          "pitch": 0.25,
+          "meanAbsoluteRgbByte": 0.12009684244791667,
+          "maxAbsoluteRgbByte": 1
+        }
+      ],
+      "glError": 0,
+      "depthRuns": 0,
+      "featureRuns": 0
+    }
+  },
+  "observations": [
+    "Stationary panoramic pixels remain exactly unchanged through twenty zero-advance passes.",
+    "In the renderer reference test, positive-advance texture warps differ by at most one RGB byte on the smooth calibration fixture, across three view orientations. This validates mapping geometry, not preservation of arbitrary image detail through repeated resampling.",
+    "Visual review of the motion-only sequence shows foreground approach rather than the old repeated screenshot-placement stretching.",
+    "Arches develops repeated curved ribbing; Organic develops branching cellular structure. These outputs come from the actual Inception objectives with no authored glitch effects.",
+    "Low-resolution source detail still softens during approach. The experiment transforms an existing scene and does not yet establish fresh area generation or indefinite visual novelty."
+  ],
+  "nextSteps": [
+    "Regenerate regions that run out of detail while preserving the surrounding layout and palette; compare against a no-refresh control.",
+    "Test a gradual transition from arches to organic objectives, then a 30-50 stage sequence to assess coherence and repetition.",
+    "Build an optional interactive travel preview with look, advance, pause, recent backtracking and return home after content continuity is convincing.",
+    "Measure generation-ahead scheduling and a bounded panorama cache before planning a session with no fixed endpoint."
+  ],
+  "limitations": [
+    "One marmot source photo and one hardware configuration.",
+    "Stage playback is a keyframe review tool, not smooth continuous travel.",
+    "No fresh regional inpainting, saved-history feature, or infinite runtime has been implemented."
+  ],
+  "artifacts": {
+    "gallery": "test-results/dream-drift-calibrated/index.html",
+    "report": "test-results/dream-drift-calibrated/report.json",
+    "rendererCalibration": "test-results/dream-drift-calibrated/renderer-calibration.json"
+  },
+  "reproduction": "node tools/experiment-dream-drift.mjs --calibrated-patterns --output test-results/dream-drift-calibrated /path/to/images.jpg",
+  "selectedMeasurements": [
+    {
+      "id": "calibrated-control-1",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "control",
+        "stage": 1,
+        "target": null,
+        "advance": 0.08,
+        "dreamSteps": 0,
+        "stepSize": 0
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0.11328125,
+        "seamMaxByte": 10,
+        "seamNeighborMeanByte": 2.1178385416666665,
+        "meanChangeByte": 17.54696528116862,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.8023274739583335
+      }
+    },
+    {
+      "id": "calibrated-control-5",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "control",
+        "stage": 5,
+        "target": null,
+        "advance": 0.08,
+        "dreamSteps": 0,
+        "stepSize": 0
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 1.078125,
+        "seamMaxByte": 25,
+        "seamNeighborMeanByte": 3.359375,
+        "meanChangeByte": 15.62030283610026,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 2.383742014567057
+      }
+    },
+    {
+      "id": "calibrated-control-10",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "control",
+        "stage": 10,
+        "target": null,
+        "advance": 0.08,
+        "dreamSteps": 0,
+        "stepSize": 0
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 2.2233072916666665,
+        "seamMaxByte": 31,
+        "seamNeighborMeanByte": 3.8470052083333335,
+        "meanChangeByte": 14.790639241536459,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 1.7813065846761067
+      }
+    },
+    {
+      "id": "calibrated-arches-1",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "arches",
+        "stage": 1,
+        "target": {
+          "id": "arches",
+          "label": "Arches candidate",
+          "layer": "mixed_6a",
+          "channel": 42
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 1.1061197916666667,
+        "seamMaxByte": 5,
+        "seamNeighborMeanByte": 1.3567708333333333,
+        "meanChangeByte": 5.410463333129883,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.79692014058431
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": 0.26987192034721375,
+        "scoreEnd": 0.8208526372909546,
+        "bakeMs": 1811.0999999977648,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "id": "calibrated-arches-5",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "arches",
+        "stage": 5,
+        "target": {
+          "id": "arches",
+          "label": "Arches candidate",
+          "layer": "mixed_6a",
+          "channel": 42
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 2.1959635416666665,
+        "seamMaxByte": 11,
+        "seamNeighborMeanByte": 2.35546875,
+        "meanChangeByte": 3.7296950022379556,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.4031810760498047
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": 1.1133701801300049,
+        "scoreEnd": 1.5841189622879028,
+        "bakeMs": 1043.5999999977648,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "id": "calibrated-arches-10",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "arches",
+        "stage": 10,
+        "target": {
+          "id": "arches",
+          "label": "Arches candidate",
+          "layer": "mixed_6a",
+          "channel": 42
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 2.234375,
+        "seamMaxByte": 13,
+        "seamNeighborMeanByte": 2.361328125,
+        "meanChangeByte": 3.6417764027913413,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.4045677185058594
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": 1.2955174446105957,
+        "scoreEnd": 1.6085314750671387,
+        "bakeMs": 1001.5,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "id": "calibrated-organic-1",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "organic",
+        "stage": 1,
+        "target": {
+          "id": "organic",
+          "label": "Organic forms candidate",
+          "layer": "mixed_6c",
+          "channel": 144
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 1.3203125,
+        "seamMaxByte": 6,
+        "seamNeighborMeanByte": 1.3509114583333333,
+        "meanChangeByte": 5.57870356241862,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.732110341389974
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": -0.7704987525939941,
+        "scoreEnd": 1.566988229751587,
+        "bakeMs": 1349.0999999977648,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "id": "calibrated-organic-5",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "organic",
+        "stage": 5,
+        "target": {
+          "id": "organic",
+          "label": "Organic forms candidate",
+          "layer": "mixed_6c",
+          "channel": 144
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 1.87890625,
+        "seamMaxByte": 12,
+        "seamNeighborMeanByte": 2.0188802083333335,
+        "meanChangeByte": 3.5017776489257812,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.277838389078776
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": 2.622894287109375,
+        "scoreEnd": 3.472013235092163,
+        "bakeMs": 1169.4000000022352,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "id": "calibrated-organic-10",
+      "experiment": {
+        "phase": "calibrated",
+        "recipe": "organic",
+        "stage": 10,
+        "target": {
+          "id": "organic",
+          "label": "Organic forms candidate",
+          "layer": "mixed_6c",
+          "channel": 144
+        },
+        "advance": 0.08,
+        "dreamSteps": 4,
+        "stepSize": 0.012
+      },
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 1.94921875,
+        "seamMaxByte": 11,
+        "seamNeighborMeanByte": 2.0572916666666665,
+        "meanChangeByte": 3.4121678670247397,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 3.2977333068847656
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 4,
+        "scoreStart": 3.190993547439575,
+        "scoreEnd": 3.7086987495422363,
+        "bakeMs": 1167.0999999977648,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "stepSize": 0.012,
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    }
+  ]
+}

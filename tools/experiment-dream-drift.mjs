@@ -3,6 +3,8 @@
 // Add --target-sweep for six targets at 4/8 gentle steps, or
 // --forward-targets layer:channel,layer:channel for ten forward-regeneration stages.
 // --forward-control-only repeats the same crop/projection without further inference.
+// --calibrated-patterns compares direct panoramic approach motion with arches,
+// organic synthesis, and a motion-only control, all from the same initial seed.
 // Outputs include raw MI-GAN pixels, sphere-ready textures, six dome views,
 // independent Dream strengths, recursive Dream/outpainting, and a local gallery.
 import assert from "node:assert/strict";
@@ -65,6 +67,7 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === "--wasm") forceWasm = true;
   else if (args[i] === "--baseline-only") baselineOnly = true;
   else if (args[i] === "--target-sweep") experimentMode = "target-sweep";
+  else if (args[i] === "--calibrated-patterns") experimentMode = "calibrated";
   else if (args[i] === "--forward-control-only")
     experimentMode = "forward-control";
   else if (args[i] === "--forward-targets") {
@@ -147,6 +150,20 @@ const report = {
             cleanupOrReseeding: false,
           }
         : undefined,
+    calibratedPlan:
+      experimentMode === "calibrated"
+        ? {
+            stagesPerRecipe: 10,
+            advancePerStage: 0.08,
+            dreamSteps: 4,
+            targets: candidateTargets.filter((target) =>
+              ["arches", "organic"].includes(target.id),
+            ),
+            control: "Same direct panoramic warp, with no Dream synthesis",
+            generation:
+              "MI-GAN supplies the initial panorama only; later stages warp and optionally Dream it. No new area outpainting yet.",
+          }
+        : undefined,
     colorRetention: 1,
     independentSteps: experimentMode === "standard" ? [5, 15, 30] : undefined,
     recursiveSteps: experimentMode === "standard" ? [5, 5, 5] : undefined,
@@ -169,6 +186,7 @@ const report = {
       "Gentle modes use the actual optimizer at step size 0.012 through an experiment-only worker; target names are hypotheses, not guaranteed motifs.",
       "Six-view captures use the actual dome renderer with all relief and optical effects disabled.",
       "Timing includes real inference but does not establish simultaneous-generation frame rate.",
+      "Calibrated mode samples the prior panorama through a sphere-ray intersection; it does not paste a perspective screenshot into a flat photo rectangle. The dome camera remains at the origin.",
     ],
   },
   artifacts: [],
@@ -212,6 +230,18 @@ try {
       "**/assets/js/models/dream-drift-experiment.worker.js",
       (route) =>
         route.fulfill({ contentType: "text/javascript", body: workerSource }),
+    );
+  }
+  if (experimentMode === "calibrated") {
+    const projectionSource = await readFile(
+      new URL("./dream-drift-projection.mjs", import.meta.url),
+      "utf8",
+    );
+    report.projectionSha256 = createHash("sha256")
+      .update(projectionSource)
+      .digest("hex");
+    await page.route("**/assets/js/models/dream-drift-projection.js", (route) =>
+      route.fulfill({ contentType: "text/javascript", body: projectionSource }),
     );
   }
   await page.route(`${origin}/`, (route) =>
@@ -290,6 +320,11 @@ try {
         await import("/assets/js/models/equirectangular-canvas.js");
       const { luminanceDepth } =
         await import("/assets/js/models/depth-estimator.js");
+      const projection =
+        experimentMode === "calibrated"
+          ? await import("/assets/js/models/dream-drift-projection.js")
+          : null;
+      const calibrationChecks = [];
       const model = new CorticalDreamDomeModel();
       const baker = new DomeDreamBaker(
         experimentMode === "standard"
@@ -752,6 +787,111 @@ try {
             }
             continue;
           }
+          if (experimentMode === "calibrated") {
+            const initialPixels = pixels(generated.canvas);
+            let stationary = initialPixels;
+            for (let pass = 0; pass < 20; pass++)
+              stationary = projection.advancePanoramaPixels(
+                stationary,
+                1024,
+                512,
+                0,
+              );
+            let maximumByteError = 0;
+            for (let i = 0; i < stationary.length; i++)
+              maximumByteError = Math.max(
+                maximumByteError,
+                Math.abs(stationary[i] - initialPixels[i]),
+              );
+            if (maximumByteError !== 0)
+              throw new Error("Zero-motion calibration changed the panorama.");
+            calibrationChecks.push({
+              input: input.id,
+              zeroMotionPasses: 20,
+              maximumByteError,
+            });
+            const recipes = [
+              { id: "control", label: "Motion only", target: null },
+              ...candidateTargets
+                .filter((target) => ["arches", "organic"].includes(target.id))
+                .map((target) => ({
+                  id: target.id,
+                  label: target.label,
+                  target,
+                })),
+            ];
+            for (const recipe of recipes) {
+              let previous = generated.canvas;
+              for (let stage = 1; stage <= 10; stage++) {
+                const started = performance.now();
+                const warped = new OffscreenCanvas(1024, 512);
+                const data = projection.advancePanoramaPixels(
+                  pixels(previous),
+                  1024,
+                  512,
+                  0.08,
+                );
+                warped
+                  .getContext("2d")
+                  .putImageData(new ImageData(data, 1024, 512), 0, 0);
+                const experiment = {
+                  phase: "calibrated",
+                  recipe: recipe.id,
+                  stage,
+                  target: recipe.target,
+                  advance: 0.08,
+                  dreamSteps: recipe.target ? 4 : 0,
+                  stepSize: recipe.target ? 0.012 : 0,
+                };
+                if (recipe.target) {
+                  await save(
+                    input.id,
+                    `calibrated-${recipe.id}-${stage}-warp`,
+                    `${recipe.label} · stage ${stage} before synthesis`,
+                    warped,
+                    {
+                      captureViews: false,
+                      reference: previous,
+                      elapsedMs: performance.now() - started,
+                      experiment,
+                    },
+                  );
+                  const result = await dream(warped, 4, recipe.target);
+                  await save(
+                    input.id,
+                    `calibrated-${recipe.id}-${stage}`,
+                    `${recipe.label} · stage ${stage}`,
+                    result.canvas,
+                    {
+                      reference: warped,
+                      bake: result.bake,
+                      elapsedMs: result.bake.bakeMs,
+                      experiment,
+                      provenance:
+                        "Direct panoramic approach warp followed by gentle model synthesis; original palette retained",
+                    },
+                  );
+                  previous = result.canvas;
+                } else {
+                  await save(
+                    input.id,
+                    `calibrated-control-${stage}`,
+                    `Motion-only control · stage ${stage}`,
+                    warped,
+                    {
+                      reference: previous,
+                      elapsedMs: performance.now() - started,
+                      experiment,
+                      provenance:
+                        "Direct panoramic approach warp; no additional model inference after the initial panorama",
+                    },
+                  );
+                  previous = warped;
+                }
+              }
+            }
+            continue;
+          }
           const baseline = await dream(mirror, 15);
           await save(
             input.id,
@@ -840,6 +980,7 @@ try {
           migan: session.miganInfo,
           dreamRuns: baker.runs,
           glError: model.gl.getError(),
+          calibrationChecks,
         };
       } finally {
         baker.dispose();

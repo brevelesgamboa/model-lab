@@ -76,6 +76,18 @@ export async function writeDreamDriftGallery(output, report) {
           () => report.configuration.experimentMode === "forward-control",
         ),
     ],
+    [
+      "Calibrated motion · stage 5 comparison",
+      report.artifacts.filter((a) =>
+        /^calibrated-(?:control|arches|organic)-5$/.test(a.id),
+      ),
+    ],
+    [
+      "Calibrated motion · stage 10 comparison",
+      report.artifacts.filter((a) =>
+        /^calibrated-(?:control|arches|organic)-10$/.test(a.id),
+      ),
+    ],
   ];
   const stageEntries = report.artifacts.filter(
     (a) =>
@@ -85,10 +97,28 @@ export async function writeDreamDriftGallery(output, report) {
       a.front &&
       (a.id === "migan" || /^forward-(?:control-)?\d+$/.test(a.id)),
   );
-  const stagePlayer =
+  const stageGroups =
     stageEntries.length > 2
-      ? `<section><h2>Front-view stage snapshots</h2><p>Generated keyframes in the actual dome renderer. This player does not demonstrate smooth continuous movement.</p><label>Stage <input id="stage-slider" type="range" min="0" max="${stageEntries.length - 1}" value="0" step="1"></label> <button id="stage-play" type="button">Play stages</button><p id="stage-label"></p><img id="stage-preview" src="${escape(stageEntries[0].front)}" alt="Selected forward-regeneration stage"><script>const stages=${JSON.stringify(stageEntries.map((a) => ({ file: a.front, label: a.label })))};const slider=document.getElementById('stage-slider'),preview=document.getElementById('stage-preview'),label=document.getElementById('stage-label'),button=document.getElementById('stage-play');let timer;function showStage(){const stage=stages[Number(slider.value)];preview.src=stage.file;label.textContent=stage.label;}slider.addEventListener('input',showStage);button.addEventListener('click',()=>{if(timer){clearInterval(timer);timer=null;button.textContent='Play stages';}else{timer=setInterval(()=>{slider.value=String((Number(slider.value)+1)%stages.length);showStage();},1000);button.textContent='Pause';}});showStage();</script></section>`
-      : "";
+      ? [{ name: "Current sequence", entries: stageEntries }]
+      : [];
+  if (report.configuration.experimentMode === "calibrated") {
+    for (const [id, name] of [
+      ["arches", "Arches"],
+      ["organic", "Organic"],
+      ["control", "Motion only — no further inference"],
+    ]) {
+      const entries = report.artifacts.filter(
+        (a) =>
+          a.front &&
+          (a.id === "migan" ||
+            new RegExp(`^calibrated-${id}-\\d+$`).test(a.id)),
+      );
+      if (entries.length > 2) stageGroups.push({ name, entries });
+    }
+  }
+  const stagePlayer = stageGroups.length
+    ? `<section><h2>Front-view stage snapshots</h2><p>Generated keyframes in the actual dome renderer. This player does not demonstrate smooth continuous movement.</p><label ${stageGroups.length === 1 ? "hidden" : ""}>Pattern <select id="stage-recipe">${stageGroups.map((group, index) => `<option value="${index}">${escape(group.name)}</option>`).join("")}</select></label> <label>Stage <input id="stage-slider" type="range" min="0" max="${stageGroups[0].entries.length - 1}" value="0" step="1"></label> <button id="stage-play" type="button">Play stages</button><p id="stage-label"></p><img id="stage-preview" src="${escape(stageGroups[0].entries[0].front)}" alt="Selected forward-regeneration stage"><script>const groups=${JSON.stringify(stageGroups.map((group) => ({ name: group.name, stages: group.entries.map((a) => ({ file: a.front, label: a.label })) })))};const slider=document.getElementById('stage-slider'),preview=document.getElementById('stage-preview'),label=document.getElementById('stage-label'),button=document.getElementById('stage-play'),recipe=document.getElementById('stage-recipe');let timer;function stages(){return groups[Number(recipe.value)].stages;}function showStage(){const stage=stages()[Number(slider.value)];preview.src=stage.file;label.textContent=stage.label;}slider.addEventListener('input',showStage);recipe.addEventListener('change',()=>{slider.max=String(stages().length-1);slider.value=String(Math.min(Number(slider.value),stages().length-1));showStage();});button.addEventListener('click',()=>{if(timer){clearInterval(timer);timer=null;button.textContent='Play stages';}else{timer=setInterval(()=>{slider.value=String((Number(slider.value)+1)%stages().length);showStage();},1000);button.textContent='Pause';}});showStage();</script></section>`
+    : "";
   const comparisons = comparisonGroups
     .filter(([, entries]) => entries.length > 1)
     .map(
