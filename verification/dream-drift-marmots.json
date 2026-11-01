@@ -1,0 +1,799 @@
+{
+  "baselineSourceCommit": "4f6c9d2610c2ecad9e47ab67ef1ea1a581424c48",
+  "branch": "experiment/dream-drift",
+  "environment": {
+    "node": "v22.23.1",
+    "hardware": {
+      "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+      "webgpu": {
+        "vendor": "amd",
+        "isFallbackAdapter": false
+      }
+    }
+  },
+  "validation": {
+    "unitTestsPassed": 194,
+    "domeBrowserTestsPassed": 12,
+    "build": "passed",
+    "staticChecks": "passed",
+    "primaryArtifacts": 27,
+    "backendCheckArtifacts": 5,
+    "glError": 0,
+    "dreamWorkerRetainedTensors": 0,
+    "protectedPhotoMaxErrorByte": 0,
+    "miganRearSeamMaxErrorByte": 0
+  },
+  "configuration": {
+    "panorama": [
+      1024,
+      512
+    ],
+    "target": {
+      "layer": "mixed_5b",
+      "channel": 120
+    },
+    "colorRetention": 1,
+    "independentSteps": [
+      5,
+      15,
+      30
+    ],
+    "recursiveSteps": [
+      5,
+      5,
+      5
+    ],
+    "outpaintingViewYawDegrees": 60,
+    "effects": {
+      "waves": 0,
+      "refraction": 0,
+      "dispersion": 0,
+      "depthRelief": 0,
+      "neuralRelief": 0,
+      "cameraDolly": 0
+    },
+    "notes": [
+      "Uses the installed MI-GAN pipeline v2 and local InceptionV3 workers without stubs.",
+      "Mirrored textures require the dome's mirrored mapping; their flat texture is not a full panorama.",
+      "Raw MI-GAN output is saved before the existing photo/seam/pole compositor.",
+      "Dream-on-MI-GAN is an experiment harness combination, not a newly enabled application mode.",
+      "Progression releases photo protection; all independent strengths start from the same MI-GAN panorama.",
+      "Recursive outpainting reanchors a 60-degree perspective view; it does not demonstrate forward travel.",
+      "Six-view captures use the actual dome renderer with all relief and optical effects disabled.",
+      "Timing includes real inference but does not establish simultaneous-generation frame rate."
+    ]
+  },
+  "inputs": [
+    {
+      "id": "photo-1",
+      "name": "Himalayan-marmot_-udeyismailShutterstock-copy_en6jwc.jpg",
+      "sha256": "52b894d5b68ad461d50152e6c80a87e96cce492e5d7c05932ee98fa65464a3ee"
+    },
+    {
+      "id": "photo-2",
+      "name": "484351002_3898009110462736_2299646428952345762_n.jpg",
+      "sha256": "d8e9211c3ea5b36ccd2b0da2f13ad529b69bab941772d17664986a0f6eba57c1"
+    },
+    {
+      "id": "photo-3",
+      "name": "images.jpg",
+      "sha256": "40c995fe845080b9ac198465920eada3cbe14908e2b83beba82c9279ced4c82c"
+    }
+  ],
+  "modelIdentity": {
+    "miganPipelineSha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+    "inceptionGraphSha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849"
+  },
+  "primaryInference": {
+    "migan": {
+      "backend": "WebGPU + WASM",
+      "origin": "Local file",
+      "cached": true
+    },
+    "dreamRuns": 9,
+    "glError": 0
+  },
+  "backendCheck": {
+    "inference": {
+      "migan": {
+        "backend": "WASM",
+        "origin": "Local file",
+        "cached": true
+      },
+      "dreamRuns": 1,
+      "glError": 0
+    },
+    "backends": [
+      "WebGPU + WASM",
+      "WASM"
+    ],
+    "comparisons": [
+      {
+        "id": "migan-raw",
+        "meanAbsoluteRgbByte": 0.003840764363606771,
+        "maxAbsoluteRgbByte": 1,
+        "changedPixelPercent": 0.8249282836914062
+      },
+      {
+        "id": "migan",
+        "meanAbsoluteRgbByte": 0.0000782012939453125,
+        "maxAbsoluteRgbByte": 1,
+        "changedPixelPercent": 0.02346038818359375
+      }
+    ]
+  },
+  "observations": [
+    "Visual review found synthesized distortions in MI-GAN output while authored optical effects were disabled. GPU and WASM outputs differ by at most one byte per RGB channel for the checked landscape photo.",
+    "For mixed_5b channel 120, 5/15/30 independent Dream steps increasingly cover the same scene with repeating cellular texture; this is not evidence of generating new spatial areas.",
+    "Two rounds of view-conditioned outpainting invent surroundings but visibly lose detail and the original marmot. Mean horizontal edge difference drops from about 7.70 to 4.41 to 2.38 bytes per channel; this is a diagnostic of detail change, not an aesthetic score.",
+    "The small Hello photo gave a visually coherent first outpaint in this sample. The protected text remains in the original image; generated regions were not subjected to OCR.",
+    "High-strength Dream views show stretched patterns near the poles. Projection artifacts must be distinguished from model-generated content."
+  ],
+  "limitations": [
+    "Three photo examples, one Inception target, one hardware configuration, and one photo checked across MI-GAN backends.",
+    "No continuous forward-motion illusion or runtime background-generation frame rate has been tested.",
+    "Depth and neural relief are disabled in the visual comparisons; no trained depth inference was needed for these tests.",
+    "The view-conditioned outpainting chain is a reanchoring experiment, not a reconstructed or persistent 3D world.",
+    "Original photos and generated images remain in ignored local test-results; the runner, settings, and measurements are versioned."
+  ],
+  "artifacts": {
+    "gallery": "test-results/dream-drift-marmots/index.html",
+    "report": "test-results/dream-drift-marmots/report.json",
+    "wasmGallery": "test-results/dream-drift-marmots/wasm-check/index.html",
+    "backendComparison": "test-results/dream-drift-marmots/backend-comparison.json"
+  },
+  "reproduction": [
+    "node tools/experiment-dream-drift.mjs /path/to/landscape.jpg /path/to/close-marmot.jpg /path/to/hello.jpg",
+    "node tools/experiment-dream-drift.mjs --wasm --baseline-only --output test-results/dream-drift-marmots/wasm-check /path/to/landscape.jpg"
+  ],
+  "measurements": [
+    {
+      "input": "photo-1",
+      "id": "source",
+      "mapping": "source",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 726,
+        "height": 968,
+        "opaque": true,
+        "seamMeanByte": 64.95488980716253,
+        "seamMaxByte": 254,
+        "seamNeighborMeanByte": 15.904269972451791,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 14.8474626998763
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "mirrored",
+      "mapping": "mirrored",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 63.569661458333336,
+        "seamMaxByte": 254,
+        "seamNeighborMeanByte": 8.177083333333334,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 8.274516423543295
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "migan-raw",
+      "mapping": "migan",
+      "elapsedMs": 739.6999999992549,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 46.805989583333336,
+        "seamMaxByte": 250,
+        "seamNeighborMeanByte": 4.853515625,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 9.19906997680664
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "migan",
+      "mapping": "migan",
+      "elapsedMs": 739.6999999992549,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0,
+        "seamMaxByte": 0,
+        "seamNeighborMeanByte": 3.291015625,
+        "meanChangeByte": 134.16485049449875,
+        "protectedMaxByte": 0,
+        "meanHorizontalEdgeByte": 7.70089724973451
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "dream-mirrored-15",
+      "mapping": "mirrored",
+      "elapsedMs": 5020.599999997765,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 23.0625,
+        "seamMaxByte": 129,
+        "seamNeighborMeanByte": 5.341145833333333,
+        "meanChangeByte": 30.045820236206055,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 11.32503890991211
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 15,
+        "scoreStart": -0.647742748260498,
+        "scoreEnd": 5.885648250579834,
+        "bakeMs": 5020.599999997765,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "independent-5",
+      "mapping": "migan",
+      "elapsedMs": 1013.8000000007451,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 3.572265625,
+        "seamMaxByte": 17,
+        "seamNeighborMeanByte": 3.560546875,
+        "meanChangeByte": 16.97767702738444,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 8.843470891316732
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 5,
+        "scoreStart": -0.3134614825248718,
+        "scoreEnd": 3.0178377628326416,
+        "bakeMs": 1013.8000000007451,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "independent-15",
+      "mapping": "migan",
+      "elapsedMs": 2283.800000000745,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 5.20703125,
+        "seamMaxByte": 19,
+        "seamNeighborMeanByte": 4.932942708333333,
+        "meanChangeByte": 29.37272834777832,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 11.917221069335938
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 15,
+        "scoreStart": -0.3134614825248718,
+        "scoreEnd": 5.957437515258789,
+        "bakeMs": 2283.800000000745,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "independent-30",
+      "mapping": "migan",
+      "elapsedMs": 4448,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 5.478515625,
+        "seamMaxByte": 26,
+        "seamNeighborMeanByte": 5.201822916666667,
+        "meanChangeByte": 42.81526883443197,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 15.203259150187174
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 30,
+        "scoreStart": -0.3134614825248718,
+        "scoreEnd": 7.808780193328857,
+        "bakeMs": 4448,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-dream-1",
+      "mapping": "migan",
+      "elapsedMs": 952.1000000014901,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 3.572265625,
+        "seamMaxByte": 17,
+        "seamNeighborMeanByte": 3.560546875,
+        "meanChangeByte": 16.97767702738444,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 8.843470891316732
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 5,
+        "scoreStart": -0.3134614825248718,
+        "scoreEnd": 3.0178377628326416,
+        "bakeMs": 952.1000000014901,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-dream-2",
+      "mapping": "migan",
+      "elapsedMs": 933.6999999992549,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 3.5625,
+        "seamMaxByte": 17,
+        "seamNeighborMeanByte": 3.9212239583333335,
+        "meanChangeByte": 22.602331797281902,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 10.044415791829428
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 5,
+        "scoreStart": 3.000131845474243,
+        "scoreEnd": 4.5037689208984375,
+        "bakeMs": 933.6999999992549,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-dream-3",
+      "mapping": "migan",
+      "elapsedMs": 960.6999999992549,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 3.6640625,
+        "seamMaxByte": 17,
+        "seamNeighborMeanByte": 4.020182291666667,
+        "meanChangeByte": 27.448523203531902,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 11.136624654134115
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 5,
+        "scoreStart": 4.336724281311035,
+        "scoreEnd": 5.318312168121338,
+        "bakeMs": 960.6999999992549,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "outpaint-context-1",
+      "mapping": "perspective",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 512,
+        "height": 384,
+        "opaque": true,
+        "seamMeanByte": 48.559895833333336,
+        "seamMaxByte": 154,
+        "seamNeighborMeanByte": 6.298611111111111,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 5.703787909613715
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-outpaint-1-raw",
+      "mapping": "migan",
+      "elapsedMs": 212.60000000149012,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 40.845052083333336,
+        "seamMaxByte": 134,
+        "seamNeighborMeanByte": 2.1647135416666665,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 4.5310109456380205
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-outpaint-1",
+      "mapping": "migan",
+      "elapsedMs": 212.60000000149012,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0,
+        "seamMaxByte": 0,
+        "seamNeighborMeanByte": 1.232421875,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 4.407267252604167
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "outpaint-context-2",
+      "mapping": "perspective",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 512,
+        "height": 384,
+        "opaque": true,
+        "seamMeanByte": 42.786458333333336,
+        "seamMaxByte": 171,
+        "seamNeighborMeanByte": 2.6805555555555554,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 2.3028564453125
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-outpaint-2-raw",
+      "mapping": "migan",
+      "elapsedMs": 264.70000000298023,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 49.645833333333336,
+        "seamMaxByte": 176,
+        "seamNeighborMeanByte": 1.4733072916666667,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 2.440302530924479
+      }
+    },
+    {
+      "input": "photo-1",
+      "id": "recursive-outpaint-2",
+      "mapping": "migan",
+      "elapsedMs": 264.70000000298023,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0,
+        "seamMaxByte": 0,
+        "seamNeighborMeanByte": 0.8385416666666666,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 2.376744588216146
+      }
+    },
+    {
+      "input": "photo-2",
+      "id": "source",
+      "mapping": "source",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 1536,
+        "height": 2048,
+        "opaque": true,
+        "seamMeanByte": 68.04996744791667,
+        "seamMaxByte": 232,
+        "seamNeighborMeanByte": 14.650390625,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 18.621886253356934
+      }
+    },
+    {
+      "input": "photo-2",
+      "id": "mirrored",
+      "mapping": "mirrored",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 65.015625,
+        "seamMaxByte": 205,
+        "seamNeighborMeanByte": 17.341796875,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 20.12194061279297
+      }
+    },
+    {
+      "input": "photo-2",
+      "id": "migan-raw",
+      "mapping": "migan",
+      "elapsedMs": 217.80000000074506,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 44.111328125,
+        "seamMaxByte": 170,
+        "seamNeighborMeanByte": 6.839192708333333,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 11.497529983520508
+      }
+    },
+    {
+      "input": "photo-2",
+      "id": "migan",
+      "mapping": "migan",
+      "elapsedMs": 217.80000000074506,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0,
+        "seamMaxByte": 0,
+        "seamNeighborMeanByte": 4.283854166666667,
+        "meanChangeByte": 110.9441097216503,
+        "protectedMaxByte": 0,
+        "meanHorizontalEdgeByte": 9.587006494585438
+      }
+    },
+    {
+      "input": "photo-2",
+      "id": "dream-mirrored-15",
+      "mapping": "mirrored",
+      "elapsedMs": 2290.800000000745,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 10.47265625,
+        "seamMaxByte": 53,
+        "seamNeighborMeanByte": 5.587890625,
+        "meanChangeByte": 35.865193684895836,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 14.818650563557943
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 15,
+        "scoreStart": -0.46587446331977844,
+        "scoreEnd": 5.9569172859191895,
+        "bakeMs": 2290.800000000745,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    },
+    {
+      "input": "photo-3",
+      "id": "source",
+      "mapping": "source",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 335,
+        "height": 597,
+        "opaque": true,
+        "seamMeanByte": 33.7677275265215,
+        "seamMaxByte": 178,
+        "seamNeighborMeanByte": 9.6214405360134,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 10.095482387059677
+      }
+    },
+    {
+      "input": "photo-3",
+      "id": "mirrored",
+      "mapping": "mirrored",
+      "elapsedMs": 0,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 32.307942708333336,
+        "seamMaxByte": 175,
+        "seamNeighborMeanByte": 0,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 2.8423150380452475
+      }
+    },
+    {
+      "input": "photo-3",
+      "id": "migan-raw",
+      "mapping": "migan",
+      "elapsedMs": 208.70000000298023,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 39.797526041666664,
+        "seamMaxByte": 141,
+        "seamNeighborMeanByte": 2.04296875,
+        "meanChangeByte": null,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 4.748206456502278
+      }
+    },
+    {
+      "input": "photo-3",
+      "id": "migan",
+      "mapping": "migan",
+      "elapsedMs": 208.70000000298023,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 0,
+        "seamMaxByte": 0,
+        "seamNeighborMeanByte": 1.6282552083333333,
+        "meanChangeByte": 123.2407532204612,
+        "protectedMaxByte": 0,
+        "meanHorizontalEdgeByte": 4.070522900287034
+      }
+    },
+    {
+      "input": "photo-3",
+      "id": "dream-mirrored-15",
+      "mapping": "mirrored",
+      "elapsedMs": 2205.39999999851,
+      "metrics": {
+        "width": 1024,
+        "height": 512,
+        "opaque": true,
+        "seamMeanByte": 7.470052083333333,
+        "seamMaxByte": 59,
+        "seamNeighborMeanByte": 4.939453125,
+        "meanChangeByte": 30.47295888264974,
+        "protectedMaxByte": null,
+        "meanHorizontalEdgeByte": 11.147416432698568
+      },
+      "bake": {
+        "type": "result",
+        "width": 1024,
+        "height": 512,
+        "iterations": 15,
+        "scoreStart": -0.18331021070480347,
+        "scoreEnd": 6.333533763885498,
+        "bakeMs": 2205.39999999851,
+        "sizes": [
+          [
+            256,
+            512
+          ],
+          [
+            512,
+            1024
+          ]
+        ],
+        "backend": "webgl",
+        "retainedTensors": 0
+      }
+    }
+  ]
+}
