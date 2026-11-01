@@ -110,10 +110,10 @@ const CONTROLS = [
   },
   range(
     "depthScale",
-    "DEPTH SCALE",
+    "3D EXTRUSION",
     1.5,
     0.6,
-    "Pulls nearby regions inward using cached relative depth.",
+    "Pulls nearby regions inward using cached relative depth. No inference runs when this changes.",
   ),
   range(
     "neuralSwell",
@@ -124,20 +124,22 @@ const CONTROLS = [
   ),
   {
     key: "waveMode",
-    label: "CORTICAL WAVE MODE",
+    label: "WAVE MODE",
     type: "select",
     default: 2,
-    options: ["Rings", "Rays", "Spiral", "Honeycomb"].map((label, value) => ({
-      value,
-      label,
-    })),
+    options: [
+      { value: 0, label: "Concentric Rings" },
+      { value: 1, label: "Radiating Rays" },
+      { value: 2, label: "Logarithmic Spiral" },
+      { value: 3, label: "Honeycomb" },
+    ],
   },
   range(
     "gain",
-    "WAVE GAIN",
+    "CORTICAL GAIN",
     1,
-    0.3,
-    "Height of moving log-polar waves, plus subtle color refraction.",
+    0.25,
+    "Height of the moving waves on the dome surface.",
   ),
   range(
     "frequency",
@@ -173,31 +175,24 @@ const CONTROLS = [
     0.35,
     "Bends photo detail along wave gradients.",
   ),
-  range(
-    "chromaticDispersion",
-    "CHROMATIC DISPERSION",
-    0.01,
-    0.0025,
-    "Optical spectral dispersion along wave bends.",
-  ),
   {
     ...range(
-      "specularShininess",
-      "SPECULAR SHININESS",
-      64,
-      32,
-      "Tightness of the camera spotlight specular reflection.",
-      4,
+      "chromaticDispersion",
+      "CHROMATIC DISPERSION",
+      1,
+      0.35,
+      "Optical spectral dispersion along wave bends.",
+      0,
     ),
-    step: 2,
-    fineStep: 1,
+    format: "percent",
   },
   range(
-    "fogDensity",
-    "VOID FOG DENSITY",
-    1,
-    0.35,
-    "Density of darkness fading into the distance.",
+    "cameraDolly",
+    "PARALLAX DEPTH",
+    2.5,
+    0.8,
+    "Observer position inside the dome for true 3D perspective parallax. Scroll wheel also zooms/dollies.",
+    -2.0,
   ),
 ];
 
@@ -225,6 +220,24 @@ class LazyDomeDreamBridge extends DreamGuidanceBridge {
   }
 }
 
+export const DOME_CONTROL_SECTIONS = Object.freeze([
+  {
+    id: "geometry",
+    label: "Geometry & Depth",
+    keys: ["depthScale", "neuralSwell", "cameraDolly", "featureTarget"],
+  },
+  {
+    id: "waves",
+    label: "Wave Dynamics",
+    keys: ["waveMode", "gain", "frequency", "speed", "eccentricity"],
+  },
+  {
+    id: "optics",
+    label: "Optics & Refraction",
+    keys: ["edgeCoupling", "chromaticDispersion"],
+  },
+]);
+
 export class CorticalDreamDomeModel {
   constructor() {
     this.id = "cortical-dream-dome";
@@ -233,23 +246,26 @@ export class CorticalDreamDomeModel {
     this.description =
       "Stand inside your photo. Drag to look through 360°, with depth relief, neuron-driven swells and moving cortical waves. Arrow keys also look around.";
     this.controls = CONTROLS;
+    this.controlSections = DOME_CONTROL_SECTIONS;
     this.supportsRandomize = false;
     this.captureCapabilities = { savedRun: false };
     this.captureDisabledReason =
       "Photos, feature maps and camera views stay in this tab. Export PNG or GIF to keep the view.";
     this.technicalInfo = {
       title: this.name,
+      overview:
+        "A photo is mapped onto the interior of an inward-facing 360 sphere. Depth estimation raises foreground features in 3D relief, while analytic cortical waves travel continuously across the dome. Synthesize Dream runs InceptionV3 feature ascent in the background to hallucinate neural textures into the surrounding space while preserving the original photo.",
       architecture: "256² inward-facing sphere; analytic log-polar waves",
       inferenceFramework:
-        "Shared depth and Inception loaders; one-shot feature maps and manual multi-step Dream ascent in workers",
+        "Depth Anything V2 & InceptionV3 feature extractors running client-side in browser workers",
       inferenceBackend: "Depth: WebGPU / WASM; features: TF.js WebGL",
       browserInput:
         "Local photo; depth up to 518 pixels, feature map 299²; Dream panorama 1024 × 512",
       browserOutput:
         "Cached equirectangular Dream texture, relative depth and channel map; radial displacement in WebGL2",
-      license:
-        "Depth Anything V2 Small: Apache-2.0; Inception checkpoint: see third-party notice",
+      license: "Depth Anything V2: Apache-2.0; InceptionV3: Apache-2.0",
       provenanceUrl: "https://distill.pub/2017/feature-visualization/",
+      provenanceLabel: "Distill Feature Visualization Article ↗",
     };
     this.camera = new DomeCamera();
     this.estimator = new DepthEstimator();
@@ -646,22 +662,25 @@ export class CorticalDreamDomeModel {
       if (this.depthAbort === abort) this.depthAbort = null;
     }
   }
-  setNeuronTarget(layer, channel) {
+  setNeuronTarget(layer, channel, forceCustom = false) {
     const validated = validateFeatureTarget(layer, channel);
+    const idx = FEATURE_TARGETS.findIndex(
+      (t) => t.layer === validated.layer && t.channel === validated.channel,
+    );
+    const isCustom = forceCustom || idx < 0;
+    this.selectedTarget = isCustom ? -1 : idx;
+    this._isCustomNeuron = isCustom;
+    this._lastSeenParamFeatureTarget = this.selectedTarget;
     if (
       this.selectedLayer === validated.layer &&
       this.selectedChannel === validated.channel &&
       this.featureState === "ready"
-    )
+    ) {
+      this.onStateChange();
       return;
+    }
     this.selectedLayer = validated.layer;
     this.selectedChannel = validated.channel;
-    const idx = FEATURE_TARGETS.findIndex(
-      (t) => t.layer === validated.layer && t.channel === validated.channel,
-    );
-    this.selectedTarget = idx >= 0 ? idx : -1;
-    this._isCustomNeuron = idx < 0;
-    this._lastSeenParamFeatureTarget = this.selectedTarget;
     this.cancelDream();
     this.featureAbort?.abort();
     this.featureMap = emptyFeatureMap();
@@ -800,11 +819,6 @@ export class CorticalDreamDomeModel {
     }
   }
   onParameterChange(key, value) {
-    if (key === "colorRetention" && Number.isFinite(value)) {
-      if (value !== this.colorRetention) this.cancelDream();
-      this.colorRetention = Math.max(0, Math.min(1, value));
-      return false;
-    }
     if (key === "featureTarget" && Number.isInteger(value)) {
       if (value === -1) {
         this._isCustomNeuron = true;
@@ -873,7 +887,6 @@ export class CorticalDreamDomeModel {
         this._isCustomNeuron = true;
       }
     }
-    this.onParameterChange("colorRetention", p.colorRetention ?? 1);
     const version = this.sourceVersion;
     const g = await this.ensureGraphics(),
       gl = this.gl;
@@ -901,10 +914,12 @@ export class CorticalDreamDomeModel {
       gl.bindTexture(gl.TEXTURE_2D, g.textures[i]);
       gl.uniform1i(g.uniforms[name], i);
     }
+    this.camera.dolly = p.cameraDolly ?? 0.8;
     const camera = this.camera.matrices(target.width / target.height);
     gl.uniformMatrix4fv(g.uniforms.view, false, camera.view);
     gl.uniformMatrix4fv(g.uniforms.proj, false, camera.projection);
     gl.uniform3fv(g.uniforms.viewDir, camera.direction);
+    gl.uniform3fv(g.uniforms.viewPos, camera.position);
     gl.uniform2f(g.uniforms.aspect, 1, 1);
     gl.uniform2f(g.uniforms.fovea, 0.5, 0.5);
     gl.uniform1i(g.uniforms.wave_mode, p.waveMode);
@@ -913,18 +928,16 @@ export class CorticalDreamDomeModel {
       this.outpaintingMode === "mirrored" ? 1 : 0,
     );
     for (const [name, value] of Object.entries({
-      color_retention: this.colorRetention,
+      color_retention: this.colorRetention ?? 1,
       time: timeSeconds,
       frequency: p.frequency,
       speed: p.speed,
       gain: p.gain,
-      depth_extrude: p.depthScale,
+      depth_extrude: p.extrude ?? p.depthScale ?? 0.6,
       neural_extrude: p.neuralSwell,
       eccentricity: p.eccentricity,
       edge_coupling: p.edgeCoupling ?? 0.35,
-      dispersion: p.chromaticDispersion ?? 0.0025,
-      shininess: p.specularShininess ?? 32,
-      fog_density: p.fogDensity ?? 0.35,
+      dispersion: p.chromaticDispersion ?? 0.35,
     }))
       gl.uniform1f(g.uniforms[name], value);
     gl.drawElements(gl.TRIANGLES, g.count, gl.UNSIGNED_SHORT, 0);

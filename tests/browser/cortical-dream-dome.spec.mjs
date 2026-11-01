@@ -121,10 +121,14 @@ test("the independent dome closes a 360 view, renders all waves, supports drag/k
       window.__dome.camera.pitch,
     ]),
   ).toEqual([0, 0]);
+  const wavesSection = page.locator('details[data-section="waves"]');
+  if (!(await wavesSection.getAttribute("open"))) {
+    await page.locator('details[data-section="waves"] > summary').click();
+  }
   const images = [];
   for (const mode of ["0", "1", "2", "3"]) {
     await page
-      .getByLabel("CORTICAL WAVE MODE", { exact: true })
+      .getByLabel("WAVE MODE", { exact: true })
       .selectOption(mode);
     await expect(page.locator("#render-state")).toHaveText("FRAME READY");
     images.push(await canvas.evaluate((c) => c.toDataURL()));
@@ -280,8 +284,12 @@ test("a missing feature model keeps depth and waves interactive and only retries
   expect(
     await page.evaluate(() => Array.from(window.__dome.featureMap.values)),
   ).toEqual([0]);
+  const wavesSection = page.locator('details[data-section="waves"]');
+  if (!(await wavesSection.getAttribute("open"))) {
+    await page.locator('details[data-section="waves"] > summary').click();
+  }
   await page
-    .getByLabel("CORTICAL WAVE MODE", { exact: true })
+    .getByLabel("WAVE MODE", { exact: true })
     .selectOption("0");
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   expect(await page.evaluate(() => window.__dome.featureEstimator.runs)).toBe(
@@ -540,6 +548,38 @@ test("dome browse button connects neuron explorer, supports custom neurons, and 
   // Verify color retention control is not present under MODEL CONTROLS
   await expect(page.locator('[data-parameter="colorRetention"]')).toHaveCount(0);
 
+  // Verify section grouping: first section open by default, others closed
+  await expect(page.locator('details[data-section="geometry"]')).toHaveAttribute(
+    "open",
+    "",
+  );
+  await expect(
+    page.locator('details[data-section="waves"]'),
+  ).not.toHaveAttribute("open", "");
+  await expect(
+    page.locator('details[data-section="optics"]'),
+  ).not.toHaveAttribute("open", "");
+
+  // Verify custom neuron controls toggle with custom dropdown selection
+  const customControls = page.locator("#dome-custom-neuron-controls");
+  await expect(customControls).toBeHidden();
+
+  const select = page.locator("#dome-archetypes");
+  await select.selectOption("-1");
+  await expect(customControls).toBeVisible();
+
+  // Stepper controls
+  const channelInput = page.locator("#dome-custom-ch-input");
+  const initialCh = parseInt(await channelInput.inputValue(), 10);
+  await page.locator("#dome-custom-ch-inc").click();
+  expect(parseInt(await channelInput.inputValue(), 10)).toBe(initialCh + 1);
+  await page.locator("#dome-custom-ch-dec").click();
+  expect(parseInt(await channelInput.inputValue(), 10)).toBe(initialCh);
+
+  // Selecting preset archetype hides custom controls
+  await select.selectOption("0");
+  await expect(customControls).toBeHidden();
+
   // Verify browse button opens explorer dialog
   const browseBtn = page.locator("#dome-browse-neurons");
   await expect(browseBtn).toBeVisible();
@@ -559,7 +599,6 @@ test("dome browse button connects neuron explorer, supports custom neurons, and 
   await expect(dialog).not.toBeVisible();
 
   // Verify custom target updated on dome select and model
-  const select = page.locator("#dome-archetypes");
   await expect(select).toHaveValue("-1");
   const option = select.locator('option[value="-1"]');
   await expect(option).not.toHaveAttribute("hidden");

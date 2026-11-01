@@ -458,6 +458,12 @@ summary {
 }
 .mini-button {
   min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 .mini-button--highlight {
   background: #242834;
@@ -563,6 +569,9 @@ summary {
 }
 .has-dome-camera.is-looking {
   cursor: grabbing;
+}
+.has-dome-camera.is-panning {
+  cursor: move;
 }
 .dome-bake-overlay {
   position: absolute;
@@ -3833,4 +3842,30 @@ input[type="range"]::-moz-range-progress {
 
 .dome-synthesis-panel[hidden] {
   display: none !important;
+}
+
+.dome-custom-neuron {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.dome-custom-neuron[hidden] {
+  display: none !important;
+}
+
+.dome-custom-neuron__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dome-custom-neuron__header .field {
+  flex: 1;
+  margin: 0;
 }

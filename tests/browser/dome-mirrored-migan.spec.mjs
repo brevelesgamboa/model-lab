@@ -103,7 +103,7 @@ test("optional model prompt, bad-file fallback, cancellation and late worker res
   expect(errors).toEqual([]);
 });
 
-test("mirrored geometry closes rear and poles and retention lighting keeps grayscale free of colored artifacts", async ({
+test("mirrored geometry closes rear and poles and grayscale stays neutral with optical effects disabled", async ({
   page,
   context,
 }) => {
@@ -115,6 +115,7 @@ test("mirrored geometry closes rear and poles and retention lighting keeps grays
     target.width = 256;
     target.height = 256;
     const p = Object.fromEntries(d.controls.map((c) => [c.key, c.default]));
+    Object.assign(p, { gain: 0, edgeCoupling: 0, chromaticDispersion: 0 });
     let maxChroma = 0,
       minSum = Infinity;
     for (const [yaw, pitch] of [
@@ -166,13 +167,11 @@ test("real MI-GAN file picker compiles, caches bytes and reuses IndexedDB after 
   await upload(page);
   await page.locator("#dome-outpainting").selectOption("migan");
   await expect(page.locator("#dome-migan-card")).toBeVisible();
-  await page
-    .locator("#dome-migan-file")
-    .setInputFiles({
-      name: "invalid.onnx",
-      mimeType: "application/octet-stream",
-      buffer: Buffer.from("broken protobuf"),
-    });
+  await page.locator("#dome-migan-file").setInputFiles({
+    name: "invalid.onnx",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("broken protobuf"),
+  });
   await expect(page.locator("#dome-outpainting")).toHaveValue("mirrored", {
     timeout: 120000,
   });
@@ -220,7 +219,9 @@ test("real MI-GAN file picker compiles, caches bytes and reuses IndexedDB after 
   });
   await expect(page.locator("#dome-generate")).toBeHidden();
   const hasAiDepth = await page.evaluate(
-    () => window.__dome.aiDepthMap !== null && window.__dome.aiDepthMap.depth.length > 0,
+    () =>
+      window.__dome.aiDepthMap !== null &&
+      window.__dome.aiDepthMap.depth.length > 0,
   );
   expect(hasAiDepth).toBe(true);
   await page.locator("#dome-outpainting").selectOption("mirrored");

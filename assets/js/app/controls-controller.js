@@ -102,6 +102,7 @@ export function renderModelTechnicalInfo(elements, model) {
   };
 
   addRow("MODEL", info.title);
+  addRow("OVERVIEW", info.overview);
   addRow("ARCHITECTURE", info.architecture);
   addRow("TRAINING SET", info.trainingSet);
   addRow("DATASET IDENTITIES", info.datasetIdentities);
@@ -118,7 +119,7 @@ export function renderModelTechnicalInfo(elements, model) {
   if (info.provenanceUrl) {
     const link = document.createElement("a");
     link.href = info.provenanceUrl;
-    link.textContent = "Checkpoint attribution and license";
+    link.textContent = info.provenanceLabel || "Checkpoint attribution and license";
     link.target = "_blank";
     link.rel = "noopener";
     elements.modelInfoContent.append(link);
@@ -152,7 +153,6 @@ export function createControlsController({
   let presetSelect = null;
   let neuronGallery = null;
   let sensorExplorer = null;
-  let manualChannelOpen = false;
   const sectionsKey = "gl-bench:control-sections";
   let sectionState = {};
   try {
@@ -342,19 +342,24 @@ export function createControlsController({
 
     renderPresetControl();
 
-    const grouped = currentModel.id === "neural-growth";
+    const modelSections =
+      currentModel.controlSections ||
+      (currentModel.id === "neural-growth" ? GROWTH_CONTROL_SECTIONS : null);
+    const grouped = Boolean(modelSections);
     const sectionContents = new Map();
     elements.advancedControls?.classList.toggle("is-grouped", grouped);
     if (grouped) {
       elements.advancedControls.open = true;
-      for (const { id, label } of GROWTH_CONTROL_SECTIONS) {
+      for (const [index, { id, label }] of modelSections.entries()) {
         const section = document.createElement("details");
         section.className = "control-section";
         section.dataset.section = id;
         section.open =
           typeof sectionState[id] === "boolean"
             ? sectionState[id]
-            : id === "pattern";
+            : currentModel.id === "neural-growth"
+              ? id === "pattern"
+              : index === 0;
         const summary = document.createElement("summary");
         summary.textContent = label;
         const content = document.createElement("div");
@@ -373,16 +378,19 @@ export function createControlsController({
         elements.parameterControls.append(section);
         sectionContents.set(id, content);
       }
-      sectionContents.get("pattern").append(elements.growthTools);
-      const browseNeurons = document.createElement("button");
-      browseNeurons.type = "button";
-      browseNeurons.className = "mini-button browse-neurons";
-      browseNeurons.textContent = "Browse neurons";
-      browseNeurons.addEventListener("click", () => {
-        sectionContents.get("dream").parentElement.open = true;
-        neuronGallery?.open();
-      });
-      sectionContents.get("pattern").append(browseNeurons);
+      if (currentModel.id === "neural-growth") {
+        sectionContents.get("pattern")?.append(elements.growthTools);
+        const browseNeurons = document.createElement("button");
+        browseNeurons.type = "button";
+        browseNeurons.className = "mini-button browse-neurons";
+        browseNeurons.textContent = "Browse neurons";
+        browseNeurons.addEventListener("click", () => {
+          const dreamParent = sectionContents.get("dream")?.parentElement;
+          if (dreamParent) dreamParent.open = true;
+          neuronGallery?.open();
+        });
+        sectionContents.get("pattern")?.append(browseNeurons);
+      }
     }
 
     const definitions =
@@ -390,18 +398,18 @@ export function createControlsController({
       currentModel.controls;
     definitions.forEach((definition) => {
       if (
-        grouped &&
+        currentModel.id === "neural-growth" &&
         (GROWTH_BRUSH_KEYS.includes(definition.key) ||
           isPausedAudioControl(definition.key))
       )
         return;
       const section = grouped
-        ? GROWTH_CONTROL_SECTIONS.find(({ keys }) =>
+        ? modelSections.find(({ keys }) =>
             keys.includes(definition.key),
-          )?.id || "simulation"
+          )?.id || modelSections[0]?.id
         : null;
       const parent = grouped
-        ? sectionContents.get(section)
+        ? sectionContents.get(section) || elements.parameterControls
         : elements.parameterControls;
       if (definition.key === "targetLayer" && currentModel.neuronArchetypes) {
         neuronGallery = createNeuronGallery({

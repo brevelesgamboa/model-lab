@@ -3,6 +3,7 @@ import {
   createDomeNeuronControls,
 } from "../ui/dome-controls.js";
 import { createLocalModelCacheControls } from "../ui/local-model-cache.js";
+import { terminal } from "../ui/terminal.js";
 
 export function createDomeController({
   elements,
@@ -14,6 +15,7 @@ export function createDomeController({
 }) {
   let gesture = null;
   let cacheKey = null;
+  let lastLoggedPipeline = null;
   const cache = createLocalModelCacheControls(elements);
   const isActive = () => getModel() === model;
   const outpainting = createDomeOutpaintingControls(
@@ -38,6 +40,7 @@ export function createDomeController({
     if (previous && elements.canvas.hasPointerCapture?.(previous.id))
       elements.canvas.releasePointerCapture(previous.id);
     elements.canvas.classList.remove("is-looking");
+    elements.canvas.classList.remove("is-panning");
   }
   function update() {
     const active = isActive();
@@ -53,7 +56,17 @@ export function createDomeController({
       return;
     }
     if (model.bakeState === "baking") endGesture();
-    elements.domeStatus.textContent = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
+    const fullPipeline = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
+    if (fullPipeline !== lastLoggedPipeline) {
+      lastLoggedPipeline = fullPipeline;
+      terminal("DOME", fullPipeline, "info");
+    }
+    const compactFeature = model.featureStatus?.split(" · ")[0] || "";
+    const compactDepth = model.depthStatus?.split(" · ")[0] || "";
+    elements.domeStatus.textContent =
+      [compactFeature, compactDepth].filter(Boolean).join(" · ") ||
+      "Photo ready · Depth cached";
+    elements.domeStatus.title = fullPipeline;
     const isMigan =
       model.outpaintingMode === "migan" ||
       ["loading", "missing"].includes(model.inpaintState);
@@ -147,14 +160,19 @@ export function createDomeController({
       !isActive() ||
       !canInteract() ||
       model.bakeState === "baking" ||
-      event.button !== 0
+      ![0, 1, 2].includes(event.button)
     )
       return;
     event.preventDefault();
-    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    gesture = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      pan: event.button !== 0 || event.shiftKey,
+    };
     elements.canvas.focus({ preventScroll: true });
     elements.canvas.setPointerCapture(event.pointerId);
-    elements.canvas.classList.add("is-looking");
+    elements.canvas.classList.add(gesture.pan ? "is-panning" : "is-looking");
   });
   elements.canvas.addEventListener("pointermove", (event) => {
     if (
@@ -166,13 +184,38 @@ export function createDomeController({
     )
       return;
     event.preventDefault();
-    model.camera.look(event.clientX - gesture.x, event.clientY - gesture.y);
+    const dx = event.clientX - gesture.x,
+      dy = event.clientY - gesture.y;
     gesture.x = event.clientX;
     gesture.y = event.clientY;
+    if (gesture.pan) {
+      model.camera.pan(dx, dy, elements.canvas.clientHeight || 512);
+    } else {
+      model.camera.look(dx, dy);
+    }
     redraw();
   });
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
     elements.canvas.addEventListener(name, endGesture);
+  elements.canvas.addEventListener(
+    "wheel",
+    (event) => {
+      if (!isActive() || !canInteract()) return;
+      event.preventDefault();
+      const scale =
+        event.deltaMode === 1
+          ? 16
+          : event.deltaMode === 2
+            ? elements.canvas.clientHeight
+            : 1;
+      model.camera.zoom(event.deltaY * scale);
+      redraw();
+    },
+    { passive: false },
+  );
+  elements.canvas.addEventListener("contextmenu", (event) => {
+    if (isActive()) event.preventDefault();
+  });
   elements.canvas.addEventListener("keydown", (event) => {
     if (!isActive() || !canInteract() || model.bakeState === "baking") return;
     const direction = {

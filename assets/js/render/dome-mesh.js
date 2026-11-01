@@ -49,6 +49,9 @@ export class DomeCamera {
   reset() {
     this.yaw = 0;
     this.pitch = 0;
+    this.dolly = 0;
+    this.scrollDolly = 0;
+    this.target = [0, 0, 0];
   }
   look(dx, dy) {
     this.yaw =
@@ -56,29 +59,58 @@ export class DomeCamera {
     const limit = (89 * Math.PI) / 180;
     this.pitch = clamp(this.pitch + dy * 0.006, -limit, limit);
   }
+  zoom(delta) {
+    const step = clamp(delta, -1000, 1000) * 0.0015;
+    this.scrollDolly = clamp((this.scrollDolly || 0) - step, -2.5, 2.5);
+  }
+  pan(dx, dy, height) {
+    const sy = Math.sin(this.yaw),
+      cy = Math.cos(this.yaw),
+      sp = Math.sin(this.pitch),
+      cp = Math.cos(this.pitch);
+    const right = [cy, 0, sy];
+    const up = [-sy * sp, cp, cy * sp];
+    const scale = (3.5 * Math.tan((85 * Math.PI) / 360)) / Math.max(1, height);
+    this.target = this.target || [0, 0, 0];
+    this.target[0] = clamp(this.target[0] + (-right[0] * dx + up[0] * dy) * scale, -2.5, 2.5);
+    this.target[1] = clamp(this.target[1] + (-right[1] * dx + up[1] * dy) * scale, -2.5, 2.5);
+    this.target[2] = clamp(this.target[2] + (-right[2] * dx + up[2] * dy) * scale, -2.5, 2.5);
+  }
   matrices(aspect = 1) {
     const sy = Math.sin(this.yaw),
       cy = Math.cos(this.yaw),
       sp = Math.sin(this.pitch),
       cp = Math.cos(this.pitch);
     const direction = [sy * cp, sp, -cy * cp];
-    // Right/up/back basis, with no camera translation.
+    const right = [cy, 0, sy];
+    const up = [-sy * sp, cp, cy * sp];
+    const back = [-direction[0], -direction[1], -direction[2]];
+    const totalDolly = (this.dolly || 0) + (this.scrollDolly || 0);
+    const tgt = this.target || [0, 0, 0];
+    const position = [
+      tgt[0] + direction[0] * totalDolly,
+      tgt[1] + direction[1] * totalDolly,
+      tgt[2] + direction[2] * totalDolly,
+    ];
+    const tx = -(right[0] * position[0] + right[1] * position[1] + right[2] * position[2]) || 0;
+    const ty = -(up[0] * position[0] + up[1] * position[1] + up[2] * position[2]) || 0;
+    const tz = -(back[0] * position[0] + back[1] * position[1] + back[2] * position[2]) || 0;
     const view = new Float32Array([
-      cy,
-      -sy * sp,
-      -sy * cp,
+      right[0],
+      up[0],
+      back[0],
       0,
+      right[1],
+      up[1],
+      back[1],
       0,
-      cp,
-      -sp,
+      right[2],
+      up[2],
+      back[2],
       0,
-      sy,
-      cy * sp,
-      cy * cp,
-      0,
-      0,
-      0,
-      0,
+      tx,
+      ty,
+      tz,
       1,
     ]);
     const f = 1 / Math.tan((85 * Math.PI) / 360),
@@ -102,6 +134,6 @@ export class DomeCamera {
       (2 * far * near) / (near - far),
       0,
     ]);
-    return { view, projection, direction };
+    return { view, projection, direction, position };
   }
 }

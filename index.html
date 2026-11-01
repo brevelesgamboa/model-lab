@@ -265,7 +265,7 @@
                     <label
                       class="mini-button mini-button--highlight"
                       for="dome-image"
-                      >Upload image</label
+                      >Choose photo</label
                     >
                     <input
                       id="dome-image"
@@ -282,7 +282,7 @@
                       class="mini-button"
                       type="button"
                     >
-                      Reset view
+                      Reset camera
                     </button>
                     <button
                       id="dome-retry"
@@ -308,9 +308,22 @@
                         <option value="2">Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)</option>
                         <option value="3">Biological Lattices (mixed_6d · ch 182)</option>
                         <option value="4">Crystalline Spires (mixed_7b · ch 314)</option>
-                        <option value="-1" hidden>Custom neuron target</option>
+                        <option value="-1">Custom neuron target</option>
                       </select>
                     </label>
+                    <div id="dome-custom-neuron-controls" class="dome-custom-neuron" hidden>
+                      <div class="dome-custom-neuron__header">
+                        <label class="field" for="dome-custom-layer">Layer
+                          <select id="dome-custom-layer" aria-label="Custom Dream Layer"></select>
+                        </label>
+                        <div class="control-fine-group">
+                          <button type="button" class="nudge-button" id="dome-custom-ch-dec" data-direction="-1" aria-label="Decrease channel">-</button>
+                          <input type="text" id="dome-custom-ch-input" class="control-fine-input" value="120" aria-label="Custom neuron channel">
+                          <button type="button" class="nudge-button" id="dome-custom-ch-inc" data-direction="1" aria-label="Increase channel">+</button>
+                        </div>
+                      </div>
+                      <input type="range" id="dome-custom-ch-slider" class="control-range-input" min="0" max="767" step="1" value="120" aria-label="Custom neuron channel slider">
+                    </div>
                     <button
                       id="dome-browse-neurons"
                       class="mini-button neuron-gallery__browse"
@@ -388,47 +401,8 @@
                     aria-live="polite"
                   ></p>
                   <p class="field__help">
-                    Drag or use arrow keys to look around · Turn the clock on
-                    for moving waves · Fullscreen fills your view.
+                    Drag or arrow keys to look · Scroll to dolly · Shift-drag to pan.
                   </p>
-                  <details class="cortical-tools__help">
-                    <summary>? What shapes the dome?</summary>
-                    <p>
-                      Mirrored Wrap reflects your photo around the dome
-                      instantly. Optional MI-GAN fills the surroundings from the
-                      photo; it may invent textures rather than a realistic
-                      landscape. Its model loads only after you choose that
-                      mode.
-                    </p>
-                    <p>
-                      Depth and Neural Swell raise details in the photo; rings,
-                      rays, spirals and honeycomb waves animate the whole
-                      sphere. Both modes wrap continuously around the rear.
-                      Mirrored Wrap repeats reflected details.
-                    </p>
-                    <p>
-                      Synthesize Dream starts only when you click. Color
-                      Retention at 1 changes brightness while preserving the
-                      palette; lowering it allows color changes. Webbing,
-                      Cellular and Arches describe possible motifs, not
-                      guaranteed shapes. You can cancel and keep the previous
-                      view. A new neuron target takes effect on the next bake.
-                      Maps stay in this tab; PNG and GIF export the view.
-                    </p>
-                    <a
-                      href="https://distill.pub/2017/feature-visualization/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      >Feature visualization ↗</a
-                    >
-                    ·
-                    <a
-                      href="https://pmc.ncbi.nlm.nih.gov/articles/PMC1088430/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      >Cortical pattern paper ↗</a
-                    >
-                  </details>
                   <details id="model-cache-drawer" class="cortical-tools__help">
                     <summary>Dome settings · Local Model Cache</summary>
                     <p id="model-cache-inception">Inception: checking…</p>
