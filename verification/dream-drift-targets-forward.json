@@ -1,0 +1,1537 @@
+{
+  "baselineRevision": "c12cd0679b50128043bd4c7aa5712665de623eb6",
+  "branch": "experiment/dream-drift",
+  "input": {
+    "id": "photo-1",
+    "name": "images.jpg",
+    "sha256": "40c995fe845080b9ac198465920eada3cbe14908e2b83beba82c9279ced4c82c"
+  },
+  "modelIdentity": {
+    "miganPipelineSha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+    "inceptionGraphSha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849"
+  },
+  "hardware": {
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "webgpu": {
+      "vendor": "amd",
+      "isFallbackAdapter": false
+    }
+  },
+  "methods": {
+    "sweep": {
+      "configuration": {
+        "experimentMode": "target-sweep",
+        "requestedMiganBackend": "automatic",
+        "baselineOnly": false,
+        "panorama": [
+          1024,
+          512
+        ],
+        "candidateTargets": [
+          {
+            "id": "webbing",
+            "label": "Webbing candidate",
+            "layer": "Conv2d_4a_3x3",
+            "channel": 42
+          },
+          {
+            "id": "cellular",
+            "label": "Cellular control",
+            "layer": "mixed_5b",
+            "channel": 120
+          },
+          {
+            "id": "arches",
+            "label": "Arches candidate",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          {
+            "id": "organic",
+            "label": "Organic forms candidate",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          {
+            "id": "lattices",
+            "label": "Lattice candidate",
+            "layer": "mixed_6d",
+            "channel": 182
+          },
+          {
+            "id": "crystals",
+            "label": "Crystalline candidate",
+            "layer": "mixed_7b",
+            "channel": 314
+          }
+        ],
+        "dreamStepSize": 0.012,
+        "sweepSteps": [
+          4,
+          8
+        ],
+        "colorRetention": 1,
+        "effects": {
+          "waves": 0,
+          "refraction": 0,
+          "dispersion": 0,
+          "depthRelief": 0,
+          "neuralRelief": 0,
+          "cameraDolly": 0
+        },
+        "notes": [
+          "Uses the installed MI-GAN pipeline v2 and local InceptionV3 workers without stubs.",
+          "Mirrored textures require the dome's mirrored mapping; their flat texture is not a full panorama.",
+          "Raw MI-GAN output is saved before the existing photo/seam/pole compositor.",
+          "Dream-on-MI-GAN is an experiment harness combination, not a newly enabled application mode.",
+          "Progression releases photo protection; all independent strengths start from the same MI-GAN panorama.",
+          "Legacy recursive outpainting reanchors a 60-degree view. The forward mode crops 8% from a front perspective view and reanchors it; neither reconstructs a 3D world.",
+          "Gentle modes use the actual optimizer at step size 0.012 through an experiment-only worker; target names are hypotheses, not guaranteed motifs.",
+          "Six-view captures use the actual dome renderer with all relief and optical effects disabled.",
+          "Timing includes real inference but does not establish simultaneous-generation frame rate."
+        ]
+      },
+      "caseCount": 12,
+      "seed": "One MI-GAN panorama shared by all 12 cases"
+    },
+    "forward": {
+      "configuration": {
+        "experimentMode": "forward",
+        "requestedMiganBackend": "automatic",
+        "baselineOnly": false,
+        "panorama": [
+          1024,
+          512
+        ],
+        "forwardTargets": [
+          {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          }
+        ],
+        "dreamStepSize": 0.012,
+        "forwardPlan": {
+          "stages": 10,
+          "cropFraction": 0.92,
+          "dreamSteps": 4,
+          "targetOrder": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            1
+          ],
+          "cleanupOrReseeding": false
+        },
+        "colorRetention": 1,
+        "effects": {
+          "waves": 0,
+          "refraction": 0,
+          "dispersion": 0,
+          "depthRelief": 0,
+          "neuralRelief": 0,
+          "cameraDolly": 0
+        },
+        "notes": [
+          "Uses the installed MI-GAN pipeline v2 and local InceptionV3 workers without stubs.",
+          "Mirrored textures require the dome's mirrored mapping; their flat texture is not a full panorama.",
+          "Raw MI-GAN output is saved before the existing photo/seam/pole compositor.",
+          "Dream-on-MI-GAN is an experiment harness combination, not a newly enabled application mode.",
+          "Progression releases photo protection; all independent strengths start from the same MI-GAN panorama.",
+          "Legacy recursive outpainting reanchors a 60-degree view. The forward mode crops 8% from a front perspective view and reanchors it; neither reconstructs a 3D world.",
+          "Gentle modes use the actual optimizer at step size 0.012 through an experiment-only worker; target names are hypotheses, not guaranteed motifs.",
+          "Six-view captures use the actual dome renderer with all relief and optical effects disabled.",
+          "Timing includes real inference but does not establish simultaneous-generation frame rate."
+        ]
+      },
+      "stages": 10,
+      "seed": "Fresh MI-GAN inference from the same photo and weights; no scene rescue or clean-context reset"
+    },
+    "control": {
+      "stages": 10,
+      "cropFraction": 0.92,
+      "dreamRuns": 0,
+      "seed": "MI-GAN panorama from the same photo and weights",
+      "method": "Repeat front-view capture, center crop, and existing photo placement/border initialization. No additional MI-GAN or Inception inference. Peripheral fill differs from the synthesis chain."
+    }
+  },
+  "selection": {
+    "method": "Subjective visual review of all 12 panoramas and both selected 4-step front views; no automatic aesthetic score",
+    "targets": [
+      {
+        "layer": "mixed_6a",
+        "channel": 42,
+        "reason": "Curved rib-like patterns with readable large scenery at the gentler strength"
+      },
+      {
+        "layer": "mixed_6c",
+        "channel": 144,
+        "reason": "Distinct branching/cellular forms while keeping the broad landscape and marmot recognizable in a single pass"
+      }
+    ],
+    "note": "Candidate labels describe possible visual motifs, not verified semantic meanings of individual neurons."
+  },
+  "validation": {
+    "sourceImportsModelIntegrityAndLint": "passed",
+    "targetCasesPassed": 12,
+    "forwardStagesCompleted": 10,
+    "controlStagesCompleted": 10,
+    "dreamWorkersWithZeroRetainedTensors": 22,
+    "glErrors": 0,
+    "externalRequests": 0,
+    "applicationFilesChanged": false,
+    "galleryChecks": [
+      {
+        "run": "dream-drift-target-sweep",
+        "artifacts": 16,
+        "images": 42,
+        "stagePlayer": false,
+        "errors": []
+      },
+      {
+        "run": "dream-drift-forward",
+        "artifacts": 44,
+        "images": 78,
+        "stagePlayer": true,
+        "errors": []
+      },
+      {
+        "run": "dream-drift-forward-control",
+        "artifacts": 14,
+        "images": 38,
+        "stagePlayer": true,
+        "errors": []
+      }
+    ]
+  },
+  "findings": [
+    "Reducing the optimizer step from 0.04 to 0.012 exposes more distinct target-specific patterns while preserving a readable scene in this sample.",
+    "The arches and organic candidates were selected for different visual structures. The cellular control still quickly creates a repeating pebble-like texture.",
+    "Ten recursive model stages completed, but the subject stretches and the scene loses clarity; this method does not establish a convincing forward-travel illusion.",
+    "The no-further-inference control also develops radial stretching and blur. This implicates repeated perspective capture, planar photo placement, and resampling; the streaking cannot be attributed solely to the models.",
+    "Model-generated patterns remain visible in the synthesis chain beyond the resampling effects demonstrated by the control."
+  ],
+  "nextExperiment": "Calibrate perspective-to-panorama round-trip projection with inference disabled, then repeat the forward chain while preserving angular coordinates. Evaluate checkpoint refresh only after geometric drift is controlled.",
+  "limitations": [
+    "One low-resolution marmot photo, six feature targets, two strengths, and one native GPU configuration.",
+    "Forward stages are discrete keyframes. Playback is a review aid, not a smooth movement implementation.",
+    "No demonstration of endless coherent scene generation, full-history backtracking, or simultaneous-generation rendering performance.",
+    "No authored wave, refraction, chromatic dispersion, relief, or camera-translation effects were used.",
+    "Generated images remain local in ignored test-results; source tools and measurements are versioned."
+  ],
+  "artifacts": {
+    "sweepGallery": "test-results/dream-drift-target-sweep/index.html",
+    "forwardGallery": "test-results/dream-drift-forward/index.html",
+    "controlGallery": "test-results/dream-drift-forward-control/index.html"
+  },
+  "reproduction": [
+    "node tools/experiment-dream-drift.mjs --target-sweep --output test-results/dream-drift-target-sweep /path/to/images.jpg",
+    "node tools/experiment-dream-drift.mjs --forward-targets mixed_6a:42,mixed_6c:144 --output test-results/dream-drift-forward /path/to/images.jpg",
+    "node tools/experiment-dream-drift.mjs --forward-control-only --output test-results/dream-drift-forward-control /path/to/images.jpg"
+  ],
+  "measurements": {
+    "sweep": [
+      {
+        "id": "sweep-webbing-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "webbing",
+            "label": "Webbing candidate",
+            "layer": "Conv2d_4a_3x3",
+            "channel": 42
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.984375,
+          "seamMaxByte": 3,
+          "seamNeighborMeanByte": 1.0501302083333333,
+          "meanChangeByte": 6.421948115030925,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.10678227742513
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 3.175661087036133,
+          "scoreEnd": 4.434986114501953,
+          "bakeMs": 1457,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-webbing-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "webbing",
+            "label": "Webbing candidate",
+            "layer": "Conv2d_4a_3x3",
+            "channel": 42
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.23828125,
+          "seamMaxByte": 6,
+          "seamNeighborMeanByte": 1.2923177083333333,
+          "meanChangeByte": 8.458260218302408,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.7974700927734375
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": 3.175661087036133,
+          "scoreEnd": 5.248658657073975,
+          "bakeMs": 1392.0999999977648,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-cellular-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "cellular",
+            "label": "Cellular control",
+            "layer": "mixed_5b",
+            "channel": 120
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.890625,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.10546875,
+          "meanChangeByte": 6.952413558959961,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.10672124226888
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.1583903431892395,
+          "scoreEnd": 2.242953062057495,
+          "bakeMs": 1159.699999999255,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-cellular-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "cellular",
+            "label": "Cellular control",
+            "layer": "mixed_5b",
+            "channel": 120
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.6171875,
+          "seamMaxByte": 7,
+          "seamNeighborMeanByte": 1.6419270833333333,
+          "meanChangeByte": 9.178969065348307,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.538519541422526
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": -0.1583903431892395,
+          "scoreEnd": 3.5801568031311035,
+          "bakeMs": 1417.9000000022352,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-arches-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "arches",
+            "label": "Arches candidate",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.826171875,
+          "seamMaxByte": 4,
+          "seamNeighborMeanByte": 1.060546875,
+          "meanChangeByte": 6.176069259643555,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.1687666575113935
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.25479844212532043,
+          "scoreEnd": 0.7806113362312317,
+          "bakeMs": 2169.099999997765,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-arches-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "arches",
+            "label": "Arches candidate",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.990234375,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.1015625,
+          "meanChangeByte": 7.525341033935547,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.489531834920247
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": 0.25479844212532043,
+          "scoreEnd": 1.1834121942520142,
+          "bakeMs": 1541.8999999985099,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-organic-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "organic",
+            "label": "Organic forms candidate",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.134765625,
+          "seamMaxByte": 6,
+          "seamNeighborMeanByte": 1.224609375,
+          "meanChangeByte": 6.316093444824219,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.105826695760091
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.8350497484207153,
+          "scoreEnd": 1.4397778511047363,
+          "bakeMs": 1858.3999999985099,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-organic-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "organic",
+            "label": "Organic forms candidate",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.34375,
+          "seamMaxByte": 6,
+          "seamNeighborMeanByte": 1.4680989583333333,
+          "meanChangeByte": 7.715600331624349,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.405901590983073
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": -0.8350497484207153,
+          "scoreEnd": 2.5767276287078857,
+          "bakeMs": 1796.9000000022352,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-lattices-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "lattices",
+            "label": "Lattice candidate",
+            "layer": "mixed_6d",
+            "channel": 182
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.083984375,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.279296875,
+          "meanChangeByte": 6.064943949381511,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.009002049763997
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.37323546409606934,
+          "scoreEnd": 1.5646452903747559,
+          "bakeMs": 1260.6000000014901,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-lattices-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "lattices",
+            "label": "Lattice candidate",
+            "layer": "mixed_6d",
+            "channel": 182
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.439453125,
+          "seamMaxByte": 6,
+          "seamNeighborMeanByte": 1.4557291666666667,
+          "meanChangeByte": 7.298533757527669,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.273925145467122
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": 0.37323546409606934,
+          "scoreEnd": 2.204892873764038,
+          "bakeMs": 1869.199999999255,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-crystals-4",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "crystals",
+            "label": "Crystalline candidate",
+            "layer": "mixed_7b",
+            "channel": 314
+          },
+          "steps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.95703125,
+          "seamMaxByte": 4,
+          "seamNeighborMeanByte": 1.0364583333333333,
+          "meanChangeByte": 5.867092132568359,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.9821090698242188
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.4729853570461273,
+          "scoreEnd": 0.5718719363212585,
+          "bakeMs": 2509,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "sweep-crystals-8",
+        "experiment": {
+          "phase": "sweep",
+          "target": {
+            "id": "crystals",
+            "label": "Crystalline candidate",
+            "layer": "mixed_7b",
+            "channel": 314
+          },
+          "steps": 8,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.52734375,
+          "seamMaxByte": 7,
+          "seamNeighborMeanByte": 1.6080729166666667,
+          "meanChangeByte": 6.814840316772461,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 4.246711730957031
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 8,
+          "scoreStart": -0.4729853570461273,
+          "scoreEnd": 1.126650333404541,
+          "bakeMs": 2495.5,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      }
+    ],
+    "forward": [
+      {
+        "id": "forward-1",
+        "experiment": {
+          "phase": "forward",
+          "stage": 1,
+          "parent": "migan",
+          "target": {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.849609375,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 0.9420572916666666,
+          "meanChangeByte": 4.433820724487305,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.2188498179117837
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.16025330126285553,
+          "scoreEnd": 0.8113071322441101,
+          "bakeMs": 1909.699999999255,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-2",
+        "experiment": {
+          "phase": "forward",
+          "stage": 2,
+          "parent": "forward-1",
+          "target": {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.869140625,
+          "seamMaxByte": 4,
+          "seamNeighborMeanByte": 1.0234375,
+          "meanChangeByte": 3.9587440490722656,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.127934137980143
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.24275022745132446,
+          "scoreEnd": 0.8046154379844666,
+          "bakeMs": 1133.4000000022352,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-3",
+        "experiment": {
+          "phase": "forward",
+          "stage": 3,
+          "parent": "forward-2",
+          "target": {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.939453125,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.068359375,
+          "meanChangeByte": 3.830862045288086,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.045717239379883
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.2955762445926666,
+          "scoreEnd": 0.7588943243026733,
+          "bakeMs": 1133.0999999977648,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-4",
+        "experiment": {
+          "phase": "forward",
+          "stage": 4,
+          "parent": "forward-3",
+          "target": {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.15234375,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.18359375,
+          "meanChangeByte": 4.206118901570638,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.0264129638671875
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -1.204950213432312,
+          "scoreEnd": 1.7608754634857178,
+          "bakeMs": 1386.3999999985099,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-5",
+        "experiment": {
+          "phase": "forward",
+          "stage": 5,
+          "parent": "forward-4",
+          "target": {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.080078125,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.0677083333333333,
+          "meanChangeByte": 4.136360168457031,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.0356756846110025
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.8245005011558533,
+          "scoreEnd": 1.9045804738998413,
+          "bakeMs": 1236,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-6",
+        "experiment": {
+          "phase": "forward",
+          "stage": 6,
+          "parent": "forward-5",
+          "target": {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.076171875,
+          "seamMaxByte": 8,
+          "seamNeighborMeanByte": 1.2154947916666667,
+          "meanChangeByte": 4.150899887084961,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 3.137594223022461
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.7001151442527771,
+          "scoreEnd": 1.8796521425247192,
+          "bakeMs": 1201.4000000022352,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-7",
+        "experiment": {
+          "phase": "forward",
+          "stage": 7,
+          "parent": "forward-6",
+          "target": {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.873046875,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 0.939453125,
+          "meanChangeByte": 3.8551324208577475,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 2.942628860473633
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.15480460226535797,
+          "scoreEnd": 0.6518229842185974,
+          "bakeMs": 1071.2000000029802,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-8",
+        "experiment": {
+          "phase": "forward",
+          "stage": 8,
+          "parent": "forward-7",
+          "target": {
+            "id": "selected-1",
+            "label": "mixed_6a:42",
+            "layer": "mixed_6a",
+            "channel": 42
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.107421875,
+          "seamMaxByte": 6,
+          "seamNeighborMeanByte": 1.20703125,
+          "meanChangeByte": 3.8348007202148438,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 2.940650304158529
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": 0.26837357878685,
+          "scoreEnd": 0.6921374201774597,
+          "bakeMs": 1046.5,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-9",
+        "experiment": {
+          "phase": "forward",
+          "stage": 9,
+          "parent": "forward-8",
+          "target": {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 1.06640625,
+          "seamMaxByte": 4,
+          "seamNeighborMeanByte": 1.19140625,
+          "meanChangeByte": 4.252681732177734,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 2.9425862630208335
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.7929344177246094,
+          "scoreEnd": 1.9086673259735107,
+          "bakeMs": 1222.300000000745,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      },
+      {
+        "id": "forward-10",
+        "experiment": {
+          "phase": "forward",
+          "stage": 10,
+          "parent": "forward-9",
+          "target": {
+            "id": "selected-2",
+            "label": "mixed_6c:144",
+            "layer": "mixed_6c",
+            "channel": 144
+          },
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 4,
+          "stepSize": 0.012
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0.94140625,
+          "seamMaxByte": 5,
+          "seamNeighborMeanByte": 1.1165364583333333,
+          "meanChangeByte": 4.059118270874023,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 2.819636027018229
+        },
+        "bake": {
+          "type": "result",
+          "width": 1024,
+          "height": 512,
+          "iterations": 4,
+          "scoreStart": -0.42617031931877136,
+          "scoreEnd": 2.0391287803649902,
+          "bakeMs": 1250.5,
+          "sizes": [
+            [
+              256,
+              512
+            ],
+            [
+              512,
+              1024
+            ]
+          ],
+          "stepSize": 0.012,
+          "backend": "webgl",
+          "retainedTensors": 0
+        }
+      }
+    ],
+    "control": [
+      {
+        "id": "forward-control-1",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 1,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.05859375,
+          "meanChangeByte": 34.68191146850586,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 1.301282246907552
+        }
+      },
+      {
+        "id": "forward-control-2",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 2,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.055989583333333336,
+          "meanChangeByte": 20.232823689778645,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 1.0064798990885417
+        }
+      },
+      {
+        "id": "forward-control-3",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 3,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.057291666666666664,
+          "meanChangeByte": 14.882157643636068,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.8998565673828125
+        }
+      },
+      {
+        "id": "forward-control-4",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 4,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.040364583333333336,
+          "meanChangeByte": 12.273695627848307,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.824151357014974
+        }
+      },
+      {
+        "id": "forward-control-5",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 5,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.055989583333333336,
+          "meanChangeByte": 11.445822397867838,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.7435518900553385
+        }
+      },
+      {
+        "id": "forward-control-6",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 6,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.06705729166666667,
+          "meanChangeByte": 11.468902587890625,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.693383534749349
+        }
+      },
+      {
+        "id": "forward-control-7",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 7,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.056640625,
+          "meanChangeByte": 10.045089721679688,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.6727244059244791
+        }
+      },
+      {
+        "id": "forward-control-8",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 8,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.05859375,
+          "meanChangeByte": 9.283088684082031,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.6726430257161459
+        }
+      },
+      {
+        "id": "forward-control-9",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 9,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.033203125,
+          "meanChangeByte": 8.982162475585938,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.6267484029134115
+        }
+      },
+      {
+        "id": "forward-control-10",
+        "experiment": {
+          "phase": "forward-control",
+          "stage": 10,
+          "cropFraction": 0.92,
+          "yaw": 0,
+          "dreamSteps": 0
+        },
+        "metrics": {
+          "width": 1024,
+          "height": 512,
+          "opaque": true,
+          "seamMeanByte": 0,
+          "seamMaxByte": 0,
+          "seamNeighborMeanByte": 0.0546875,
+          "meanChangeByte": 6.8346710205078125,
+          "protectedMaxByte": null,
+          "meanHorizontalEdgeByte": 0.5876388549804688
+        }
+      }
+    ]
+  }
+}
