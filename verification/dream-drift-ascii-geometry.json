@@ -1,0 +1,1401 @@
+{
+  "status": "complete",
+  "branch": "experiment/dream-drift",
+  "revision": "f394edd758a0d63ee90972a39d92560f7be72f7f",
+  "configuration": {
+    "sources": 3,
+    "levels": [
+      3,
+      5,
+      6
+    ],
+    "recipe": "mixed",
+    "modes": [
+      "saturated image",
+      "partial ASCII",
+      "full ASCII"
+    ],
+    "geometry": [
+      "sphere radius 5",
+      "blurred brightness relief up to 0.65",
+      "relief plus two swept-tube arches and depth-tested floor"
+    ],
+    "glyphGrid": [
+      192,
+      64
+    ],
+    "glyphs": " .,:;-=+*ox%#@",
+    "inferenceRuns": 0,
+    "productionChanges": false,
+    "camera": {
+      "verticalFovDegrees": 85,
+      "yawAmplitudeRadians": 0.22,
+      "lateralAmplitude": 0.32,
+      "forwardAmplitude": 0.1
+    },
+    "resolution": [
+      640,
+      480
+    ]
+  },
+  "frames": [
+    {
+      "scene": "photo-1-level-3",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-1-level-3-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-1-level-3-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 12.39142333984375,
+        "maxByte": 114,
+        "changedChannels": 822059
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-1-level-3-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 75.88371337890625,
+        "maxByte": 244,
+        "changedChannels": 919938
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-1-level-3-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-1-level-3-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 12.39304443359375,
+        "maxByte": 114,
+        "changedChannels": 822077
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-1-level-3-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 75.88537027994792,
+        "maxByte": 244,
+        "changedChannels": 919917
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-1-level-3-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-1-level-3-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 10.832510579427083,
+        "maxByte": 114,
+        "changedChannels": 802823
+      }
+    },
+    {
+      "scene": "photo-1-level-3",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-1-level-3-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 66.92778727213542,
+        "maxByte": 243,
+        "changedChannels": 896890
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-1-level-5-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-1-level-5-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 22.527950846354166,
+        "maxByte": 191,
+        "changedChannels": 826497
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-1-level-5-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 76.13395345052083,
+        "maxByte": 246,
+        "changedChannels": 919905
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-1-level-5-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-1-level-5-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 22.53083984375,
+        "maxByte": 190,
+        "changedChannels": 826523
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-1-level-5-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 76.13487386067709,
+        "maxByte": 246,
+        "changedChannels": 919890
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-1-level-5-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-1-level-5-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 19.68883056640625,
+        "maxByte": 190,
+        "changedChannels": 807938
+      }
+    },
+    {
+      "scene": "photo-1-level-5",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-1-level-5-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 67.108046875,
+        "maxByte": 246,
+        "changedChannels": 896869
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-1-level-6-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-1-level-6-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 30.998269856770833,
+        "maxByte": 232,
+        "changedChannels": 828110
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-1-level-6-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 77.10533528645833,
+        "maxByte": 247,
+        "changedChannels": 919970
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-1-level-6-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-1-level-6-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 31.00340576171875,
+        "maxByte": 232,
+        "changedChannels": 828166
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-1-level-6-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 77.1064404296875,
+        "maxByte": 247,
+        "changedChannels": 919966
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-1-level-6-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-1-level-6-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 27.1633837890625,
+        "maxByte": 219,
+        "changedChannels": 809762
+      }
+    },
+    {
+      "scene": "photo-1-level-6",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-1-level-6-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 67.96406331380209,
+        "maxByte": 247,
+        "changedChannels": 896917
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-2-level-3-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-2-level-3-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 16.28194742838542,
+        "maxByte": 101,
+        "changedChannels": 857566
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-2-level-3-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 89.6316943359375,
+        "maxByte": 243,
+        "changedChannels": 910949
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-2-level-3-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-2-level-3-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 16.28271484375,
+        "maxByte": 101,
+        "changedChannels": 857627
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-2-level-3-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 89.63090576171875,
+        "maxByte": 243,
+        "changedChannels": 910962
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-2-level-3-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-2-level-3-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 13.331669921875,
+        "maxByte": 101,
+        "changedChannels": 832163
+      }
+    },
+    {
+      "scene": "photo-2-level-3",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-2-level-3-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 73.86721842447916,
+        "maxByte": 243,
+        "changedChannels": 887877
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-2-level-5-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-2-level-5-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 30.24207763671875,
+        "maxByte": 185,
+        "changedChannels": 862137
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-2-level-5-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 89.54079182942708,
+        "maxByte": 244,
+        "changedChannels": 910913
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-2-level-5-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-2-level-5-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 30.243778483072916,
+        "maxByte": 185,
+        "changedChannels": 862127
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-2-level-5-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 89.54043375651041,
+        "maxByte": 244,
+        "changedChannels": 910879
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-2-level-5-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-2-level-5-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 24.576097005208332,
+        "maxByte": 185,
+        "changedChannels": 839137
+      }
+    },
+    {
+      "scene": "photo-2-level-5",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-2-level-5-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 73.79147786458333,
+        "maxByte": 244,
+        "changedChannels": 887805
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-2-level-6-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-2-level-6-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 40.24250651041667,
+        "maxByte": 222,
+        "changedChannels": 863760
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-2-level-6-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 89.81946940104167,
+        "maxByte": 244,
+        "changedChannels": 910794
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-2-level-6-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-2-level-6-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 40.243601888020834,
+        "maxByte": 222,
+        "changedChannels": 863823
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-2-level-6-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 89.81891194661458,
+        "maxByte": 244,
+        "changedChannels": 910802
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-2-level-6-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-2-level-6-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 32.57251057942708,
+        "maxByte": 222,
+        "changedChannels": 841385
+      }
+    },
+    {
+      "scene": "photo-2-level-6",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-2-level-6-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 74.00994873046875,
+        "maxByte": 244,
+        "changedChannels": 887734
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-3-level-3-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-3-level-3-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 13.78036376953125,
+        "maxByte": 92,
+        "changedChannels": 870666
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-3-level-3-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 75.85668619791667,
+        "maxByte": 233,
+        "changedChannels": 920743
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-3-level-3-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-3-level-3-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 13.781514485677084,
+        "maxByte": 92,
+        "changedChannels": 870694
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-3-level-3-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 75.85760335286459,
+        "maxByte": 233,
+        "changedChannels": 920755
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-3-level-3-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-3-level-3-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 11.002112630208334,
+        "maxByte": 92,
+        "changedChannels": 845312
+      }
+    },
+    {
+      "scene": "photo-3-level-3",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-3-level-3-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 61.47043212890625,
+        "maxByte": 233,
+        "changedChannels": 897115
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-3-level-5-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-3-level-5-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 25.281063639322916,
+        "maxByte": 177,
+        "changedChannels": 873283
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-3-level-5-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 75.47350830078125,
+        "maxByte": 239,
+        "changedChannels": 920780
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-3-level-5-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-3-level-5-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 25.28243896484375,
+        "maxByte": 177,
+        "changedChannels": 873348
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-3-level-5-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 75.47406331380208,
+        "maxByte": 239,
+        "changedChannels": 920787
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-3-level-5-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-3-level-5-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 20.210413411458333,
+        "maxByte": 177,
+        "changedChannels": 848907
+      }
+    },
+    {
+      "scene": "photo-3-level-5",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-3-level-5-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 61.134027506510414,
+        "maxByte": 237,
+        "changedChannels": 897249
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 0,
+      "geometry": 0,
+      "file": "photo-3-level-6-m0-g0.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 1,
+      "geometry": 0,
+      "file": "photo-3-level-6-m1-g0.png",
+      "changeFromImage": {
+        "meanByte": 33.79027425130209,
+        "maxByte": 227,
+        "changedChannels": 874109
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 2,
+      "geometry": 0,
+      "file": "photo-3-level-6-m2-g0.png",
+      "changeFromImage": {
+        "meanByte": 76.0230517578125,
+        "maxByte": 239,
+        "changedChannels": 920717
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 0,
+      "geometry": 1,
+      "file": "photo-3-level-6-m0-g1.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 1,
+      "geometry": 1,
+      "file": "photo-3-level-6-m1-g1.png",
+      "changeFromImage": {
+        "meanByte": 33.79290934244791,
+        "maxByte": 227,
+        "changedChannels": 874126
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 2,
+      "geometry": 1,
+      "file": "photo-3-level-6-m2-g1.png",
+      "changeFromImage": {
+        "meanByte": 76.02368489583333,
+        "maxByte": 239,
+        "changedChannels": 920719
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 0,
+      "geometry": 2,
+      "file": "photo-3-level-6-m0-g2.png",
+      "changeFromImage": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 1,
+      "geometry": 2,
+      "file": "photo-3-level-6-m1-g2.png",
+      "changeFromImage": {
+        "meanByte": 26.991070963541667,
+        "maxByte": 207,
+        "changedChannels": 850023
+      }
+    },
+    {
+      "scene": "photo-3-level-6",
+      "mode": 2,
+      "geometry": 2,
+      "file": "photo-3-level-6-m2-g2.png",
+      "changeFromImage": {
+        "meanByte": 61.494518229166665,
+        "maxByte": 237,
+        "changedChannels": 897191
+      }
+    }
+  ],
+  "checks": [
+    {
+      "scene": "photo-1-level-3",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-3",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-3",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-5",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-5",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-5",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-6",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-6",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-1-level-6",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-3",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-3",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-3",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-5",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-5",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-5",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-6",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-6",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-2-level-6",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-3",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-3",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-3",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-5",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-5",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-5",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-6",
+      "geometry": 0,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-6",
+      "geometry": 1,
+      "headSamples": 49,
+      "headMaxByte": 0
+    },
+    {
+      "scene": "photo-3-level-6",
+      "geometry": 2,
+      "headSamples": 49,
+      "headMaxByte": 0
+    }
+  ],
+  "parallax": [
+    {
+      "geometry": 0,
+      "translationChange": {
+        "meanByte": 30.045875651041666,
+        "maxByte": 247,
+        "changedChannels": 904225
+      },
+      "differenceFromFlatAtCenter": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      },
+      "differenceFromFlatAtOffset": {
+        "meanByte": 0,
+        "maxByte": 0,
+        "changedChannels": 0
+      }
+    },
+    {
+      "geometry": 1,
+      "translationChange": {
+        "meanByte": 30.347184244791666,
+        "maxByte": 247,
+        "changedChannels": 904449
+      },
+      "differenceFromFlatAtCenter": {
+        "meanByte": 0.03577067057291667,
+        "maxByte": 102,
+        "changedChannels": 32782
+      },
+      "differenceFromFlatAtOffset": {
+        "meanByte": 12.628539225260417,
+        "maxByte": 185,
+        "changedChannels": 817638
+      }
+    },
+    {
+      "geometry": 2,
+      "translationChange": {
+        "meanByte": 27.47873372395833,
+        "maxByte": 247,
+        "changedChannels": 901591
+      },
+      "differenceFromFlatAtCenter": {
+        "meanByte": 13.555692545572917,
+        "maxByte": 232,
+        "changedChannels": 276418
+      },
+      "differenceFromFlatAtOffset": {
+        "meanByte": 22.409615071614585,
+        "maxByte": 226,
+        "changedChannels": 831880
+      }
+    }
+  ],
+  "synchronizedDrawReadbackMs": [
+    1.2000000001862645,
+    1.199999999254942,
+    1.2999999998137355,
+    1.400000000372529,
+    1.2000000001862645,
+    1.2999999998137355,
+    1.2000000001862645,
+    1.300000000745058,
+    1.2999999998137355,
+    1.199999999254942,
+    1.199999999254942,
+    1.699999999254942,
+    1.2000000001862645,
+    1.2000000001862645,
+    1.2999999998137355,
+    1.2999999998137355,
+    1.2999999998137355,
+    1.400000000372529,
+    1.300000000745058,
+    1.1000000005587935,
+    1.2000000001862645,
+    1.099999999627471,
+    1.2000000001862645,
+    1.400000000372529,
+    1.2999999998137355,
+    1.2999999998137355,
+    1.300000000745058,
+    2.5,
+    1.2999999998137355,
+    1,
+    1.1000000005587935,
+    1.400000000372529,
+    1.199999999254942,
+    1.2000000001862645,
+    1.199999999254942,
+    1.5,
+    1.5,
+    1.1000000005587935,
+    1.2999999998137355,
+    1.2000000001862645,
+    1.800000000745058,
+    1.199999999254942,
+    1.2999999998137355,
+    1.2000000001862645,
+    1.2999999998137355,
+    1.1000000005587935,
+    1.099999999627471,
+    1.199999999254942,
+    1.2999999998137355,
+    1.199999999254942,
+    1.199999999254942,
+    1,
+    1.2999999998137355,
+    1.199999999254942,
+    1.2000000001862645,
+    1.2000000001862645,
+    1.400000000372529,
+    1.1000000005587935,
+    1.2000000001862645,
+    1.099999999627471,
+    1.199999999254942,
+    1.2000000001862645,
+    1.400000000372529,
+    1.099999999627471,
+    1.3999999994412065,
+    1.400000000372529,
+    1.3999999994412065,
+    1.2000000001862645,
+    1.5,
+    1.099999999627471,
+    1.199999999254942,
+    1.2000000001862645,
+    1.099999999627471,
+    1.1000000005587935,
+    1.2000000001862645,
+    1.2999999998137355,
+    1.699999999254942,
+    1.099999999627471,
+    1.099999999627471,
+    1.300000000745058,
+    1.3999999994412065
+  ],
+  "pausedRedrawExact": true,
+  "turnReturnExact": true,
+  "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+  "glError": 0,
+  "motion": [
+    {
+      "file": "motion-m0-g2.webm",
+      "mode": 0,
+      "geometry": 2,
+      "framesRequested": 91,
+      "bytes": 1344023,
+      "mime": "video/webm;codecs=vp9",
+      "elapsedMs": 6113.399999999441
+    },
+    {
+      "file": "motion-m1-g0.webm",
+      "mode": 1,
+      "geometry": 0,
+      "framesRequested": 91,
+      "bytes": 1440296,
+      "mime": "video/webm;codecs=vp9",
+      "elapsedMs": 6118.700000000186
+    },
+    {
+      "file": "motion-m1-g1.webm",
+      "mode": 1,
+      "geometry": 1,
+      "framesRequested": 91,
+      "bytes": 1436045,
+      "mime": "video/webm;codecs=vp9",
+      "elapsedMs": 6119.200000000186
+    },
+    {
+      "file": "motion-m1-g2.webm",
+      "mode": 1,
+      "geometry": 2,
+      "framesRequested": 91,
+      "bytes": 1468805,
+      "mime": "video/webm;codecs=vp9",
+      "elapsedMs": 6120.9000000003725
+    },
+    {
+      "file": "motion-m2-g2.webm",
+      "mode": 2,
+      "geometry": 2,
+      "framesRequested": 91,
+      "bytes": 1544707,
+      "mime": "video/webm;codecs=vp9",
+      "elapsedMs": 6118.399999999441
+    }
+  ],
+  "playback": [
+    {
+      "file": "motion-m0-g2.webm",
+      "width": 640,
+      "height": 480,
+      "seekTimes": [
+        0.2,
+        1.6,
+        3.2,
+        5.9
+      ],
+      "decoded": true
+    },
+    {
+      "file": "motion-m1-g0.webm",
+      "width": 640,
+      "height": 480,
+      "seekTimes": [
+        0.2,
+        1.6,
+        3.2,
+        5.9
+      ],
+      "decoded": true
+    },
+    {
+      "file": "motion-m1-g1.webm",
+      "width": 640,
+      "height": 480,
+      "seekTimes": [
+        0.2,
+        1.6,
+        3.2,
+        5.9
+      ],
+      "decoded": true
+    },
+    {
+      "file": "motion-m1-g2.webm",
+      "width": 640,
+      "height": 480,
+      "seekTimes": [
+        0.2,
+        1.6,
+        3.2,
+        5.9
+      ],
+      "decoded": true
+    },
+    {
+      "file": "motion-m2-g2.webm",
+      "width": 640,
+      "height": 480,
+      "seekTimes": [
+        0.2,
+        1.6,
+        3.2,
+        5.9
+      ],
+      "decoded": true
+    }
+  ],
+  "errors": [],
+  "textureHashes": {
+    "photo-1-progression-mixed-3-neon.png": "48d743cf8212d736fc910a75e9014f7936627992d9a30efb2b2bbc639b9b6e3d",
+    "photo-1-progression-mixed-3.png": "a850067f299d407e4802b90cb1f812106bf3fa4c0b0c2c9d9cdaf1d871fd6968",
+    "photo-1-migan.png": "c1783975a43715601b825bb5680a10e987ea37cd835157b3c4e6115104ae3496",
+    "photo-1-progression-mixed-5-neon.png": "aaf129338307402f0bf7e156a38e92e1d3abdfdbe81e1ce1e5ccb2f50fa0d505",
+    "photo-1-progression-mixed-5.png": "1d9ad419d445bbf094dc4534f9c9c305be89a53f264a0890534e76ec76022e02",
+    "photo-1-progression-mixed-6-neon.png": "4c58daee44309840a8a4f107dadca9a320b7b9b3b5a2b28cac6a62f8d5510cea",
+    "photo-1-progression-mixed-6.png": "b0f2df6d72a236b0c4051fc2e24a7e9a0e71be3a58f32cbb3d0e9f8738897224",
+    "photo-2-progression-mixed-3-neon.png": "ea834abf6aecffa4a5b3924bf70f97faf0c096da8cb45e5b7bba4b1038873c2d",
+    "photo-2-progression-mixed-3.png": "cdd9eb1a6709162c63390bd6dce4d4b26774a6c5b22dc65f24a0dc7d3d13cac6",
+    "photo-2-migan.png": "604bbddc218d1c8704bba2fe77d23b15071ad356e696b77f63818589807024d6",
+    "photo-2-progression-mixed-5-neon.png": "4cad69e553953f4639696bb1ab79ea09b541feba0e1a32df63b2b4fa061c5183",
+    "photo-2-progression-mixed-5.png": "16b6316f5d0d56d56d322c0af41211dfd9fbe5a6a668744b13a69876f953fdcc",
+    "photo-2-progression-mixed-6-neon.png": "d0cae551d66e515b6bfac904fe96f5b10efb57c126c48d772c9827641a525e33",
+    "photo-2-progression-mixed-6.png": "0231dde61c48eabb1c7bd2c27adf27686fba7a5428c1c35d47d01a60d274ec75",
+    "photo-3-progression-mixed-3-neon.png": "8fe518347c9f036af2f182e57d1e553fdd0b12c398be24796bc6211dc0ea6462",
+    "photo-3-progression-mixed-3.png": "7e37453d9fd3a7c9eeea8c1158af49b587cecb7efb0a79cc45a4bcfcff856412",
+    "photo-3-migan.png": "84a967b62f77d24436864eee5c631dc2474a8fb5668c6ed1f17c6864788a4831",
+    "photo-3-progression-mixed-5-neon.png": "f3da7cf8afe2e89f2fa9d1bdca078c6488f6ad631ac9b69d4b80c0a19020a80d",
+    "photo-3-progression-mixed-5.png": "b15f921c28aa9b5df2be1bc5828a50f30c88caae7954d53e7a75cbe059051b5a",
+    "photo-3-progression-mixed-6-neon.png": "86a1da8d53ba4c22bbfc53f3a4a879eb25cc29f5b5c8d03e8c7c7c8746c36971",
+    "photo-3-progression-mixed-6.png": "fa3b8e45b5f628d60c9c1bab0d560e163c80bbef76e3983f33a277a45263ed5c"
+  },
+  "sourceTexturesUnchanged": true,
+  "codeHashes": {
+    "tools/dream-drift-ascii-renderer.mjs": "a18217d21346464336a7e5d4ff0e67bc574184950f907deb7a2a8cfddf374bcc",
+    "tools/experiment-dream-drift-ascii.mjs": "2d9abaef6224b81eaf8a7a4b82f8037cfd8128763118d9deb7d811dcf0f6a3e9",
+    "assets/js/render/dome-mesh.js": "abfcec28abc5d685f6a4a5168c47e636ff527d177b2a16b5b5a15d8b181e4de3"
+  },
+  "timingSummary": {
+    "medianMs": 1.2000000001862645,
+    "p95Ms": 1.5,
+    "note": "Synchronized draw + CPU readback on one desktop GPU, not application frame-rate or generation throughput"
+  },
+  "limits": [
+    "Cached six-stage model chain; no new world generation or endless traversal.",
+    "Brightness relief is not a depth estimate; arches/floor are authored geometry.",
+    "ASCII and neon are display effects, not model-generated glitches.",
+    "World UV anchoring is deterministic; aliasing under motion still needs visual review, especially near poles and at a distance.",
+    "No collision or doorway traversal is implemented by this isolated renderer."
+  ],
+  "galleryValidation": {
+    "mobile": {
+      "scrollWidth": 390,
+      "viewport": 390
+    },
+    "embeddedTextures": 21,
+    "referencedStills": 81,
+    "decodedClips": 5
+  }
+}
