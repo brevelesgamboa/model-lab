@@ -6,11 +6,14 @@ export class DomeDreamBaker {
     createWorker = () =>
       new Worker(new URL("./inception-dream-bake.worker.js", import.meta.url)),
     capture = (image) => createImageBitmap(image),
+    persistent = false,
   } = {}) {
     this.createWorker = createWorker;
     this.capture = capture;
     this.pending = null;
     this.runs = 0;
+    this.persistent = persistent;
+    this.worker = null;
   }
   bake(
     canvas,
@@ -22,9 +25,13 @@ export class DomeDreamBaker {
       onProgress = () => {},
       photoRect = canvas.photoRect,
       colorRetention = 1,
+      stepSize = 0.04,
+      preserveDetail = false,
     } = {},
   ) {
     const target = validateFeatureTarget(layer, channel);
+    if (!Number.isFinite(stepSize) || stepSize < 0 || stepSize > 0.04)
+      throw new RangeError("Invalid dream step size.");
     if (!Number.isInteger(iterations) || iterations < 1 || iterations > 100)
       throw new RangeError("Invalid dream iteration count.");
     if (
@@ -33,7 +40,7 @@ export class DomeDreamBaker {
       colorRetention > 1
     )
       throw new RangeError("Invalid color retention.");
-    this.cancel();
+    if (this.pending) this.cancel();
     if (signal?.aborted) return Promise.reject(cancelled());
     return new Promise((resolve, reject) => {
       const request = { worker: null };
@@ -44,7 +51,10 @@ export class DomeDreamBaker {
         }
         this.pending = null;
         signal?.removeEventListener("abort", request.abort);
-        request.worker?.terminate();
+        if (error || !this.persistent) {
+          request.worker?.terminate();
+          if (this.worker === request.worker) this.worker = null;
+        }
         if (error) reject(error);
         else resolve(result);
       };
@@ -59,7 +69,8 @@ export class DomeDreamBaker {
             return;
           }
           try {
-            const worker = this.createWorker();
+            const worker = this.worker ?? this.createWorker();
+            this.worker = worker;
             request.worker = worker;
             worker.onmessage = ({ data }) => {
               if (this.pending !== request) {
@@ -83,6 +94,9 @@ export class DomeDreamBaker {
                 iterations,
                 photoRect,
                 colorRetention,
+                stepSize,
+                preserveDetail,
+                keepAlive: this.persistent,
                 runtimeUrl: new URL(
                   "../../vendor/tensorflow/tf.min.js",
                   import.meta.url,
@@ -104,6 +118,8 @@ export class DomeDreamBaker {
   }
   cancel() {
     this.pending?.abort();
+    this.worker?.terminate();
+    this.worker = null;
   }
   dispose() {
     this.cancel();
@@ -111,13 +127,35 @@ export class DomeDreamBaker {
 }
 
 export function uploadDream360(gl, texture, image) {
+  const { width, height } = image;
+  let ctx = image.getContext?.("2d");
+  if (!ctx) {
+    // Keep non-2D image sources on the same byte upload path too.
+    const canvas = new OffscreenCanvas(width, height);
+    ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0, width, height);
+  }
+  // ImageData exposes canonical RGBA bytes, bypassing canvas GPU surface
+  // imports whose BGRA channel order can be mishandled by some drivers.
+  const { data } = ctx.getImageData(0, 0, width, height);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    width,
+    height,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    data,
+  );
 }
 
 export async function bakeFullDome360(

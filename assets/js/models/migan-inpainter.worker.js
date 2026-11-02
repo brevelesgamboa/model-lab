@@ -1,5 +1,8 @@
 import { getMiganSession, loadMiganFromFile } from "./migan-loader.js";
-import { inpaintEquirectangular } from "./migan-inpainter.js";
+import {
+  inpaintEquirectangular,
+  inpaintMaskedCanvas,
+} from "./migan-inpainter.js";
 self.onmessage = async ({ data }) => {
   try {
     const session = data.file
@@ -13,9 +16,12 @@ self.onmessage = async ({ data }) => {
       self.postMessage({ type: "ready", ...session.miganInfo });
       return;
     }
-    const canvas = await inpaintEquirectangular(data.bitmap, session, {
-      coverage: data.coverage || "immersive",
-    });
+    const canvas =
+      data.type === "patch"
+        ? await inpaintMaskedCanvas(data.bitmap, data.mask, session)
+        : await inpaintEquirectangular(data.bitmap, session, {
+            coverage: data.coverage || "immersive",
+          });
     const rgba = canvas
       .getContext("2d")
       .getImageData(0, 0, canvas.width, canvas.height).data;

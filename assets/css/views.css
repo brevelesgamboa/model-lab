@@ -744,3 +744,40 @@
   margin-top: auto;
   padding-top: 6px;
 }
+
+.dream-radar {
+  position: relative;
+  margin-bottom: 0.35rem;
+}
+.dream-radar canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 7px;
+  outline-offset: 3px;
+}
+.dream-radar__layers {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 3px;
+}
+.dream-radar__layers button {
+  border: 1px solid #33575c;
+  border-radius: 3px;
+  background: #0a1922;
+  color: #74979a;
+  font: 8px monospace;
+  padding: 3px 4px;
+  cursor: pointer;
+}
+.dream-radar__layers button[aria-pressed="true"] {
+  color: #b3f3df;
+  border-color: #548c81;
+  box-shadow: inset 0 0 6px #4fe5c01a;
+}
+.dream-radar__layers button:focus-visible {
+  outline: 2px solid #c6ffee;
+  outline-offset: 2px;
+}

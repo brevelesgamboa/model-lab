@@ -2,13 +2,24 @@
 precision highp float;
 precision highp int;
 uniform sampler2D u_dream_360;
-uniform vec3 u_viewDir;
+uniform sampler2D u_neural;
+uniform sampler2D u_journey_anchor;
+uniform sampler2D u_journey_echo;
+uniform sampler2D u_journey_dream;
+uniform sampler2D u_journey_structure;
+uniform sampler2D u_journey_cavern;
+uniform float u_depth_extrude;
+uniform float u_neural_extrude;
 uniform float u_color_retention;
 uniform float u_edge_coupling;
 uniform float u_dispersion;
 uniform vec3 u_viewPos;
 #include <cortical-waves>
 #include <dome-mapping>
+#include <journey-mapping>
+#include <journey-depth>
+#include <journey-geometry>
+#include <journey-feedback>
 in vec2 v_uv;
 in vec3 v_worldPos;
 in vec3 v_normal;
@@ -21,6 +32,19 @@ float domeWave(vec2 uv) {
 }
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126, 0.7152, 0.0722)); }
 vec3 sampleTextureSafe(vec2 uv) {
+  if (u_journey_enabled == 1) {
+    vec2 mapped = journeyMappedUV(uv);
+    if (u_journey_room_mode == 1) return texture(u_journey_anchor, mapped).rgb;
+    vec2 dx = dFdx(mapped), dy = dFdy(mapped);
+    if (abs(dx.x) > 0.5) dx.x -= sign(dx.x);
+    if (abs(dy.x) > 0.5) dy.x -= sign(dy.x);
+    vec3 result = textureGrad(u_journey_anchor, mapped, dx, dy).rgb * u_journey_source_weight;
+    if (u_journey_weights.x > 0.0) result += textureGrad(u_journey_echo, mapped, dx, dy).rgb * u_journey_weights.x;
+    if (u_journey_weights.y > 0.0) result += textureGrad(u_journey_dream, mapped, dx, dy).rgb * u_journey_weights.y;
+    if (u_journey_weights.z > 0.0) result += textureGrad(u_journey_structure, mapped, dx, dy).rgb * u_journey_weights.z;
+    if (u_journey_weights.w > 0.0) result += textureGrad(u_journey_cavern, mapped, dx, dy).rgb * u_journey_weights.w;
+    return result;
+  }
   if (u_mirrored_wrap == 1) {
     vec2 mUV = domePhotoUV(uv);
     vec2 ddx = dFdx(mUV);
@@ -47,6 +71,32 @@ vec3 sampleTextureSafe(vec2 uv) {
   return textureGrad(u_dream_360, uv, ddx, ddy).rgb;
 }
 vec3 photo(vec2 uv) { return sampleTextureSafe(uv); }
+
+// Ground plane anchored to walking coordinates, with a fixed world horizon.
+vec3 journeyGroundPlane(vec3 ray, vec3 sceneColor) {
+  float eyeHeight = 1.35;
+  float floorDist = -eyeHeight / min(ray.y, -0.01);
+  vec2 worldFloor = ray.xz * floorDist + u_journey_position;
+  vec2 tileCoord = worldFloor * 0.35;
+  // Evaluate derivatives before the horizon branch for neighboring fragments.
+  vec2 grid = abs(fract(tileCoord - 0.5) - 0.5) / max(fwidth(tileCoord), vec2(0.001));
+  float seam = 1.0 - clamp(min(grid.x, grid.y) * 1.6, 0.0, 1.0);
+  if (ray.y >= -0.01) return sceneColor;
+
+  vec3 floorBase = vec3(0.025, 0.032, 0.045);
+  vec3 jointGlow = u_journey_palette * 0.45 + vec3(0.06, 0.09, 0.14);
+  vec3 floorColor = mix(floorBase, jointGlow, seam * 0.6);
+  float fresnel = pow(clamp(1.0 + ray.y, 0.0, 1.0), 3.5);
+  floorColor = mix(floorColor, sceneColor * 0.6 + jointGlow * 0.25, fresnel * 0.45);
+
+  float horizonFade = 1.0 - smoothstep(-0.14, -0.01, ray.y);
+  float distanceFade = 1.0 - smoothstep(10.0, 32.0, floorDist);
+  // Unfold with the entrance, restoring the waking photo on the walk home.
+  float presence = smoothstep(1.5, 4.0, u_journey_distance);
+  float floorAlpha = horizonFade * distanceFade * presence * 0.88;
+  return mix(sceneColor, floorColor, floorAlpha);
+}
+
 void main() {
   vec3 eyeVec = u_viewPos - v_worldPos;
   vec3 toEye = length(eyeVec) > 1e-6 ? normalize(eyeVec) : -normalize(v_worldPos);
@@ -80,5 +130,29 @@ void main() {
   float fresnel = pow(1.0 - facing, 3.0);
   vec3 rim = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + v_waveVal * 2.5 + u_time * 0.12);
   color += rim * fresnel * u_gain * 0.25;
+  if (u_journey_enabled == 1) {
+    float depth = journeyDepth(journeyMappedUV(uv));
+    float presence = smoothstep(0.0, 6.0, u_journey_distance);
+    float mist = pow(1.0 - depth, 1.8) * u_journey_depth_effects.y * presence;
+    color = mix(color, u_journey_palette * 0.35 + vec3(0.025, 0.035, 0.06), mist);
+    float bands = depth * 22.0;
+    float width = max(fwidth(bands), 0.04);
+    float contour = 1.0 - smoothstep(width, width * 2.0, abs(fract(bands + 0.5) - 0.5));
+    color += contour * u_journey_depth_effects.z * presence * (u_journey_palette * 0.5 + vec3(0.08, 0.16, 0.22));
+  }
+  bool opaqueWarp = u_journey_warp.x > 0.5 && u_journey_warp.y >= 0.12 && u_journey_warp.y <= 0.85;
+  if (u_journey_enabled == 1 && u_journey_distance > 0.0 && !opaqueWarp) {
+    // 0..1.5: separate the photo into real relative-depth surfaces. The traced
+    // projection remains identical for the 1.5..4 aperture and full immersion.
+    // Only the material unfolds within the source-anchored aperture; there is
+    // no cross-fade to an unrelated tunnel projection at either boundary.
+    vec3 ray = normalize(v_worldPos + vec3(refraction, 0.0));
+    float separation = smoothstep(0.0, 1.5, u_journey_distance);
+    color = mix(color, journeyGeometry(ray, color), separation);
+  }
+  if (u_journey_enabled == 1) color = journeyGroundPlane(normalize(v_worldPos), color);
+  if (u_journey_enabled == 1) color = journeyFeedback(color, normalize(v_worldPos));
+  if (u_journey_enabled == 1) color = journeyWarpChamber(normalize(v_worldPos), color);
+  if (u_swap_rb > 0.5) color = color.bgr;
   out_color = vec4(color, 1.0);
 }

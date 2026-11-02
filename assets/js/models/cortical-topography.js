@@ -1,4 +1,5 @@
 import { OrbitCamera, createPlaneMesh } from "../render/plane-mesh.js";
+import { isLinuxFirefox } from "../render/photo-color.js";
 import { AsyncCanvasMetrics } from "../core/async-canvas-metrics.js";
 import {
   DepthEstimator,
@@ -152,6 +153,7 @@ export class CorticalTopographyModel {
         "https://huggingface.co/onnx-community/depth-anything-v2-small-ONNX",
     };
     this.camera = new OrbitCamera();
+    this.swapRB = isLinuxFirefox();
     this.estimator = new DepthEstimator();
     this.canvas = document.createElement("canvas");
     this.gl = this.canvas.getContext("webgl2", {
@@ -308,6 +310,7 @@ export class CorticalTopographyModel {
           "mvp",
           "model",
           "source",
+          "swap_rb",
           "depth",
           "time",
           "wave_mode",
@@ -457,6 +460,7 @@ export class CorticalTopographyModel {
     gl.clearColor(0.035, 0.045, 0.06, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(g.program);
+    gl.uniform1f(g.uniforms.swap_rb, this.swapRB ? 1 : 0);
     gl.bindVertexArray(g.vao);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, g.sourceTexture);

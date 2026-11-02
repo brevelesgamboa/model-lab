@@ -1,3 +1,5 @@
+import { prepareDomeFeedback } from "../render/dome-feedback.js";
+import { isLinuxFirefox } from "../render/photo-color.js";
 import { DomeCamera } from "../render/dome-mesh.js";
 import {
   createDomeGraphics,
@@ -19,6 +21,9 @@ import { CURATED_NEURONS } from "./neural-growth.js";
 import { DreamGuidanceBridge } from "./neural-growth/dream-guidance.js";
 
 import { MiganInpainter } from "./migan-inpainter.js";
+import { DomeJourney } from "./dome-journey.js";
+import { DomeJourneyFields } from "./dome-journey-fields.js";
+import { createSeedAnchors } from "./dome-seed-cropper.js";
 import { projectPhotoMap } from "./equirectangular-canvas.js";
 import {
   DomeDreamBaker,
@@ -271,6 +276,39 @@ export class CorticalDreamDomeModel {
     this.estimator = new DepthEstimator();
     this.featureEstimator = new FeatureHeatmapEstimator();
     this.baker = new DomeDreamBaker();
+    this.journey = new DomeJourney();
+    this.journeyPalette = [0.4, 0.5, 0.6];
+    this.journeyFields = new DomeJourneyFields({
+      inpainter: new MiganInpainter(),
+      baker: new DomeDreamBaker({ persistent: true }),
+      depthEstimator: new DepthEstimator(),
+      createFrontierWorkers: () => ({
+        inpainter: new MiganInpainter(),
+        baker: new DomeDreamBaker(),
+        depthEstimator: new DepthEstimator(),
+      }),
+      onChange: () => this.onStateChange(),
+      onCommit: () => this.uploadJourney(),
+    });
+    this.journey.onWarpStart = (node, warp) => {
+      void this.journeyFields.generateFrontierNode(
+        node.id,
+        node.cell,
+        this.journeyFields.anchorFor(node.cell, this.journey.seed),
+        {
+          seed: this.journey.seed,
+          from: warp.from,
+          to: warp.to,
+          layer: this.selectedLayer,
+          channel: this.selectedChannel,
+          colorRetention: this.colorRetention,
+        },
+      );
+    };
+    this.journey.onWarpComplete = (warp) =>
+      this.journeyFields.completeFrontier(warp.id);
+    this.journey.onWarpCancel = () => this.journeyFields.cancelFrontier();
+    this.journey.onReturnToPhoto = () => this.journeyFields.cancelFrontier();
     this.inpainter = new MiganInpainter();
     this.outpaintingMode = "mirrored";
     this.inpaintState = "idle";
@@ -279,6 +317,7 @@ export class CorticalDreamDomeModel {
     this.aiDepthAbort = null;
     this.aiDepthEstimator = new DepthEstimator();
     this.colorRetention = 1;
+    this.colorSwapRB = isLinuxFirefox();
     this.bakeState = "idle";
     this.bakeProgress = 0;
     this.bakeStatus = "Generate a 360 dream field when ready";
@@ -288,7 +327,9 @@ export class CorticalDreamDomeModel {
     this._lastSeenParamFeatureTarget = null;
     this._isCustomNeuron = false;
     this.neuronArchetypes = DOME_NEURON_ARCHETYPES;
-    this.dreamBridge = new LazyDomeDreamBridge({ archetypes: DOME_NEURON_ARCHETYPES });
+    this.dreamBridge = new LazyDomeDreamBridge({
+      archetypes: DOME_NEURON_ARCHETYPES,
+    });
     this.sourceVersion = 0;
     this.graphicsEpoch = 0;
     this.onStateChange = () => {};
@@ -305,6 +346,7 @@ export class CorticalDreamDomeModel {
     this.canvas.addEventListener("webglcontextlost", (event) => {
       event.preventDefault();
       this.cancel();
+      this.journeyFields.pool.releaseGPU(false);
       this.graphicsEpoch++;
       this.graphics = null;
       this.graphicsPromise = null;
@@ -327,8 +369,74 @@ export class CorticalDreamDomeModel {
   getCanvasMetrics(canvas, refresh) {
     return this.metrics.read(canvas, refresh);
   }
+  setJourneyEnabled(enabled) {
+    this.journey.enabled = Boolean(enabled);
+    if (enabled) this.cancelDream();
+    else {
+      this.journey.cancelWarp();
+      this.journeyFields.cancel(false);
+    }
+    this.onStateChange();
+  }
+  resetJourney() {
+    this.journey.home();
+    this.journey.resetExploration();
+    if (this.seedAnchors) this.journeyFields.setAnchors(this.seedAnchors);
+    else this.journeyFields.reset();
+  }
+  newJourney(seed) {
+    this.journey.newDream(seed);
+    this.journeyFields.setAnchors(this.seedAnchors);
+    this.camera.reset();
+    this.onStateChange();
+  }
+  generateJourney() {
+    if (["loading", "missing"].includes(this.inpaintState))
+      return Promise.resolve(false);
+    this.cancelDream();
+    return this.journeyFields.generate(
+      this.seed360,
+      this.selectedLayer || "mixed_5b",
+      this.selectedChannel ?? 120,
+      this.colorRetention,
+      {
+        neuralDetail: this.journey.neuralDetail,
+        regions: this.journey.generationRegions,
+      },
+    );
+  }
+  uploadJourney() {
+    if (this.disposed || !this.graphics || !this.available || !this.seed360)
+      return;
+    const gl = this.gl,
+      g = this.graphics;
+    for (let index = 0; index < 5; index++) {
+      gl.activeTexture(gl.TEXTURE0 + 3 + index);
+      uploadDream360(
+        gl,
+        g.textures[3 + index],
+        index === 0
+          ? this.seed360
+          : (this.journeyFields.regionalImage(index - 1) ?? this.seed360),
+      );
+      if (this.outpaintingMode === "mirrored")
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    }
+    for (let index = 0; index < 4; index++) {
+      const depth = this.journeyFields.regionalDepth(index);
+      if (!depth) continue;
+      gl.activeTexture(gl.TEXTURE0 + 8 + index);
+      uploadDepthTexture(gl, g.textures[8 + index], depth);
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_WRAP_S,
+        this.outpaintingMode === "mirrored" ? gl.CLAMP_TO_EDGE : gl.REPEAT,
+      );
+    }
+  }
   useDemo() {
     this.cancel();
+    this.seedSources = null;
     this.source.width = 1024;
     this.source.height = 640;
     const ctx = this.source.getContext("2d");
@@ -378,6 +486,16 @@ export class CorticalDreamDomeModel {
     this.onStateChange();
   }
   prepareSurround() {
+    this.resetJourney();
+    const paletteCanvas = new OffscreenCanvas(16, 8),
+      paletteContext = paletteCanvas.getContext("2d");
+    paletteContext.drawImage(this.source, 0, 0, 16, 8);
+    const colors = paletteContext.getImageData(0, 0, 16, 8).data;
+    this.journeyPalette = [0, 1, 2].map((channel) => {
+      let sum = 0;
+      for (let i = channel; i < colors.length; i += 4) sum += colors[i];
+      return Math.max(0.06, sum / (16 * 8 * 255));
+    });
     if (this.aiDepthAbort) {
       this.aiDepthAbort.abort();
       this.aiDepthAbort = null;
@@ -395,8 +513,11 @@ export class CorticalDreamDomeModel {
     this.inpaintState = "idle";
     this.inpaintNotice = "";
     this.inpaintInfo = null;
+    this.seedAnchors = createSeedAnchors(this.seedSources || [this.source]);
+    this.journeyFields.setAnchors(this.seedAnchors);
   }
   useMirrored(message = "") {
+    this.resetJourney();
     this.inpaintVersion++;
     if (this.inpainter.pending) this.inpainter.cancel();
     if (this.aiDepthAbort) {
@@ -419,6 +540,7 @@ export class CorticalDreamDomeModel {
     this.onStateChange();
   }
   async prepareInpainting(file) {
+    this.resetJourney();
     this.cancelDream();
     const version = ++this.inpaintVersion;
     const sourceVersion = this.sourceVersion;
@@ -516,6 +638,7 @@ export class CorticalDreamDomeModel {
     if (this.outpaintingMode === "mirrored")
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     this.uploadGeometry();
+    this.uploadJourney();
   }
   uploadGeometry() {
     if (!this.graphics || !this.available) return;
@@ -583,20 +706,45 @@ export class CorticalDreamDomeModel {
       });
     return this.graphicsPromise;
   }
-  async setSourceFile(file) {
+  setSourceFile(file) {
+    return this.setSourceFiles([file]);
+  }
+  async setSourceFiles(files) {
+    const inputs = Array.from(files);
+    if (inputs.length < 1 || inputs.length > 3)
+      throw new RangeError("Choose between one and three seed images.");
     this.cancel();
     const version = this.sourceVersion;
-    const bitmap = await createImageBitmap(file);
+    const decoded = await Promise.allSettled(
+      inputs.map((file) => createImageBitmap(file)),
+    );
+    const bitmaps = decoded
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => r.value);
     try {
       if (this.disposed || version !== this.sourceVersion) return;
-      const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
-      this.source.width = Math.max(1, Math.round(bitmap.width * scale));
-      this.source.height = Math.max(1, Math.round(bitmap.height * scale));
+      const failed = decoded.find((r) => r.status === "rejected");
+      if (failed) throw failed.reason;
+      const sources = bitmaps.map((bitmap) => {
+        const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height)),
+          canvas = new OffscreenCanvas(
+            Math.max(1, Math.round(bitmap.width * scale)),
+            Math.max(1, Math.round(bitmap.height * scale)),
+          ),
+          ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#08080c";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      });
+      this.source.width = sources[0].width;
+      this.source.height = sources[0].height;
       const ctx = this.source.getContext("2d");
-      ctx.fillStyle = "#08080c";
-      ctx.fillRect(0, 0, this.source.width, this.source.height);
-      ctx.drawImage(bitmap, 0, 0, this.source.width, this.source.height);
-      this.sourceName = file.name || "Local photo";
+      ctx.drawImage(sources[0], 0, 0);
+      this.seedSources = sources;
+      this.sourceName = inputs
+        .map((file) => file.name || "Local photo")
+        .join(" + ");
       this.hasPhoto = true;
       this.depthMap = luminanceDepth(this.source);
       this.featureMap = emptyFeatureMap();
@@ -614,7 +762,7 @@ export class CorticalDreamDomeModel {
       this.onStateChange();
       await this.buildMaps();
     } finally {
-      bitmap.close();
+      for (const bitmap of bitmaps) bitmap.close();
     }
   }
   async buildMaps({ depth = true, feature = true } = {}) {
@@ -681,6 +829,10 @@ export class CorticalDreamDomeModel {
     }
     this.selectedLayer = validated.layer;
     this.selectedChannel = validated.channel;
+    this.journeyFields.cancel(false);
+    if (this.journey.neuralDetail && this.journeyFields.images.length)
+      this.journeyFields.status =
+        "Dream Target changed · extend the space again to update optional neuron detail. Existing areas preserved.";
     this.cancelDream();
     this.featureAbort?.abort();
     this.featureMap = emptyFeatureMap();
@@ -845,6 +997,8 @@ export class CorticalDreamDomeModel {
     });
   }
   cancel() {
+    this.journey?.cancelWarp();
+    this.journeyFields?.cancel(false);
     this.sourceVersion++;
     this.inpaintVersion++;
     this.inpainter.cancel();
@@ -899,6 +1053,46 @@ export class CorticalDreamDomeModel {
       this.canvas.width = target.width;
       this.canvas.height = target.height;
     }
+    const rooms = this.journeyFields.roomBindings(
+      this.journey.position,
+      this.journey.seed,
+      gl,
+    );
+    const feedback = prepareDomeFeedback(gl, g, {
+      width: target.width,
+      height: target.height,
+      active: this.journey.enabled && this.journey.geometry > 0,
+      epoch: `${version}:${this.journeyFields.revision}:${this.journeyFields.textureRevision}:${this.journey.historyEpoch}:${this.journey.seed}:${this.colorSwapRB}`,
+      position: [...this.journey.position],
+      yaw: this.camera.yaw,
+      pitch: this.camera.pitch,
+      time: timeSeconds,
+      signature: JSON.stringify([
+        p,
+        timeSeconds,
+        this.journey.position,
+        this.camera.yaw,
+        this.camera.pitch,
+        this.camera.target,
+        this.camera.scrollDolly,
+        this.journey.enabled,
+        this.journey.seed,
+        this.journey.historyEpoch,
+        this.journeyFields.revision,
+        this.journeyFields.textureRevision,
+        this.journey.recursion,
+        this.journey.corruption,
+        this.journey.density,
+        this.journey.clarity,
+        this.journey.faithfulness,
+        this.journey.retro,
+        this.journey.depthParallax,
+        this.journey.depthFog,
+        this.journey.depthContours,
+        this.journey.warpUniform,
+        this.colorSwapRB,
+      ]),
+    });
     gl.viewport(0, 0, target.width, target.height);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -908,6 +1102,17 @@ export class CorticalDreamDomeModel {
     gl.clearColor(8 / 255, 8 / 255, 12 / 255, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(g.program);
+    gl.uniform1f(g.uniforms.swap_rb, this.colorSwapRB ? 1 : 0);
+    gl.uniform4fv(g.uniforms.journey_warp, this.journey.warpUniform);
+    gl.uniform1i(g.uniforms.journey_room_mode, this.journey.enabled ? 1 : 0);
+    gl.uniform4fv(
+      g.uniforms.journey_room_cells,
+      Float32Array.from(
+        Array.from({ length: 4 }, (_, i) =>
+          rooms[i] ? [...rooms[i].cell, 1, 0] : [0, 0, 0, 0],
+        ).flat(),
+      ),
+    );
     gl.bindVertexArray(g.vao);
     for (const [i, name] of ["dream_360", "depth", "neural"].entries()) {
       gl.activeTexture(gl.TEXTURE0 + i);
@@ -915,7 +1120,76 @@ export class CorticalDreamDomeModel {
       gl.uniform1i(g.uniforms[name], i);
     }
     this.camera.dolly = p.cameraDolly ?? 0.8;
-    const camera = this.camera.matrices(target.width / target.height);
+    const perspectiveCamera = this.camera.matrices(
+      target.width / target.height,
+    );
+    const camera = this.journey.enabled
+      ? this.camera.matrices(target.width / target.height, {
+          originLocked: true,
+        })
+      : perspectiveCamera;
+    for (const [index, name] of [
+      "journey_anchor",
+      "journey_echo",
+      "journey_dream",
+      "journey_structure",
+      "journey_cavern",
+    ].entries()) {
+      gl.activeTexture(gl.TEXTURE0 + 3 + index);
+      const room = rooms[index - 1];
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        index === 0
+          ? g.textures[3]
+          : (room.gpu?.[0] ?? g.textures[room.photoIndex]),
+      );
+      gl.uniform1i(g.uniforms[name], 3 + index);
+    }
+    gl.uniform1i(g.uniforms.journey_enabled, this.journey.enabled ? 1 : 0);
+    gl.uniform3fv(
+      g.uniforms.journey_offset,
+      this.journey.offset(perspectiveCamera.position),
+    );
+    gl.uniform4fv(g.uniforms.journey_weights, this.journey.weights);
+    gl.uniform1f(g.uniforms.journey_source_weight, this.journey.sourceWeight);
+    for (const [index, name] of [
+      "journey_depth_echo",
+      "journey_depth_dream",
+      "journey_depth_structure",
+      "journey_depth_cavern",
+    ].entries()) {
+      gl.activeTexture(gl.TEXTURE0 + 8 + index);
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        rooms[index]?.gpu?.[1] ?? g.textures[rooms[index].depthIndex],
+      );
+      gl.uniform1i(g.uniforms[name], 8 + index);
+    }
+    gl.uniform1f(g.uniforms.journey_distance, this.journey.distance);
+    gl.uniform3f(
+      g.uniforms.journey_depth_effects,
+      this.journey.depthParallax,
+      this.journey.depthFog,
+      this.journey.depthContours,
+    );
+    gl.uniform1f(g.uniforms.journey_geometry, this.journey.geometry);
+    gl.uniform1f(g.uniforms.journey_faithfulness, this.journey.faithfulness);
+    gl.uniform1f(g.uniforms.journey_retro, this.journey.retro);
+    gl.activeTexture(gl.TEXTURE12);
+    gl.bindTexture(gl.TEXTURE_2D, g.textures[12]);
+    gl.uniform1i(g.uniforms.journey_history, 12);
+    gl.uniform2f(g.uniforms.journey_resolution, target.width, target.height);
+    gl.uniform2fv(g.uniforms.journey_motion, feedback.motion);
+    gl.uniform1f(g.uniforms.journey_history_valid, feedback.valid ? 1 : 0);
+    gl.uniform1ui(g.uniforms.journey_seed, this.journey.seed);
+    gl.uniform4f(g.uniforms.journey_style, ...this.journey.style);
+    gl.uniform2f(
+      g.uniforms.journey_position,
+      this.journey.position[0],
+      this.journey.position[1],
+    );
+    gl.uniform3fv(g.uniforms.journey_palette, this.journeyPalette);
+    gl.uniform3fv(g.uniforms.journey_camera_offset, perspectiveCamera.position);
     gl.uniformMatrix4fv(g.uniforms.view, false, camera.view);
     gl.uniformMatrix4fv(g.uniforms.proj, false, camera.projection);
     gl.uniform3fv(g.uniforms.viewDir, camera.direction);
@@ -954,6 +1228,8 @@ export class CorticalDreamDomeModel {
         sourceName: this.sourceName,
         dreamBakes: this.baker.runs,
         dreamState: this.bakeState,
+        journeyDistance: this.journey.distance,
+        journeySection: this.journey.section,
       },
     };
   }
@@ -961,6 +1237,7 @@ export class CorticalDreamDomeModel {
     this.disposed = true;
     this.graphicsEpoch++;
     this.cancel();
+    this.journeyFields.reset();
     if (this.graphics && this.available)
       disposeDomeGraphics(this.gl, this.graphics);
     this.graphics = null;

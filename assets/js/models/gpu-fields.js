@@ -1,4 +1,5 @@
 import { clamp } from "../core/utils.js";
+import { isLinuxFirefox } from "../render/photo-color.js";
 
 const VERTEX_SHADER = `#version 300 es
 precision highp float;
@@ -33,6 +34,7 @@ uniform float u_p7;
 uniform float u_p8;
 uniform float u_p9;
 uniform int u_variant;
+uniform float u_swap_rb;
 
 in vec2 v_uv;
 out vec4 out_color;
@@ -159,6 +161,7 @@ void main() {
   vec3 color;
   if (u_variant == 0) color = chromaticField(v_uv);
   else color = foldedFractal(v_uv);
+  if (u_swap_rb > 0.5) color = color.bgr;
   out_color = vec4(color, 1.0);
 }`;
 
@@ -222,6 +225,7 @@ class GpuFieldModel {
     this.program = null;
     this.uniforms = null;
     this.vao = null;
+    this.swapRB = isLinuxFirefox();
     this.initializeWebGl();
   }
 
@@ -254,6 +258,7 @@ class GpuFieldModel {
         "u_p8",
         "u_p9",
         "u_variant",
+        "u_swap_rb",
       ];
       this.uniforms = Object.fromEntries(
         names.map((name) => [name, gl.getUniformLocation(program, name)]),
@@ -352,6 +357,7 @@ class GpuFieldModel {
       gl.uniform1f(this.uniforms[`u_p${index}`], Number(mapped[index]) || 0);
     }
     gl.uniform1i(this.uniforms.u_variant, this.variant.shaderVariant);
+    gl.uniform1f(this.uniforms.u_swap_rb, this.swapRB ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.flush();
 

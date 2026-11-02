@@ -265,14 +265,15 @@
                     <label
                       class="mini-button mini-button--highlight"
                       for="dome-image"
-                      >Choose photo</label
+                      >Choose 1–3 photos</label
                     >
                     <input
                       id="dome-image"
                       class="visually-hidden"
                       type="file"
+                      multiple
                       accept="image/png,image/jpeg,image/webp"
-                      aria-label="Dream Dome photo"
+                      aria-label="Dream Dome seed photos (one to three)"
                     />
                     <button id="dome-demo" class="mini-button" type="button">
                       Use demo
@@ -300,29 +301,374 @@
                       <option value="migan">AI Inpainter (MI-GAN)</option>
                     </select>
                   </label>
-                  <div id="dream-synthesis-section" class="dome-synthesis-panel">
-                    <label class="field" for="dome-archetypes">Dream Target
+                  <section
+                    class="dome-model-card dome-journey-panel"
+                    aria-label="Dream Drift"
+                  >
+                    <label class="field"
+                      ><span
+                        ><input id="journey-enabled" type="checkbox" /> Dream
+                        Drift · photo space</span
+                      ></label
+                    >
+                    <p class="field__help">
+                      Wander through recursive photo tunnels, filigree and
+                      corrupted echoes. Each dream has a different map; your
+                      image keeps showing through.
+                    </p>
+                    <div id="journey-options" hidden>
+                      <p
+                        id="journey-position"
+                        class="field__help"
+                        role="status"
+                      >
+                        Photo clearing
+                      </p>
+                      <div class="dream-radar">
+                        <canvas
+                          id="journey-map"
+                          width="280"
+                          height="210"
+                          tabindex="0"
+                          role="img"
+                          aria-label="Interactive dream radar. Use arrow keys to select a hub and Enter to warp."
+                          aria-describedby="journey-radar-hint"
+                        ></canvas>
+                        <div
+                          class="dream-radar__layers"
+                          role="group"
+                          aria-label="Radar layers"
+                        >
+                          <button
+                            id="journey-geo"
+                            type="button"
+                            aria-pressed="true"
+                            title="Relative depth contours"
+                          >
+                            GEO
+                          </button>
+                          <button
+                            id="journey-net"
+                            type="button"
+                            aria-pressed="true"
+                            title="Corridors, visited hubs and frontiers"
+                          >
+                            NET
+                          </button>
+                          <button
+                            id="journey-trace"
+                            type="button"
+                            aria-pressed="true"
+                            title="Recent movement trace"
+                          >
+                            TRACE
+                          </button>
+                        </div>
+                      </div>
+                      <p id="journey-radar-hint" class="field__help">
+                        Click a visited hub or a frontier marker for a 5-second
+                        warp. Esc cancels; Return to photo takes you home.
+                      </p>
+                      <div class="field-grid">
+                        <label class="field" for="journey-recursion"
+                          >Recursion
+                          <input
+                            id="journey-recursion"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value="0.28"
+                          />
+                        </label>
+                        <label class="field" for="journey-corruption"
+                          >Corruption
+                          <input
+                            id="journey-corruption"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value="0.08"
+                          />
+                        </label>
+                        <label class="field" for="journey-density"
+                          >Density
+                          <input
+                            id="journey-density"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value="0.35"
+                          />
+                        </label>
+                        <label class="field" for="journey-clarity"
+                          >Clarity
+                          <input
+                            id="journey-clarity"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value="0.85"
+                          />
+                        </label>
+                      </div>
+                      <label class="field" for="journey-seed"
+                        >Dream seed
+                        <input
+                          id="journey-seed"
+                          type="number"
+                          min="0"
+                          max="4294967295"
+                          step="1"
+                          required
+                        />
+                      </label>
+                      <div class="cortical-tools__actions">
+                        <button
+                          id="journey-new"
+                          class="mini-button"
+                          type="button"
+                        >
+                          New dream
+                        </button>
+                        <button
+                          id="journey-load-seed"
+                          class="mini-button"
+                          type="button"
+                        >
+                          Load seed
+                        </button>
+                      </div>
+                      <details class="control-section">
+                        <summary>Space &amp; texture</summary>
+                        <div class="control-section__content">
+                          <label class="field" for="journey-speed"
+                            >Travel speed
+                            <output id="journey-speed-value">2</output>
+                            <input
+                              id="journey-speed"
+                              type="range"
+                              min="0.5"
+                              max="6"
+                              step="0.1"
+                              value="2"
+                            />
+                          </label>
+                          <label class="field" for="journey-faithfulness"
+                            >Photo fidelity
+                            <input
+                              id="journey-faithfulness"
+                              type="range"
+                              min="0.4"
+                              max="1"
+                              step="0.01"
+                              value="0.75"
+                            />
+                          </label>
+                          <label class="field" for="journey-retro"
+                            >Coarse dream textures
+                            <input
+                              id="journey-retro"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value="0.18"
+                            />
+                          </label>
+                          <label class="field"
+                            ><span
+                              ><input
+                                id="journey-neural-detail"
+                                type="checkbox"
+                              />
+                              Add neuron detail to new fills</span
+                            ></label
+                          >
+                          <label class="field"
+                            ><span
+                              ><input id="journey-swap-rb" type="checkbox" />
+                              Swap Red / Blue channels</span
+                            ></label
+                          >
+                          <p class="field__help">
+                            MI-GAN extends missing borders while keeping known
+                            photo pixels. Optional neuron detail uses your Dream
+                            Target; regenerate to apply it.
+                          </p>
+                        </div>
+                      </details>
+                      <details class="control-section">
+                        <summary>Depth visuals</summary>
+                        <div class="control-section__content">
+                          <label class="field" for="journey-depth-parallax"
+                            >Depth parallax
+                            <input
+                              id="journey-depth-parallax"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value="0.5"
+                            />
+                          </label>
+                          <label class="field" for="journey-depth-fog"
+                            >Depth fog
+                            <input
+                              id="journey-depth-fog"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value="0.25"
+                            />
+                          </label>
+                          <label class="field" for="journey-depth-contours"
+                            >Contour glow
+                            <input
+                              id="journey-depth-contours"
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value="0.12"
+                            />
+                          </label>
+                          <p class="field__help">
+                            Depth Anything shapes each completed area. Your
+                            extrusion, neural swell, waves and optical controls
+                            also remain available.
+                          </p>
+                        </div>
+                      </details>
+                      <div class="cortical-tools__actions">
+                        <button
+                          id="journey-home"
+                          class="mini-button"
+                          type="button"
+                        >
+                          Return to photo
+                        </button>
+                        <button
+                          id="journey-look"
+                          class="mini-button"
+                          type="button"
+                        >
+                          Mouse look
+                        </button>
+                        <button
+                          id="journey-cancel"
+                          class="mini-button"
+                          type="button"
+                          hidden
+                        >
+                          Cancel generation
+                        </button>
+                      </div>
+                      <p
+                        id="journey-status"
+                        class="field__help"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        Explore the photo now. Extend nearby areas with the
+                        local MI-GAN inpainter when ready.
+                      </p>
+                      <progress
+                        id="journey-progress"
+                        max="100"
+                        value="0"
+                        aria-label="Regional generation progress"
+                        hidden
+                      ></progress>
+                      <p class="field__help">
+                        Click the canvas, then WASD to walk. Drag or capture the
+                        mouse to look; Esc releases it. Follow the map to
+                        explore branches. New dream changes the map; Load seed
+                        recreates it. Extend dream space adds local AI fills.
+                        Use the clock to animate while standing still.
+                      </p>
+                    </div>
+                  </section>
+                  <div
+                    id="dream-synthesis-section"
+                    class="dome-synthesis-panel"
+                  >
+                    <label class="field" for="dome-archetypes"
+                      >Dream Target
                       <select id="dome-archetypes" aria-label="DREAM TARGET">
-                        <option value="0">Cellular &amp; Ocular Nodes (mixed_5b · ch 120)</option>
-                        <option value="1">Ribbed Arches &amp; Terraces (mixed_6a · ch 42)</option>
-                        <option value="2">Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)</option>
-                        <option value="3">Biological Lattices (mixed_6d · ch 182)</option>
-                        <option value="4">Crystalline Spires (mixed_7b · ch 314)</option>
+                        <option value="0">
+                          Cellular &amp; Ocular Nodes (mixed_5b · ch 120)
+                        </option>
+                        <option value="1">
+                          Ribbed Arches &amp; Terraces (mixed_6a · ch 42)
+                        </option>
+                        <option value="2">
+                          Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)
+                        </option>
+                        <option value="3">
+                          Biological Lattices (mixed_6d · ch 182)
+                        </option>
+                        <option value="4">
+                          Crystalline Spires (mixed_7b · ch 314)
+                        </option>
                         <option value="-1">Custom neuron target</option>
                       </select>
                     </label>
-                    <div id="dome-custom-neuron-controls" class="dome-custom-neuron" hidden>
+                    <div
+                      id="dome-custom-neuron-controls"
+                      class="dome-custom-neuron"
+                      hidden
+                    >
                       <div class="dome-custom-neuron__header">
-                        <label class="field" for="dome-custom-layer">Layer
-                          <select id="dome-custom-layer" aria-label="Custom Dream Layer"></select>
+                        <label class="field" for="dome-custom-layer"
+                          >Layer
+                          <select
+                            id="dome-custom-layer"
+                            aria-label="Custom Dream Layer"
+                          ></select>
                         </label>
                         <div class="control-fine-group">
-                          <button type="button" class="nudge-button" id="dome-custom-ch-dec" data-direction="-1" aria-label="Decrease channel">-</button>
-                          <input type="text" id="dome-custom-ch-input" class="control-fine-input" value="120" aria-label="Custom neuron channel">
-                          <button type="button" class="nudge-button" id="dome-custom-ch-inc" data-direction="1" aria-label="Increase channel">+</button>
+                          <button
+                            type="button"
+                            class="nudge-button"
+                            id="dome-custom-ch-dec"
+                            data-direction="-1"
+                            aria-label="Decrease channel"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="text"
+                            id="dome-custom-ch-input"
+                            class="control-fine-input"
+                            value="120"
+                            aria-label="Custom neuron channel"
+                          />
+                          <button
+                            type="button"
+                            class="nudge-button"
+                            id="dome-custom-ch-inc"
+                            data-direction="1"
+                            aria-label="Increase channel"
+                          >
+                            +
+                          </button>
                         </div>
                       </div>
-                      <input type="range" id="dome-custom-ch-slider" class="control-range-input" min="0" max="767" step="1" value="120" aria-label="Custom neuron channel slider">
+                      <input
+                        type="range"
+                        id="dome-custom-ch-slider"
+                        class="control-range-input"
+                        min="0"
+                        max="767"
+                        step="1"
+                        value="120"
+                        aria-label="Custom neuron channel slider"
+                      />
                     </div>
                     <button
                       id="dome-browse-neurons"
@@ -401,7 +747,8 @@
                     aria-live="polite"
                   ></p>
                   <p class="field__help">
-                    Drag or arrow keys to look · Scroll to dolly · Shift-drag to pan.
+                    Drag or arrow keys to look · Scroll to dolly · Shift-drag to
+                    pan.
                   </p>
                   <details id="model-cache-drawer" class="cortical-tools__help">
                     <summary>Dome settings · Local Model Cache</summary>
@@ -603,10 +950,27 @@
                       height="512"
                       aria-label="Model output"
                     ></canvas>
-                    <div id="dome-bake-overlay" class="dome-bake-overlay" hidden>
-                      <p id="dome-bake-label" role="status" aria-live="polite">Synthesizing 360 Universe: 0%…</p>
-                      <progress id="dome-bake-progress" max="100" value="0" aria-label="360 dream generation progress"></progress>
-                      <button id="dome-cancel-bake" class="mini-button" type="button">Cancel synthesis</button>
+                    <div
+                      id="dome-bake-overlay"
+                      class="dome-bake-overlay"
+                      hidden
+                    >
+                      <p id="dome-bake-label" role="status" aria-live="polite">
+                        Synthesizing 360 Universe: 0%…
+                      </p>
+                      <progress
+                        id="dome-bake-progress"
+                        max="100"
+                        value="0"
+                        aria-label="360 dream generation progress"
+                      ></progress>
+                      <button
+                        id="dome-cancel-bake"
+                        class="mini-button"
+                        type="button"
+                      >
+                        Cancel synthesis
+                      </button>
                     </div>
                     <canvas
                       id="mask-overlay-canvas"
@@ -914,10 +1278,7 @@
                 </div>
 
                 <details id="brush-settings" class="brush-settings">
-                  <summary
-                    title="Brush settings"
-                    aria-label="Brush settings"
-                  >
+                  <summary title="Brush settings" aria-label="Brush settings">
                     <span
                       id="brush-diameter-preview"
                       class="brush-diameter-preview"
@@ -1141,21 +1502,34 @@
                     <dd id="archive-resolution">—</dd>
                   </div>
                 </dl>
-                <section id="hq-renders" class="saved-section hq-saved-section" hidden>
+                <section
+                  id="hq-renders"
+                  class="saved-section hq-saved-section"
+                  hidden
+                >
                   <div class="saved-section__head">
                     <div>
-                      <h2 class="saved-section__title">High-Resolution Snapshots</h2>
-                      <p class="saved-section__desc">Full-detail 2K/4K PNG exports stored in this browser.</p>
+                      <h2 class="saved-section__title">
+                        High-Resolution Snapshots
+                      </h2>
+                      <p class="saved-section__desc">
+                        Full-detail 2K/4K PNG exports stored in this browser.
+                      </p>
                     </div>
                     <span id="hq-status" class="panel-code">READY</span>
                   </div>
-                  <div id="hq-render-list" class="hq-render-list hq-render-grid"></div>
+                  <div
+                    id="hq-render-list"
+                    class="hq-render-list hq-render-grid"
+                  ></div>
                 </section>
                 <section class="saved-section">
                   <div class="saved-section__head">
                     <div>
                       <h2 class="saved-section__title">Parameter Runs</h2>
-                      <p class="saved-section__desc">Simulation states, bookmarks, and parameters.</p>
+                      <p class="saved-section__desc">
+                        Simulation states, bookmarks, and parameters.
+                      </p>
                     </div>
                   </div>
                   <div

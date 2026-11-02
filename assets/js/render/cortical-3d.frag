@@ -2,6 +2,7 @@
 precision highp float;
 precision highp int;
 uniform sampler2D u_source;
+uniform float u_swap_rb;
 uniform vec3 u_viewPos;
 uniform vec3 u_lightPos;
 uniform float u_edge_coupling;
@@ -42,5 +43,7 @@ void main() {
   color = pow(max(color, vec3(0.0)), vec3(2.2));
   color *= 0.40 + 0.68 * diffuse + 0.03 * v_baseDepth;
   color += vec3(0.16, 0.19, 0.23) * specular;
-  out_color = vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), 1.0);
+  vec3 finalColor = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
+  if (u_swap_rb > 0.5) finalColor = finalColor.bgr;
+  out_color = vec4(finalColor, 1.0);
 }

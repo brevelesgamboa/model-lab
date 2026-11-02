@@ -6,6 +6,10 @@ export async function createDomeGraphics(gl, isCurrent) {
     "../shaders/cortical-dome.frag",
     "./cortical-waves.glsl",
     "../shaders/cortical-dome-mapping.glsl",
+    "../shaders/dome-journey-mapping.glsl",
+    "../shaders/dome-journey-geometry.glsl",
+    "../shaders/dome-journey-depth.glsl",
+    "../shaders/dome-journey-feedback.glsl",
   ];
   const sources = await Promise.all(
     urls.map(async (url) => {
@@ -31,7 +35,11 @@ export async function createDomeGraphics(gl, isCurrent) {
         shader,
         source
           .replace("#include <cortical-waves>", sources[2])
-          .replace("#include <dome-mapping>", sources[3]),
+          .replace("#include <dome-mapping>", sources[3])
+          .replace("#include <journey-mapping>", sources[4])
+          .replace("#include <journey-geometry>", sources[5])
+          .replace("#include <journey-depth>", sources[6])
+          .replace("#include <journey-feedback>", sources[7]),
       );
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
@@ -54,7 +62,7 @@ export async function createDomeGraphics(gl, isCurrent) {
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 13; i++) {
       const texture = gl.createTexture();
       textures.push(texture);
       gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -65,9 +73,40 @@ export async function createDomeGraphics(gl, isCurrent) {
     }
     const uniforms = Object.fromEntries(
       [
+        "swap_rb",
+        "journey_warp",
+        "journey_room_mode",
+        "journey_room_cells[0]",
         "view",
         "proj",
         "dream_360",
+        "journey_enabled",
+        "journey_offset",
+        "journey_weights",
+        "journey_geometry",
+        "journey_source_weight",
+        "journey_faithfulness",
+        "journey_retro",
+        "journey_seed",
+        "journey_style",
+        "journey_history",
+        "journey_resolution",
+        "journey_motion",
+        "journey_history_valid",
+        "journey_position",
+        "journey_camera_offset",
+        "journey_palette",
+        "journey_anchor",
+        "journey_echo",
+        "journey_dream",
+        "journey_structure",
+        "journey_cavern",
+        "journey_depth_echo",
+        "journey_depth_dream",
+        "journey_depth_structure",
+        "journey_depth_cavern",
+        "journey_depth_effects",
+        "journey_distance",
         "mirrored_wrap",
         "color_retention",
         "depth",
@@ -88,6 +127,7 @@ export async function createDomeGraphics(gl, isCurrent) {
         "aspect",
       ].map((name) => [name, gl.getUniformLocation(program, `u_${name}`)]),
     );
+    uniforms.journey_room_cells = uniforms["journey_room_cells[0]"];
     return {
       program,
       vao,

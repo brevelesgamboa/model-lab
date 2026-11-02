@@ -141,10 +141,13 @@ export async function optimizeDomeDream(
     signal,
     stepSize = 0.04,
     colorRetention = 1,
+    preserveDetail = false,
   } = {},
 ) {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > 100)
     throw new RangeError("Use between 1 and 100 dream iterations.");
+  if (!Number.isFinite(stepSize) || stepSize < 0 || stepSize > 0.04)
+    throw new RangeError("Dream step size must be between zero and 0.04.");
   if (
     !Number.isFinite(colorRetention) ||
     colorRetention < 0 ||
@@ -161,6 +164,7 @@ export async function optimizeDomeDream(
       : [[sourceHeight, sourceWidth]];
   let image,
     base,
+    residual,
     c,
     completed = 0,
     scoreStart = null,
@@ -170,9 +174,16 @@ export async function optimizeDomeDream(
     for (let octave = 0; octave < sizes.length; octave++) {
       const [height, width] = sizes[octave];
       base = tf.image.resizeBilinear(seed, [height, width]);
-      const initial = image
-        ? tf.image.resizeBilinear(image, [height, width])
-        : base.clone();
+      // Upsample the coarse change, retaining the source's fine detail.
+      const initial = residual
+        ? tf.tidy(() =>
+            base.add(tf.image.resizeBilinear(residual, [height, width])),
+          )
+        : image
+          ? tf.image.resizeBilinear(image, [height, width])
+          : base.clone();
+      residual?.dispose();
+      residual = null;
       image?.dispose();
       image = constrainDomeColor(tf, initial, base, colorRetention);
       initial.dispose();
@@ -258,6 +269,8 @@ export async function optimizeDomeDream(
         onProgress(Math.round((completed / iterations) * 100));
         if (completed % 2 === 0) await tf.nextFrame();
       }
+      if (preserveDetail && octave < sizes.length - 1)
+        residual = image.sub(base);
       base.dispose();
       base = null;
       tf.dispose(c);
@@ -278,6 +291,7 @@ export async function optimizeDomeDream(
         scoreEnd,
         bakeMs: performance.now() - started,
         sizes,
+        preserveDetail,
       };
     } finally {
       pixels.dispose();
@@ -285,6 +299,7 @@ export async function optimizeDomeDream(
   } finally {
     image?.dispose();
     base?.dispose();
+    residual?.dispose();
     if (c) tf.dispose(c);
   }
 }

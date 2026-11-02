@@ -13,6 +13,7 @@ import {
   validateSize,
 } from "./reference.js";
 import { hexToRgb } from "../../core/utils.js";
+import { isLinuxFirefox } from "../../render/photo-color.js";
 import { ResonanceConfig } from "./resonance-config.js";
 import {
   MOTION_GRID_SIZE,
@@ -621,6 +622,7 @@ uniform ivec2 u_viewport;
 uniform float u_zoom;
 uniform vec2 u_pan;
 uniform int u_displayFilter;
+uniform float u_swap_rb;
 
 vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int style) {
   if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return vec2(0.0);
@@ -858,6 +860,7 @@ void main() {
     }
   }
 
+  if (u_swap_rb > 0.5) rgb = rgb.bgr;
   out_color = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }`;
 
@@ -877,6 +880,7 @@ uniform float u_geometryCenterX;
 uniform float u_geometryCenterY;
 uniform float u_geometrySoftness;
 uniform float u_foldCount;
+uniform float u_swap_rb;
 
 void main() {
   vec2 pos = (v_uv - 0.5 - vec2(u_geometryCenterX, u_geometryCenterY)) * 2.0;
@@ -996,6 +1000,7 @@ void main() {
     blendedRgb = mix(prevRgb * u_decay, curr.rgb, max(0.05, 1.0 - u_decay));
   }
 
+  if (u_swap_rb > 0.5) blendedRgb = blendedRgb.bgr;
   out_color = vec4(clamp(blendedRgb, 0.0, 1.0), 1.0);
 }`;
 
@@ -1500,6 +1505,7 @@ export class TextureNcaRuntime {
           u_geometryCenterY: this.geometryCenterY,
           u_geometrySoftness: this.geometrySoftness,
           u_foldCount: this.foldCount,
+          u_swap_rb: isLinuxFirefox() ? 1 : 0,
         },
       );
       this.run(
@@ -1901,6 +1907,7 @@ export class TextureNcaRuntime {
       u_zoom: z,
       u_pan: Array.isArray(pan) ? pan : [0, 0],
       u_displayFilter: filterCode,
+      u_swap_rb: isLinuxFirefox() ? 1 : 0,
       ...rippleUniforms,
     };
 
@@ -1963,6 +1970,7 @@ export class TextureNcaRuntime {
           u_geometryCenterY: this.geometryCenterY,
           u_geometrySoftness: this.geometrySoftness,
           u_foldCount: this.foldCount,
+          u_swap_rb: isLinuxFirefox() ? 1 : 0,
         },
       );
       this.echoIndex = 1 - this.echoIndex;

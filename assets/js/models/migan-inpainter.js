@@ -22,6 +22,73 @@ export function packMiganInputs(rgba, width, height, rect) {
   return { image, mask };
 }
 
+export function packMaskedMiganInputs(rgba, width, height, known) {
+  const count = width * height;
+  if (
+    !(known instanceof Uint8Array) ||
+    known.length !== count ||
+    rgba.length !== count * 4
+  )
+    throw new RangeError(
+      "The image and known-region mask must have matching dimensions.",
+    );
+  const image = new Uint8Array(count * 3);
+  for (let i = 0; i < count; i++)
+    for (let c = 0; c < 3; c++) image[c * count + i] = rgba[i * 4 + c];
+  return { image, mask: Uint8Array.from(known, (v) => (v ? 255 : 0)) };
+}
+
+// Explicit composition protects every known pixel, including neural refinement.
+export function compositeMaskedMigan(result, source, known) {
+  const count = known.length,
+    output = new Uint8ClampedArray(source);
+  if (source.length !== count * 4 || result.length !== count * 3)
+    throw new RangeError("The regional result has invalid dimensions.");
+  for (let i = 0; i < count; i++) {
+    if (!known[i]) {
+      for (let c = 0; c < 3; c++) output[i * 4 + c] = result[c * count + i];
+      output[i * 4 + 3] = 255;
+    }
+  }
+  return output;
+}
+
+export async function inpaintMaskedCanvas(bitmap, known, session) {
+  const { width, height } = bitmap;
+  const canvas = new OffscreenCanvas(width, height),
+    ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0);
+  const source = ctx.getImageData(0, 0, width, height).data;
+  const packed = packMaskedMiganInputs(source, width, height, known);
+  const ort = await ensureOnnxRuntime();
+  const image = new ort.Tensor("uint8", packed.image, [1, 3, height, width]);
+  const mask = new ort.Tensor("uint8", packed.mask, [1, 1, height, width]);
+  let outputs;
+  try {
+    outputs = await session.run({ image, mask });
+    const result = outputs.result;
+    if (
+      result?.type !== "uint8" ||
+      result.dims.join() !== [1, 3, height, width].join()
+    )
+      throw new Error("Unexpected regional MI-GAN result.");
+    ctx.putImageData(
+      new ImageData(
+        compositeMaskedMigan(await result.getData(), source, known),
+        width,
+        height,
+      ),
+      0,
+      0,
+    );
+    return canvas;
+  } finally {
+    image.dispose();
+    mask.dispose();
+    for (const tensor of Object.values(outputs ?? {})) tensor.dispose();
+  }
+}
+
 export function compositeMigan(result, source, width, height, rect) {
   const output = new Uint8ClampedArray(width * height * 4),
     count = width * height;
@@ -191,11 +258,9 @@ export class MiganInpainter {
       throw new DOMException("Inpainting cancelled.", "AbortError");
     }
     try {
-      const result = await this.request(
-        "inpaint",
-        { bitmap, coverage },
-        [bitmap],
-      );
+      const result = await this.request("inpaint", { bitmap, coverage }, [
+        bitmap,
+      ]);
       const canvas = new OffscreenCanvas(result.width, result.height);
       canvas
         .getContext("2d")
@@ -205,6 +270,50 @@ export class MiganInpainter {
           0,
         );
       canvas.photoRect = result.photoRect;
+      return canvas;
+    } catch (error) {
+      bitmap.close();
+      throw error;
+    }
+  }
+  async inpaintMasked(source, known, { signal } = {}) {
+    if (signal?.aborted)
+      throw new DOMException("Inpainting cancelled.", "AbortError");
+    const abort = () => this.cancel();
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      return await this.inpaintMaskedRequest(source, known);
+    } finally {
+      signal?.removeEventListener("abort", abort);
+    }
+  }
+  async inpaintMaskedRequest(source, known) {
+    const epoch = this.epoch,
+      bitmap = await this.capture(source);
+    if (epoch !== this.epoch) {
+      bitmap.close();
+      throw new DOMException("Inpainting cancelled.", "AbortError");
+    }
+    const mask = new Uint8Array(known);
+    if (mask.length !== bitmap.width * bitmap.height) {
+      bitmap.close();
+      throw new RangeError("Invalid regional mask.");
+    }
+    try {
+      const result = await this.request("patch", { bitmap, mask }, [
+        bitmap,
+        mask.buffer,
+      ]);
+      if (result.type !== "result")
+        throw new Error("The local MI-GAN model is unavailable.");
+      const canvas = new OffscreenCanvas(result.width, result.height);
+      canvas
+        .getContext("2d")
+        .putImageData(
+          new ImageData(result.rgba, result.width, result.height),
+          0,
+          0,
+        );
       return canvas;
     } catch (error) {
       bitmap.close();

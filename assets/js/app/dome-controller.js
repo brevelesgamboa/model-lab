@@ -4,6 +4,7 @@ import {
 } from "../ui/dome-controls.js";
 import { createLocalModelCacheControls } from "../ui/local-model-cache.js";
 import { terminal } from "../ui/terminal.js";
+import { createDomeJourneyControls } from "../ui/dome-journey-controls.js";
 
 export function createDomeController({
   elements,
@@ -18,6 +19,14 @@ export function createDomeController({
   let lastLoggedPipeline = null;
   const cache = createLocalModelCacheControls(elements);
   const isActive = () => getModel() === model;
+  const journeyControls = createDomeJourneyControls({
+    elements,
+    model,
+    isActive,
+    canInteract,
+    render,
+    onWarpChange: update,
+  });
   const outpainting = createDomeOutpaintingControls(
     elements,
     model,
@@ -46,6 +55,7 @@ export function createDomeController({
     const active = isActive();
     outpainting.update();
     neuronControls.update();
+    journeyControls.update();
     elements.domeTools.hidden = !active;
     elements.domeBakeOverlay.hidden = !active || model.bakeState !== "baking";
     elements.canvas.classList.toggle("has-dome-camera", active);
@@ -55,7 +65,7 @@ export function createDomeController({
       endGesture();
       return;
     }
-    if (model.bakeState === "baking") endGesture();
+    if (model.bakeState === "baking" || model.journey.warping) endGesture();
     const fullPipeline = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
     if (fullPipeline !== lastLoggedPipeline) {
       lastLoggedPipeline = fullPipeline;
@@ -71,8 +81,9 @@ export function createDomeController({
       model.outpaintingMode === "migan" ||
       ["loading", "missing"].includes(model.inpaintState);
     if (elements.dreamSynthesisSection) {
-      elements.dreamSynthesisSection.hidden = isMigan;
-      elements.dreamSynthesisSection.style.display = isMigan ? "none" : "block";
+      elements.dreamSynthesisSection.hidden = isMigan && !model.journey.enabled;
+      elements.dreamSynthesisSection.style.display =
+        isMigan && !model.journey.enabled ? "none" : "block";
     }
     const targetBlock = elements.parameterControls?.querySelector(
       '.control-block[data-parameter="featureTarget"]',
@@ -87,11 +98,17 @@ export function createDomeController({
         dupSelect.tabIndex = -1;
       }
     }
-    elements.domeGenerate.hidden = isMigan;
+    elements.domeGenerate.hidden = isMigan && !model.journey.enabled;
+    elements.domeGenerate.textContent = model.journey.enabled
+      ? "Extend dream space"
+      : "Synthesize Dream";
     elements.domeGenerate.disabled =
-      isMigan ||
-      !model.hasPhoto ||
+      (isMigan && !model.journey.enabled) ||
+      ["loading", "missing"].includes(model.inpaintState) ||
+      (!model.hasPhoto && !model.journey.enabled) ||
+      model.journeyFields.state === "baking" ||
       model.bakeState === "baking" ||
+      model.journey.warping ||
       [model.depthState, model.featureState].includes("loading");
     elements.domeBakeLabel.textContent = model.bakeStatus;
     elements.domeBakeProgress.value = model.bakeProgress;
@@ -114,7 +131,8 @@ export function createDomeController({
       model.depthState,
       model.featureState,
     ].includes("loading");
-    elements.domeResetView.disabled = model.bakeState === "baking";
+    elements.domeResetView.disabled =
+      model.bakeState === "baking" || model.journey.warping;
   }
   let lastSyncedTarget = null;
   model.onStateChange = () => {
@@ -134,13 +152,13 @@ export function createDomeController({
       elements.domeStatus.textContent = `Could not prepare the photo: ${error.message}`;
   };
   elements.domeImage.addEventListener("change", () => {
-    const file = elements.domeImage.files?.[0];
+    const files = Array.from(elements.domeImage.files || []);
     elements.domeImage.value = "";
-    if (file && isActive() && canInteract())
-      void model.setSourceFile(file).catch(report);
+    if (files.length && isActive() && canInteract())
+      void model.setSourceFiles(files).catch(report);
   });
   elements.domeResetView.addEventListener("click", () => {
-    if (isActive() && canInteract()) {
+    if (isActive() && canInteract() && !model.journey.warping) {
       model.camera.reset();
       redraw();
     }
@@ -152,7 +170,10 @@ export function createDomeController({
     if (isActive() && canInteract()) void model.retryMaps().catch(report);
   });
   elements.domeGenerate.addEventListener("click", () => {
-    if (isActive() && canInteract()) void model.generateDream().catch(report);
+    if (isActive() && canInteract() && !model.journey.warping)
+      void (
+        model.journey.enabled ? model.generateJourney() : model.generateDream()
+      ).catch(report);
   });
   elements.domeCancelBake.addEventListener("click", () => model.cancelDream());
   elements.canvas.addEventListener("pointerdown", (event) => {
@@ -160,6 +181,8 @@ export function createDomeController({
       !isActive() ||
       !canInteract() ||
       model.bakeState === "baking" ||
+      model.journey.warping ||
+      document.pointerLockElement === elements.canvas ||
       ![0, 1, 2].includes(event.button)
     )
       return;
@@ -180,6 +203,8 @@ export function createDomeController({
       event.pointerId !== gesture.id ||
       !isActive() ||
       model.bakeState === "baking" ||
+      model.journey.warping ||
+      document.pointerLockElement === elements.canvas ||
       !canInteract()
     )
       return;
@@ -200,7 +225,7 @@ export function createDomeController({
   elements.canvas.addEventListener(
     "wheel",
     (event) => {
-      if (!isActive() || !canInteract()) return;
+      if (!isActive() || !canInteract() || model.journey.warping) return;
       event.preventDefault();
       const scale =
         event.deltaMode === 1
@@ -217,7 +242,13 @@ export function createDomeController({
     if (isActive()) event.preventDefault();
   });
   elements.canvas.addEventListener("keydown", (event) => {
-    if (!isActive() || !canInteract() || model.bakeState === "baking") return;
+    if (
+      !isActive() ||
+      !canInteract() ||
+      model.bakeState === "baking" ||
+      model.journey.warping
+    )
+      return;
     const direction = {
       ArrowLeft: [12, 0],
       ArrowRight: [-12, 0],
@@ -232,5 +263,6 @@ export function createDomeController({
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) endGesture();
   });
+  document.addEventListener("pointerlockchange", endGesture);
   return { update };
 }

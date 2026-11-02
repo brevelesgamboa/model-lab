@@ -1,4 +1,5 @@
 import { clamp } from "../core/utils.js";
+import { isLinuxFirefox } from "../render/photo-color.js";
 
 const VERTEX_SHADER = `#version 300 es
 precision highp float;
@@ -30,6 +31,7 @@ uniform float u_time;
 uniform float u_drift;
 uniform int u_equation;
 uniform int u_iterations;
+uniform float u_swap_rb;
 
 in vec2 v_uv;
 out vec4 out_color;
@@ -100,6 +102,7 @@ void main() {
   }
 
   color = pow(max(color, 0.0), vec3(0.88));
+  if (u_swap_rb > 0.5) color = color.bgr;
   out_color = vec4(clamp(color, 0.0, 1.0), 1.0);
 }`;
 
@@ -250,6 +253,7 @@ export class FractalFunctionModel {
     this.program = null;
     this.uniforms = null;
     this.vao = null;
+    this.swapRB = isLinuxFirefox();
     this.initializeWebGl();
   }
 
@@ -278,6 +282,7 @@ export class FractalFunctionModel {
         "u_drift",
         "u_equation",
         "u_iterations",
+        "u_swap_rb",
       ];
       this.uniforms = Object.fromEntries(
         uniformNames.map((name) => [
@@ -690,6 +695,7 @@ export class FractalFunctionModel {
       this.uniforms.u_iterations,
       Math.round(clamp(parameters.iterations, 30, 700)),
     );
+    gl.uniform1f(this.uniforms.u_swap_rb, this.swapRB ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     const context = targetCanvas.getContext("2d", { alpha: false });
