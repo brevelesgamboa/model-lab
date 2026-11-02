@@ -1,0 +1,287 @@
+{
+  "baselineRevision": "0b4a7a0269715c44c73e38f62b631f888f1d9f38",
+  "branch": "experiment/dream-drift",
+  "startedAt": "2026-11-02T19:42:04.401Z",
+  "finishedInferenceAt": "2026-11-02T19:43:56.318Z",
+  "inputs": [
+    {
+      "id": "photo-1",
+      "name": "484351002_3898009110462736_2299646428952345762_n.jpg",
+      "sha256": "d8e9211c3ea5b36ccd2b0da2f13ad529b69bab941772d17664986a0f6eba57c1"
+    },
+    {
+      "id": "photo-2",
+      "name": "Himalayan-marmot_-udeyismailShutterstock-copy_en6jwc.jpg",
+      "sha256": "52b894d5b68ad461d50152e6c80a87e96cce492e5d7c05932ee98fa65464a3ee"
+    },
+    {
+      "id": "photo-3",
+      "name": "images.jpg",
+      "sha256": "40c995fe845080b9ac198465920eada3cbe14908e2b83beba82c9279ced4c82c"
+    }
+  ],
+  "hardware": {
+    "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "webgpu": {
+      "vendor": "amd",
+      "isFallbackAdapter": false
+    }
+  },
+  "modelIdentity": {
+    "miganPipelineSha256": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+    "inceptionGraphSha256": "10256b8f8d3afd623a0ce762417a27e106c41f6f8582152fb32f6dcf03123849"
+  },
+  "method": {
+    "levels": [
+      {
+        "name": "Familiar",
+        "iterations": 2,
+        "stepSize": 0.004,
+        "protection": "photo",
+        "neon": 0.35
+      },
+      {
+        "name": "Suggestive",
+        "iterations": 4,
+        "stepSize": 0.006,
+        "protection": "subject",
+        "neon": 0.45
+      },
+      {
+        "name": "Unfolding",
+        "iterations": 6,
+        "stepSize": 0.008,
+        "protection": "subject",
+        "neon": 0.55
+      },
+      {
+        "name": "Transformed",
+        "iterations": 6,
+        "stepSize": 0.01,
+        "protection": "subject",
+        "neon": 0.65
+      },
+      {
+        "name": "Surreal",
+        "iterations": 8,
+        "stepSize": 0.012,
+        "protection": "subject",
+        "neon": 0.75
+      },
+      {
+        "name": "Deep dream",
+        "iterations": 8,
+        "stepSize": 0.012,
+        "protection": "subject",
+        "neon": 0.8
+      }
+    ],
+    "recipes": [
+      {
+        "id": "arches",
+        "label": "Arches",
+        "organic": [0, 0, 0, 0, 0, 0]
+      },
+      {
+        "id": "organic",
+        "label": "Organic",
+        "organic": [1, 1, 1, 1, 1, 1]
+      },
+      {
+        "id": "mixed",
+        "label": "Arches → organic",
+        "organic": [0, 0, 0.3333333333333333, 0.5, 0.75, 1]
+      }
+    ],
+    "projection": "Stationary actual dome renderer; no motion warp, camera translation or journey geometry",
+    "generation": "One MI-GAN panorama per source; cumulative real Inception passes; no additional area generation after the seed",
+    "protection": "First level preserves the photo; later levels preserve hand-marked marmot head patches",
+    "preserveDetail": true,
+    "mixedRecipe": "Sequential arches then organic updates, sharing the same total iteration budget as each single-target recipe",
+    "lighting": "Independent cyan/violet split tone and bloom from model-change edges; never supplied to the model",
+    "baseline": "The unchanged starting MI-GAN panorama is available at every depth for comparison",
+    "steps": [2, 4, 6, 6, 8, 8],
+    "actualRenderer": "CorticalDreamDomeModel, fixed per-source yaw/pitch, 512×384 captures",
+    "manualHeadAnnotations": true,
+    "colorRetention": 1,
+    "opticalEffects": {
+      "waves": 0,
+      "refraction": 0,
+      "dispersion": 0,
+      "depthRelief": 0,
+      "neuralRelief": 0,
+      "cameraDolly": 0
+    },
+    "newAreaOutpaintingAfterSeed": false,
+    "neonUsesAuthoredLighting": true,
+    "neonFedBackIntoSynthesis": false
+  },
+  "validation": {
+    "sourceImportsModelIntegrityAndLint": "passed",
+    "unitTestsPassed": 243,
+    "miGanPanoramas": 3,
+    "inceptionBakeCalls": 63,
+    "modelStages": 54,
+    "neonVariants": 54,
+    "zeroRetainedTensorPasses": 63,
+    "protectedHeadCoresUnchanged": true,
+    "allRecipesIncreaseChangeFromSeed": true,
+    "displayPassModelTexturesUnchanged": true,
+    "displayPassInferenceRuns": 0,
+    "maxWhiteClippedFraction": 0,
+    "glErrors": 0,
+    "errors": [],
+    "gallery": {
+      "status": "passed",
+      "sources": 3,
+      "recipesPerSource": 3,
+      "generatedLevelsPerRecipe": 6,
+      "pairedViewsChecked": 36,
+      "artifactFiles": 264,
+      "playPause": true,
+      "mobileOverflow": false,
+      "errors": []
+    }
+  },
+  "measured": [
+    {
+      "input": "photo-1",
+      "recipes": [
+        {
+          "recipe": "arches",
+          "meanChangeFromSeedByLevel": [
+            1.1415632637895146, 2.611846106176144, 4.528144739599606,
+            6.494385966265655, 9.031726715549196, 11.174778183632196
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 15.09173766976136
+        },
+        {
+          "recipe": "organic",
+          "meanChangeFromSeedByLevel": [
+            1.3375048053248786, 3.053247499623931, 5.261975383879565,
+            7.406084987715082, 9.995478816070806, 12.12197039534163
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 15.154761032318783
+        },
+        {
+          "recipe": "mixed",
+          "meanChangeFromSeedByLevel": [
+            1.1415632637895146, 2.611846106176144, 4.516327818941787,
+            6.474807883432782, 8.878471244550216, 11.102022029280661
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 15.169587147057728
+        }
+      ]
+    },
+    {
+      "input": "photo-2",
+      "recipes": [
+        {
+          "recipe": "arches",
+          "meanChangeFromSeedByLevel": [
+            0.7563093156204619, 2.1108620451616864, 3.9689487840297804,
+            5.768763678386615, 8.0578026886339, 9.919619664150867
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 8.06014591131292
+        },
+        {
+          "recipe": "organic",
+          "meanChangeFromSeedByLevel": [
+            0.8958301374486102, 2.470014291996482, 4.560542201018593,
+            6.444590389846802, 8.793350258738828, 10.690251017569695
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 8.205243551982983
+        },
+        {
+          "recipe": "mixed",
+          "meanChangeFromSeedByLevel": [
+            0.7563093156204619, 2.1108620451616864, 3.9360235012579,
+            5.769554979444069, 8.000928084923606, 9.992047999631835
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 8.239792344194228
+        }
+      ]
+    },
+    {
+      "input": "photo-3",
+      "recipes": [
+        {
+          "recipe": "arches",
+          "meanChangeFromSeedByLevel": [
+            0.9446995386566829, 2.479061176578899, 4.405466816015058,
+            6.212962749851674, 8.478031209721966, 10.27883331798932
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 6.771181130956034
+        },
+        {
+          "recipe": "organic",
+          "meanChangeFromSeedByLevel": [
+            1.0916670502669859, 2.7412698960698867, 4.684050154463062,
+            6.435410656928333, 8.613716396612041, 10.368401435176661
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 6.710416922400213
+        },
+        {
+          "recipe": "mixed",
+          "meanChangeFromSeedByLevel": [
+            0.9446995386566829, 2.479061176578899, 4.295811468115142,
+            6.034391047280018, 8.09724012357045, 9.922352262730415
+          ],
+          "changeNondecreasing": true,
+          "protectedCoreMaxByte": 0,
+          "finalMeanHorizontalEdgeByte": 6.824894765645778
+        }
+      ]
+    }
+  ],
+  "review": {
+    "preferredCandidate": "Mountain source, arches-to-organic, levels 3–5 with neon on",
+    "arches": "Ribbed folds and directional structure, particularly visible on fur and mountain surfaces",
+    "organic": "Cellular growth spreads through the landscape and sky, becoming busy at the deepest level",
+    "mixed": "Structure emerges first, then gives way to organic textures while the marked foreground head stays stable",
+    "neon": "Cyan/violet display accents with preserved warm subject colors; not a model-learned neon scene",
+    "limitations": [
+      "This is a stationary visual progression, not traversable or endless generated locations.",
+      "MI-GAN generates only the initial surrounding panorama; deeper stages are Inception feature ascent.",
+      "The effects remain mostly texture changes rather than semantic architectural scene generation.",
+      "Unprotected subjects, text and small details can deform; the manual head mask is not automatic image understanding.",
+      "Existing journey browser failures from the prior audit were not rerun because application code was not changed."
+    ]
+  },
+  "artifacts": {
+    "gallery": "test-results/dream-drift-neon-progression/index.html",
+    "fullReport": "test-results/dream-drift-neon-progression/report.json",
+    "overviews": [
+      "test-results/dream-drift-neon-progression/photo-1-mixed-overview.png",
+      "test-results/dream-drift-neon-progression/photo-2-mixed-overview.png",
+      "test-results/dream-drift-neon-progression/photo-3-mixed-overview.png"
+    ],
+    "preview": "test-results/dream-drift-neon-progression/gallery-preview.png"
+  },
+  "rerun": [
+    "node tools/experiment-dream-drift.mjs --neon-progression --output test-results/dream-drift-neon-progression <three photo paths>",
+    "node tools/refresh-dream-drift-progression.mjs test-results/dream-drift-neon-progression"
+  ],
+  "scope": {
+    "applicationFilesChanged": false,
+    "rawImagesCommitted": false,
+    "commitSubject": "Add real-model neon progression studies for three marmot sources",
+    "headBeforeSave": "0b4a7a0269715c44c73e38f62b631f888f1d9f38"
+  }
+}

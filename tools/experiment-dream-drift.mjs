@@ -5,6 +5,8 @@
 // --forward-control-only repeats the same crop/projection without further inference.
 // --calibrated-patterns compares direct panoramic approach motion with arches,
 // organic synthesis, and a motion-only control, all from the same initial seed.
+// --neon-progression runs six stationary levels for all supplied photos, with
+// arches, organic and mixed recipes plus a separate neon display comparison.
 // Outputs include raw MI-GAN pixels, sphere-ready textures, six dome views,
 // independent Dream strengths, recursive Dream/outpainting, and a local gallery.
 import assert from "node:assert/strict";
@@ -16,6 +18,10 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { createStaticServer } from "../server.mjs";
 import { writeDreamDriftGallery } from "./dream-drift-gallery.mjs";
+import {
+  PROGRESSION_RECIPES,
+  PROGRESSION_LEVELS,
+} from "./dream-drift-progression.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -68,6 +74,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--baseline-only") baselineOnly = true;
   else if (args[i] === "--target-sweep") experimentMode = "target-sweep";
   else if (args[i] === "--calibrated-patterns") experimentMode = "calibrated";
+  else if (args[i] === "--neon-progression") experimentMode = "progression";
   else if (args[i] === "--forward-control-only")
     experimentMode = "forward-control";
   else if (args[i] === "--forward-targets") {
@@ -138,7 +145,12 @@ const report = {
     candidateTargets:
       experimentMode === "target-sweep" ? candidateTargets : undefined,
     forwardTargets: experimentMode === "forward" ? forwardTargets : undefined,
-    dreamStepSize: experimentMode === "standard" ? 0.04 : 0.012,
+    dreamStepSize:
+      experimentMode === "progression"
+        ? undefined
+        : experimentMode === "standard"
+          ? 0.04
+          : 0.012,
     sweepSteps: experimentMode === "target-sweep" ? [4, 8] : undefined,
     forwardPlan:
       experimentMode === "forward"
@@ -162,6 +174,26 @@ const report = {
             control: "Same direct panoramic warp, with no Dream synthesis",
             generation:
               "MI-GAN supplies the initial panorama only; later stages warp and optionally Dream it. No new area outpainting yet.",
+          }
+        : undefined,
+    progressionPlan:
+      experimentMode === "progression"
+        ? {
+            levels: PROGRESSION_LEVELS,
+            recipes: PROGRESSION_RECIPES,
+            projection:
+              "Stationary actual dome renderer; no motion warp, camera translation or journey geometry",
+            generation:
+              "One MI-GAN panorama per source; cumulative real Inception passes; no additional area generation after the seed",
+            protection:
+              "First level preserves the photo; later levels preserve hand-marked marmot head patches",
+            preserveDetail: true,
+            mixedRecipe:
+              "Sequential arches then organic updates, sharing the same total iteration budget as each single-target recipe",
+            lighting:
+              "Independent cyan/violet split tone and bloom from model-change edges; never supplied to the model",
+            baseline:
+              "The unchanged starting MI-GAN panorama is available at every depth for comparison",
           }
         : undefined,
     colorRetention: 1,
@@ -218,7 +250,7 @@ try {
   });
   page.setDefaultTimeout(180000);
   page.on("pageerror", (error) => report.errors.push(error.message));
-  if (experimentMode !== "standard") {
+  if (!["standard", "progression"].includes(experimentMode)) {
     const workerSource = await readFile(
       new URL("./dream-drift-experiment.worker.mjs", import.meta.url),
       "utf8",
@@ -230,6 +262,20 @@ try {
       "**/assets/js/models/dream-drift-experiment.worker.js",
       (route) =>
         route.fulfill({ contentType: "text/javascript", body: workerSource }),
+    );
+  }
+  if (experimentMode === "progression") {
+    const source = await readFile(
+      new URL("./dream-drift-progression.mjs", import.meta.url),
+      "utf8",
+    );
+    report.progressionHelperSha256 = createHash("sha256")
+      .update(source)
+      .digest("hex");
+    await page.route(
+      "**/assets/js/models/dream-drift-progression.js",
+      (route) =>
+        route.fulfill({ contentType: "text/javascript", body: source }),
     );
   }
   if (experimentMode === "calibrated") {
@@ -325,10 +371,15 @@ try {
           ? await import("/assets/js/models/dream-drift-projection.js")
           : null;
       const calibrationChecks = [];
+      const progressionChecks = [];
+      const progression =
+        experimentMode === "progression"
+          ? await import("/assets/js/models/dream-drift-progression.js")
+          : null;
       const model = new CorticalDreamDomeModel();
       const baker = new DomeDreamBaker(
-        experimentMode === "standard"
-          ? {}
+        ["standard", "progression"].includes(experimentMode)
+          ? { persistent: experimentMode === "progression" }
           : {
               createWorker: () => {
                 const worker = new Worker(
@@ -361,6 +412,7 @@ try {
         cameraDolly: 0,
       });
       const frame = document.createElement("canvas");
+      let frontPitch = 0;
       frame.width = 512;
       frame.height = 384;
       const encode = async (canvas) => {
@@ -448,13 +500,20 @@ try {
         model.camera.reset();
         model.uploadSource();
       }
-      async function views(canvas, mapping) {
+      async function views(canvas, mapping, frontOnly = false) {
         await present(canvas, mapping);
+        if (frontOnly) {
+          model.camera.pitch = frontPitch;
+          await model.render(frame, parameters, 0);
+          if (model.gl.getError() !== 0)
+            throw new Error("Dome renderer produced a WebGL error.");
+          return { sheet: null, front: await encode(frame) };
+        }
         let front;
         const sheet = new OffscreenCanvas(1536, 816),
           ctx = sheet.getContext("2d");
         const angles = [
-          ["Front", 0, 0],
+          ["Front", 0, frontPitch],
           ["Right", Math.PI / 2, 0],
           ["Rear", Math.PI, 0],
           ["Left", -Math.PI / 2, 0],
@@ -494,6 +553,7 @@ try {
           experiment,
           provenance,
           captureViews = true,
+          frontOnly = false,
         } = {},
       ) {
         const entry = {
@@ -502,7 +562,7 @@ try {
           label,
           mapping,
           texture: `${input}-${id}.png`,
-          views: captureViews ? `${input}-${id}-views.png` : null,
+          views: captureViews && !frontOnly ? `${input}-${id}-views.png` : null,
           front: captureViews ? `${input}-${id}-front.png` : null,
           elapsedMs,
           metrics: metrics(canvas, reference, rect),
@@ -512,7 +572,9 @@ try {
         };
         if (!entry.metrics.opaque)
           throw new Error(`${id} contains transparent pixels.`);
-        const captures = captureViews ? await views(canvas, mapping) : null;
+        const captures = captureViews
+          ? await views(canvas, mapping, frontOnly)
+          : null;
         await window.saveExperimentArtifact(
           entry,
           await encode(canvas),
@@ -549,6 +611,7 @@ try {
         seed,
         iterations,
         target = { layer: "mixed_5b", channel: 120 },
+        options = {},
       ) {
         const result = await baker.bake(
           seed,
@@ -558,11 +621,15 @@ try {
           {
             photoRect: null,
             colorRetention: 1,
+            ...options,
           },
         );
         if (result.retainedTensors !== 0)
           throw new Error("Dream worker retained tensors.");
-        if (experimentMode !== "standard" && result.stepSize !== 0.012)
+        if (
+          !["standard", "progression"].includes(experimentMode) &&
+          result.stepSize !== 0.012
+        )
           throw new Error("The gentle optimization step was not applied.");
         const canvas = new OffscreenCanvas(result.width, result.height);
         canvas
@@ -578,6 +645,9 @@ try {
       }
       try {
         for (const [index, input] of inputs.entries()) {
+          frontPitch = progression
+            ? progression.marmotViewPitch(input.name)
+            : 0;
           const bytes = Uint8Array.from(atob(input.base64), (c) =>
             c.charCodeAt(0),
           );
@@ -630,6 +700,135 @@ try {
             0
           )
             throw new Error("MI-GAN changed the protected photo core.");
+          if (experimentMode === "progression") {
+            const initial = generated.canvas;
+            const subjectRect = progression.marmotSubjectRect(input.name, rect);
+            const light = (canvas, strength) => {
+              const styled = new OffscreenCanvas(canvas.width, canvas.height);
+              const data = progression.neonPanoramaPixels(
+                pixels(canvas),
+                pixels(initial),
+                canvas.width,
+                canvas.height,
+                { strength, photoRect: subjectRect },
+              );
+              styled
+                .getContext("2d")
+                .putImageData(
+                  new ImageData(data, canvas.width, canvas.height),
+                  0,
+                  0,
+                );
+              return styled;
+            };
+            await save(
+              input.id,
+              "progression-baseline-neon",
+              "Starting panorama · neon lighting",
+              light(initial, 0.25),
+              {
+                reference: initial,
+                frontOnly: true,
+                provenance:
+                  "The unchanged starting MI-GAN panorama with authored neon display treatment only",
+                experiment: {
+                  phase: "progression-baseline",
+                  variant: "neon",
+                  neon: 0.25,
+                },
+              },
+            );
+            for (const recipe of progression.PROGRESSION_RECIPES) {
+              let previous = initial;
+              for (let level = 1; level <= 6; level++) {
+                const settings = progression.progressionStage(recipe.id, level);
+                const protection =
+                  settings.protection === "photo" ? rect : subjectRect;
+                let current = previous;
+                const bakes = [];
+                for (const pass of settings.passes) {
+                  const result = await dream(current, pass.iterations, pass, {
+                    stepSize: settings.stepSize,
+                    preserveDetail: true,
+                    photoRect: protection,
+                  });
+                  if (
+                    !result.bake.preserveDetail ||
+                    result.bake.iterations !== pass.iterations
+                  )
+                    throw new Error(
+                      "Progression did not apply its detail-preserving iteration budget.",
+                    );
+                  bakes.push({
+                    ...result.bake,
+                    ...pass,
+                    stepSize: settings.stepSize,
+                  });
+                  current = result.canvas;
+                }
+                const subject = metrics(current, initial, subjectRect);
+                if (subject.protectedMaxByte !== 0)
+                  throw new Error("The protected marmot head patch changed.");
+                const experiment = {
+                  phase: "progression",
+                  ...settings,
+                  subjectRect,
+                  frontPitch,
+                  changeFromPrevious: metrics(current, previous).meanChangeByte,
+                  parent:
+                    level === 1
+                      ? "migan"
+                      : `progression-${recipe.id}-${level - 1}`,
+                };
+                const id = `progression-${recipe.id}-${level}`;
+                await save(
+                  input.id,
+                  id,
+                  `${recipe.label} · ${level}/6 · ${settings.name}`,
+                  current,
+                  {
+                    reference: initial,
+                    rect: subjectRect,
+                    frontOnly: level !== 6,
+                    elapsedMs: bakes.reduce(
+                      (sum, bake) => sum + bake.bakeMs,
+                      0,
+                    ),
+                    bake: { passes: bakes, retainedTensors: 0 },
+                    experiment: { ...experiment, variant: "plain" },
+                    provenance:
+                      "Cumulative real Inception synthesis; original chroma and marked head core preserved; stationary camera; optical effects disabled",
+                  },
+                );
+                const started = performance.now();
+                const styled = light(current, settings.neon);
+                await save(
+                  input.id,
+                  `${id}-neon`,
+                  `${recipe.label} · ${level}/6 · neon`,
+                  styled,
+                  {
+                    reference: current,
+                    frontOnly: level !== 6,
+                    elapsedMs: performance.now() - started,
+                    experiment: { ...experiment, variant: "neon", parent: id },
+                    provenance:
+                      "Same model image with separate cyan/violet display lighting and bloom; no warping or generated content added",
+                  },
+                );
+                progressionChecks.push({
+                  input: input.id,
+                  recipe: recipe.id,
+                  level,
+                  protectedMaxByte: subject.protectedMaxByte,
+                  meanChangeFromSeed: subject.meanChangeByte,
+                });
+                // Only the natural-color model output becomes the next seed.
+                previous = current;
+              }
+            }
+            continue;
+          }
           if (experimentMode === "target-sweep") {
             for (const target of candidateTargets) {
               for (const steps of [4, 8]) {
@@ -981,6 +1180,7 @@ try {
           dreamRuns: baker.runs,
           glError: model.gl.getError(),
           calibrationChecks,
+          progressionChecks,
         };
       } finally {
         baker.dispose();

@@ -2,6 +2,11 @@ import path from "node:path";
 import { writeFile } from "node:fs/promises";
 
 export async function writeDreamDriftGallery(output, report) {
+  if (report.configuration.experimentMode === "progression") {
+    const { writeDreamProgressionGallery } =
+      await import("./dream-drift-progression-gallery.mjs");
+    return writeDreamProgressionGallery(output, report);
+  }
   const escape = (s) =>
     String(s).replace(
       /[&<>"']/g,
