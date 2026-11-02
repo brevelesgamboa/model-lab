@@ -124,6 +124,8 @@ try {
           base = pixels(reference),
           { width, height } = c;
         let change = 0,
+          chroma = 0,
+          luminance = 0,
           seam = 0,
           seamMax = 0,
           edge = 0,
@@ -132,6 +134,11 @@ try {
         for (let y = 0; y < height; y++)
           for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4;
+            chroma +=
+              Math.max(data[i], data[i + 1], data[i + 2]) -
+              Math.min(data[i], data[i + 1], data[i + 2]);
+            luminance +=
+              data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
             if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255)
               clipped++;
             for (let c = 0; c < 3; c++) {
@@ -158,6 +165,8 @@ try {
           meanHorizontalEdgeByte: edge / (width * height * 3),
           protectedMaxByte: null,
           whiteClippedFraction: clipped / (width * height),
+          meanChromaByte: chroma / (width * height),
+          meanLuminanceByte: luminance / (width * height),
         };
       };
       const render = async (canvas, entry, pitch) => {
@@ -235,13 +244,48 @@ try {
                   ? "progression-baseline-neon"
                   : entry.id + "-neon"),
             );
+            const soft = {
+              texture: neon.texture.replace(/\.png$/, "-soft.png"),
+              front: neon.front.replace(/\.png$/, "-soft.png"),
+              views: neon.views?.replace(/\.png$/, "-soft.png") || null,
+              saturation: 1,
+            };
+            const muted = new OffscreenCanvas(canvas.width, canvas.height);
+            muted
+              .getContext("2d")
+              .putImageData(
+                new ImageData(
+                  neonPanoramaPixels(
+                    pixels(canvas),
+                    pixels(initial),
+                    canvas.width,
+                    canvas.height,
+                    {
+                      strength: neon.experiment.neon,
+                      photoRect: subjectRect,
+                      saturation: 1,
+                    },
+                  ),
+                  canvas.width,
+                  canvas.height,
+                ),
+                0,
+                0,
+              );
+            await window.saveDisplayArtifact(soft.texture, await encode(muted));
+            await render(muted, soft, pitch);
             const styled = new OffscreenCanvas(canvas.width, canvas.height);
+            const started = performance.now();
             const data = neonPanoramaPixels(
               pixels(canvas),
               pixels(initial),
               canvas.width,
               canvas.height,
-              { strength: neon.experiment.neon, photoRect: subjectRect },
+              {
+                strength: neon.experiment.neon,
+                photoRect: subjectRect,
+                saturation: 2.1,
+              },
             );
             styled
               .getContext("2d")
@@ -250,6 +294,7 @@ try {
                 0,
                 0,
               );
+            const elapsedMs = performance.now() - started;
             await window.saveDisplayArtifact(
               neon.texture,
               await encode(styled),
@@ -259,6 +304,8 @@ try {
               input: input.id,
               id: neon.id,
               metrics: measure(styled, canvas),
+              elapsedMs,
+              soft: { ...soft, metrics: measure(muted, canvas) },
             });
           }
           const mixed = entries.filter(
@@ -303,10 +350,15 @@ try {
       sha,
       `${file} model pixels changed`,
     );
-  for (const update of display.updates)
-    report.artifacts.find(
+  for (const update of display.updates) {
+    const entry = report.artifacts.find(
       (a) => a.input === update.input && a.id === update.id,
-    ).metrics = update.metrics;
+    );
+    entry.metrics = update.metrics;
+    entry.elapsedMs = update.elapsedMs;
+    entry.soft = update.soft;
+    entry.experiment.saturation = 2.1;
+  }
   for (const entry of report.artifacts)
     if (entry.experiment?.phase === "progression")
       entry.experiment.frontPitch = display.framing.find(
@@ -319,6 +371,10 @@ try {
     originalReportSha256: hash(originalReport),
     inferenceRuns: 0,
     generatedTextureHashesUnchanged: true,
+    saturation: 2.1,
+    previousNeonSaturation: 1,
+    colorTreatment:
+      "Luminance-preserving chroma gain with a shared gamut limit and reduced gain over the marked head core",
     framing: display.framing,
     originalModelTextures: Object.fromEntries(before),
     glError: display.glError,

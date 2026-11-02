@@ -144,7 +144,7 @@ export function neonPanoramaPixels(
   reference,
   width,
   height,
-  { strength = 0.65, photoRect = null } = {},
+  { strength = 0.65, photoRect = null, saturation = 2.1 } = {},
 ) {
   if (
     !Number.isInteger(width) ||
@@ -155,7 +155,10 @@ export function neonPanoramaPixels(
     reference.length !== rgba.length ||
     !Number.isFinite(strength) ||
     strength < 0 ||
-    strength > 1
+    strength > 1 ||
+    !Number.isFinite(saturation) ||
+    saturation < 0 ||
+    saturation > 3
   )
     throw new RangeError(
       "Invalid neon panorama pixels, dimensions, or strength.",
@@ -224,12 +227,14 @@ export function neonPanoramaPixels(
   const output = rgba.slice();
   const violet = [0.59, 0.31, 1],
     cyan = [0.04, 0.94, 1];
+  const color = new Float64Array(3);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = y * width + x,
         p = i * 4,
         luma = light[i];
-      const amount = strength * (1 - photoKeep(x, y, photoRect) * 0.85);
+      const keep = photoKeep(x, y, photoRect);
+      const amount = strength * (1 - keep * 0.85);
       const hue = smooth(0.08, 0.68, luma);
       const tint = amount * (0.1 + Math.pow(1 - luma, 2) * 0.5);
       const glow = Math.min(
@@ -240,9 +245,20 @@ export function neonPanoramaPixels(
         const accent = violet[c] * (1 - hue) + cyan[c] * hue;
         let value = rgba[p + c] / 255;
         value = value * (1 - tint) + accent * Math.max(0.4, luma + 0.06) * tint;
-        output[p + c] = Math.round(
-          255 * (1 - (1 - value) * (1 - accent * glow)),
-        );
+        color[c] = clamp(1 - (1 - value) * (1 - accent * glow));
+      }
+      // Increase chroma around the existing luminance, preserving the hue.
+      // Limit the shared gain at the gamut boundary instead of clipping RGB
+      // channels independently. Marked heads receive a smaller color boost.
+      const colorY = color[0] * 0.2126 + color[1] * 0.7152 + color[2] * 0.0722;
+      let gain = 1 + (saturation - 1) * Math.sqrt(strength) * (1 - keep * 0.6);
+      for (let c = 0; c < 3; c++) {
+        const delta = color[c] - colorY;
+        if (delta > 0) gain = Math.min(gain, (1 - colorY) / delta);
+        else if (delta < 0) gain = Math.min(gain, -colorY / delta);
+      }
+      for (let c = 0; c < 3; c++) {
+        output[p + c] = Math.round(255 * (colorY + (color[c] - colorY) * gain));
       }
     }
   return output;

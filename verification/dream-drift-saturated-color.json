@@ -1,0 +1,88 @@
+{
+  "baselineExperimentRevision": "33635d4a4e589fcbd42f5cfd5cae4a7d021dff58",
+  "branch": "experiment/dream-drift",
+  "updatedAt": "2026-11-02T20:05:53.438Z",
+  "inputs": [
+    {
+      "id": "photo-1",
+      "name": "484351002_3898009110462736_2299646428952345762_n.jpg",
+      "sha256": "d8e9211c3ea5b36ccd2b0da2f13ad529b69bab941772d17664986a0f6eba57c1"
+    },
+    {
+      "id": "photo-2",
+      "name": "Himalayan-marmot_-udeyismailShutterstock-copy_en6jwc.jpg",
+      "sha256": "52b894d5b68ad461d50152e6c80a87e96cce492e5d7c05932ee98fa65464a3ee"
+    },
+    {
+      "id": "photo-3",
+      "name": "images.jpg",
+      "sha256": "40c995fe845080b9ac198465920eada3cbe14908e2b83beba82c9279ced4c82c"
+    }
+  ],
+  "method": {
+    "newAiInferenceRuns": 0,
+    "startingImages": "Saved natural-color model outputs from the previous marmot experiment",
+    "saturation": 2.1,
+    "previousSaturation": 1,
+    "chromaGain": "RGB chroma scaled around Rec.709-weighted luminance, limited by a common gamut bound; gain scales with neon strength and is reduced over the marked head region",
+    "lighting": "Existing cyan/violet lighting and bloom are retained",
+    "gallery": "More saturated is the default; Previous look is available for every source, recipe, and stage"
+  },
+  "validation": {
+    "sourceSyntaxImportsModelIntegrityAndLint": "passed",
+    "unitTestsPassed": 243,
+    "displayComparisons": 57,
+    "modelTexturesUnchanged": true,
+    "modelTexturesHashChecked": 57,
+    "allComparisonsHaveHigherChroma": true,
+    "meanChromaIncreasePercent": 68.3645296708918,
+    "maxMeanLuminanceChangeByte": 0.08291550381804313,
+    "maxWhiteClippedFraction": 0,
+    "glErrors": 0,
+    "errors": [],
+    "gallery": {
+      "status": "passed",
+      "sources": 3,
+      "recipesPerSource": 3,
+      "generatedLevelsPerRecipe": 6,
+      "pairedViewsChecked": 36,
+      "artifactFiles": 387,
+      "colorLooks": 2,
+      "moreSaturatedComparisons": 57,
+      "maxMeanLuminanceChangeByte": 0.08291550381804313,
+      "meanChromaIncreasePercent": 68.3645296708918,
+      "playPause": true,
+      "mobileOverflow": false,
+      "errors": []
+    }
+  },
+  "measurements": [
+    {
+      "input": "photo-1",
+      "previousMeanChromaByte": 20.80048219781173,
+      "saturatedMeanChromaByte": 37.803757316187806,
+      "meanChromaIncreasePercent": 80.59997518264692
+    },
+    {
+      "input": "photo-2",
+      "previousMeanChromaByte": 39.2108403256065,
+      "saturatedMeanChromaByte": 57.250538073087995,
+      "meanChromaIncreasePercent": 46.0835730514832
+    },
+    {
+      "input": "photo-3",
+      "previousMeanChromaByte": 15.377410788285104,
+      "saturatedMeanChromaByte": 27.495116183632298,
+      "meanChromaIncreasePercent": 78.4100407785452
+    }
+  ],
+  "artifacts": {
+    "gallery": "test-results/dream-drift-neon-progression/index.html",
+    "fullReport": "test-results/dream-drift-neon-progression/report.json",
+    "preview": "test-results/dream-drift-neon-progression/gallery-preview.png"
+  },
+  "scope": {
+    "applicationFilesChanged": false,
+    "privateImagesCommitted": false
+  }
+}

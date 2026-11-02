@@ -192,6 +192,7 @@ const report = {
               "Sequential arches then organic updates, sharing the same total iteration budget as each single-target recipe",
             lighting:
               "Independent cyan/violet split tone and bloom from model-change edges; never supplied to the model",
+            neonSaturation: 2.1,
             baseline:
               "The unchanged starting MI-GAN panorama is available at every depth for comparison",
           }
@@ -735,6 +736,7 @@ try {
                   phase: "progression-baseline",
                   variant: "neon",
                   neon: 0.25,
+                  saturation: 2.1,
                 },
               },
             );
@@ -811,7 +813,12 @@ try {
                     reference: current,
                     frontOnly: level !== 6,
                     elapsedMs: performance.now() - started,
-                    experiment: { ...experiment, variant: "neon", parent: id },
+                    experiment: {
+                      ...experiment,
+                      variant: "neon",
+                      parent: id,
+                      saturation: 2.1,
+                    },
                     provenance:
                       "Same model image with separate cyan/violet display lighting and bloom; no warping or generated content added",
                   },
