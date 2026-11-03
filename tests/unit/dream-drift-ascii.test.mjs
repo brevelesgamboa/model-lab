@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createArchMesh } from "../../tools/dream-drift-ascii-renderer.mjs";
+import {
+  createArchMesh,
+  GLYPH_SETS,
+} from "../../tools/dream-drift-ascii-renderer.mjs";
+
+test("hex palette contains the complete single-cell hexadecimal alphabet", () => {
+  assert.deepEqual([...GLYPH_SETS.hex.replace(" ", "")].sort(), [
+    ..."0123456789ABCDEF",
+  ]);
+});
+
+test("glyph palettes have one blank and unique printable ASCII characters", () => {
+  for (const characters of Object.values(GLYPH_SETS)) {
+    assert.equal(new Set(characters).size, characters.length);
+    assert.equal([...characters].filter((c) => c === " ").length, 1);
+    assert(
+      [...characters].every(
+        (c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126,
+      ),
+    );
+  }
+});
 
 // Intersect a forward ray with a mesh, so the test checks the actual opening.
 function hitCount(mesh, origin) {

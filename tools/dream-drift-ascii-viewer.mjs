@@ -1,4 +1,4 @@
-// UI extracted from Gemini's local gateway demo; visual behavior is preserved.
+// Isolated image-colored gateway experiment, originally extracted from Gemini's demo.
 import { createAsciiRenderer } from "./dream-drift-ascii-renderer.mjs";
 
 export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
@@ -11,12 +11,6 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
   const canvas = document.getElementById("view"),
     renderer = createAsciiRenderer(canvas);
   const el = (id) => document.getElementById(id),
-    modes = [
-      "Saturated image",
-      "Woven ASCII · clear face",
-      "Colored ASCII throughout",
-    ],
-    geometries = ["Plain dome", "Shallow relief", "Relief + neon arches"],
     densities = { 240: 80, 320: 112, 416: 144 };
   let active,
     loading = false,
@@ -46,35 +40,38 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
     if (el("archStyle")) renderer.settings.archStyle = +el("archStyle").value;
     if (el("animMode")) renderer.settings.animMode = +el("animMode").value;
     if (el("animSpeed")) renderer.settings.animSpeed = +el("animSpeed").value;
+    renderer.settings.glyphSet = el("glyphSet").value;
+    renderer.settings.vibrancy = +el("vibrancy").value;
+    renderer.settings.paletteMode = +el("paletteMode").value;
     renderer.draw(time);
     refreshStills();
   }
   function refreshStills() {
     if (!active) return;
-    el("stills").innerHTML = modes
-      .flatMap((m, mode) =>
-        geometries.map(
-          (g, geometry) =>
+    el("stills").innerHTML = ["hex", "technical", "classic"]
+      .flatMap((glyphSet) =>
+        [0, 1].map(
+          (palette) =>
             '<figure><a href="' +
             active.id +
-            "-m" +
-            mode +
-            "-g" +
-            geometry +
+            "-" +
+            glyphSet +
+            "-p" +
+            palette +
             '.png"><img loading="lazy" src="' +
             active.id +
-            "-m" +
-            mode +
-            "-g" +
-            geometry +
+            "-" +
+            glyphSet +
+            "-p" +
+            palette +
             '.png" alt="' +
-            m +
-            " with " +
-            g +
-            '"></a><figcaption>' +
-            m +
+            glyphSet +
             " · " +
-            g +
+            (palette === 0 ? "Image colors" : "Neon image") +
+            '"></a><figcaption>' +
+            glyphSet +
+            " · " +
+            (palette === 0 ? "Image colors" : "Neon image") +
             "</figcaption></figure>",
         ),
       )
@@ -93,8 +90,11 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
     "archStyle",
     "animMode",
     "animSpeed",
+    "glyphSet",
+    "paletteMode",
   ])
     el(id).addEventListener("change", controls);
+  el("vibrancy").addEventListener("input", controls);
   function showError(e) {
     el("status").textContent = e.message;
     console.error(e);
@@ -139,7 +139,12 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
     const delta = last === undefined ? 0 : Math.min(0.1, (now - last) / 1000);
     last = now;
     if (!automation && !loading && active) {
-      if (el("living") && el("living").checked) time += delta;
+      if (
+        el("living") &&
+        el("living").checked &&
+        renderer.settings.animMode > 0
+      )
+        time += delta;
       if (el("motion") && el("motion").checked) pose((now % 12000) / 12000);
       const isAnimated =
         renderer.settings.animMode > 0 && el("living") && el("living").checked;
@@ -151,23 +156,22 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
   }
   requestAnimationFrame(tick);
   const clips = [
-    { mode: 0, geometry: 2 },
-    { mode: 1, geometry: 0 },
-    { mode: 1, geometry: 1 },
-    { mode: 1, geometry: 2 },
-    { mode: 2, geometry: 2 },
+    {
+      file: "hex-rain-still.webm",
+      label: "Image-colored hex rain · still camera",
+    },
+    {
+      file: "hex-rain-camera.webm",
+      label: "Image-colored hex rain · slow camera",
+    },
   ];
   el("clips").innerHTML = clips
     .map(
       (c) =>
-        '<figure><video controls loop muted playsinline preload="none" src="motion-m' +
-        c.mode +
-        "-g" +
-        c.geometry +
-        '.webm"></video><figcaption>' +
-        modes[c.mode] +
-        " · " +
-        geometries[c.geometry] +
+        '<figure><video controls muted playsinline preload="none" src="' +
+        c.file +
+        '"></video><figcaption>' +
+        c.label +
         "</figcaption></figure>",
     )
     .join("");
@@ -178,6 +182,9 @@ export async function mountDreamAsciiViewer({ assets, scenes: entries }) {
     pose,
     get active() {
       return active;
+    },
+    get time() {
+      return time;
     },
     set automation(v) {
       automation = v;

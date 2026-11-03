@@ -4,7 +4,7 @@
     name="viewport"
     content="width=device-width,initial-scale=1"
   />
-  <title>Dream drift · ASCII and geometry experiment</title>
+  <title>Dream drift · Image-colored hex rain</title>
   <style>
     * {
       box-sizing: border-box;
@@ -43,7 +43,8 @@
       gap: 5px;
     }
     select,
-    button {
+    button,
+    input[type="range"] {
       background: #14233c;
       color: #edf7ff;
       border: 1px solid #375471;
@@ -127,11 +128,11 @@
     }
   </style>
   <main>
-    <h1>Dream drift · ASCII + geometry</h1>
+    <h1>Dream drift · Image-colored hex rain</h1>
     <p>
-      Three marmot photos, cached arches → organic model stages, and the
-      saturated neon look. Compare image, partial ASCII and full ASCII with a
-      plain dome, shallow relief, or neon arch frames.
+      Colors from your image flow through fine hex characters and a gently
+      breathing woven gateway. Compare three marmot images and saved model
+      stages.
     </p>
     <nav>
       <label
@@ -163,9 +164,34 @@
         </select></label
       >
       <label
+        >Glyph set<select id="glyphSet">
+          <option value="hex" selected>Hex · 0–9, A–F</option>
+          <option value="technical">Alphanumeric</option>
+          <option value="classic">Classic ASCII</option>
+        </select></label
+      >
+      <label
+        >Palette<select id="paletteMode">
+          <option value="0" selected>Image colors</option>
+          <option value="1">Neon image comparison</option>
+        </select></label
+      >
+      <label
+        >Vibrancy
+        <input
+          id="vibrancy"
+          type="range"
+          min="0.7"
+          max="1.6"
+          step="0.05"
+          value="1.25"
+      /></label>
+      <label
         >Archway Style<select id="archStyle">
-          <option value="0" selected>Photographic Vault (samples scene)</option>
-          <option value="1">Woven ASCII Gateway (living glyphs)</option>
+          <option value="0">Photographic Vault (samples scene)</option>
+          <option value="1" selected>
+            Woven ASCII Gateway (living glyphs)
+          </option>
           <option value="2">5-Rib Colonnade (deep corridor)</option>
           <option value="3">Carved Proscenium (broad frame)</option>
           <option value="4">Frosted Glass Threshold</option>
@@ -181,18 +207,18 @@
       >
       <label
         >Animation<select id="animMode">
-          <option value="1" selected>Living Woven Flow (gentle morph)</option>
+          <option value="1">Living Woven Flow (gentle morph)</option>
           <option value="2">Cortical Wave Ripple (harmonic wave)</option>
           <option value="3">Neural Shimmer Pulse (subtle breath)</option>
-          <option value="4">Cascade Matrix Stream (woven rain)</option>
+          <option value="4" selected>Cascade Matrix Stream (woven rain)</option>
           <option value="0">Static (pause flow)</option>
         </select></label
       >
       <label
         >Speed<select id="animSpeed">
           <option value="0.5">0.5x · Gentle</option>
-          <option value="1.0" selected>1.0x · Normal</option>
-          <option value="1.8">1.8x · Swift</option>
+          <option value="1.0">1.0x · Normal</option>
+          <option value="1.8" selected>1.8x · Swift</option>
         </select></label
       >
     </nav>
@@ -210,17 +236,16 @@
     </div>
     <p id="status">Loading…</p>
     <p>
-      The source scenes are actual saved MI-GAN/Inception outputs. ASCII, neon
-      lighting and arch meshes are authored display treatments. Relief uses
-      blurred image brightness, not reconstructed depth. This tests a single
-      bounded chamber; it does not generate an endless world.
+      The scene and woven gateway share the same downward rain field. Image
+      colors come from the saved model output; vibrancy boosts saturation while
+      preserving luminance. This remains one experimental chamber using cached
+      model images.
     </p>
-    <h2>Same-view comparisons</h2>
+    <h2>Saved views · image colors and palettes</h2>
     <div id="stills"></div>
-    <h2>Recorded camera motion</h2>
+    <h2>Recorded studies</h2>
     <p>
-      Each clip uses the same slow turn and sideways movement. Pause to compare
-      glyph detail and parallax.
+      Compare the shared rain on a still view and during a slow camera turn.
     </p>
     <div class="clips" id="clips"></div>
   </main>
