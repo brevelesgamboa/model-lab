@@ -1,0 +1,640 @@
+{
+  "status": "complete",
+  "date": "2026-11-03T03:14:51.221Z",
+  "captures": [
+    {
+      "photo": 3,
+      "level": 1,
+      "file": "photo-3-depth-1.png",
+      "resources": {
+        "meshes": 33,
+        "textures": 5,
+        "segments": 6,
+        "origin": 0,
+        "originSite": [
+          0,
+          0
+        ]
+      },
+      "meanByte": 127.07085586734694,
+      "darkFraction": 0,
+      "profile": {
+        "level": 0,
+        "name": "Photo clearing",
+        "model": 0,
+        "hex": 0,
+        "neon": 0,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 3,
+      "level": 2,
+      "file": "photo-3-depth-2.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 1,
+        "originSite": [
+          -18,
+          0
+        ]
+      },
+      "meanByte": 120.21581930272109,
+      "darkFraction": 0,
+      "profile": {
+        "level": 1,
+        "name": "Neon threshold",
+        "model": 0.8999999999999999,
+        "hex": 0.3432952110638061,
+        "neon": 0.5141492641576604,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 3,
+      "level": 3,
+      "file": "photo-3-depth-3.png",
+      "resources": {
+        "meshes": 40,
+        "textures": 5,
+        "segments": 7,
+        "origin": 3,
+        "originSite": [
+          0,
+          -18
+        ]
+      },
+      "meanByte": 110.211481292517,
+      "darkFraction": 0,
+      "profile": {
+        "level": 2,
+        "name": "Woven passage",
+        "model": 2.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 3,
+      "level": 4,
+      "file": "photo-3-depth-4.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 5,
+        "originSite": [
+          0,
+          -54
+        ]
+      },
+      "meanByte": 109.95754336734694,
+      "darkFraction": 0,
+      "profile": {
+        "level": 3,
+        "name": "Signal drift",
+        "model": 3.3,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.1401961230920717,
+        "fractal": 0,
+        "echo": 0.15625
+      }
+    },
+    {
+      "photo": 3,
+      "level": 5,
+      "file": "photo-3-depth-5.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 8,
+        "originSite": [
+          -36,
+          -36
+        ]
+      },
+      "meanByte": 108.34280612244898,
+      "darkFraction": 0,
+      "profile": {
+        "level": 4,
+        "name": "Folded gallery",
+        "model": 5.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.3527780837206431,
+        "fractal": 0.035234999999999995,
+        "echo": 0.84375
+      }
+    },
+    {
+      "photo": 3,
+      "level": 6,
+      "file": "photo-3-depth-6.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 12,
+        "originSite": [
+          -54,
+          -18
+        ]
+      },
+      "meanByte": 103.65134991496599,
+      "darkFraction": 0,
+      "profile": {
+        "level": 5,
+        "name": "Deep recurrence",
+        "model": 6,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.5366155828868808,
+        "fractal": 0.333355,
+        "echo": 1
+      }
+    },
+    {
+      "photo": 1,
+      "level": 1,
+      "file": "photo-1-depth-1.png",
+      "resources": {
+        "meshes": 33,
+        "textures": 5,
+        "segments": 6,
+        "origin": 0,
+        "originSite": [
+          0,
+          0
+        ]
+      },
+      "meanByte": 126.24138860544218,
+      "darkFraction": 0.0013660714285714285,
+      "profile": {
+        "level": 0,
+        "name": "Photo clearing",
+        "model": 0,
+        "hex": 0,
+        "neon": 0,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 1,
+      "level": 2,
+      "file": "photo-1-depth-2.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 1,
+        "originSite": [
+          -18,
+          0
+        ]
+      },
+      "meanByte": 116.03335586734694,
+      "darkFraction": 0,
+      "profile": {
+        "level": 1,
+        "name": "Neon threshold",
+        "model": 0.8999999999999999,
+        "hex": 0.3432952110638061,
+        "neon": 0.5141492641576604,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 1,
+      "level": 3,
+      "file": "photo-1-depth-3.png",
+      "resources": {
+        "meshes": 40,
+        "textures": 5,
+        "segments": 7,
+        "origin": 3,
+        "originSite": [
+          0,
+          -18
+        ]
+      },
+      "meanByte": 109.75451955782313,
+      "darkFraction": 0,
+      "profile": {
+        "level": 2,
+        "name": "Woven passage",
+        "model": 2.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 1,
+      "level": 4,
+      "file": "photo-1-depth-4.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 5,
+        "originSite": [
+          0,
+          -54
+        ]
+      },
+      "meanByte": 110.75191709183673,
+      "darkFraction": 0,
+      "profile": {
+        "level": 3,
+        "name": "Signal drift",
+        "model": 3.3,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.1401961230920717,
+        "fractal": 0,
+        "echo": 0.15625
+      }
+    },
+    {
+      "photo": 1,
+      "level": 5,
+      "file": "photo-1-depth-5.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 8,
+        "originSite": [
+          -36,
+          -36
+        ]
+      },
+      "meanByte": 103.30982270408164,
+      "darkFraction": 0,
+      "profile": {
+        "level": 4,
+        "name": "Folded gallery",
+        "model": 5.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.3527780837206431,
+        "fractal": 0.035234999999999995,
+        "echo": 0.84375
+      }
+    },
+    {
+      "photo": 1,
+      "level": 6,
+      "file": "photo-1-depth-6.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 12,
+        "originSite": [
+          -54,
+          -18
+        ]
+      },
+      "meanByte": 100.23901828231293,
+      "darkFraction": 0,
+      "profile": {
+        "level": 5,
+        "name": "Deep recurrence",
+        "model": 6,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.5366155828868808,
+        "fractal": 0.333355,
+        "echo": 1
+      }
+    },
+    {
+      "photo": 2,
+      "level": 1,
+      "file": "photo-2-depth-1.png",
+      "resources": {
+        "meshes": 33,
+        "textures": 5,
+        "segments": 6,
+        "origin": 0,
+        "originSite": [
+          0,
+          0
+        ]
+      },
+      "meanByte": 147.4363975340136,
+      "darkFraction": 0.00010459183673469388,
+      "profile": {
+        "level": 0,
+        "name": "Photo clearing",
+        "model": 0,
+        "hex": 0,
+        "neon": 0,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 2,
+      "level": 2,
+      "file": "photo-2-depth-2.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 1,
+        "originSite": [
+          -18,
+          0
+        ]
+      },
+      "meanByte": 131.20354336734695,
+      "darkFraction": 0,
+      "profile": {
+        "level": 1,
+        "name": "Neon threshold",
+        "model": 0.8999999999999999,
+        "hex": 0.3432952110638061,
+        "neon": 0.5141492641576604,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 2,
+      "level": 3,
+      "file": "photo-2-depth-3.png",
+      "resources": {
+        "meshes": 40,
+        "textures": 5,
+        "segments": 7,
+        "origin": 3,
+        "originSite": [
+          0,
+          -18
+        ]
+      },
+      "meanByte": 118.40032950680272,
+      "darkFraction": 0,
+      "profile": {
+        "level": 2,
+        "name": "Woven passage",
+        "model": 2.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0,
+        "fractal": 0,
+        "echo": 0
+      }
+    },
+    {
+      "photo": 2,
+      "level": 4,
+      "file": "photo-2-depth-4.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 5,
+        "originSite": [
+          0,
+          -54
+        ]
+      },
+      "meanByte": 125.38922916666667,
+      "darkFraction": 0,
+      "profile": {
+        "level": 3,
+        "name": "Signal drift",
+        "model": 3.3,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.1401961230920717,
+        "fractal": 0,
+        "echo": 0.15625
+      }
+    },
+    {
+      "photo": 2,
+      "level": 5,
+      "file": "photo-2-depth-5.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 8,
+        "originSite": [
+          -36,
+          -36
+        ]
+      },
+      "meanByte": 116.78699277210885,
+      "darkFraction": 0,
+      "profile": {
+        "level": 4,
+        "name": "Folded gallery",
+        "model": 5.1,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.3527780837206431,
+        "fractal": 0.035234999999999995,
+        "echo": 0.84375
+      }
+    },
+    {
+      "photo": 2,
+      "level": 6,
+      "file": "photo-2-depth-6.png",
+      "resources": {
+        "meshes": 38,
+        "textures": 5,
+        "segments": 7,
+        "origin": 12,
+        "originSite": [
+          -54,
+          -18
+        ]
+      },
+      "meanByte": 116.84030484693878,
+      "darkFraction": 0,
+      "profile": {
+        "level": 5,
+        "name": "Deep recurrence",
+        "model": 6,
+        "hex": 1,
+        "neon": 1,
+        "corruption": 0.5366155828868808,
+        "fractal": 0.333355,
+        "echo": 1
+      }
+    }
+  ],
+  "errors": [],
+  "limits": {
+    "routeTilePlaces": 64,
+    "activeSegments": 7,
+    "gpuTextures": 5,
+    "generatedCachePlaces": 6,
+    "savedImageStages": 7
+  },
+  "settings": {
+    "combinations": 54,
+    "glyphs": " 71CF3425A96E8D0B"
+  },
+  "continuity": [
+    {
+      "boundary": 1,
+      "forwardMean": 5.1882742346938775,
+      "reverseMean": 0
+    },
+    {
+      "boundary": 2,
+      "forwardMean": 4.591704506802721,
+      "reverseMean": 0
+    },
+    {
+      "boundary": 6,
+      "forwardMean": 7.678142857142857,
+      "reverseMean": 0
+    },
+    {
+      "boundary": 64,
+      "forwardMean": 8.12890731292517,
+      "reverseMean": 0
+    }
+  ],
+  "longRoute": {
+    "windows": 160,
+    "finalPlace": 999951,
+    "resources": {
+      "meshes": 40,
+      "textures": 5,
+      "segments": 7,
+      "origin": 999951,
+      "originSite": [
+        -54,
+        -2249856
+      ]
+    },
+    "maxMeshes": 40
+  },
+  "cancellation": "Return to entrance cancels pending preparation without moving the camera later.",
+  "recording": {
+    "file": "walkthrough.webm",
+    "seconds": 10,
+    "fromPlace": 2.4,
+    "toPlace": 6.308177777777777,
+    "bytes": 5624758
+  },
+  "performance": {
+    "gpu": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "gpuTimerSupported": true,
+    "width": 1120,
+    "height": 700,
+    "samples": 26,
+    "medianMs": 1.08872,
+    "p95Ms": 1.09544
+  },
+  "live": {
+    "held": 4.88,
+    "resumed": 5.2799999999999985,
+    "generated": 1,
+    "metrics": {
+      "index": 5,
+      "layer": "mixed_6a",
+      "channel": 46,
+      "iterations": 4,
+      "width": 512,
+      "height": 256,
+      "retainedTensors": 0,
+      "backend": "webgl",
+      "bakeMs": 1298.2999999970198,
+      "scoreStart": 0.018638450652360916,
+      "scoreEnd": 0.2723231613636017,
+      "meanChangedByte": 1.6080551147460938
+    },
+    "cache": 1,
+    "resources": {
+      "meshes": 38,
+      "textures": 5,
+      "segments": 7,
+      "origin": 5,
+      "originSite": [
+        0,
+        -54
+      ]
+    },
+    "glError": 0
+  },
+  "offline": "Portable gallery loads and plays saved model images without a server.",
+  "controls": "Keyboard movement, Space auto-walk toggle, home, depth jumps, gateway selection and map visibility passed.",
+  "mobile": "390px viewport has no horizontal overflow.",
+  "savedImages": {
+    "count": 42,
+    "sha256": {
+      "photo-1-migan.png": "c1783975a43715601b825bb5680a10e987ea37cd835157b3c4e6115104ae3496",
+      "photo-1-progression-baseline-neon.png": "44e011c6d75b25c478f51bdeb7ccffe4b6fbe31bd6e978fe958f7844abcc2cde",
+      "photo-1-progression-mixed-1.png": "2841a5fd12eb39b2b6f86e23293463696bcef05b879997c18810b12b64aa2a6d",
+      "photo-1-progression-mixed-1-neon.png": "ba1e9c4b5cfbcf274fb6c735ede8edb1d19c3749765e6341631cff749de69b4e",
+      "photo-1-progression-mixed-2.png": "c2061b22f597593e2441e197736a1abd29476a9f1501b53b531b40044771d1f7",
+      "photo-1-progression-mixed-2-neon.png": "c87c0b0541777f44b17e345d0e7deb3e1796fa12e63c57195441f06e78535433",
+      "photo-1-progression-mixed-3.png": "a850067f299d407e4802b90cb1f812106bf3fa4c0b0c2c9d9cdaf1d871fd6968",
+      "photo-1-progression-mixed-3-neon.png": "48d743cf8212d736fc910a75e9014f7936627992d9a30efb2b2bbc639b9b6e3d",
+      "photo-1-progression-mixed-4.png": "30072525b3f80d2eec704155f65d8677be72720e0f0d291bbe543de377e41e25",
+      "photo-1-progression-mixed-4-neon.png": "6f5c134847fc327160dbc877e3460d5efc67ecc01b0f1b916d4cc2c45df2c7ba",
+      "photo-1-progression-mixed-5.png": "1d9ad419d445bbf094dc4534f9c9c305be89a53f264a0890534e76ec76022e02",
+      "photo-1-progression-mixed-5-neon.png": "aaf129338307402f0bf7e156a38e92e1d3abdfdbe81e1ce1e5ccb2f50fa0d505",
+      "photo-1-progression-mixed-6.png": "b0f2df6d72a236b0c4051fc2e24a7e9a0e71be3a58f32cbb3d0e9f8738897224",
+      "photo-1-progression-mixed-6-neon.png": "4c58daee44309840a8a4f107dadca9a320b7b9b3b5a2b28cac6a62f8d5510cea",
+      "photo-2-migan.png": "604bbddc218d1c8704bba2fe77d23b15071ad356e696b77f63818589807024d6",
+      "photo-2-progression-baseline-neon.png": "ca60a5f9a82fac8716b8761ca25d8696ab8c87548421efe617772214df7b4d62",
+      "photo-2-progression-mixed-1.png": "4fd169cf4cfc271dc888eed7b7f170626f0d14576a9a271803a57c7f6006e69f",
+      "photo-2-progression-mixed-1-neon.png": "2d00ed5adaa60b3081b6167085ce2adcb3f9e7217e874ac96f1c28ebd6fd0922",
+      "photo-2-progression-mixed-2.png": "67a5bf1994feffa00c3eee212a9dd165aa080bc8d4cdb397fd81c0b7001589f4",
+      "photo-2-progression-mixed-2-neon.png": "271ce961558685a896fd8c30a3fb177816d34fddfc3e0be40e1154929700780b",
+      "photo-2-progression-mixed-3.png": "cdd9eb1a6709162c63390bd6dce4d4b26774a6c5b22dc65f24a0dc7d3d13cac6",
+      "photo-2-progression-mixed-3-neon.png": "ea834abf6aecffa4a5b3924bf70f97faf0c096da8cb45e5b7bba4b1038873c2d",
+      "photo-2-progression-mixed-4.png": "e86656b7fc0e74c91b50fa5b6a936b00a49eae5e138dce7a8414c22506672403",
+      "photo-2-progression-mixed-4-neon.png": "2c9ec1aaae9fcf5d6ebc9f36d2b9a3520775894c99b1608910dda31cb6d46368",
+      "photo-2-progression-mixed-5.png": "16b6316f5d0d56d56d322c0af41211dfd9fbe5a6a668744b13a69876f953fdcc",
+      "photo-2-progression-mixed-5-neon.png": "4cad69e553953f4639696bb1ab79ea09b541feba0e1a32df63b2b4fa061c5183",
+      "photo-2-progression-mixed-6.png": "0231dde61c48eabb1c7bd2c27adf27686fba7a5428c1c35d47d01a60d274ec75",
+      "photo-2-progression-mixed-6-neon.png": "d0cae551d66e515b6bfac904fe96f5b10efb57c126c48d772c9827641a525e33",
+      "photo-3-migan.png": "84a967b62f77d24436864eee5c631dc2474a8fb5668c6ed1f17c6864788a4831",
+      "photo-3-progression-baseline-neon.png": "c8227900554f42d0aeb8361a96d6130ec85f9975c0ea0afaf9c0280ea6f62d6c",
+      "photo-3-progression-mixed-1.png": "cd43a718a8f212df16c59920041468334ffffdcf6ceec0f54ad6db1ed03b6f99",
+      "photo-3-progression-mixed-1-neon.png": "cd5acaab86cc72661564933764365da95c3fef587541a106c50a149e81011eb1",
+      "photo-3-progression-mixed-2.png": "f56d4157ea6a32cadefb05dc49e25531f7d5c78b47d71c306a7c3dbb8c65f4f8",
+      "photo-3-progression-mixed-2-neon.png": "c795558eb7f41afc2ffbe2e5ba936dd63a05ba17c4a3131eca14143859fc0ea4",
+      "photo-3-progression-mixed-3.png": "7e37453d9fd3a7c9eeea8c1158af49b587cecb7efb0a79cc45a4bcfcff856412",
+      "photo-3-progression-mixed-3-neon.png": "8fe518347c9f036af2f182e57d1e553fdd0b12c398be24796bc6211dc0ea6462",
+      "photo-3-progression-mixed-4.png": "d91c43a4c6b7917540a35781bde1d550a6b13ef9ebb2443b3477e034617384be",
+      "photo-3-progression-mixed-4-neon.png": "2a36eb576bf224febb74ed4ff8df8db542b542358aa90cf60db0fb5936fb5430",
+      "photo-3-progression-mixed-5.png": "b15f921c28aa9b5df2be1bc5828a50f30c88caae7954d53e7a75cbe059051b5a",
+      "photo-3-progression-mixed-5-neon.png": "f3da7cf8afe2e89f2fa9d1bdca078c6488f6ad631ac9b69d4b80c0a19020a80d",
+      "photo-3-progression-mixed-6.png": "fa3b8e45b5f628d60c9c1bab0d560e163c80bbef76e3983f33a277a45263ed5c",
+      "photo-3-progression-mixed-6-neon.png": "86a1da8d53ba4c22bbfc53f3a4a879eb25cc29f5b5c8d03e8c7c7c8746c36971"
+    },
+    "unchanged": true
+  }
+}

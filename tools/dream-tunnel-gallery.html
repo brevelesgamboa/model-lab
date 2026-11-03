@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  />
+  <title>Dream Drift · endless tunnel study</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #090d19;
+      color: #e2eef0;
+      font:
+        15px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1380px;
+      margin: auto;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+    p {
+      color: #afc2d3;
+      line-height: 1.5;
+      margin: 8px 0 18px;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+    button,
+    select {
+      background: #19293e;
+      border: 1px solid #39546b;
+      border-radius: 6px;
+      padding: 10px;
+      color: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:hover,
+    select:hover {
+      border-color: #a4eddf;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    input[type="range"] {
+      width: 160px;
+      accent-color: #6ae8dc;
+    }
+    input[type="checkbox"] {
+      accent-color: #6ae8dc;
+    }
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    canvas:focus-visible {
+      outline: 2px solid #6ae8dc;
+      outline-offset: 3px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .check {
+      flex-direction: row;
+      align-items: center;
+      padding: 10px 0;
+    }
+    #view {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16/10;
+      touch-action: none;
+      background: #19293e;
+      border: 1px solid #39546b;
+      border-radius: 8px;
+    }
+    .scene {
+      position: relative;
+    }
+    #map {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      background: #0a1325bd;
+      border: 1px solid #9dded950;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    #loading {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #122c39d9;
+      border: 1px solid #74cabb;
+      border-radius: 20px;
+      padding: 10px 20px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #status {
+      min-height: 24px;
+      margin-top: 14px;
+      color: #a4eddf;
+    }
+    #readout {
+      font-size: 13px;
+      color: #afc2d3;
+    }
+    details {
+      margin-top: 16px;
+      border-top: 1px solid #314453;
+      padding-top: 14px;
+    }
+    summary {
+      cursor: pointer;
+    }
+    small {
+      color: #afc2d3;
+    }
+    #retry,
+    #cached {
+      border-color: #ddbc80;
+    }
+    .note {
+      max-width: 950px;
+    }
+    .mobile {
+      display: none;
+    }
+    @media (max-width: 700px) {
+      main {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 21px;
+      }
+      #view {
+        aspect-ratio: 4/5;
+      }
+      #map {
+        width: 120px;
+        height: 94px;
+      }
+      .mobile {
+        display: block;
+      }
+      select {
+        max-width: 280px;
+      }
+      #loading {
+        font-size: 12px;
+        padding: 8px 10px;
+      }
+    }
+  </style>
+  <main>
+    <h1>Dream Drift · tunnel study</h1>
+    <p class="note">
+      A photo becomes a neon signal, then slowly unravels. Follow a repeating
+      fractal route through six kinds of gateway. The floor stays level while
+      the walls become stranger.
+    </p>
+    <div class="controls">
+      <label
+        >Photo<select id="photo">
+          <option value="1">1 · Close marmot</option>
+          <option value="2">2 · Mountain marmots</option>
+          <option value="3">3 · Small “Hello” marmot</option>
+        </select></label
+      >
+      <label>Jump to depth<select id="depth"></select></label>
+      <button id="walk" aria-pressed="false">Auto walk</button
+      ><button id="home">Return to entrance</button
+      ><button id="center">Center view</button>
+      <label class="check"
+        ><input type="checkbox" id="map-toggle" checked />Route map</label
+      >
+    </div>
+    <div class="scene">
+      <canvas
+        id="view"
+        width="1120"
+        height="700"
+        tabindex="0"
+        aria-label="Interactive dream tunnel. W and S move; A and D sidestep. Drag to look."
+      ></canvas
+      ><canvas
+        id="map"
+        width="180"
+        height="140"
+        aria-label="Nearby route map"
+      ></canvas>
+      <div id="loading" hidden>
+        Next place is forming · you can still look around
+      </div>
+    </div>
+    <div id="status" role="status" aria-live="polite">
+      Loading saved model imagery…
+    </div>
+    <div id="readout"></div>
+    <div class="controls">
+      <button id="forward" class="mobile">Hold to walk</button
+      ><button id="back" class="mobile">Hold to return</button
+      ><button id="retry" hidden>Retry generation</button
+      ><button id="cached" hidden>Continue with saved images</button>
+    </div>
+    <p>
+      W/S or ↑/↓ to move · A/D to sidestep · drag to look · Space to pause auto
+      walk. Following the route turns the camera gently; looking around stays
+      independent.
+    </p>
+    <details open>
+      <summary>Tune this experiment</summary>
+      <div class="controls">
+        <label
+          >Wall presence<input
+            id="walls"
+            type="range"
+            min="0"
+            max=".9"
+            value=".54"
+            step=".01"
+        /></label>
+        <label
+          >Negative floor<input
+            id="floor"
+            type="range"
+            min="0"
+            max="1"
+            value=".65"
+            step=".01"
+        /></label>
+        <label
+          >Corruption amount<input
+            id="corruption"
+            type="range"
+            min="0"
+            max="1"
+            value="1"
+            step=".01"
+        /></label>
+        <label
+          >Walk speed<input
+            id="speed"
+            type="range"
+            min="1"
+            max="7"
+            value="3"
+            step=".25"
+        /></label>
+        <label>Gateway<select id="arch"></select></label>
+        <label
+          >Loading test<select id="delay">
+            <option value="0">No added delay</option>
+            <option value="1.5">1.5 seconds</option>
+            <option value="6">6 seconds</option>
+          </select></label
+        >
+        <label class="check"
+          ><input id="live" type="checkbox" />Generate new model imagery</label
+        >
+      </div>
+      <small id="source-note"></small>
+    </details>
+    <p class="note">
+      <small
+        >Experiment only. The tunnel mesh, rain, glyph corruption and four-fold
+        material are procedural effects. The panorama images come from the saved
+        model stages or live local Inception generation. The Hilbert route
+        repeats in 64-place tiles; only nearby geometry and six generated places
+        stay in memory. Tunnels hold at a visible threshold until the next image
+        is ready. This tests the experience; it does not generate new 3D
+        worlds.</small
+      >
+    </p>
+  </main>
+  <!-- DREAM_TUNNEL_MODULE -->
+</html>
