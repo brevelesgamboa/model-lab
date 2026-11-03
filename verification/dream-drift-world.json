@@ -1,0 +1,503 @@
+{
+  "status": "complete",
+  "started": "2026-11-03T04:56:30.342Z",
+  "reference": [
+    {
+      "waveMode": 0,
+      "yaw": 0,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 0,
+      "yaw": 0.7,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 1,
+      "yaw": 0,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 1,
+      "yaw": 0.7,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 2,
+      "yaw": 0,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 2,
+      "yaw": 0.7,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 3,
+      "yaw": 0,
+      "maxByte": 0
+    },
+    {
+      "waveMode": 3,
+      "yaw": 0.7,
+      "maxByte": 0
+    }
+  ],
+  "visits": [
+    {
+      "from": "clearing",
+      "to": "waves",
+      "depth": 1,
+      "image": "e2879da2cfd91c8d2e7637433fca5c881d52bb066f1ba2e9c818ff4eabbdef9c",
+      "runs": 0,
+      "metadata": {
+        "id": "waves",
+        "kind": "saved model stage",
+        "study": 1
+      },
+      "shortcutOpen": false,
+      "visited": ["clearing", "waves"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "waves",
+      "to": "terrace",
+      "depth": 1.4,
+      "image": "036d1349694a7fd1716351ec9021d20287073110d75fb4a8a088c9ae33ceb6b8",
+      "runs": 2,
+      "metadata": {
+        "id": "terrace",
+        "kind": "generated place",
+        "layer": "Conv2d_4a_3x3",
+        "channel": 42,
+        "iterations": 6,
+        "stepSize": 0.018,
+        "bakeMs": 887.6999999955297,
+        "scoreStart": 3.5435359477996826,
+        "scoreEnd": 4.980896949768066,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": false,
+      "visited": ["clearing", "waves", "terrace"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "terrace",
+      "to": "hex",
+      "depth": 3,
+      "image": "346d31c2ed20216f8513c3d3b1317d871554fe069138b9bc3833ba41bd2f63f5",
+      "runs": 2,
+      "metadata": {
+        "id": "hex",
+        "kind": "saved model stage",
+        "study": 2
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "hex",
+      "to": "garden",
+      "depth": 2,
+      "image": "6fbe13e56a601936154faf5084bead5b97426514c5830c504c5465df07baa71f",
+      "runs": 2,
+      "metadata": {
+        "id": "garden",
+        "kind": "generated place",
+        "layer": "mixed_6c",
+        "channel": 144,
+        "iterations": 8,
+        "stepSize": 0.022,
+        "bakeMs": 2722.10000000149,
+        "scoreStart": -0.6996842622756958,
+        "scoreEnd": 2.5843658447265625,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "garden",
+      "to": "clearing",
+      "depth": 0,
+      "image": "fa9a9f8ab812693176719100e54c25bd48d0fe82fa22679ec0da84d94e71e918",
+      "runs": 2,
+      "metadata": {
+        "id": "clearing",
+        "kind": "saved model stage",
+        "study": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "clearing",
+      "to": "garden",
+      "depth": 2,
+      "image": "6fbe13e56a601936154faf5084bead5b97426514c5830c504c5465df07baa71f",
+      "runs": 2,
+      "metadata": {
+        "id": "garden",
+        "kind": "generated place",
+        "layer": "mixed_6c",
+        "channel": 144,
+        "iterations": 8,
+        "stepSize": 0.022,
+        "bakeMs": 2722.10000000149,
+        "scoreStart": -0.6996842622756958,
+        "scoreEnd": 2.5843658447265625,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "garden",
+      "to": "pocket",
+      "depth": 2.6,
+      "image": "e23b3d6a9b84c97ef07626b0b0406fdf2ec851fd5e6884724a698b096e1725f6",
+      "runs": 3,
+      "metadata": {
+        "id": "pocket",
+        "kind": "generated place",
+        "layer": "mixed_6d",
+        "channel": 182,
+        "iterations": 8,
+        "stepSize": 0.024,
+        "bakeMs": 1531.8999999985099,
+        "scoreStart": 0.3220074772834778,
+        "scoreEnd": 1.8315389156341553,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "pocket",
+      "to": "hex",
+      "depth": 3,
+      "image": "346d31c2ed20216f8513c3d3b1317d871554fe069138b9bc3833ba41bd2f63f5",
+      "runs": 3,
+      "metadata": {
+        "id": "hex",
+        "kind": "saved model stage",
+        "study": 2
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "hex",
+      "to": "terrace",
+      "depth": 1.4,
+      "image": "036d1349694a7fd1716351ec9021d20287073110d75fb4a8a088c9ae33ceb6b8",
+      "runs": 3,
+      "metadata": {
+        "id": "terrace",
+        "kind": "generated place",
+        "layer": "Conv2d_4a_3x3",
+        "channel": 42,
+        "iterations": 6,
+        "stepSize": 0.018,
+        "bakeMs": 887.6999999955297,
+        "scoreStart": 3.5435359477996826,
+        "scoreEnd": 4.980896949768066,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "terrace",
+      "to": "clearing",
+      "depth": 0,
+      "image": "fa9a9f8ab812693176719100e54c25bd48d0fe82fa22679ec0da84d94e71e918",
+      "runs": 3,
+      "metadata": {
+        "id": "clearing",
+        "kind": "saved model stage",
+        "study": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "clearing",
+      "to": "garden",
+      "depth": 2,
+      "image": "6fbe13e56a601936154faf5084bead5b97426514c5830c504c5465df07baa71f",
+      "runs": 3,
+      "metadata": {
+        "id": "garden",
+        "kind": "generated place",
+        "layer": "mixed_6c",
+        "channel": 144,
+        "iterations": 8,
+        "stepSize": 0.022,
+        "bakeMs": 2722.10000000149,
+        "scoreStart": -0.6996842622756958,
+        "scoreEnd": 2.5843658447265625,
+        "retainedTensors": 0
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "from": "garden",
+      "to": "hex",
+      "depth": 3,
+      "image": "346d31c2ed20216f8513c3d3b1317d871554fe069138b9bc3833ba41bd2f63f5",
+      "runs": 3,
+      "metadata": {
+        "id": "hex",
+        "kind": "saved model stage",
+        "study": 2
+      },
+      "shortcutOpen": true,
+      "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+      "look": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    }
+  ],
+  "errors": [],
+  "fullHexParity": {
+    "maxByte": 0,
+    "meanByte": 0
+  },
+  "reload": {
+    "area": "hex",
+    "visited": ["clearing", "waves", "terrace", "hex", "garden", "pocket"],
+    "image": "346d31c2ed20216f8513c3d3b1317d871554fe069138b9bc3833ba41bd2f63f5",
+    "runs": 0,
+    "restored": 1
+  },
+  "cancellation": {
+    "stopped": true,
+    "area": "clearing",
+    "position": [0, 0],
+    "warp": null
+  },
+  "preset": {
+    "gain": 0.47,
+    "frequency": 11.3,
+    "waveMode": 3,
+    "floor": 0.62,
+    "negative": 0.71,
+    "fullHex": true
+  },
+  "sources": [
+    {
+      "source": "photo-1",
+      "key": "dream-world-v1:a715bf6e7f118131aec5615eff3355920e382bbdbf0dc18621db9e032dff675c:417",
+      "garden": "765a122dabfbc4735f4ae8e25b725041130d5a972a9528858857d30186c20358",
+      "metrics": {
+        "id": "garden",
+        "kind": "generated place",
+        "layer": "mixed_6c",
+        "channel": 144,
+        "iterations": 8,
+        "stepSize": 0.022,
+        "bakeMs": 2615.5,
+        "scoreStart": -0.6945886015892029,
+        "scoreEnd": 1.4513095617294312,
+        "retainedTensors": 0
+      }
+    },
+    {
+      "source": "photo-2",
+      "key": "dream-world-v1:f6a179c96d449e70c0c500a5066f0d0cdba71e3dc1e6a92ad1f13ef52172d7c4:417",
+      "garden": "730a5baa49b1a3eaa621f9e4480021fd3accf23cd4e455946a247d2356d43cdd",
+      "metrics": {
+        "id": "garden",
+        "kind": "generated place",
+        "layer": "mixed_6c",
+        "channel": 144,
+        "iterations": 8,
+        "stepSize": 0.022,
+        "bakeMs": 1791.5,
+        "scoreStart": -0.5284899473190308,
+        "scoreEnd": 2.1491239070892334,
+        "retainedTensors": 0
+      }
+    }
+  ],
+  "performance": {
+    "gpu": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "width": 960,
+    "height": 720,
+    "samples": 20,
+    "medianMs": 2.2603,
+    "p95Ms": 3.2816,
+    "textures": 15,
+    "images": 6
+  },
+  "recording": {
+    "file": "branching-world.webm",
+    "seconds": 22,
+    "walkSpeed": 3.5,
+    "places": ["clearing", "waves", "terrace", "hex"],
+    "bytes": 13645906
+  },
+  "controls": "Walk-through folds, E entry, free keyboard movement, map visibility, look controls, save/load presets and 390px layout passed.",
+  "preserved": {
+    "assets/js/models/cortical-dream-dome.js": "fd5f8ae65e5f3fbea7003f639a2ae5ad37c3987873aba41ff567e449f3fafbe2",
+    "assets/js/render/dome-graphics.js": "55ae8f0b900593982b7ef706fba8472194a42cd2117eab41478aae6ccc769fb0",
+    "assets/js/render/cortical-waves.glsl": "417ec3b92e3723e69b85825ef0292219c6c88a53e552d49bdfdfbd49d5770678",
+    "assets/js/shaders/cortical-dome.vert": "1e9c0d562b987ba0991d6dddff8b0dc5812268e6e45cf71c0499161811f7b270",
+    "assets/js/shaders/cortical-dome.frag": "8a0be2975c5b48741a054a6fd8e0ec80f3b52afb3c59a8162185e5def90d1eb6",
+    "tools/dream-origin-shaders.mjs": "56c18fddd287ca9c53272418eb25a542c9004ea3d1111dd03c4910e6ef75992a"
+  },
+  "finished": "2026-11-03T04:57:16.036Z"
+}

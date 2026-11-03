@@ -6,7 +6,13 @@ import { emptyFeatureMap } from "../assets/js/models/inception-feature-map.js";
 import { extendOriginShader } from "./dream-origin-shaders.mjs";
 import { originTreatment } from "./dream-origin-space.mjs";
 
-export async function createOriginRenderer(canvas, { extended = true } = {}) {
+export async function createOriginRenderer(
+  canvas,
+  { extended = true, worldMode = false } = {},
+) {
+  const worldExtension = worldMode
+    ? (await import("./dream-world-shaders.mjs")).extendWorldShader
+    : null;
   const model = new CorticalDreamDomeModel(),
     gl = model.gl;
   if (!gl) throw new Error("This study requires WebGL2.");
@@ -35,9 +41,12 @@ export async function createOriginRenderer(canvas, { extended = true } = {}) {
     const program = gl.createProgram();
     for (const { type, source } of original) {
       const shader = gl.createShader(type);
+      const origin = extendOriginShader(source, type === gl.FRAGMENT_SHADER);
       gl.shaderSource(
         shader,
-        extendOriginShader(source, type === gl.FRAGMENT_SHADER),
+        worldExtension
+          ? worldExtension(origin, type === gl.FRAGMENT_SHADER)
+          : origin,
       );
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
@@ -152,6 +161,20 @@ export async function createOriginRenderer(canvas, { extended = true } = {}) {
       extendedUniforms,
       program,
       u,
+      world: worldMode
+        ? Object.fromEntries(
+            [
+              "active",
+              "floor_offset",
+              "gate_count",
+              "gates[0]",
+              "landmark",
+            ].map((name) => [
+              name,
+              gl.getUniformLocation(program, "u_world_" + name),
+            ]),
+          )
+        : null,
       next,
       glyph,
       glyphs: glyphs.map((g) => g.character).join(""),
@@ -226,9 +249,13 @@ export async function createOriginRenderer(canvas, { extended = true } = {}) {
     original = false,
     portalPresence = 1,
     target = canvas,
+    appearance = null,
+    areaWorld = null,
   } = {}) {
     const g = await ensure();
-    const treatment = originTreatment(original ? 0 : depth);
+    const treatment = original
+      ? originTreatment(0)
+      : appearance || originTreatment(depth);
     const neon = !original && settings.digital ? treatment.neon : 0;
     const hex = original
       ? 0
@@ -283,6 +310,24 @@ export async function createOriginRenderer(canvas, { extended = true } = {}) {
         glyph_count: 17,
       }))
         gl.uniform1f(u[name], value);
+      if (extra.world) {
+        const w = extra.world;
+        gl.uniform1f(w.active, areaWorld ? 1 : 0);
+        gl.uniform2fv(w.floor_offset, areaWorld?.floorOffset || [0, 0]);
+        const gates = settings.portal ? areaWorld?.gates || [] : [];
+        gl.uniform1i(w.gate_count, Math.min(4, gates.length));
+        const values = new Float32Array(16);
+        gates
+          .slice(0, 4)
+          .forEach((gate, i) =>
+            values.set(
+              [gate.position[0], gate.position[1], gate.yaw, gate.presence],
+              i * 4,
+            ),
+          );
+        gl.uniform4fv(w["gates[0]"], values);
+        gl.uniform4fv(w.landmark, areaWorld?.landmark || [0, 0, 0, 0]);
+      }
     }
     await model.render(target, params, time);
     return {

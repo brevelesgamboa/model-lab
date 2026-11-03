@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Dream Drift · places to wander</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #0c101b;
+      color: #e4e9f0;
+      font:
+        15px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1190px;
+      padding: 24px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 25px;
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 18px 0 6px;
+    }
+    p {
+      color: #b5c3d1;
+      line-height: 1.5;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+    button,
+    select,
+    input[type="text"] {
+      padding: 9px 12px;
+      color: inherit;
+      background: #1a293c;
+      border: 1px solid #465b70;
+      border-radius: 6px;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:hover {
+      border-color: #b1dfd9;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    canvas:focus-visible {
+      outline: 2px solid #a8e3d8;
+      outline-offset: 3px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin: 14px 0;
+    }
+    label {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+    input[type="range"] {
+      width: 150px;
+      accent-color: #8ed7d0;
+    }
+    input[type="checkbox"] {
+      accent-color: #8ed7d0;
+    }
+    .scene {
+      position: relative;
+    }
+    #view {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 8px;
+      background: #141d2d;
+      touch-action: none;
+    }
+    #labels {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .gate-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      font-size: 12px;
+      white-space: nowrap;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: #0a1427bd;
+      color: #e4f5ef;
+      border: 1px solid #9cd0c54d;
+    }
+    #map-wrap {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      background: #101a2bc9;
+      border: 1px solid #7c9f9b70;
+      border-radius: 8px;
+      padding: 5px;
+      pointer-events: none;
+    }
+    #map {
+      width: 180px;
+      height: 155px;
+      display: block;
+    }
+    #status {
+      min-height: 24px;
+      margin: 10px 0 4px;
+      color: #b3e1d8;
+    }
+    #activity,
+    #readout,
+    #hint,
+    small {
+      color: #aebdce;
+      font-size: 13px;
+    }
+    #activity {
+      min-height: 20px;
+    }
+    #exits button {
+      font-size: 13px;
+      padding: 7px 10px;
+    }
+    details {
+      margin: 20px 0;
+      border-top: 1px solid #344353;
+      padding-top: 14px;
+    }
+    summary {
+      cursor: pointer;
+    }
+    .mobile {
+      display: none;
+    }
+    .field {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    #upload {
+      max-width: 100%;
+    }
+    #look-name {
+      max-width: 190px;
+    }
+    @media (max-width: 650px) {
+      main {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      .mobile {
+        display: flex;
+      }
+      select {
+        max-width: 100%;
+      }
+      #view {
+        aspect-ratio: 4/4.5;
+      }
+      #map {
+        width: 110px;
+        height: 95px;
+      }
+      .gate-label {
+        font-size: 10px;
+        padding: 3px 5px;
+      }
+    }
+  </style>
+  <main>
+    <h1>Dream Drift · places to wander</h1>
+    <p>
+      Two paths from a familiar image. Follow its folds toward full colored hex,
+      find a quiet pocket, and discover a way home.
+    </p>
+    <div class="controls">
+      <label
+        >Source<select id="source">
+          <option value="photo-3">Marmot 3 · “Hello”</option>
+          <option value="photo-1">Marmot 1 · close portrait</option>
+          <option value="photo-2">Marmot 2 · mountain group</option>
+          <option value="demo">Original built-in landscape</option>
+        </select></label
+      ><button id="home">Return to clearing</button
+      ><button id="hold">Hold original · B</button
+      ><button id="pause">Pause waves</button
+      ><label><input type="checkbox" id="show-map" checked />Map</label>
+    </div>
+    <div class="scene">
+      <canvas
+        id="view"
+        width="960"
+        height="720"
+        tabindex="0"
+        aria-label="Dream world. Drag to look, use W A S D to walk freely, and walk through a fold or press E nearby."
+      ></canvas>
+      <div id="labels"></div>
+      <div id="map-wrap">
+        <canvas
+          id="map"
+          width="220"
+          height="190"
+          aria-label="Discovered places and connecting folds"
+        ></canvas>
+      </div>
+    </div>
+    <h2 id="area">Photo Clearing</h2>
+    <div id="readout"></div>
+    <div id="status" role="status">Preparing the original dome…</div>
+    <div id="activity"></div>
+    <div class="controls">
+      <button id="enter" disabled>Enter nearby fold · E</button
+      ><button id="cancel" hidden>Cancel transition</button
+      ><button id="retry" hidden>Retry fold</button>
+    </div>
+    <div id="hint"></div>
+    <div id="exits" class="controls" aria-label="Face a nearby exit"></div>
+    <p id="description"></p>
+    <div class="controls mobile">
+      <button id="forward">Forward</button><button id="back">Back</button
+      ><button id="left">Left</button><button id="right">Right</button>
+    </div>
+    <p>
+      Drag to look · W/S forward/back · A/D sidestep · E enters a nearby fold ·
+      B holds the original · Escape cancels a transition. The floor is open in
+      every direction. “Face” buttons turn your view toward an exit.
+    </p>
+    <details open>
+      <summary>Save this look</summary>
+      <div class="controls">
+        <label class="field"
+          >Look name<input
+            id="look-name"
+            type="text"
+            maxlength="48"
+            value="My dream look" /></label
+        ><button id="save-look">Save current look</button
+        ><label
+          >Saved looks<select
+            id="presets"
+            aria-label="Saved looks"
+          ></select></label
+        ><button id="load-look">Load look</button
+        ><button id="reset-look">Reset to original settings</button>
+      </div>
+      <small
+        >Your wave, floor and hex settings are saved in this browser. The most
+        recently saved look loads next time.</small
+      >
+    </details>
+    <details>
+      <summary>Original wave and depth controls</summary>
+      <div class="controls">
+        <label class="field"
+          >Wave mode<select id="waveMode">
+            <option value="0">Rings</option>
+            <option value="1">Rays</option>
+            <option value="2">Spiral</option>
+            <option value="3">Honeycomb</option>
+          </select></label
+        ><label class="field"
+          >Wave height<input
+            id="gain"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label class="field"
+          >Wave frequency<input
+            id="frequency"
+            type="range"
+            min="1"
+            max="30"
+            step=".1" /></label
+        ><label class="field"
+          >Wave speed<input
+            id="speed"
+            type="range"
+            min="0"
+            max="3"
+            step=".01" /></label
+        ><label class="field"
+          >Foveal scale<input
+            id="eccentricity"
+            type="range"
+            min=".005"
+            max=".5"
+            step=".005" /></label
+        ><label class="field"
+          >Depth<input
+            id="depthScale"
+            type="range"
+            min="0"
+            max="1.5"
+            step=".01" /></label
+        ><label class="field"
+          >Neural swell<input
+            id="neuralSwell"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label class="field"
+          >Refraction<input
+            id="edgeCoupling"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label class="field"
+          >Dispersion<input
+            id="chromaticDispersion"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label class="field"
+          >Parallax<input
+            id="cameraDolly"
+            type="range"
+            min="-2"
+            max="2.5"
+            step=".01"
+        /></label>
+      </div>
+    </details>
+    <details>
+      <summary>Floor and colored hex</summary>
+      <div class="controls">
+        <label class="field"
+          >Floor presence<input
+            id="floor"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label class="field"
+          >Negative floor<input
+            id="negative"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label
+          ><input id="digital" type="checkbox" checked />Automatic neon + hex
+          progression</label
+        ><label
+          ><input id="hex" type="checkbox" />Full colored hex everywhere</label
+        ><label
+          ><input id="portal" type="checkbox" checked />Visible folds</label
+        >
+      </div>
+      <small
+        >Automatic progression reaches full colored hex in the Hex Expanse. Wave
+        controls stay active throughout.</small
+      >
+    </details>
+    <details>
+      <summary>Use your own image</summary>
+      <p>
+        <input
+          id="upload"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+        />
+      </p>
+      <small
+        >Your image stays local. New places generate as needed. Revisited places
+        reuse their saved output.</small
+      >
+    </details>
+    <p>
+      <small
+        >First exploration slice on the experiment branch: five main places and
+        one hidden pocket, linked by folds. This uses the original dome
+        renderer, an open floor and image-space movement. It is a finite loop
+        before extending the map. Photos begin with brightness relief and a
+        local neuron map.</small
+      >
+    </p>
+  </main>
+  <script type="module" src="/world/dream-world-viewer.mjs"></script>
+</html>
