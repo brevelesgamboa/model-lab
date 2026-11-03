@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  />
+  <title>Dream drift · ASCII and geometry experiment</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #080c1a;
+      color: #e6f4ff;
+      font:
+        15px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1250px;
+      margin: auto;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 26px;
+      margin: 0 0 8px;
+    }
+    p {
+      color: #aabdd2;
+      line-height: 1.55;
+      max-width: 920px;
+    }
+    nav,
+    .controls {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 18px 0;
+    }
+    label {
+      display: grid;
+      gap: 5px;
+    }
+    select,
+    button {
+      background: #14233c;
+      color: #edf7ff;
+      border: 1px solid #375471;
+      padding: 10px;
+      border-radius: 6px;
+      font: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      max-height: 75vh;
+      object-fit: contain;
+      background: #000;
+      border: 1px solid #375471;
+      touch-action: none;
+    }
+    label:has(input) {
+      display: flex;
+      align-items: center;
+    }
+    input {
+      accent-color: #40efff;
+    }
+    #status {
+      min-height: 24px;
+      color: #63e5ed;
+    }
+    #stills {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    figure {
+      margin: 0;
+      background: #101a2c;
+      border: 1px solid #233b58;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    figure img {
+      width: 100%;
+      display: block;
+    }
+    figcaption {
+      padding: 9px;
+      color: #b9d0e5;
+      font-size: 13px;
+    }
+    .clips {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    video {
+      width: 100%;
+      display: block;
+    }
+    a {
+      color: #70ecfa;
+    }
+    @media (max-width: 650px) {
+      main {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      #stills {
+        grid-template-columns: 1fr;
+      }
+      canvas {
+        max-height: none;
+      }
+      select {
+        max-width: 100%;
+      }
+    }
+  </style>
+  <main>
+    <h1>Dream drift · ASCII + geometry</h1>
+    <p>
+      Three marmot photos, cached arches → organic model stages, and the
+      saturated neon look. Compare image, partial ASCII and full ASCII with a
+      plain dome, shallow relief, or neon arch frames.
+    </p>
+    <nav>
+      <label
+        >Photo<select id="photo">
+          <option value="photo-1">1 · Close marmot</option>
+          <option value="photo-2" selected>2 · Mountain marmots</option>
+          <option value="photo-3">3 · Small “Hello” image</option>
+        </select></label
+      >
+      <label
+        >Depth<select id="level">
+          <option value="3">3 · Unfolding</option>
+          <option value="5" selected>5 · Surreal</option>
+          <option value="6">6 · Deep dream</option>
+        </select></label
+      >
+      <label
+        >Display<select id="mode">
+          <option value="0">Saturated image</option>
+          <option value="1" selected>Woven ASCII · clear face</option>
+          <option value="2">Colored ASCII throughout</option>
+        </select></label
+      >
+      <label
+        >Characters<select id="density">
+          <option value="240">Small</option>
+          <option value="320" selected>Smaller</option>
+          <option value="416">Finest</option>
+        </select></label
+      >
+      <label
+        >Archway Style<select id="archStyle">
+          <option value="0" selected>Photographic Vault (samples scene)</option>
+          <option value="1">Woven ASCII Gateway (living glyphs)</option>
+          <option value="2">5-Rib Colonnade (deep corridor)</option>
+          <option value="3">Carved Proscenium (broad frame)</option>
+          <option value="4">Frosted Glass Threshold</option>
+          <option value="5">Original Neon Wire (comparison)</option>
+        </select></label
+      >
+      <label
+        >Geometry<select id="geometry">
+          <option value="0">Plain dome</option>
+          <option value="1">Shallow relief</option>
+          <option value="2" selected>Relief + arches</option>
+        </select></label
+      >
+      <label
+        >Animation<select id="animMode">
+          <option value="1" selected>Living Woven Flow (gentle morph)</option>
+          <option value="2">Cortical Wave Ripple (harmonic wave)</option>
+          <option value="3">Neural Shimmer Pulse (subtle breath)</option>
+          <option value="4">Cascade Matrix Stream (woven rain)</option>
+          <option value="0">Static (pause flow)</option>
+        </select></label
+      >
+      <label
+        >Speed<select id="animSpeed">
+          <option value="0.5">0.5x · Gentle</option>
+          <option value="1.0" selected>1.0x · Normal</option>
+          <option value="1.8">1.8x · Swift</option>
+        </select></label
+      >
+    </nav>
+    <canvas
+      id="view"
+      width="960"
+      height="720"
+      aria-label="Interactive dream comparison"
+    ></canvas>
+    <div class="controls">
+      <button id="reset">Reset view</button
+      ><label><input type="checkbox" id="living" checked />Slow change</label
+      ><label><input type="checkbox" id="motion" />Slow turn + sideways</label
+      ><span>Drag to look · Shift-drag to move sideways</span>
+    </div>
+    <p id="status">Loading…</p>
+    <p>
+      The source scenes are actual saved MI-GAN/Inception outputs. ASCII, neon
+      lighting and arch meshes are authored display treatments. Relief uses
+      blurred image brightness, not reconstructed depth. This tests a single
+      bounded chamber; it does not generate an endless world.
+    </p>
+    <h2>Same-view comparisons</h2>
+    <div id="stills"></div>
+    <h2>Recorded camera motion</h2>
+    <p>
+      Each clip uses the same slow turn and sideways movement. Pause to compare
+      glyph detail and parallax.
+    </p>
+    <div class="clips" id="clips"></div>
+  </main>
+  <!-- DREAM_DRIFT_MODULE -->
+</html>

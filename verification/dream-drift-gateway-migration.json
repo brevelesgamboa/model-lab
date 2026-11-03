@@ -1,0 +1,65 @@
+{
+  "status": "complete",
+  "operation": "Extract Gemini gateway demo into tracked experiment source without visual changes",
+  "baseline": {
+    "file": "test-results/dream-drift-ascii-geometry/index.gemini-1e670952dfe8.html",
+    "sha256": "1e670952dfe8b64773c25b2b7fe5a0f9eff18606ce4f51f0a81c801985ea2a0f"
+  },
+  "rebuilt": {
+    "file": "test-results/dream-drift-gateway-rebuild/index.html",
+    "sha256": "1bb6db16c47abff1806756913df98569bac92008e35879dd49f1d1f3f368053e"
+  },
+  "matrix": {
+    "scenes": 9,
+    "archStyles": 6,
+    "animationModes": 5,
+    "speeds": [
+      0.5,
+      1,
+      1.8
+    ],
+    "columns": [
+      240,
+      320,
+      416
+    ],
+    "resolution": [
+      320,
+      240
+    ],
+    "mainTimeSeconds": 3.25,
+    "additionalCases": "Image/partial/full display with smooth/relief geometry at 0 and 8 seconds; translated woven gateway"
+  },
+  "exactPixelMatches": 2547,
+  "mismatches": [],
+  "fixtureDigest": "1b045a7b1f168786783d73ab38bcc3c75081e3301967f4b32029d50f88fcf694",
+  "controlsIdentical": true,
+  "rendererDefaultsIdentical": true,
+  "interactiveControls": {
+    "selection": true,
+    "drag": true,
+    "reset": true,
+    "motion": {
+      "pausedDraws": 0,
+      "animatedDraws": 15,
+      "resumedPauseDraws": 0,
+      "timeAdvanced": true
+    },
+    "mobile": {
+      "viewport": 390,
+      "scrollWidth": 390
+    }
+  },
+  "renderer": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+  "errors": [],
+  "inferenceRuns": 0,
+  "sourceHashes": {
+    "assets/js/render/dome-mesh.js": "abfcec28abc5d685f6a4a5168c47e636ff527d177b2a16b5b5a15d8b181e4de3",
+    "tools/dream-drift-ascii-renderer.mjs": "fde26424dbfdf1ea0b9bc1781f3db0f601e5c3f2035114c21bc34285141c8007",
+    "tools/dream-drift-ascii-viewer.mjs": "64bd92eabae0e587c8651d3c09d8fe3a0b6aae6cce4a2f95c5cbb0fd0fd21dad",
+    "tools/dream-drift-ascii-gallery.html": "5b765f837f87fc87d6c46481d671fab57e3bc8d019a034248acd856f5ae97fa6",
+    "tools/dream-drift-ascii-gallery.mjs": "1758e1534ad568e6a4416ad372ba49a698c394df2942e715ba62034edfbd541d",
+    "tools/experiment-dream-drift-ascii.mjs": "c673215cfb5736f93ebe4919feb025629ef8380ed5ccd2f86598b1aa7fe96ae5",
+    "tools/verify-dream-drift-gateway-migration.mjs": "e6189864624cc8f531b9ed4e2818a4f065257f081d48cb1ba8effbe9891abed0"
+  }
+}

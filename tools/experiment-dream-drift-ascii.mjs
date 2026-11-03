@@ -1,5 +1,6 @@
 // Cached-model ASCII + real mesh comparison. No inference or application edits.
-// node tools/experiment-dream-drift-ascii.mjs [input-folder] [output-folder]
+// node tools/experiment-dream-drift-ascii.mjs [input-folder] [output-folder] [--gallery-only]
+// --gallery-only rebuilds the live page without inference, captures or reports.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -7,13 +8,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { chromium } from "@playwright/test";
+import { writeDreamAsciiGallery } from "./dream-drift-ascii-gallery.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const galleryOnly = process.argv.includes("--gallery-only");
+const positional = process.argv.slice(2).filter((a) => a !== "--gallery-only");
 const input = path.resolve(
-  process.argv[2] || "test-results/dream-drift-neon-progression",
+  positional[0] || "test-results/dream-drift-neon-progression",
 );
 const output = path.resolve(
-  process.argv[3] || "test-results/dream-drift-ascii-geometry",
+  positional[1] || "test-results/dream-drift-ascii-geometry",
 );
 await mkdir(output, { recursive: true });
 const source = JSON.parse(
@@ -59,77 +63,15 @@ for (const entry of source.artifacts.filter(
   });
 }
 assert.equal(scenes.length, 9);
-const meshSource = (
-  await readFile(path.join(root, "assets/js/render/dome-mesh.js"), "utf8")
-).replaceAll("export ", "");
-const rendererSource = (
-  await readFile(
-    new URL("./dream-drift-ascii-renderer.mjs", import.meta.url),
-    "utf8",
-  )
-)
-  .replace(/^import .*;\n/m, "")
-  .replaceAll("export ", "");
-const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dream drift · ASCII and geometry experiment</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#080c1a;color:#e6f4ff;font:15px system-ui,sans-serif}main{max-width:1250px;margin:auto;padding:24px}h1{font-size:26px;margin:0 0 8px}p{color:#aabdd2;line-height:1.55;max-width:920px}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}label{display:grid;gap:5px}select,button{background:#14233c;color:#edf7ff;border:1px solid #375471;padding:10px;border-radius:6px;font:inherit}button{cursor:pointer}canvas{display:block;width:100%;aspect-ratio:4/3;max-height:75vh;object-fit:contain;background:#000;border:1px solid #375471;touch-action:none}label:has(input){display:flex;align-items:center}input{accent-color:#40efff}#status{min-height:24px;color:#63e5ed}#stills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}figure{margin:0;background:#101a2c;border:1px solid #233b58;border-radius:7px;overflow:hidden}figure img{width:100%;display:block}figcaption{padding:9px;color:#b9d0e5;font-size:13px}.clips{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}video{width:100%;display:block}a{color:#70ecfa}@media(max-width:650px){main{padding:14px}h1{font-size:22px}#stills{grid-template-columns:1fr}canvas{max-height:none}select{max-width:100%}}
-</style><main>
-<h1>Dream drift · ASCII + geometry</h1>
-<p>Three marmot photos, cached arches → organic model stages, and the saturated neon look. Compare image, partial ASCII and full ASCII with a plain dome, shallow relief, or neon arch frames.</p>
-<nav><label>Photo<select id="photo"><option value="photo-1">1 · Close marmot</option><option value="photo-2" selected>2 · Mountain marmots</option><option value="photo-3">3 · Small “Hello” image</option></select></label>
-<label>Depth<select id="level"><option value="3">3 · Unfolding</option><option value="5" selected>5 · Surreal</option><option value="6">6 · Deep dream</option></select></label>
-<label>Display<select id="mode"><option value="0">Saturated image</option><option value="1" selected>Partial ASCII · clear face</option><option value="2">Full ASCII</option></select></label>
-<label>Geometry<select id="geometry"><option value="0">Plain dome</option><option value="1">Shallow relief</option><option value="2" selected>Relief + neon arches</option></select></label></nav>
-<canvas id="view" width="960" height="720" aria-label="Interactive dream comparison"></canvas>
-<div class="controls"><button id="reset">Reset view</button><label><input type="checkbox" id="motion">Slow turn + sideways motion</label><span>Drag to look · Shift-drag to move sideways</span></div>
-<p id="status">Loading…</p>
-<p>The source scenes are actual saved MI-GAN/Inception outputs. ASCII, neon lighting and arch meshes are authored display treatments. Relief uses blurred image brightness, not reconstructed depth. This tests a single bounded chamber; it does not generate an endless world.</p>
-<h2>Same-view comparisons</h2><div id="stills"></div>
-<h2>Recorded camera motion</h2><p>Each clip uses the same slow turn and sideways movement. Pause to compare glyph detail and parallax.</p><div class="clips" id="clips"></div>
-</main><script type="module">
-${meshSource}
-${rendererSource}
-const assets=${JSON.stringify(Object.fromEntries(embedded))};
-const scenes=${JSON.stringify(scenes)}.map(s=>({...s,neon:assets[s.neon],natural:assets[s.natural],seed:assets[s.seed]}));
-const canvas=document.getElementById("view"), renderer=createAsciiRenderer(canvas);
-const el=id=>document.getElementById(id), modes=["Saturated image","Partial ASCII","Full ASCII"], geometries=["Plain dome","Shallow relief","Relief + neon arches"];
-let active,loading=false,generation=0,automation=false,drag=null;
-async function selectScene(id){
-  const s=scenes.find(s=>s.id===id); if(!s)throw new Error("Unknown scene");
-  const ticket=++generation;loading=true;
-  await renderer.load(s);if(ticket!==generation)return;
-  active=s;loading=false;
-  el("status").textContent="Ready · drag to look, or enable the slow camera path";
-  renderer.draw();
-}
-function controls(){renderer.settings.mode=+el("mode").value;renderer.settings.geometry=+el("geometry").value;renderer.draw();refreshStills();}
-function refreshStills(){
-  if(!active)return;
-  el("stills").innerHTML=modes.flatMap((m,mode)=>geometries.map((g,geometry)=>'<figure><a href="'+active.id+'-m'+mode+'-g'+geometry+'.png"><img loading="lazy" src="'+active.id+'-m'+mode+'-g'+geometry+'.png" alt="'+m+' with '+g+'"></a><figcaption>'+m+' · '+g+'</figcaption></figure>')).join("");
-}
-async function change(){await selectScene(el("photo").value+"-level-"+el("level").value);controls();}
-for(const id of ["photo","level"])el(id).addEventListener("change",()=>change().catch(showError));
-for(const id of ["mode","geometry"])el(id).addEventListener("change",controls);
-function showError(e){el("status").textContent=e.message;console.error(e);}
-el("reset").onclick=()=>{el("motion").checked=false;renderer.camera.reset();renderer.camera.pitch=active.pitch;renderer.draw();};
-canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);el("motion").checked=false;};
-canvas.onpointerup=()=>{drag=null;};canvas.onpointercancel=()=>{drag=null;};
-canvas.onpointermove=e=>{if(!drag||loading)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};if(e.shiftKey){renderer.camera.pan(dx*.4,dy*.4,canvas.clientHeight);}else renderer.camera.look(dx*.45,dy*.45);renderer.draw();};
-function pose(t){
-  renderer.camera.yaw=Math.sin(t*Math.PI*2)*.22;
-  renderer.camera.pitch=active.pitch+Math.sin(t*Math.PI*4)*.025;
-  renderer.camera.target=[Math.sin(t*Math.PI*2)*.32,0,Math.sin(t*Math.PI*2)*.10];
-}
-function tick(t){if(!automation&&!loading&&active&&el("motion").checked){pose((t%12000)/12000);renderer.draw();}requestAnimationFrame(tick);}requestAnimationFrame(tick);
-const clips=[{mode:0,geometry:2},{mode:1,geometry:0},{mode:1,geometry:1},{mode:1,geometry:2},{mode:2,geometry:2}];
-el("clips").innerHTML=clips.map(c=>'<figure><video controls loop muted playsinline preload="none" src="motion-m'+c.mode+'-g'+c.geometry+'.webm"></video><figcaption>'+modes[c.mode]+' · '+geometries[c.geometry]+'</figcaption></figure>').join("");
-window.experiment={renderer,scenes,selectScene,pose,get active(){return active;},set automation(v){automation=v;}};
-await change();window.experimentReady=true;
-</script></html>`;
-const galleryPath = path.join(output, "index.html");
-await writeFile(galleryPath, html);
+const galleryPath = await writeDreamAsciiGallery(output, {
+  assets: Object.fromEntries(embedded),
+  scenes,
+});
 console.log(`Built self-contained live gallery with ${scenes.length} scenes`);
+if (galleryOnly) {
+  console.log(galleryPath);
+  process.exit(0);
+}
 
 const browser = await chromium.launch({
   args: [
