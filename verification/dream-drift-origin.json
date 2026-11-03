@@ -1,0 +1,678 @@
+{
+  "status": "complete",
+  "started": "2026-11-03T03:53:47.848Z",
+  "identity": [
+    {
+      "id": "demo",
+      "checks": [
+        {
+          "waveMode": 0,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 0,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        }
+      ],
+      "depth": "luminance",
+      "feature": "empty"
+    },
+    {
+      "id": "photo-3",
+      "checks": [
+        {
+          "waveMode": 0,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 0,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        }
+      ],
+      "depth": "luminance",
+      "feature": "activation"
+    },
+    {
+      "id": "photo-1",
+      "checks": [
+        {
+          "waveMode": 0,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 0,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        }
+      ],
+      "depth": "luminance",
+      "feature": "activation"
+    },
+    {
+      "id": "photo-2",
+      "checks": [
+        {
+          "waveMode": 0,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 0,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 1,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 2,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        },
+        {
+          "waveMode": 3,
+          "yaw": 0.7,
+          "maxByte": 0,
+          "meanByte": 0,
+          "differentBytes": 0
+        }
+      ],
+      "depth": "luminance",
+      "feature": "activation"
+    }
+  ],
+  "studies": [
+    {
+      "id": "demo",
+      "version": "origin-study-v1",
+      "fingerprint": "bfe7cae03f3bedfb656a35d52992c2e602bba2cb656ffc62c3e48fa9dc39bbab",
+      "metrics": [
+        {
+          "name": "Light",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 6,
+              "stepSize": 0.014,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 2103.8000000044703,
+              "scoreStart": 0.3529358506202698,
+              "scoreEnd": 1.0537041425704956,
+              "meanChangedByte": 6.385194142659505,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        },
+        {
+          "name": "Deep",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 2863.1999999955297,
+              "scoreStart": 1.0324702262878418,
+              "scoreEnd": 2.0359435081481934,
+              "meanChangedByte": 14.882762908935547,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            },
+            {
+              "layer": "mixed_6c",
+              "channel": 144,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 3298.89999999851,
+              "scoreStart": -0.2687845826148987,
+              "scoreEnd": 4.146543502807617,
+              "meanChangedByte": 16.501612345377605,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        }
+      ],
+      "changes": [
+        {
+          "stage": 1,
+          "meanByte": 6.385194142659505,
+          "fractionOver12": 0.11904144287109375
+        },
+        {
+          "stage": 2,
+          "meanByte": 23.799301147460938,
+          "fractionOver12": 0.6912994384765625
+        }
+      ],
+      "params": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "id": "photo-3",
+      "version": "origin-study-v1",
+      "fingerprint": "fa9a9f8ab812693176719100e54c25bd48d0fe82fa22679ec0da84d94e71e918",
+      "metrics": [
+        {
+          "name": "Light",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 6,
+              "stepSize": 0.014,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 1934.8999999985099,
+              "scoreStart": 0.2586182951927185,
+              "scoreEnd": 1.0044182538986206,
+              "meanChangedByte": 6.0778350830078125,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        },
+        {
+          "name": "Deep",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 2848.7999999970198,
+              "scoreStart": 1.0679774284362793,
+              "scoreEnd": 2.1049861907958984,
+              "meanChangedByte": 14.949440002441406,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            },
+            {
+              "layer": "mixed_6c",
+              "channel": 144,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 3276.9000000059605,
+              "scoreStart": -0.7916565537452698,
+              "scoreEnd": 3.971151351928711,
+              "meanChangedByte": 17.068480173746746,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        }
+      ],
+      "changes": [
+        {
+          "stage": 1,
+          "meanByte": 6.0778350830078125,
+          "fractionOver12": 0.10090573628743489
+        },
+        {
+          "stage": 2,
+          "meanByte": 24.520750681559246,
+          "fractionOver12": 0.6876309712727865
+        }
+      ],
+      "params": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "id": "photo-1",
+      "version": "origin-study-v1",
+      "fingerprint": "a715bf6e7f118131aec5615eff3355920e382bbdbf0dc18621db9e032dff675c",
+      "metrics": [
+        {
+          "name": "Light",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 6,
+              "stepSize": 0.014,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 1430.3999999985099,
+              "scoreStart": 0.23323580622673035,
+              "scoreEnd": 0.49677473306655884,
+              "meanChangedByte": 6.610336939493815,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        },
+        {
+          "name": "Deep",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 2808,
+              "scoreStart": 0.6134830713272095,
+              "scoreEnd": 1.4425338506698608,
+              "meanChangedByte": 15.456769943237305,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            },
+            {
+              "layer": "mixed_6c",
+              "channel": 144,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 3189.10000000149,
+              "scoreStart": -0.750301718711853,
+              "scoreEnd": 3.151489734649658,
+              "meanChangedByte": 17.797475814819336,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        }
+      ],
+      "changes": [
+        {
+          "stage": 1,
+          "meanByte": 6.610336939493815,
+          "fractionOver12": 0.09959793090820312
+        },
+        {
+          "stage": 2,
+          "meanByte": 26.609060287475586,
+          "fractionOver12": 0.6934642791748047
+        }
+      ],
+      "params": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    },
+    {
+      "id": "photo-2",
+      "version": "origin-study-v1",
+      "fingerprint": "f6a179c96d449e70c0c500a5066f0d0cdba71e3dc1e6a92ad1f13ef52172d7c4",
+      "metrics": [
+        {
+          "name": "Light",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 6,
+              "stepSize": 0.014,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 1377.5,
+              "scoreStart": 0.24500449001789093,
+              "scoreEnd": 0.6779043674468994,
+              "meanChangedByte": 5.535552342732747,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        },
+        {
+          "name": "Deep",
+          "passes": [
+            {
+              "layer": "mixed_6a",
+              "channel": 42,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 2783.8000000044703,
+              "scoreStart": 0.6740545630455017,
+              "scoreEnd": 1.7084194421768188,
+              "meanChangedByte": 14.737626393636068,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            },
+            {
+              "layer": "mixed_6c",
+              "channel": 144,
+              "iterations": 18,
+              "stepSize": 0.03,
+              "width": 1024,
+              "height": 512,
+              "bakeMs": 3149.7000000029802,
+              "scoreStart": -0.6445527672767639,
+              "scoreEnd": 3.615065574645996,
+              "meanChangedByte": 16.870075861612957,
+              "retainedTensors": 0,
+              "backend": "webgl"
+            }
+          ]
+        }
+      ],
+      "changes": [
+        {
+          "stage": 1,
+          "meanByte": 5.535552342732747,
+          "fractionOver12": 0.09122657775878906
+        },
+        {
+          "stage": 2,
+          "meanByte": 24.143372853597004,
+          "fractionOver12": 0.6759796142578125
+        }
+      ],
+      "params": {
+        "featureTarget": 0,
+        "depthScale": 0.6,
+        "neuralSwell": 0.35,
+        "waveMode": 2,
+        "gain": 0.25,
+        "frequency": 8,
+        "speed": 0.7,
+        "eccentricity": 0.12,
+        "edgeCoupling": 0.35,
+        "chromaticDispersion": 0.35,
+        "cameraDolly": 0.8
+      }
+    }
+  ],
+  "errors": [],
+  "exploration": {
+    "position": [
+      50.98143380229655,
+      -31.636899460314602
+    ],
+    "yaw": 0.23,
+    "parallax": [
+      0.4793408574991799,
+      0,
+      -0.4696546071913181
+    ]
+  },
+  "fold": {
+    "entered": true,
+    "start": [
+      0,
+      -9
+    ],
+    "end": [
+      0,
+      -9
+    ],
+    "yaw": 0,
+    "endYaw": 0,
+    "frontier": 1
+  },
+  "liveFold": {
+    "entered": true,
+    "start": [
+      0,
+      -45
+    ],
+    "held": [
+      0,
+      -45
+    ],
+    "end": [
+      0,
+      -45
+    ],
+    "frontier": 3,
+    "newRuns": 1,
+    "glError": 0
+  },
+  "cancel": {
+    "position": [
+      0,
+      0
+    ],
+    "depth": 0,
+    "warp": null
+  },
+  "settings": {
+    "combinations": 72,
+    "glyphs": " 71CF3425A96E8D0B"
+  },
+  "performance": {
+    "gpu": "ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon RX 6700 XT (RADV NAVI22) (0x000073DF)), radv)",
+    "width": 960,
+    "height": 720,
+    "gpuTimerSupported": true,
+    "samples": 20,
+    "medianMs": 1.7233,
+    "p95Ms": 2.73856
+  },
+  "recording": {
+    "file": "open-dome-walkthrough.webm",
+    "seconds": 8,
+    "bytes": 4179205,
+    "frontiers": 1
+  },
+  "controls": "Source selection, depth changes, keyboard sidestep, original comparison hold, home and 390px viewport passed.",
+  "preserved": {
+    "assets/js/models/cortical-dream-dome.js": "fd5f8ae65e5f3fbea7003f639a2ae5ad37c3987873aba41ff567e449f3fafbe2",
+    "assets/js/render/dome-graphics.js": "55ae8f0b900593982b7ef706fba8472194a42cd2117eab41478aae6ccc769fb0",
+    "assets/js/render/cortical-waves.glsl": "417ec3b92e3723e69b85825ef0292219c6c88a53e552d49bdfdfbd49d5770678",
+    "assets/js/shaders/cortical-dome.vert": "1e9c0d562b987ba0991d6dddff8b0dc5812268e6e45cf71c0499161811f7b270",
+    "assets/js/shaders/cortical-dome.frag": "8a0be2975c5b48741a054a6fd8e0ec80f3b52afb3c59a8162185e5def90d1eb6",
+    "assets/js/shaders/cortical-dome-mapping.glsl": "c42afe93ebe513610af7cc1834099ed4f75c04434808a2878c228ebf7b638947"
+  },
+  "finished": "2026-11-03T03:54:16.291Z"
+}

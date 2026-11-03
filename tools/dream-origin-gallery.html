@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Dream Drift · original dome study</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #0c101b;
+      color: #e4e9f0;
+      font:
+        15px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1190px;
+      padding: 24px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 24px;
+      margin: 0 0 8px;
+    }
+    p {
+      color: #b5c3d1;
+      line-height: 1.55;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+    button,
+    select {
+      padding: 9px 12px;
+      color: inherit;
+      background: #1a293c;
+      border: 1px solid #465b70;
+      border-radius: 6px;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:hover {
+      border-color: #b1dfd9;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    canvas:focus-visible {
+      outline: 2px solid #a8e3d8;
+      outline-offset: 3px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin: 15px 0;
+    }
+    label {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+    input[type="range"] {
+      width: 155px;
+      accent-color: #8ed7d0;
+    }
+    input[type="checkbox"] {
+      accent-color: #8ed7d0;
+    }
+    #view {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 8px;
+      background: #141d2d;
+      touch-action: none;
+    }
+    #status {
+      min-height: 24px;
+      margin: 12px 0 4px;
+      color: #b3e1d8;
+    }
+    #readout,
+    #fold-note,
+    small {
+      color: #aebdce;
+      font-size: 13px;
+    }
+    .references {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .references figure {
+      margin: 0;
+    }
+    .references canvas {
+      width: 100%;
+      background: #141d2d;
+      border: 1px solid #364a5f;
+      border-radius: 6px;
+    }
+    .references figcaption {
+      padding: 6px 0;
+    }
+    details {
+      margin: 20px 0;
+      border-top: 1px solid #344353;
+      padding-top: 15px;
+    }
+    summary {
+      cursor: pointer;
+    }
+    .mobile {
+      display: none;
+    }
+    #upload {
+      max-width: 100%;
+    }
+    @media (max-width: 650px) {
+      main {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 21px;
+      }
+      .references {
+        gap: 6px;
+      }
+      .references figcaption {
+        font-size: 12px;
+      }
+      .mobile {
+        display: flex;
+      }
+      select {
+        max-width: 100%;
+      }
+      #view {
+        aspect-ratio: 4/4.5;
+      }
+    }
+  </style>
+  <main>
+    <h1>Dream Drift · back inside the original dome</h1>
+    <p>
+      The app’s original depth, cortical waves and refraction, with stronger
+      model studies and optional free exploration.
+    </p>
+    <div class="controls">
+      <label
+        >Source<select id="source">
+          <option value="demo">Original built-in landscape</option>
+          <option value="photo-1">Marmot 1 · close portrait</option>
+          <option value="photo-2">Marmot 2 · mountain group</option>
+          <option value="photo-3">Marmot 3 · “Hello”</option>
+        </select></label
+      ><button id="generate">Generate Light + Deep</button
+      ><button id="cancel" hidden>Cancel</button
+      ><button id="pause">Pause waves</button>
+    </div>
+    <div class="controls">
+      <button data-depth="0">Original</button
+      ><button data-depth="1">Light</button><button data-depth="2">Deep</button
+      ><label
+        >Transformation<input
+          id="depth"
+          type="range"
+          min="0"
+          max="2"
+          step=".01"
+          value="0" /></label
+      ><button id="hold">Hold to compare original · B</button>
+    </div>
+    <canvas
+      id="view"
+      width="960"
+      height="720"
+      tabindex="0"
+      aria-label="Original dream dome. Drag to look. Enable exploration and use W A S D to wander freely."
+    ></canvas>
+    <div id="status" role="status">Preparing the original renderer…</div>
+    <div id="readout"></div>
+    <div class="controls">
+      <label><input type="checkbox" id="explore" />Explore freely</label
+      ><button id="home">Return to original</button
+      ><button id="fold" disabled>Enter nearby fold · E</button>
+    </div>
+    <div id="fold-note"></div>
+    <div class="controls mobile">
+      <button id="forward">Forward</button><button id="back">Back</button
+      ><button id="left">Left</button><button id="right">Right</button>
+    </div>
+    <p>
+      Drag to look · W/S forward/back · A/D sidestep · B holds the original
+      image · E enters a nearby fold · Escape cancels generation. The floor
+      extends in every direction; the fold is optional.
+    </p>
+    <details open>
+      <summary>Original / Light / Deep comparison</summary>
+      <p>
+        <small
+          >Same camera, wave settings and time. These reference captures show
+          model output through the original dome, with digital accents
+          off.</small
+        >
+      </p>
+      <div class="references">
+        <figure>
+          <canvas id="reference-0" width="320" height="240"></canvas>
+          <figcaption>Original source</figcaption>
+        </figure>
+        <figure>
+          <canvas id="reference-1" width="320" height="240"></canvas>
+          <figcaption>Light model transformation</figcaption>
+        </figure>
+        <figure>
+          <canvas id="reference-2" width="320" height="240"></canvas>
+          <figcaption>Strong model transformation</figcaption>
+        </figure>
+      </div>
+    </details>
+    <details>
+      <summary>Floor, folds and digital treatment</summary>
+      <div class="controls">
+        <label
+          >Floor presence<input
+            id="floor"
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value=".72" /></label
+        ><label
+          >Negative floor<input
+            id="negative"
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value=".55" /></label
+        ><label
+          ><input type="checkbox" id="portal" checked />Optional fold</label
+        ><label
+          ><input type="checkbox" id="digital" checked />Neon + fine hex
+          accents</label
+        ><label><input type="checkbox" id="hex" />Full colored hex</label>
+      </div>
+    </details>
+    <details>
+      <summary>Original dome controls</summary>
+      <div class="controls">
+        <label
+          >Waves<select id="waveMode">
+            <option value="0">Rings</option>
+            <option value="1">Rays</option>
+            <option value="2">Spiral</option>
+            <option value="3">Honeycomb</option>
+          </select></label
+        ><label
+          >Wave height<input
+            id="gain"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label
+          >Depth<input
+            id="depthScale"
+            type="range"
+            min="0"
+            max="1.5"
+            step=".01" /></label
+        ><label
+          >Neural swell<input
+            id="neuralSwell"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label
+          >Refraction<input
+            id="edgeCoupling"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><label
+          >Dispersion<input
+            id="chromaticDispersion"
+            type="range"
+            min="0"
+            max="1"
+            step=".01" /></label
+        ><button id="reset-controls">Reset dome settings</button
+        ><button id="depth-map">Estimate photo depth</button>
+      </div>
+      <small
+        >Photos start with brightness relief and a locally computed neuron map.
+        Optional estimated depth uses the app’s existing depth model and may
+        download it once.</small
+      >
+    </details>
+    <details>
+      <summary>Try another image</summary>
+      <p>
+        <input
+          id="upload"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+        />
+      </p>
+      <small
+        >Your image stays local. Generate the two studies after choosing
+        it.</small
+      >
+    </details>
+    <p>
+      <small
+        >Experiment branch. The baseline uses the actual app renderer.
+        Exploration adds an image-space movement illusion, an open floor and one
+        reusable fold. Strong model imagery comes from cumulative Inception
+        feature ascent. This is the first open area, before building a larger
+        map.</small
+      >
+    </p>
+  </main>
+  <script type="module" src="/origin/dream-origin-viewer.mjs"></script>
+</html>
