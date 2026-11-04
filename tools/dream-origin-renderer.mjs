@@ -8,10 +8,13 @@ import { originTreatment } from "./dream-origin-space.mjs";
 
 export async function createOriginRenderer(
   canvas,
-  { extended = true, worldMode = false } = {},
+  { extended = true, worldMode = false, driftMode = false } = {},
 ) {
   const worldExtension = worldMode
     ? (await import("./dream-world-shaders.mjs")).extendWorldShader
+    : null;
+  const driftExtension = driftMode
+    ? (await import("./dream-open-shaders.mjs")).extendOpenShader
     : null;
   const model = new CorticalDreamDomeModel(),
     gl = model.gl;
@@ -42,12 +45,12 @@ export async function createOriginRenderer(
     for (const { type, source } of original) {
       const shader = gl.createShader(type);
       const origin = extendOriginShader(source, type === gl.FRAGMENT_SHADER);
-      gl.shaderSource(
-        shader,
-        worldExtension
-          ? worldExtension(origin, type === gl.FRAGMENT_SHADER)
-          : origin,
-      );
+      let assembled = worldExtension
+        ? worldExtension(origin, type === gl.FRAGMENT_SHADER)
+        : origin;
+      if (driftExtension)
+        assembled = driftExtension(assembled, type === gl.FRAGMENT_SHADER);
+      gl.shaderSource(shader, assembled);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
         throw new Error(gl.getShaderInfoLog(shader));
@@ -175,6 +178,25 @@ export async function createOriginRenderer(
             ]),
           )
         : null,
+      drift: driftMode
+        ? Object.fromEntries(
+            [
+              "active",
+              "mapping",
+              "wave_next",
+              "wave_mix",
+              "wave_amount",
+              "phase",
+              "effect",
+              "arch_count",
+              "arches[0]",
+              "shapes[0]",
+            ].map((name) => [
+              name,
+              gl.getUniformLocation(program, "u_drift_" + name),
+            ]),
+          )
+        : null,
       next,
       glyph,
       glyphs: glyphs.map((g) => g.character).join(""),
@@ -251,6 +273,8 @@ export async function createOriginRenderer(
     target = canvas,
     appearance = null,
     areaWorld = null,
+    drift = null,
+    waveParams = null,
   } = {}) {
     const g = await ensure();
     const treatment = original
@@ -328,8 +352,28 @@ export async function createOriginRenderer(
         gl.uniform4fv(w["gates[0]"], values);
         gl.uniform4fv(w.landmark, areaWorld?.landmark || [0, 0, 0, 0]);
       }
+      if (extra.drift) {
+        const d = extra.drift,
+          arches = settings.portal ? drift?.arches || [] : [];
+        gl.uniform1f(d.active, drift ? 1 : 0);
+        gl.uniform2fv(d.mapping, drift?.mapping || [0, 0]);
+        gl.uniform1i(d.wave_next, drift?.waveNext ?? params.waveMode);
+        gl.uniform1f(d.wave_mix, drift?.waveMix || 0);
+        gl.uniform1f(d.wave_amount, drift?.waveAmount || 0);
+        gl.uniform1f(d.phase, drift?.phase || 0);
+        gl.uniform2fv(d.effect, drift?.effect || [-1, 0]);
+        gl.uniform1i(d.arch_count, Math.min(3, arches.length));
+        const positions = new Float32Array(12),
+          shapes = new Float32Array(12);
+        arches.slice(0, 3).forEach((a, i) => {
+          positions.set([...a.position, a.yaw, a.presence], i * 4);
+          shapes.set([a.radius, a.type, a.twist, a.phase], i * 4);
+        });
+        gl.uniform4fv(d["arches[0]"], positions);
+        gl.uniform4fv(d["shapes[0]"], shapes);
+      }
     }
-    await model.render(target, params, time);
+    await model.render(target, waveParams || params, time);
     return {
       glError: gl.getError(),
       vertices: 65536,

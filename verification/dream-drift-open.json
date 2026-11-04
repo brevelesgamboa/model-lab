@@ -1,0 +1,333 @@
+{
+  "started": "2026-11-04T01:30:43.141Z",
+  "status": "complete",
+  "errors": [],
+  "initial": {
+    "render": {
+      "glError": 0,
+      "vertices": 65536,
+      "textures": 15,
+      "source": "photo-3",
+      "depth": "luminance",
+      "feature": "activation"
+    },
+    "params": {
+      "featureTarget": 0,
+      "depthScale": 0.6,
+      "neuralSwell": 0.35,
+      "waveMode": 2,
+      "gain": 0.25,
+      "frequency": 8,
+      "speed": 0.7,
+      "eccentricity": 0.12,
+      "edgeCoupling": 0.35,
+      "chromaticDispersion": 0.35,
+      "cameraDolly": 0.8
+    },
+    "landscapes": 3,
+    "options": {
+      "autoWaves": true,
+      "strength": 0.65
+    }
+  },
+  "parity": [
+    {
+      "fullHex": false,
+      "mode": 0,
+      "maxByte": 1,
+      "meanByte": 0.000020616319444444445
+    },
+    {
+      "fullHex": false,
+      "mode": 1,
+      "maxByte": 1,
+      "meanByte": 0.00002242476851851852
+    },
+    {
+      "fullHex": false,
+      "mode": 2,
+      "maxByte": 1,
+      "meanByte": 0.00004593460648148148
+    },
+    {
+      "fullHex": false,
+      "mode": 3,
+      "maxByte": 1,
+      "meanByte": 0.00004774305555555556
+    },
+    {
+      "fullHex": true,
+      "mode": 0,
+      "maxByte": 1,
+      "meanByte": 0.00019241898148148148
+    },
+    {
+      "fullHex": true,
+      "mode": 1,
+      "maxByte": 1,
+      "meanByte": 0.00018844039351851853
+    },
+    {
+      "fullHex": true,
+      "mode": 2,
+      "maxByte": 1,
+      "meanByte": 0.0003917100694444444
+    },
+    {
+      "fullHex": true,
+      "mode": 3,
+      "maxByte": 1,
+      "meanByte": 0.00032371238425925927
+    }
+  ],
+  "drift": {
+    "baseline": {
+      "featureTarget": 0,
+      "depthScale": 0.6,
+      "neuralSwell": 0.35,
+      "waveMode": 2,
+      "gain": 0.25,
+      "frequency": 8,
+      "speed": 0.7,
+      "eccentricity": 0.12,
+      "edgeCoupling": 0.35,
+      "chromaticDispersion": 0.35,
+      "cameraDolly": 0.8
+    },
+    "automatic": {
+      "featureTarget": 0,
+      "depthScale": 0.6,
+      "neuralSwell": 0.40684384667823376,
+      "waveMode": 2,
+      "gain": 0.353245715259577,
+      "frequency": 7.770688802227651,
+      "speed": 0.8123129253842285,
+      "eccentricity": 0.10138525391041302,
+      "edgeCoupling": 0.39682788086561954,
+      "chromaticDispersion": 0.40034384667823375,
+      "cameraDolly": 0.8
+    },
+    "manual": {
+      "featureTarget": 0,
+      "depthScale": 0.6,
+      "neuralSwell": 0.35,
+      "waveMode": 2,
+      "gain": 0.25,
+      "frequency": 8,
+      "speed": 0.7,
+      "eccentricity": 0.12,
+      "edgeCoupling": 0.35,
+      "chromaticDispersion": 0.35,
+      "cameraDolly": 0.8
+    },
+    "depth": 3,
+    "hex": "100% colored hex · your waves",
+    "moved": 0.25,
+    "baseUnchanged": true
+  },
+  "sources": [
+    {
+      "id": "photo-1",
+      "width": 1024,
+      "height": 512,
+      "restored": false,
+      "metrics": [
+        {
+          "id": "1:-3:2:-1",
+          "kind": "generated place",
+          "key": "1:-3:2:-1",
+          "stage": 2,
+          "landscape": -1,
+          "channel": 181,
+          "layer": "mixed_6c",
+          "iterations": 10,
+          "stepSize": 0.024800000000000003,
+          "bakeMs": 3333.5999999940395,
+          "scoreStart": 0.6241253018379211,
+          "scoreEnd": 2.426361560821533,
+          "retainedTensors": 0
+        }
+      ],
+      "glError": 0
+    },
+    {
+      "id": "photo-2",
+      "width": 1024,
+      "height": 512,
+      "restored": false,
+      "metrics": [
+        {
+          "id": "1:-3:2:-1",
+          "kind": "generated place",
+          "key": "1:-3:2:-1",
+          "stage": 2,
+          "landscape": -1,
+          "channel": 181,
+          "layer": "mixed_6c",
+          "iterations": 10,
+          "stepSize": 0.024800000000000003,
+          "bakeMs": 2202.2999999970198,
+          "scoreStart": 0.5607737302780151,
+          "scoreEnd": 2.7085161209106445,
+          "retainedTensors": 0
+        }
+      ],
+      "glError": 0
+    },
+    {
+      "id": "photo-3",
+      "width": 1024,
+      "height": 512,
+      "restored": false,
+      "metrics": [
+        {
+          "id": "1:-3:2:-1",
+          "kind": "generated place",
+          "key": "1:-3:2:-1",
+          "stage": 2,
+          "landscape": -1,
+          "channel": 181,
+          "layer": "mixed_6c",
+          "iterations": 10,
+          "stepSize": 0.024800000000000003,
+          "bakeMs": 2194,
+          "scoreStart": 0.352649986743927,
+          "scoreEnd": 2.7987043857574463,
+          "retainedTensors": 0
+        }
+      ],
+      "glError": 0
+    }
+  ],
+  "landscapes": [
+    {
+      "index": 0,
+      "width": 1024,
+      "height": 512,
+      "metrics": {
+        "id": "landscape-check:0",
+        "kind": "generated place",
+        "key": "landscape-check:0",
+        "stage": 2,
+        "landscape": 0,
+        "channel": 145,
+        "layer": "mixed_6c",
+        "iterations": 9,
+        "stepSize": 0.024800000000000003,
+        "bakeMs": 1757.4000000059605,
+        "scoreStart": 0.6086796522140503,
+        "scoreEnd": 2.395595073699951,
+        "retainedTensors": 0
+      },
+      "glError": 0
+    },
+    {
+      "index": 1,
+      "width": 1024,
+      "height": 512,
+      "metrics": {
+        "id": "landscape-check:1",
+        "kind": "generated place",
+        "key": "landscape-check:1",
+        "stage": 2,
+        "landscape": 1,
+        "channel": 79,
+        "layer": "mixed_6a",
+        "iterations": 7,
+        "stepSize": 0.028,
+        "bakeMs": 1284.7999999970198,
+        "scoreStart": 0.12897709012031555,
+        "scoreEnd": 0.9832583665847778,
+        "retainedTensors": 0
+      },
+      "glError": 0
+    },
+    {
+      "index": 2,
+      "width": 1024,
+      "height": 512,
+      "metrics": {
+        "id": "landscape-check:2",
+        "kind": "generated place",
+        "key": "landscape-check:2",
+        "stage": 2,
+        "landscape": 2,
+        "channel": 70,
+        "layer": "mixed_6a",
+        "iterations": 6,
+        "stepSize": 0.028,
+        "bakeMs": 1070.1000000089407,
+        "scoreStart": 0.06324216723442078,
+        "scoreEnd": 0.5389673709869385,
+        "retainedTensors": 0
+      },
+      "glError": 0
+    }
+  ],
+  "encounters": [
+    {
+      "type": 0,
+      "duration": 24.36122955661267,
+      "amount": 1,
+      "moved": 12.50000000000001,
+      "key": "0:-1:2:-1",
+      "glError": 0
+    },
+    {
+      "type": 1,
+      "duration": 30.446400695480406,
+      "amount": 1,
+      "moved": 12.499999999999979,
+      "key": "0:-1:2:-1",
+      "glError": 0
+    },
+    {
+      "type": 2,
+      "duration": 29.838318752124906,
+      "amount": 1,
+      "moved": 12.500000000000018,
+      "key": "0:-2:2:-1",
+      "glError": 0
+    },
+    {
+      "type": 3,
+      "duration": 29.532556239515543,
+      "amount": 1,
+      "moved": 12.500000000000124,
+      "key": "12:-16:2:0",
+      "glError": 0
+    }
+  ],
+  "walkThrough": {
+    "type": 1,
+    "expected": 1
+  },
+  "failure": {
+    "error": "Controlled generation failure",
+    "imageRetained": true,
+    "moved": 0.2500000000000004
+  },
+  "cache": {
+    "images": 8,
+    "blobs": 6,
+    "pending": null,
+    "active": null,
+    "error": ""
+  },
+  "saved": {
+    "gain": 0.19,
+    "frequency": 10.4,
+    "strength": 0.27,
+    "autoWaves": false,
+    "autoDepth": false,
+    "landscapes": false
+  },
+  "customUpload": true,
+  "controls": "Free keyboard movement, automatic-wave toggle, strength, saved base settings, independent depth/hex, custom image and 390px layout passed.",
+  "preserved": {
+    "assets/js/models/cortical-dream-dome.js": "fd5f8ae65e5f3fbea7003f639a2ae5ad37c3987873aba41ff567e449f3fafbe2",
+    "assets/js/render/cortical-waves.glsl": "417ec3b92e3723e69b85825ef0292219c6c88a53e552d49bdfdfbd49d5770678",
+    "tools/dream-origin-shaders.mjs": "56c18fddd287ca9c53272418eb25a542c9004ea3d1111dd03c4910e6ef75992a",
+    "tools/dream-world-shaders.mjs": "12708d107458a0ef5d955426a1c01f4b6f3b9a1b09db8046439513bdc9fd903f"
+  }
+}

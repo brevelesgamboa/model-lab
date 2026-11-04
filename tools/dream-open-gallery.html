@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  />
+  <title>Dream Drift · open field</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #0c101b;
+      color: #e4e9f0;
+      font:
+        15px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1190px;
+      margin: auto;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 25px;
+      margin: 0 0 8px;
+      font-weight: 600;
+    }
+    p {
+      line-height: 1.5;
+      color: #b5c3d1;
+    }
+    button,
+    select,
+    input {
+      font: inherit;
+    }
+    button,
+    select {
+      padding: 9px 12px;
+      color: inherit;
+      background: #1a293c;
+      border: 1px solid #465b70;
+      border-radius: 6px;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+    button:hover {
+      border-color: #b1dfd9;
+    }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    canvas:focus-visible {
+      outline: 2px solid #a8e3d8;
+      outline-offset: 3px;
+    }
+    .controls {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin: 14px 0;
+    }
+    label {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    input[type="range"] {
+      width: 145px;
+      accent-color: #8ed7d0;
+    }
+    input[type="checkbox"] {
+      accent-color: #8ed7d0;
+    }
+    #view {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      touch-action: none;
+      background: #101a2b;
+      border-radius: 8px;
+    }
+    small,
+    #readout,
+    #activity,
+    #effect-note,
+    #effective {
+      color: #aebdce;
+      font-size: 13px;
+    }
+    #status {
+      min-height: 24px;
+      margin: 12px 0 4px;
+      color: #b3e1d8;
+    }
+    #activity {
+      min-height: 20px;
+    }
+    details {
+      margin: 20px 0;
+      border-top: 1px solid #344353;
+      padding-top: 14px;
+    }
+    summary {
+      cursor: pointer;
+    }
+    #wave-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin: 20px 0;
+    }
+    #wave-controls label {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    #upload {
+      max-width: 100%;
+    }
+    .mobile {
+      display: none;
+    }
+    a {
+      color: #b3e1d8;
+    }
+    [hidden] {
+      display: none !important;
+    }
+    @media (max-width: 650px) {
+      main {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      .mobile {
+        display: flex;
+      }
+      select {
+        max-width: 100%;
+      }
+      #view {
+        aspect-ratio: 4/4.5;
+      }
+    }
+  </style>
+  <main>
+    <h1>Dream Drift · open field</h1>
+    <p>
+      An image to wander through. Stay a while, follow a ripple, or let an arch
+      change things for a moment.
+    </p>
+    <div class="controls">
+      <label
+        >Image
+        <select id="source">
+          <option value="photo-3">Small “Hello” marmot</option>
+          <option value="photo-1">Standing marmot</option>
+          <option value="photo-2">Marmot valley</option>
+          <option value="demo">Built-in image</option>
+        </select></label
+      >
+      <button id="home">Return to image</button
+      ><button id="pause">Pause drift</button
+      ><button id="hold">Hold original · B</button>
+    </div>
+    <div class="controls">
+      <label
+        ><input id="auto-waves" type="checkbox" checked />Automatic waves</label
+      ><label
+        >Drift strength
+        <input
+          id="strength"
+          type="range"
+          min="0"
+          max="1"
+          step=".01"
+          value=".65" /></label
+      ><label
+        ><input id="landscapes" type="checkbox" checked />Mix marmot landscape
+        studies</label
+      >
+    </div>
+    <canvas
+      id="view"
+      width="960"
+      height="720"
+      tabindex="0"
+      aria-label="Open-ended dream image. WASD moves, drag to look, E enters a nearby arch."
+    ></canvas>
+    <div class="controls mobile">
+      <button id="left">←</button><button id="forward">↑</button
+      ><button id="back">↓</button><button id="right">→</button>
+    </div>
+    <p id="status">Opening the image</p>
+    <div id="activity" aria-live="polite"></div>
+    <div class="controls">
+      <label
+        >Depth
+        <input
+          id="depth"
+          type="range"
+          min="0"
+          max="3"
+          step=".01"
+          value="0"
+        /><span id="depth-value">0.0</span></label
+      ><label
+        ><input id="auto-depth" type="checkbox" checked />Gradually
+        deepen</label
+      ><span id="readout"></span>
+    </div>
+    <div class="controls">
+      <button id="enter" disabled>Enter nearby arch · E</button
+      ><button id="try-arch">Try a brief arch effect</button
+      ><button id="release" hidden>Release effect · Escape</button>
+    </div>
+    <p id="effect-note"></p>
+    <small
+      >WASD or arrows move · drag to look · B holds the original. You can walk
+      around every arch. Lower Drift strength or switch Automatic waves off to
+      settle into your own settings.</small
+    >
+    <details>
+      <summary>Your wave settings</summary>
+      <p id="effective"></p>
+      <div id="wave-controls"></div>
+      <div class="controls">
+        <button id="save-look">Save this look</button
+        ><button id="reset-look">Reset waves</button>
+      </div>
+      <small
+        >Automatic motion varies around these values. Saving remembers your base
+        settings and drift preferences in this browser.</small
+      >
+    </details>
+    <details>
+      <summary>Floor, hex and arches</summary>
+      <div class="controls">
+        <label
+          >Floor
+          <input
+            id="floor"
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value=".72" /></label
+        ><label
+          >Inverted floor
+          <input
+            id="negative"
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value=".55" /></label
+        ><label
+          ><input id="full-hex" type="checkbox" />Full colored hex
+          everywhere</label
+        ><label
+          ><input id="arches" type="checkbox" checked />Occasional arches</label
+        >
+      </div>
+      <small
+        >Depth controls the regular neon and hex progression, independently of
+        Automatic waves.</small
+      >
+    </details>
+    <details>
+      <summary>Use your own image</summary>
+      <p><input id="upload" type="file" accept="image/*" /></p>
+      <small
+        >Your upload stays local. New uploads start with local DeepDream
+        variations; the marmot landscape studies are optional prepared
+        images.</small
+      >
+    </details>
+    <details>
+      <summary>About this experiment</summary>
+      <p>
+        The field places arches and chooses image variations procedurally. New
+        DeepDream panoramas form locally in the background while you keep
+        moving. Three prepared AI landscape studies use the supplied marmot
+        valley as a reference. Farther content is recycled to keep memory
+        bounded; this is an endless drift illusion rather than an unlimited
+        collection of unique landscapes.
+      </p>
+    </details>
+  </main>
+  <script type="module" src="/drift/dream-open-viewer.mjs"></script>
+</html>
