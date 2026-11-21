@@ -521,6 +521,42 @@ summary {
   line-height: 10px;
   background: transparent;
 }
+.cortical-tools {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.cortical-tools__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cortical-tools p {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.cortical-tools__help {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.cortical-tools__help summary {
+  cursor: pointer;
+}
+.cortical-tools__help p {
+  margin: 8px 0;
+}
+.has-orbit-camera {
+  cursor: grab;
+  touch-action: none;
+}
+.has-orbit-camera.is-orbiting {
+  cursor: grabbing;
+}
 .control-fine-group {
   flex: 0 0 auto;
   display: grid;

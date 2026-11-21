@@ -23,6 +23,7 @@ import {
 } from "./app/controls-controller.js";
 import { createDreamController } from "./app/dream-controller.js";
 import { createGrowthController } from "./app/growth-controller.js";
+import { createCorticalController } from "./app/cortical-controller.js";
 import { createExportController } from "./capture/export-controller.js";
 import { ModelRegistry } from "./core/model-registry.js";
 import { ExperimentStore } from "./core/experiment-store.js";
@@ -228,6 +229,17 @@ const growthController = createGrowthController({
     renderCurrentFrame({ forceAnalysis: true });
   },
 });
+const corticalController = createCorticalController({
+  elements,
+  getModel: () => currentModel,
+  model: registry.get("cortical-topography"),
+  render: renderCurrentFrame,
+  canInteract: () =>
+    currentView === "lab" &&
+    !gifEncoding &&
+    !hqRendering &&
+    !playback.isSuspended(),
+});
 const controlsController = createControlsController({
   elements,
   controlElements,
@@ -329,9 +341,11 @@ function acceptRenderedFrame({
     : qualityProfile.analysisInterval;
   const shouldAnalyze =
     forceAnalysis || !latestRender || now - lastAnalyzedAt >= interval;
-  const commonMetrics = shouldAnalyze
-    ? analyzeCanvas(elements.canvas)
-    : latestRender.commonMetrics;
+  const commonMetrics = model.getCanvasMetrics
+    ? model.getCanvasMetrics(elements.canvas, shouldAnalyze)
+    : shouldAnalyze
+      ? analyzeCanvas(elements.canvas)
+      : latestRender.commonMetrics;
   if (shouldAnalyze) lastAnalyzedAt = now;
   latestRender = {
     backend: result?.backend || model.backend,
@@ -370,6 +384,7 @@ function acceptRenderedFrame({
   elements.modelBackend.textContent = `ARCHITECTURE: ${latestRender.backend}`;
   dreamController.update();
   growthController.update();
+  corticalController?.update();
   if (failed) setStatus(`${model.name} ERROR`);
   else if (
     ["LOADING", "CHECKING"].some(
@@ -1302,15 +1317,15 @@ function updateModulationFeedback(parameters, timestamp) {
 
 function refreshModelOptions(preferredId = currentModel?.id) {
   elements.modelSelect.replaceChildren();
-  registry.getAll().forEach((model) => {
-    const option = document.createElement("option");
-    option.value = model.id;
-    option.textContent = model.available
-      ? model.name
-      : `${model.name} [UNAVAILABLE]`;
-    option.disabled = !model.available;
-    elements.modelSelect.append(option);
-  });
+  registry
+    .getAll()
+    .filter((model) => model.available)
+    .forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = model.name;
+      elements.modelSelect.append(option);
+    });
   const preferred = registry.get(preferredId);
   const selected = preferred?.available ? preferred : registry.getDefault();
   if (selected) elements.modelSelect.value = selected.id;
@@ -1390,6 +1405,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
   updateFractalTools();
   dreamController.update();
   growthController.update();
+  corticalController?.update();
   updateAudioUi();
   resizeLiveCanvas({ render: false });
 
