@@ -1,4 +1,5 @@
-import { INCEPTION_LAYER_CHANNELS } from "../models/neural-growth/dream-guidance.js";
+import { INCEPTION_LAYER_CHANNELS } from "../models/neural-growth/inception-layers.js";
+import { createNeuronPreview } from "./neuron-preview.js";
 
 const PAGE_SIZE = 12;
 const previewKey = (layer, channel) => `${layer}_${channel}`;
@@ -10,11 +11,10 @@ export function createNeuronExplorer({
   neurons,
   previewBridge,
   onSelect,
+  onSensorSelect,
 }) {
   let values = parameters;
   let disposed = false;
-  let selectedKey = "";
-  let selectedAbort = null;
   let detailAbort = null;
   let detailTarget = null;
   let searchTimer = null;
@@ -43,31 +43,8 @@ export function createNeuronExplorer({
     ]),
   );
 
-  const selectedPreview = document.createElement("figure");
-  selectedPreview.className = "neuron-selected-preview";
-  selectedPreview.setAttribute("aria-label", "Selected neuron preview");
-  const selectedImage = document.createElement("img");
-  selectedImage.width = selectedImage.height = 128;
-  selectedImage.hidden = true;
-  selectedImage.addEventListener("error", () => {
-    if (disposed || selectedImage.hidden) return;
-    previewBridge?.previewCache.delete(selectedKey);
-    selectedImage.hidden = true;
-    selectedStatus.textContent = "Preview unavailable. You can retry.";
-    loadButton.textContent = "Retry neuron preview";
-    loadButton.hidden = false;
-  });
-  const selectedText = document.createElement("div");
-  const selectedCaption = document.createElement("figcaption");
-  const selectedStatus = document.createElement("p");
-  selectedStatus.className = "neuron-selected-preview__status";
-  selectedStatus.setAttribute("role", "status");
-  const loadButton = document.createElement("button");
-  loadButton.type = "button";
-  loadButton.className = "mini-button";
-  loadButton.textContent = "Preview selected neuron";
-  selectedText.append(selectedCaption, selectedStatus, loadButton);
-  selectedPreview.append(selectedImage, selectedText);
+  const preview = createNeuronPreview({ parameters, previewBridge });
+  const selectedPreview = preview.element;
 
   const dialog = document.createElement("dialog");
   dialog.className = "neuron-explorer";
@@ -84,8 +61,12 @@ export function createNeuronExplorer({
   header.append(heading, close);
   const note = document.createElement("p");
   note.className = "neuron-explorer__note";
-  note.textContent =
-    "InceptionV3 · Inspect a channel, then choose whether to use it as a Dream target. New previews generate only when you ask.";
+  const purpose = onSensorSelect
+    ? onSelect
+      ? "a visual sensor or Dream target"
+      : "a visual sensor"
+    : "a Dream target";
+  note.textContent = `InceptionV3 · Inspect a channel, then use it as ${purpose}. Previews show optimized feature examples. New previews generate only when you ask.`;
   const toolbar = document.createElement("div");
   toolbar.className = "neuron-explorer__toolbar";
   const layerLabel = document.createElement("label");
@@ -97,6 +78,7 @@ export function createNeuronExplorer({
   allLayers.textContent = "All layers";
   layerSelect.append(allLayers);
   for (const [name, prefix] of [
+    ["Stem layers", "Conv2d_"],
     ["Earlier layers", "mixed_5"],
     ["Middle layers", "mixed_6"],
     ["Later layers", "mixed_7"],
@@ -122,6 +104,7 @@ export function createNeuronExplorer({
   const collection = document.createElement("select");
   collection.setAttribute("aria-label", "Preview collection");
   for (const [value, text] of [
+    ["curated", "Sample neuron previews"],
     ["available", "Available previews"],
     ["all", "All channels"],
     ["favorites", "Favorite neurons"],
@@ -428,11 +411,15 @@ export function createNeuronExplorer({
       layerSelect.value = Object.hasOwn(INCEPTION_LAYER_CHANNELS, saved.layer)
         ? saved.layer
         : "all";
-      collection.value = ["available", "all", "favorites", "recent"].includes(
-        saved.collection,
-      )
+      collection.value = [
+        "curated",
+        "available",
+        "all",
+        "favorites",
+        "recent",
+      ].includes(saved.collection)
         ? saved.collection
-        : "available";
+        : "curated";
       if (collection.value === "all" && layerSelect.value === "all")
         layerSelect.value = values.targetLayer;
       allLayers.disabled = collection.value === "all";
@@ -478,6 +465,12 @@ export function createNeuronExplorer({
   applyDetail.type = "button";
   applyDetail.className = "mini-button";
   applyDetail.textContent = "Use as Dream target";
+  applyDetail.hidden = !onSelect;
+  const applySensor = document.createElement("button");
+  applySensor.type = "button";
+  applySensor.className = "mini-button";
+  applySensor.textContent = "Use as sensor";
+  applySensor.hidden = !onSensorSelect;
   const favoriteDetail = document.createElement("button");
   favoriteDetail.type = "button";
   favoriteDetail.className = "mini-button";
@@ -488,6 +481,7 @@ export function createNeuronExplorer({
   detailActions.append(
     generateDetail,
     applyDetail,
+    applySensor,
     favoriteDetail,
     closeDetail,
   );
@@ -497,23 +491,39 @@ export function createNeuronExplorer({
     detailImage.src = url;
     detailImage.hidden = false;
     generateDetail.hidden = true;
-    detailStatus.textContent =
-      "Cached feature visualization · InceptionV3 · 96 × 96. Live guidance uses the current strength and on/off setting.";
+    const neuronMeta = neurons.find(
+      (n) =>
+        n.layer === detailTarget?.layer && n.channel === detailTarget?.channel,
+    );
+    detailStatus.textContent = neuronMeta
+      ? `${neuronMeta.desc} · Cached feature visualization · InceptionV3 · 96 × 96.`
+      : "Cached feature visualization · InceptionV3 · 96 × 96. This is an optimized example, not a live view of the canvas.";
   }
 
   function inspect(layer, channel) {
     detailAbort?.abort();
     detailAbort = null;
     detailTarget = { layer, channel };
+    applySensor.disabled = channel < 0;
+    applySensor.title =
+      channel < 0
+        ? "Choose a single channel to use as a sensor."
+        : "Measure this channel on the live canvas. Existing Inception routes use the selection.";
     const key = previewKey(layer, channel);
     recents = [key, ...recents.filter((item) => item !== key)].slice(0, 24);
     saveLibrary();
-    detailHeading.textContent = `${layer} · ${channelName(channel)}`;
+    const neuronMeta = neurons.find(
+      (n) => n.layer === layer && n.channel === channel,
+    );
+    detailHeading.textContent = neuronMeta
+      ? `${neuronMeta.name} (${layer} · ${channelName(channel)})`
+      : `${layer} · ${channelName(channel)}`;
     detailImage.alt = `Feature visualization · ${detailHeading.textContent}`;
     detailImage.hidden = true;
     detailImage.removeAttribute("src");
-    detailStatus.textContent =
-      "No preview yet. Generate one here or include this channel in a background batch.";
+    detailStatus.textContent = neuronMeta
+      ? `${neuronMeta.desc} · No preview yet. Generate one here or include this channel in a background batch.`
+      : "No preview yet. Generate one here or include this channel in a background batch.";
     generateDetail.textContent = "Generate neuron preview";
     generateDetail.hidden = false;
     generateDetail.disabled = false;
@@ -564,6 +574,11 @@ export function createNeuronExplorer({
     onSelect({ layer, channel, name: `${layer} · ${channelName(channel)}` });
     dialog.close();
   });
+  applySensor.addEventListener("click", () => {
+    if (!detailTarget || detailTarget.channel < 0) return;
+    onSensorSelect(detailTarget);
+    dialog.close();
+  });
   function toggleFavorite(layer, channel) {
     const key = previewKey(layer, channel);
     if (favorites.has(key)) favorites.delete(key);
@@ -591,65 +606,9 @@ export function createNeuronExplorer({
   });
   backgroundControls.addEventListener("toggle", saveLibrary);
 
-  function showSelected(url) {
-    selectedImage.src = url;
-    selectedImage.alt = `Feature visualization · ${selectedCaption.textContent}`;
-    selectedImage.hidden = false;
-    selectedStatus.textContent =
-      "An example feature response; live results depend on the field.";
-    loadButton.hidden = true;
-    selectedPreview.setAttribute("aria-busy", "false");
-  }
-
-  async function loadSelected(retry = false) {
-    selectedAbort?.abort();
-    const abort = new AbortController();
-    selectedAbort = abort;
-    const key = selectedKey;
-    selectedStatus.textContent = "Generating feature preview…";
-    selectedPreview.setAttribute("aria-busy", "true");
-    loadButton.hidden = true;
-    try {
-      const url = await previewBridge.requestPreview(
-        values.targetLayer,
-        values.targetChannel,
-        {
-          signal: abort.signal,
-          retry,
-          onProgress: (step, total) => {
-            if (!disposed && !abort.signal.aborted && key === selectedKey)
-              selectedStatus.textContent = `Generating feature preview · ${Math.round((100 * step) / total)}%`;
-          },
-        },
-      );
-      if (!disposed && !abort.signal.aborted && key === selectedKey)
-        showSelected(url);
-    } catch (error) {
-      if (disposed || abort.signal.aborted || key !== selectedKey) return;
-      selectedStatus.textContent = "Preview unavailable. You can retry.";
-      selectedPreview.setAttribute("aria-busy", "false");
-      loadButton.textContent = "Retry neuron preview";
-      loadButton.hidden = false;
-    }
-  }
-
   function update(parameters) {
     values = parameters;
-    const key = previewKey(values.targetLayer, values.targetChannel);
-    if (selectedKey !== key) {
-      selectedAbort?.abort();
-      selectedKey = key;
-      selectedImage.hidden = true;
-      selectedImage.removeAttribute("src");
-      selectedCaption.textContent = `${values.targetLayer} · ${channelName(values.targetChannel)}`;
-      selectedStatus.textContent =
-        "Click Preview selected neuron to generate an example.";
-      selectedPreview.setAttribute("aria-busy", "false");
-      loadButton.textContent = "Preview selected neuron";
-      loadButton.hidden = false;
-    }
-    const cached = previewBridge?.previewCache.get(key);
-    if (cached) showSelected(cached);
+    preview.update(parameters);
     for (const { card, layer, channel } of visibleCards)
       card.setAttribute(
         "aria-pressed",
@@ -661,34 +620,47 @@ export function createNeuronExplorer({
 
   function renderPage() {
     const query = search.value.trim().toLowerCase().replace(/^#/, "");
-    const choices = Object.entries(INCEPTION_LAYER_CHANNELS)
-      .filter(
-        ([layer]) => layerSelect.value === "all" || layerSelect.value === layer,
-      )
-      .flatMap(([layer, count]) =>
-        Array.from({ length: count + 1 }, (_, i) => ({
-          layer,
-          channel: i - 1,
-        })),
-      )
-      .filter(
-        ({ layer, channel }) =>
-          collection.value === "all" ||
-          (collection.value === "favorites"
-            ? favorites.has(previewKey(layer, channel))
-            : collection.value === "recent"
-              ? recents.includes(previewKey(layer, channel))
-              : previewBridge?.previewCache.has(previewKey(layer, channel))),
-      )
-      .filter(
-        ({ layer, channel }) =>
-          !query ||
-          (/^\d+$/.test(query)
-            ? channel === Number(query)
-            : `${channelName(channel)} ${layer} ${labels.get(previewKey(layer, channel)) || ""}`
-                .toLowerCase()
-                .includes(query)),
-      );
+    let choices;
+    if (collection.value === "curated") {
+      choices = neurons
+        .filter(
+          (n) => layerSelect.value === "all" || layerSelect.value === n.layer,
+        )
+        .map((n) => ({
+          layer: n.layer,
+          channel: n.channel,
+        }));
+    } else {
+      choices = Object.entries(INCEPTION_LAYER_CHANNELS)
+        .filter(
+          ([layer]) =>
+            layerSelect.value === "all" || layerSelect.value === layer,
+        )
+        .flatMap(([layer, count]) =>
+          Array.from({ length: count + 1 }, (_, i) => ({
+            layer,
+            channel: i - 1,
+          })),
+        )
+        .filter(
+          ({ layer, channel }) =>
+            collection.value === "all" ||
+            (collection.value === "favorites"
+              ? favorites.has(previewKey(layer, channel))
+              : collection.value === "recent"
+                ? recents.includes(previewKey(layer, channel))
+                : previewBridge?.previewCache.has(previewKey(layer, channel))),
+        );
+    }
+    choices = choices.filter(
+      ({ layer, channel }) =>
+        !query ||
+        (/^\d+$/.test(query)
+          ? channel === Number(query)
+          : `${channelName(channel)} ${layer} ${labels.get(previewKey(layer, channel)) || ""}`
+              .toLowerCase()
+              .includes(query)),
+    );
     if (collection.value === "recent")
       choices.sort(
         (a, b) =>
@@ -717,11 +689,13 @@ export function createNeuronExplorer({
       page * PAGE_SIZE,
       (page + 1) * PAGE_SIZE,
     )) {
-      const group = layer.startsWith("mixed_5")
-        ? "Earlier layers"
-        : layer.startsWith("mixed_6")
-          ? "Middle layers"
-          : "Later layers";
+      const group = layer.startsWith("Conv2d_")
+        ? "Stem layers"
+        : layer.startsWith("mixed_5")
+          ? "Earlier layers"
+          : layer.startsWith("mixed_6")
+            ? "Middle layers"
+            : "Later layers";
       if (layerSelect.value === "all" && group !== previousGroup) {
         const heading = document.createElement("h3");
         heading.className = "neuron-explorer__layer-heading";
@@ -740,16 +714,26 @@ export function createNeuronExplorer({
       image.width = image.height = 128;
       image.alt = `Feature visualization · ${layer} · ${channelName(channel)}`;
       image.hidden = true;
+      const neuronMeta = neurons.find(
+        (n) => n.layer === layer && n.channel === channel,
+      );
       const caption = document.createElement("strong");
-      caption.textContent = channelName(channel);
+      caption.textContent = neuronMeta ? neuronMeta.name : channelName(channel);
       const layerBadge = document.createElement("span");
       layerBadge.className = "neuron-explorer__layer";
-      layerBadge.textContent = layer;
+      layerBadge.textContent = neuronMeta
+        ? `${layer} · ${channelName(channel)}`
+        : layer;
       const status = document.createElement("span");
       status.className = "neuron-explorer__card-status";
       status.textContent = "Preview not generated · select to inspect";
       card.append(image, layerBadge, caption, status);
-      if (labels.has(key)) {
+      if (neuronMeta?.desc) {
+        const desc = document.createElement("span");
+        desc.className = "neuron-explorer__desc";
+        desc.textContent = neuronMeta.desc;
+        card.append(desc);
+      } else if (labels.has(key)) {
         const label = document.createElement("span");
         label.className = "neuron-explorer__curated";
         label.textContent = `Curated suggestion: ${labels.get(key)}`;
@@ -791,21 +775,20 @@ export function createNeuronExplorer({
     saveLibrary();
   }
 
-  async function open() {
+  async function open({ inspectTarget = null } = {}) {
     if (dialog.open || disposed) return;
     dialog.showModal();
     await previewBridge?.loadPreviews?.();
     if (disposed || !dialog.open) return;
     restoreLibrary();
     renderPage();
-    grid
-      .querySelector('[aria-pressed="true"]')
-      ?.scrollIntoView({ block: "nearest" });
-    layerSelect.focus();
+    if (inspectTarget) inspect(inspectTarget.layer, inspectTarget.channel);
+    else
+      grid
+        .querySelector('[aria-pressed="true"]')
+        ?.scrollIntoView({ block: "nearest" });
+    layerSelect.focus({ preventScroll: true });
   }
-  loadButton.addEventListener("click", () => {
-    void loadSelected(true);
-  });
   close.addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", () => {
     clearTimeout(searchTimer);
@@ -842,7 +825,6 @@ export function createNeuronExplorer({
     renderPage();
   });
   const unsubscribe = previewBridge?.subscribePreviews((key, url) => {
-    if (!disposed && key === selectedKey) showSelected(url);
     if (disposed) return;
     for (const item of visibleCards) {
       if (item.key !== key) continue;
@@ -866,7 +848,7 @@ export function createNeuronExplorer({
     dispose() {
       disposed = true;
       clearTimeout(searchTimer);
-      selectedAbort?.abort();
+      preview.dispose();
       detailAbort?.abort();
       unsubscribe?.();
       unsubscribeStorage?.();

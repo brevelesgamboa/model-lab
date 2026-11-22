@@ -1,11 +1,11 @@
 // Reuse the pattern cards; previews come from the shared Inception model.
 import { createNeuronExplorer } from "./neuron-explorer.js";
+
 export function createNeuronGallery({
   neurons,
   parameters,
   onSelect,
-  onToggleManual,
-  manualOpen,
+  onSensorSelect,
   previewBridge,
 }) {
   const section = document.createElement("section");
@@ -24,91 +24,36 @@ export function createNeuronGallery({
   source.rel = "noopener noreferrer";
   source.textContent = "Feature Visualization ↗";
   note.append(source);
-  const strip = document.createElement("div");
-  strip.className = "growth-gallery__grid neuron-gallery__strip";
-  const cards = neurons.map((neuron) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "growth-gallery__card neuron-gallery__card";
-    card.dataset.neuronId = neuron.id;
-    const preview = document.createElement("span");
-    preview.className = "growth-gallery__thumb-wrapper neuron-gallery__preview";
-    const image = document.createElement("img");
-    image.className = "growth-gallery__thumb";
-    image.alt = `${neuron.name} generated feature preview`;
-    image.width = image.height = 96;
-    image.hidden = true;
-    preview.append(image);
-    const name = document.createElement("span");
-    name.className = "growth-gallery__card-name";
-    name.textContent = neuron.name;
-    const description = document.createElement("span");
-    description.className = "neuron-gallery__description";
-    description.textContent = neuron.desc;
-    const channel = document.createElement("span");
-    channel.className = "growth-gallery__card-id";
-    channel.textContent = `${neuron.layer} • ${neuron.channel < 0 ? "All channels" : `#${neuron.channel}`}`;
-    card.append(preview, name, description, channel);
-    card.addEventListener("click", () => onSelect(neuron));
-    strip.append(card);
-    return { card, neuron, image };
-  });
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "mini-button neuron-gallery__manual";
-  toggle.textContent = "Manual Channel Explorer";
-  toggle.setAttribute("aria-controls", "dream-channel-control");
-  toggle.setAttribute("aria-expanded", String(manualOpen));
-  toggle.addEventListener("click", () => {
-    manualOpen = !manualOpen;
-    toggle.setAttribute("aria-expanded", String(manualOpen));
-    onToggleManual(manualOpen);
-  });
-  section.append(title, note, strip, toggle);
+
   const explorer = createNeuronExplorer({
     parameters,
     neurons,
     previewBridge,
     onSelect,
+    onSensorSelect,
   });
   const browse = document.createElement("button");
   browse.type = "button";
   browse.className = "mini-button neuron-gallery__browse";
   browse.textContent = "Browse neuron previews";
   browse.addEventListener("click", explorer.open);
-  section.insertBefore(browse, strip);
 
-  function setPreview(key, url) {
-    for (const { neuron, image } of cards) {
-      if (`${neuron.layer}_${neuron.channel}` !== key) continue;
-      image.src = url;
-      image.hidden = false;
-    }
-  }
-  for (const [key, url] of previewBridge?.previewCache || [])
-    setPreview(key, url);
-  const unsubscribe = previewBridge?.subscribePreviews(setPreview);
+  const actions = document.createElement("div");
+  actions.className = "neuron-gallery__actions";
+  actions.append(browse);
+
+  section.append(title, note, actions);
 
   function update(values, options) {
     explorer.update(values, options);
-    for (const { card, neuron } of cards) {
-      const selected =
-        values.targetLayer === neuron.layer &&
-        values.targetChannel === neuron.channel &&
-        Math.abs(values.dreamStrength - neuron.strength) < 1e-6;
-      card.classList.toggle("is-selected", selected);
-      card.setAttribute("aria-pressed", String(selected));
-    }
   }
   update(parameters);
   void previewBridge?.loadPreviews?.();
   return {
     element: section,
-    selectedPreview: explorer.selectedPreview,
     open: explorer.open,
     update,
     dispose() {
-      unsubscribe?.();
       explorer.dispose();
     },
   };

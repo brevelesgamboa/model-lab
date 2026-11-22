@@ -11,6 +11,7 @@ Built with vanilla JavaScript modules, Canvas/WebGL2, ONNX Runtime Web, and Tens
 * **Fractals and Shaders:** Chromatic Flow, Folded Fractal, and Fractal Explorer with high-res export support.
 * **Neural Growth:** Interactive Neural Cellular Automata (NCA) that simulate organic textures (Membrane Field, Filament Network, Xeno Reef, and Vesicle Study).
 * **Inception Dream:** DeepDream-style feature ascent on custom images using InceptionV3 feature layers.
+* **Cortical Dream Dome:** Manually bake a panoramic Inception field around a protected photo, with depth relief, cortical waves, and 360 mouselook. The separate 3D Cortical Topography route remains available.
 * **Neuron explorer:** Browse InceptionV3 channels, inspect feature previews, bookmark favorites, and choose Dream targets. Generate previews explicitly or start a background batch for a page, layer, or channel range.
 * **DigiFace VAE:** Interactive face decoder explorer running through an ONNX decoder.
 * **Workbench shell:** Persistent Lab canvas, model controls, brush tools, capture actions, and the existing local audio EQ. Saved Runs, Experiments, and About are empty route placeholders in this frontend pass.
@@ -56,6 +57,18 @@ npm run test:browser
 * **Resolution:** Preview sizes start conservative (384 to 768px) to keep frame rates smooth. Use the export button when you want high-resolution captures.
 * **Neuron previews:** Opening the explorer, browsing, and selecting a channel do not start optimization. Use **Generate neuron preview**, **Preview selected neuron**, or **Start background cache**. A background batch runs sequentially and yields to live guidance. It continues after the explorer closes while this tab remains open; closing the tab or switching away from Neural Growth stops it. Saved images are reused after reload; unfinished batches require another explicit start.
 * **Preview storage:** The optional local preview cache keeps up to 4,096 images within a 64 MiB image-data budget, evicting the oldest used entries when full. Favorites, recently viewed neurons, and explorer filters are remembered separately for each checkpoint. Pausing, resuming, cancelling, or clearing a batch never changes the simulation's field or Dream settings.
+
+### Cortical Dream Dome
+
+Choose **Cortical Dream Dome (360)** in **Model Route**, upload a photo, then click **Generate Full 360 Dream Field**. The photo occupies about 120° in front. The photo’s border rows and columns extend into the remaining sphere with at most ±12.5% low-frequency brightness noise until a manual bake grows Inception features there. Drag or use arrow keys to look around; **Full** fills the screen and **Reset view** returns to the front.
+
+The 15-step bake runs in a worker at two scales, with periodic horizontal jitter, smooth gradients, a protected photo center, and constraints around the rear join and poles. A 50px smoothstep band straddles the photo edge (25px inside and outside), and the Dream gradient fades across that same band. Progress and cancellation are available while the camera is temporarily disabled. This produces abstract feature patterns; it is not a scene reconstruction or generative outpainting model. Changing the target refreshes the relief map once and selects the neuron for the next manual bake.
+
+**Depth Scale** and **Neural Swell** control photo relief. **Wave Gain** controls log-polar rings, rays, spirals or honeycomb on the full sphere; turn the clock on to animate. Waves remain an analytic pattern generator inspired by cortical mapping.
+
+**Dome settings → Local Model Cache** checks the actual Inception graph/shards and pinned depth files in Cache Storage. Inference saves downloaded model files when storage is available; **Cache model files** explicitly fills any missing files. **Persist Offline** asks the browser to protect origin storage from automatic eviction. A browser may decline; granted persistence is managed in browser site settings. Photos and baked textures remain in RAM, separate from the model-file cache. Keep the app open or the local server running for other app assets.
+
+PNG/GIF export the current view. Failed or cancelled synthesis keeps the previous view. The independent **3D Cortical Topography** route is preserved. Hardware verification: `node tools/verify-full-dome-dream.mjs path/to/photo.jpg` (development server on 8081, or pass its URL as the second argument).
 
 ### Cortical Stack export handoff
 

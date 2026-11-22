@@ -255,6 +255,183 @@
                     >
                   </details>
                 </section>
+                <section
+                  id="dome-tools"
+                  class="cortical-tools dome-tools"
+                  aria-label="Dream Dome source"
+                  hidden
+                >
+                  <div class="cortical-tools__actions">
+                    <label
+                      class="mini-button mini-button--highlight"
+                      for="dome-image"
+                      >Choose photo</label
+                    >
+                    <input
+                      id="dome-image"
+                      class="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      aria-label="Dream Dome photo"
+                    />
+                    <button id="dome-demo" class="mini-button" type="button">
+                      Use demo
+                    </button>
+                    <button
+                      id="dome-reset-view"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Reset camera
+                    </button>
+                    <button
+                      id="dome-retry"
+                      class="mini-button"
+                      type="button"
+                      hidden
+                    >
+                      Retry missing maps
+                    </button>
+                  </div>
+                  <label class="field"
+                    >Outpainting mode
+                    <select id="dome-outpainting">
+                      <option value="mirrored">Mirrored Wrap (Built-in)</option>
+                      <option value="migan">AI Inpainter (MI-GAN)</option>
+                    </select>
+                  </label>
+                  <div id="dream-synthesis-section" class="dome-synthesis-panel">
+                    <label class="field" for="dome-archetypes">Dream Target
+                      <select id="dome-archetypes" aria-label="DREAM TARGET">
+                        <option value="0">Cellular &amp; Ocular Nodes (mixed_5b · ch 120)</option>
+                        <option value="1">Ribbed Arches &amp; Terraces (mixed_6a · ch 42)</option>
+                        <option value="2">Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)</option>
+                        <option value="3">Biological Lattices (mixed_6d · ch 182)</option>
+                        <option value="4">Crystalline Spires (mixed_7b · ch 314)</option>
+                        <option value="-1">Custom neuron target</option>
+                      </select>
+                    </label>
+                    <div id="dome-custom-neuron-controls" class="dome-custom-neuron" hidden>
+                      <div class="dome-custom-neuron__header">
+                        <label class="field" for="dome-custom-layer">Layer
+                          <select id="dome-custom-layer" aria-label="Custom Dream Layer"></select>
+                        </label>
+                        <div class="control-fine-group">
+                          <button type="button" class="nudge-button" id="dome-custom-ch-dec" data-direction="-1" aria-label="Decrease channel">-</button>
+                          <input type="text" id="dome-custom-ch-input" class="control-fine-input" value="120" aria-label="Custom neuron channel">
+                          <button type="button" class="nudge-button" id="dome-custom-ch-inc" data-direction="1" aria-label="Increase channel">+</button>
+                        </div>
+                      </div>
+                      <input type="range" id="dome-custom-ch-slider" class="control-range-input" min="0" max="767" step="1" value="120" aria-label="Custom neuron channel slider">
+                    </div>
+                    <button
+                      id="dome-browse-neurons"
+                      class="mini-button neuron-gallery__browse"
+                      type="button"
+                    >
+                      Browse neuron previews
+                    </button>
+                    <button
+                      id="dome-generate"
+                      class="mini-button mini-button--highlight"
+                      type="button"
+                      disabled
+                    >
+                      Synthesize Dream
+                    </button>
+                  </div>
+                  <p
+                    id="dome-migan-status"
+                    class="dome-model-status"
+                    role="status"
+                  >
+                    Mirrored Wrap Active
+                  </p>
+                  <p id="dome-migan-busy" class="field__help" hidden>
+                    <span class="dome-spinner" aria-hidden="true"></span>
+                    Preparing optional MI-GAN model…
+                  </p>
+                  <div id="dome-migan-card" class="dome-model-card" hidden>
+                    <p>
+                      MI-GAN Inpainter Model (~28 MB) required for generative
+                      360 outpainting.
+                    </p>
+                    <p>
+                      Place 'migan_pipeline_v2.onnx' in './models/inpainting/'
+                      or select the file below.
+                    </p>
+                    <label class="mini-button" for="dome-migan-file"
+                      >Choose .onnx File</label
+                    >
+                    <input
+                      id="dome-migan-file"
+                      class="visually-hidden"
+                      type="file"
+                      accept=".onnx"
+                      aria-label="MI-GAN model file"
+                    />
+                    <p>
+                      Or drop the .onnx file here.
+                      <a
+                        href="https://huggingface.co/andraniksargsyan/migan/blob/main/migan_pipeline_v2.onnx"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Get the optional model ↗</a
+                      >
+                    </p>
+                  </div>
+                  <button
+                    id="dome-migan-cancel"
+                    class="mini-button"
+                    type="button"
+                    hidden
+                  >
+                    Cancel / Use Mirrored
+                  </button>
+                  <p
+                    id="dome-migan-notice"
+                    class="field__help"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p
+                    id="dome-status"
+                    class="field__help"
+                    role="status"
+                    aria-live="polite"
+                  ></p>
+                  <p class="field__help">
+                    Drag or arrow keys to look · Scroll to dolly · Shift-drag to pan.
+                  </p>
+                  <details id="model-cache-drawer" class="cortical-tools__help">
+                    <summary>Dome settings · Local Model Cache</summary>
+                    <p id="model-cache-inception">Inception: checking…</p>
+                    <p id="model-cache-depth">Depth: checking…</p>
+                    <button
+                      id="model-cache-download"
+                      class="mini-button"
+                      type="button"
+                    >
+                      Cache model files
+                    </button>
+                    <p>
+                      <label
+                        ><input id="model-cache-persist" type="checkbox" />
+                        Persist Offline</label
+                      >
+                    </p>
+                    <p id="model-cache-persistence"></p>
+                    <p>
+                      Stores model files on this device. Keep the app open or
+                      the local server running to use its other assets.
+                    </p>
+                    <p
+                      id="model-cache-status"
+                      role="status"
+                      aria-live="polite"
+                    ></p>
+                  </details>
+                </section>
                 <div id="neural-dream-tools" class="neural-dream-tools" hidden>
                   <div class="neural-dream-tools__source">
                     <label
@@ -426,6 +603,11 @@
                       height="512"
                       aria-label="Model output"
                     ></canvas>
+                    <div id="dome-bake-overlay" class="dome-bake-overlay" hidden>
+                      <p id="dome-bake-label" role="status" aria-live="polite">Synthesizing 360 Universe: 0%…</p>
+                      <progress id="dome-bake-progress" max="100" value="0" aria-label="360 dream generation progress"></progress>
+                      <button id="dome-cancel-bake" class="mini-button" type="button">Cancel synthesis</button>
+                    </div>
                     <canvas
                       id="mask-overlay-canvas"
                       class="mask-overlay-canvas"

@@ -6,6 +6,7 @@ import { LocalNeuralModel } from "../models/local-neural.js";
 import { InceptionDreamModel } from "../models/inception-dream.js";
 import { NeuralGrowthModel } from "../models/neural-growth.js";
 import { CorticalTopographyModel } from "../models/cortical-topography.js";
+import { CorticalDreamDomeModel } from "../models/cortical-dream-dome.js";
 import { validateModelDefinition } from "./model-contract.js";
 
 const MODEL_ALIASES = new Map([
@@ -31,6 +32,7 @@ export class ModelRegistry {
       inceptionDream,
       neuralGrowth,
       new CorticalTopographyModel(),
+      new CorticalDreamDomeModel(),
       this.customModel,
       this.neuralModel,
     ];

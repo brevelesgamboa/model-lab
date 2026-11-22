@@ -1,0 +1,27 @@
+{
+  "sensor": {
+    "active": true,
+    "status": "observing",
+    "inFlight": false,
+    "level": 0.8021106252457253,
+    "raw": 6.170625686645508,
+    "samples": 11,
+    "inferenceCount": 11,
+    "lastRun": 9652,
+    "inferenceMs": 14.799999997019768,
+    "captureMs": 0.4000000059604645,
+    "backend": "webgl",
+    "loadMs": 1146.5,
+    "downloadedValues": 1,
+    "retainedTensors": 0,
+    "imageSize": 128,
+    "error": null,
+    "layer": "Conv2d_4a_3x3",
+    "channel": 42
+  },
+  "image": {
+    "width": 96,
+    "height": 96
+  },
+  "errors": []
+}

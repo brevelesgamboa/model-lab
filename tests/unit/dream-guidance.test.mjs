@@ -537,6 +537,9 @@ test("failed channel previews can retry and disposal settles queued requests", a
 test("every Inception endpoint has its exact channel depth and a selectable control", () => {
   const model = new NeuralGrowthModel();
   assert.deepEqual(INCEPTION_LAYER_CHANNELS, {
+    Conv2d_2b_3x3: 64,
+    Conv2d_3b_1x1: 80,
+    Conv2d_4a_3x3: 192,
     mixed_5b: 256,
     mixed_5c: 288,
     mixed_5d: 288,

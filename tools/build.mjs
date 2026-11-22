@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +54,31 @@ for (const relative of staticFiles) {
     recursive: true,
   });
   await cp(path.join(root, relative), path.join(destination, relative));
+}
+// The optional official MI-GAN file is copied only when explicitly installed.
+// It is not a required release asset and is never downloaded by the build.
+const optionalMigan = "models/inpainting/migan_pipeline_v2.onnx";
+let migan;
+try {
+  migan = await readFile(path.join(root, optionalMigan));
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+if (migan) {
+  if (
+    createHash("sha256").update(migan).digest("hex") !==
+    "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b"
+  )
+    throw new Error(
+      "The optional MI-GAN model differs from pipeline v2. Use the file picker for custom models.",
+    );
+  await mkdir(path.dirname(path.join(destination, optionalMigan)), {
+    recursive: true,
+  });
+  await cp(
+    path.join(root, optionalMigan),
+    path.join(destination, optionalMigan),
+  );
 }
 await verifyModelAssets(destination);
 await writeFile(

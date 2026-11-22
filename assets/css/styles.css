@@ -458,6 +458,12 @@ summary {
 }
 .mini-button {
   min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 .mini-button--highlight {
   background: #242834;
@@ -556,6 +562,38 @@ summary {
 }
 .has-orbit-camera.is-orbiting {
   cursor: grabbing;
+}
+.has-dome-camera {
+  cursor: grab;
+  touch-action: none;
+}
+.has-dome-camera.is-looking {
+  cursor: grabbing;
+}
+.has-dome-camera.is-panning {
+  cursor: move;
+}
+.dome-bake-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  background: rgb(8 8 12 / 80%);
+  color: var(--text-primary);
+  text-align: center;
+}
+.dome-bake-overlay[hidden] {
+  display: none;
+}
+.dome-bake-overlay progress {
+  width: min(280px, 70vw);
+}
+.output-panel:fullscreen > .dome-tools {
+  display: none;
 }
 .control-fine-group {
   flex: 0 0 auto;
@@ -2223,7 +2261,136 @@ input[type="range"]::-moz-range-progress {
 .neuron-gallery__browse {
   margin-bottom: 10px;
 }
-.neuron-selected-preview {
+.neuron-gallery__preview-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  background: var(--bg-surface-elevated, #161822);
+  border: 1px solid var(--border-subtle, #282c3f);
+  border-radius: var(--radius-sm, 6px);
+}
+.neuron-gallery__thumb-wrapper {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-surface, #0d0f17);
+  border: 1px solid var(--border-subtle, #282c3f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.neuron-gallery__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.neuron-gallery__thumb-placeholder {
+  font-size: 10px;
+  color: var(--text-muted, #62677b);
+  text-align: center;
+  padding: 4px;
+}
+.neuron-gallery__target-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+  flex: 1;
+}
+.neuron-gallery__target-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.neuron-gallery__target-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent-mod, #38bdf8);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.neuron-gallery__target-name {
+  color: var(--text-primary, #f0f2f8);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.neuron-gallery__target-desc {
+  margin: 0;
+  color: var(--text-secondary, #9499ad);
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.neuron-gallery__target-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.neuron-gallery__preview-status {
+  font-size: 10px;
+  color: var(--text-muted, #72778e);
+}
+.stepper-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stepper-group .nudge-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #282c3f);
+  background: var(--bg-surface-elevated, #1c202e);
+  color: var(--text-primary, #f0f2f8);
+  cursor: pointer;
+}
+.stepper-group .nudge-button:hover {
+  background: var(--bg-surface-hover, #282e42);
+}
+.neuron-gallery__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.neuron-gallery__actions .mini-button {
+  margin: 0;
+}
+.neuron-explorer__desc {
+  font-size: 11px;
+  color: var(--text-secondary, #9499ad);
+  line-height: 1.35;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.neuron-selected-preview,
+.sensor-neuron-preview {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 12px;
@@ -2233,16 +2400,19 @@ input[type="range"]::-moz-range-progress {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
 }
-.neuron-selected-preview:has(img[hidden]) {
+.neuron-selected-preview:has(img[hidden]),
+.sensor-neuron-preview:has(img[hidden]) {
   grid-template-columns: minmax(0, 1fr);
 }
-.neuron-selected-preview img {
+.neuron-selected-preview img,
+.sensor-neuron-preview img {
   width: 96px;
   height: 96px;
   border-radius: 4px;
   image-rendering: auto;
 }
-.neuron-selected-preview figcaption {
+.neuron-selected-preview figcaption,
+.sensor-neuron-preview figcaption {
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -2251,6 +2421,19 @@ input[type="range"]::-moz-range-progress {
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+.sensor-neuron-preview {
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+}
+.sensor-neuron-preview img {
+  width: 72px;
+  height: 72px;
+}
+.sensor-neuron-preview figcaption {
+  font-size: 9px;
 }
 .neuron-explorer {
   box-sizing: border-box;
@@ -2670,6 +2853,112 @@ input[type="range"]::-moz-range-progress {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
+}
+.drawer-sensor {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.drawer-sensor[hidden] {
+  display: none;
+}
+.drawer-sensor label {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+.drawer-sensor select,
+.drawer-sensor input {
+  min-width: 0;
+  width: 100%;
+  font-size: 9px;
+}
+.drawer-sensor p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.drawer-sensor-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+.drawer-sensor-state button {
+  font-size: 9px;
+}
+.drawer-sensor-help > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.drawer-sensor-help > summary::-webkit-details-marker {
+  display: none;
+}
+.drawer-sensor-help .parameter-info-button {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+}
+.drawer-sensor-help[open] > summary {
+  margin-bottom: 7px;
+}
+.drawer-sensor-help > div {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.drawer-sensor-help a {
+  font-size: 10px;
+  color: var(--accent-mod);
+}
+.sensor-activity {
+  margin: 0;
+}
+.sensor-activity figcaption {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.sensor-activity svg {
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.sensor-activity-grid {
+  fill: none;
+  stroke: var(--border-subtle);
+  stroke-width: 0.5;
+}
+.sensor-activity-line {
+  fill: none;
+  stroke: var(--accent-mod);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sensor-activity-dot {
+  fill: var(--accent-mod);
+}
+.sensor-activity text {
+  fill: var(--text-muted);
+  font-size: 9px;
 }
 .drawer-audio-depth .drawer-range {
   grid-template-columns: 36px minmax(0, 1fr) 34px;
@@ -3505,4 +3794,78 @@ input[type="range"]::-moz-range-progress {
   .footer-tools #toggle-audio-visualizer::after {
     right: 5px;
   }
+}
+
+.dome-model-status {
+  color: var(--text-muted, #929aa8);
+  font-size: 0.75rem;
+}
+.dome-model-status.is-ready {
+  color: #7fcca7;
+}
+.dome-model-card {
+  padding: 12px;
+  border: 1px dashed #626d7d;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.dome-model-card p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+.dome-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: dome-spin 1s linear infinite;
+}
+@keyframes dome-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dome-spinner {
+    animation: none;
+  }
+}
+
+.dome-synthesis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.dome-synthesis-panel[hidden] {
+  display: none !important;
+}
+
+.dome-custom-neuron {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.dome-custom-neuron[hidden] {
+  display: none !important;
+}
+
+.dome-custom-neuron__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dome-custom-neuron__header .field {
+  flex: 1;
+  margin: 0;
 }

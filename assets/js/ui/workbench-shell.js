@@ -5,6 +5,9 @@ import {
   positionFromRate,
 } from "../core/lfo.js";
 import { rhythmController } from "../core/rhythm-controller.js";
+import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
+import { INCEPTION_LAYER_CHANNELS } from "../models/neural-growth/inception-layers.js";
+import { createNeuronPreview } from "./neuron-preview.js";
 
 export function setBrushRailVisible(rail, acceptsBrushInput) {
   if (!rail) return;
@@ -55,6 +58,8 @@ export function initializeWorkbenchShell(elements) {
 export function createModulationDrawer({
   definition,
   supportsLfo,
+  previewBridge,
+  onBrowseSensor,
   getLfoConfig,
   getAudioRoute,
   onLfoChange,
@@ -80,8 +85,34 @@ export function createModulationDrawer({
     <div class="drawer-rate"><label>Rate<input data-field="rate" type="range" min="0" max="1" step="0.001"></label><label class="drawer-hz"><input data-field="rateHz" type="number" min="0.005" max="8" step="0.005"><span>Hz</span></label><select data-field="rateRange"><option value="slow">Slow</option><option value="full">Full</option></select></div>
     <label class="drawer-range">Phase<input data-field="phase" type="range" min="0" max="360" step="1"><output></output></label>
     <div class="drawer-audio">
-      <div class="drawer-audio-head"><span>Audio</span><div class="drawer-segments" role="group"><button type="button" data-source="bass" aria-pressed="false">Full</button><button type="button" data-source="kick" aria-pressed="false"><span class="drawer-kick-led" aria-hidden="true"></span>Kick</button><button type="button" data-source="none" aria-pressed="true">Off</button></div></div>
+      <div class="drawer-audio-head"><span>Signal</span><div class="drawer-segments" role="group"><button type="button" data-source="bass" aria-pressed="false">Full</button><button type="button" data-source="kick" aria-pressed="false"><span class="drawer-kick-led" aria-hidden="true"></span>Kick</button><button type="button" data-source="inception" aria-pressed="false">Inception</button><button type="button" data-source="none" aria-pressed="true">Off</button></div></div>
       <div class="drawer-audio-depth"><label class="drawer-range">Depth<input data-field="audioDepth" type="range" min="0" max="1" step="0.01"><output></output></label><div class="drawer-segments drawer-audio-polarity" role="group"><button type="button" data-audio-polarity="-1" aria-pressed="false">−</button><button type="button" data-audio-polarity="1" aria-pressed="true">+</button></div></div>
+      <div class="drawer-sensor" hidden>
+        <details class="drawer-sensor-help">
+          <summary aria-label="Explain the Inception sensor"><span>Neuron sensor</span><span class="parameter-info-button" aria-hidden="true">?</span></summary>
+          <div>
+            <p>Watches the canvas and uses one neuron's response to move this parameter. Depth sets how much.</p>
+            <p>The preview shows patterns that excite that neuron. Layer chooses a network stage; Channel chooses a neuron.</p>
+            <p>The graph shows its relative response over 30 seconds. Higher means more activity.</p>
+            <a href="https://distill.pub/2017/feature-visualization/" target="_blank" rel="noopener noreferrer">Read Feature Visualization ↗</a>
+          </div>
+        </details>
+        <label>Feature layer<select data-field="sensorLayer"></select></label>
+        <label>Channel<input data-field="sensorChannel" type="number" min="0" max="191" step="1"></label>
+        <div data-sensor-preview></div>
+        <button type="button" class="mini-button" data-browse-sensor>Browse neuron gallery</button>
+        <p>One neuron shared by all Inception routes. Samples the canvas twice per second.</p>
+        <div class="drawer-sensor-state"><span data-sensor-status aria-live="polite"></span><button type="button" data-sensor-retry hidden>Retry</button></div>
+        <figure class="sensor-activity">
+          <figcaption><span>Activity</span><span>Last 30 seconds</span></figcaption>
+          <svg data-sensor-activity viewBox="0 0 240 52" role="img" aria-label="Recent neuron activity, smoothed relative response from low to high">
+            <path class="sensor-activity-grid" d="M4 4H236M4 26H236M4 48H236"/>
+            <path class="sensor-activity-line"/>
+            <circle class="sensor-activity-dot" r="2" hidden/>
+            <text x="120" y="29" text-anchor="middle" data-sensor-activity-empty>Waiting for readings…</text>
+          </svg>
+        </figure>
+      </div>
     </div>
     <details class="drawer-global-settings"><summary>Global audio settings</summary>
       <label class="drawer-range">Input gain<input data-field="inputGain" type="range" min="0.1" max="3" step="0.01"><output></output></label>
@@ -103,6 +134,8 @@ export function createModulationDrawer({
     inputGain: "global input gain",
     kickOffset: "global kick threshold",
     kickGate: "global kick gate",
+    sensorLayer: "sensor layer",
+    sensorChannel: "sensor channel",
   };
   for (const input of element.querySelectorAll("[data-field]")) {
     const key = input.dataset.field;
@@ -128,6 +161,109 @@ export function createModulationDrawer({
     option.textContent = entry.label[0] + entry.label.slice(1).toLowerCase();
     fields.get("waveform").append(option);
   }
+  for (const [layer, channels] of Object.entries(INCEPTION_LAYER_CHANNELS)) {
+    const option = document.createElement("option");
+    option.value = layer;
+    option.textContent = `${layer} · ${channels}`;
+    fields.get("sensorLayer").append(option);
+  }
+  let sensorPreview = null;
+  let activityHistory = null;
+  const activityLine = element.querySelector(".sensor-activity-line");
+  const activityDot = element.querySelector(".sensor-activity-dot");
+  const activityEmpty = element.querySelector("[data-sensor-activity-empty]");
+  function syncActivity() {
+    const history = inceptionSensor.getHistory();
+    if (history === activityHistory) return;
+    activityHistory = history;
+    const last = history.at(-1);
+    const start = (last?.timestamp || 0) - 30_000;
+    const points = history.map(({ timestamp, level }) => [
+      4 + ((timestamp - start) / 30_000) * 232,
+      48 - level * 44,
+    ]);
+    activityLine.setAttribute(
+      "d",
+      points
+        .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`)
+        .join(" "),
+    );
+    activityDot.toggleAttribute("hidden", !last);
+    activityEmpty.toggleAttribute("hidden", Boolean(last));
+    if (last) {
+      activityDot.setAttribute("cx", "236");
+      activityDot.setAttribute("cy", String(48 - last.level * 44));
+    }
+  }
+  const browseSensor = element.querySelector("[data-browse-sensor]");
+  browseSensor.hidden = !onBrowseSensor;
+  browseSensor.addEventListener("click", () => onBrowseSensor?.());
+  function syncSensor() {
+    const target = inceptionSensor.getTarget();
+    const parameters = {
+      targetLayer: target.layer,
+      targetChannel: target.channel,
+    };
+    if (previewBridge && !sensorPreview) {
+      sensorPreview = createNeuronPreview({
+        parameters,
+        previewBridge,
+        className: "sensor-neuron-preview",
+        description:
+          "Optimized feature example. The sensor measures this channel on your live canvas.",
+      });
+      element
+        .querySelector("[data-sensor-preview]")
+        .append(sensorPreview.element);
+      void previewBridge.loadPreviews();
+    }
+    sensorPreview?.update(parameters);
+    const stats = inceptionSensor.getStats();
+    syncActivity();
+    const channelInput = fields.get("sensorChannel");
+    fields.get("sensorLayer").value = target.layer;
+    channelInput.max = String(INCEPTION_LAYER_CHANNELS[target.layer] - 1);
+    if (document.activeElement !== channelInput)
+      channelInput.value = String(target.channel);
+    const status = element.querySelector("[data-sensor-status]");
+    const text =
+      stats.status === "error"
+        ? stats.error
+        : !stats.active
+          ? "Paused"
+          : stats.status === "loading"
+            ? "Loading Inception…"
+            : stats.samples < 2
+              ? "Calibrating…"
+              : `Neural energy ${Math.round(stats.level * 100)}%`;
+    if (status.textContent !== text) status.textContent = text;
+    element.querySelector("[data-sensor-retry]").hidden =
+      stats.status !== "error";
+  }
+  fields.get("sensorLayer").addEventListener("change", (event) => {
+    inceptionSensor.setTarget(
+      event.target.value,
+      inceptionSensor.getTarget().channel,
+    );
+    fields.get("sensorChannel").value = String(
+      inceptionSensor.getTarget().channel,
+    );
+    syncSensor();
+  });
+  fields.get("sensorChannel").addEventListener("change", (event) => {
+    if (event.target.value !== "")
+      inceptionSensor.setTarget(
+        inceptionSensor.getTarget().layer,
+        Number(event.target.value),
+      );
+    event.target.value = String(inceptionSensor.getTarget().channel);
+    syncSensor();
+  });
+  element.querySelector("[data-sensor-retry]").addEventListener("click", () => {
+    inceptionSensor.stop();
+    inceptionSensor.start();
+    syncSensor();
+  });
   const svg = element.querySelector("svg");
   svg.setAttribute("aria-label", `${definition.label} LFO curve and playhead`);
   element
@@ -159,7 +295,7 @@ export function createModulationDrawer({
   const showBreakdown = () => {
     if (!latestFrame) return;
     const frame = latestFrame;
-    valueRow.title = `Base ${frame.baseValue.toFixed(2)} · LFO ${(frame.oscillatorValue - frame.baseValue).toFixed(2)} · Audio ${(frame.audioValue - frame.oscillatorValue).toFixed(2)}`;
+    valueRow.title = `Base ${frame.baseValue.toFixed(2)} · LFO ${(frame.oscillatorValue - frame.baseValue).toFixed(2)} · ${frame.audioSource === "inception" ? "Inception" : "Audio"} ${(frame.audioValue - frame.oscillatorValue).toFixed(2)}`;
   };
   valueRow.tabIndex = 0;
   valueRow.addEventListener("pointerenter", showBreakdown);
@@ -216,6 +352,11 @@ export function createModulationDrawer({
       );
     }
     audio.dataset.source = route.source;
+    element.querySelector(".drawer-sensor").hidden =
+      route.source !== "inception";
+    element.querySelector(".drawer-global-settings").hidden =
+      route.source === "inception";
+    if (route.source === "inception") syncSensor();
     for (const button of sourceButtons)
       button.setAttribute(
         "aria-pressed",
@@ -331,6 +472,7 @@ export function createModulationDrawer({
   }
   function updateFrame(frame, kickActive) {
     if (element.closest("[hidden], details:not([open])")) return;
+    if (getAudioRoute().source === "inception") syncSensor();
     latestFrame = frame;
     const text = frame.effectiveValue.toFixed(2);
     if (text !== lastValue) {
@@ -353,7 +495,14 @@ export function createModulationDrawer({
   }
   sync();
   syncSettings();
-  return { element, sync, syncSettings, updateFrame, updateKick };
+  return {
+    element,
+    sync,
+    syncSettings,
+    updateFrame,
+    updateKick,
+    dispose: () => sensorPreview?.dispose(),
+  };
 }
 
 export function bindModulationStrip({
