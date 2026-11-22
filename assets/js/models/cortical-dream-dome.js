@@ -586,7 +586,7 @@ export class CorticalDreamDomeModel {
   async setSourceFile(file) {
     this.cancel();
     const version = this.sourceVersion;
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file, { colorSpaceConversion: "none" });
     try {
       if (this.disposed || version !== this.sourceVersion) return;
       const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));

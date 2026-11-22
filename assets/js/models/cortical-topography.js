@@ -237,6 +237,7 @@ export class CorticalTopographyModel {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.graphics.sourceTexture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
@@ -344,7 +345,7 @@ export class CorticalTopographyModel {
   async setSourceFile(file) {
     this.cancel();
     const version = this.sourceVersion;
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file, { colorSpaceConversion: "none" });
     try {
       if (this.disposed || version !== this.sourceVersion) return;
       const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));

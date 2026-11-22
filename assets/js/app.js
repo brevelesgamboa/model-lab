@@ -1345,15 +1345,15 @@ function updateModulationFeedback(parameters, timestamp) {
 
 function refreshModelOptions(preferredId = currentModel?.id) {
   elements.modelSelect.replaceChildren();
-  registry.getAll().forEach((model) => {
-    const option = document.createElement("option");
-    option.value = model.id;
-    option.textContent = model.available
-      ? model.name
-      : `${model.name} [UNAVAILABLE]`;
-    option.disabled = !model.available;
-    elements.modelSelect.append(option);
-  });
+  registry
+    .getAll()
+    .filter((model) => model.available)
+    .forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = model.name;
+      elements.modelSelect.append(option);
+    });
   const preferred = registry.get(preferredId);
   const selected = preferred?.available ? preferred : registry.getDefault();
   if (selected) elements.modelSelect.value = selected.id;
