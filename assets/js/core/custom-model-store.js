@@ -147,8 +147,4 @@ export const CustomModelStore = {
       persistent = false;
     }
   },
-
-  isPersistent() {
-    return persistent;
-  },
 };

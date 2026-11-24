@@ -31,9 +31,6 @@ export class CustomPcaModel {
       return "No local model is available. Build or import one in Experiments.";
     return `A ${this.data.basis.length}-component ${this.data.colorSpace || "GRAYSCALE"} model trained from ${this.data.trainingSamples} local image samples. Its source images are not embedded in the model file.`;
   }
-  get animated() {
-    return true;
-  }
   get available() {
     return Boolean(this.data);
   }

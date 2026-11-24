@@ -177,7 +177,6 @@ export class DigiFaceVaeModel {
     this.session = null;
     this.sessionPromise = null;
     this.sessionBackend = "ONNX RUNTIME WEB / INITIALIZING";
-    this.loadError = null;
     this.modelState = "UNCHECKED";
     this.selfCheckPromise = null;
     this.selfCheckResult = null;
@@ -224,10 +223,6 @@ export class DigiFaceVaeModel {
       inferenceFramework: "ONNX Runtime Web",
       inferenceBackend: "WASM / WebGPU (browser-dependent)",
     };
-  }
-
-  get animated() {
-    return true;
   }
 
   get available() {
@@ -428,14 +423,6 @@ export class DigiFaceVaeModel {
   }
 
   configureRuntime(ort) {
-    if (ort.env?.wasm) {
-      // The bundled ESM runtime resolves its own WASM binary relative to
-      // ort.webgpu.bundle.min.mjs, which is copied into the same directory.
-      // Avoid overriding wasmPaths here because doing so forces ONNX Runtime
-      // back into its dynamic-module loader.
-      ort.env.wasm.numThreads = 1;
-      ort.env.wasm.proxy = false;
-    }
     if (ort.env?.webgpu) {
       ort.env.webgpu.powerPreference = "high-performance";
     }
@@ -444,7 +431,6 @@ export class DigiFaceVaeModel {
 
   async createSession() {
     const ort = this.configureRuntime(await ensureOnnxRuntime());
-    this.loadError = null;
 
     if (navigator.gpu && onnxRuntimeMode() === "webgpu") {
       try {
@@ -479,7 +465,6 @@ export class DigiFaceVaeModel {
           return session;
         })
         .catch((error) => {
-          this.loadError = error;
           this.sessionBackend = "ONNX MODEL FILE REQUIRED";
           throw error;
         })
@@ -540,7 +525,6 @@ export class DigiFaceVaeModel {
         }
 
         this.modelState = "READY";
-        this.loadError = null;
         this.selfCheckResult = {
           state: "READY",
           inputShape: [1, LATENT_DIM],
@@ -551,7 +535,6 @@ export class DigiFaceVaeModel {
         return this.selfCheckResult;
       } catch (error) {
         this.modelState = "ERROR";
-        this.loadError = error;
         this.selfCheckResult = null;
         throw error;
       } finally {
