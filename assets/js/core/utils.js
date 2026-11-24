@@ -4,10 +4,6 @@ export function clamp(value, min = 0, max = 1) {
   return Math.min(max, Math.max(min, numeric));
 }
 
-export function lerp(a, b, amount) {
-  return a + (b - a) * amount;
-}
-
 export function mulberry32(seed) {
   let value = Number(seed) >>> 0;
   return function random() {
@@ -53,16 +49,6 @@ export function sanitizeModelName(value) {
   return (normalized || "My model").slice(0, 32);
 }
 
-export function hashString(value) {
-  let hash = 0x811c9dc5;
-  const text = String(value);
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0").toUpperCase();
-}
-
 export function formatTimestampForFile(date = new Date()) {
   return date.toISOString().replace(/[:.]/g, "-");
 }
@@ -82,11 +68,6 @@ export function safeJsonParse(value, fallback = null) {
 export function deepClone(value) {
   if (typeof structuredClone === "function") return structuredClone(value);
   return JSON.parse(JSON.stringify(value));
-}
-
-export function formatNumber(value, digits = 3) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric.toFixed(digits) : "—";
 }
 
 export function formatPercent(value, digits = 1) {

@@ -117,7 +117,6 @@ export function createHqGallery({ elements, isRendering, setStatus }) {
   async function closeViewer({ exitFullscreen = true } = {}) {
     if (!elements.hqViewer) return;
     elements.hqViewer.hidden = true;
-    elements.outputPanel?.classList.remove("is-hq-viewer");
     elements.hqViewerImage?.removeAttribute("src");
     activeRender = null;
     if (

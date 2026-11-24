@@ -11,7 +11,6 @@ export function collectElements() {
     labGrid: document.getElementById("lab-grid"),
     outputPanel: document.getElementById("output-panel"),
     outputStage: document.querySelector(".output-stage"),
-    outputFrame: document.querySelector(".output-frame"),
     fractalTools: document.getElementById("fractal-tools"),
     exploreHint: document.getElementById("explore-hint"),
     fractalExamplesTool: document.getElementById("fractal-examples-tool"),

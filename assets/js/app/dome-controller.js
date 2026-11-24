@@ -221,5 +221,5 @@ export function createDomeController({
     if (!isActive() || !levels) return;
     model.onAudioFrame?.(levels, timestamp, rhythmController);
   }
-  return { update, onAudioFrame, stopDrift };
+  return { update, onAudioFrame };
 }

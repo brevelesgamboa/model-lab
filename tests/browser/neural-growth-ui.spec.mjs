@@ -1619,12 +1619,45 @@ test("restoring old audio settings preserves values and manual routes without pr
   });
 });
 
-test("neuron archetype cards update all three targets without changing the cellular field", async ({
+async function inspectGrowthNeuron(page, layer, channel) {
+  await page
+    .getByRole("button", { name: "Browse neuron previews", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Neuron explorer",
+    exact: true,
+  });
+  await expect(
+    dialog.locator(".neuron-explorer__pagination [role=status]"),
+  ).not.toBeEmpty();
+  await dialog.getByLabel("Preview collection").selectOption("all");
+  await dialog.getByLabel("Explorer layer").selectOption(layer);
+  await dialog
+    .getByLabel("Find neuron channel")
+    .fill(channel < 0 ? "" : String(channel));
+  await dialog
+    .locator('.neuron-explorer__card[data-channel="' + channel + '"]')
+    .click();
+  return dialog;
+}
+
+async function chooseGrowthNeuron(page, layer, channel) {
+  const dialog = await inspectGrowthNeuron(page, layer, channel);
+  await dialog
+    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+}
+
+test("curated explorer choices select Dream targets without changing strength or the cellular field", async ({
   page,
 }) => {
   await selectGrowth(page);
   await page.locator("#step-growth").click();
   const before = await state(page);
+  const strength = await page
+    .getByLabel("DREAM STRENGTH exact value", { exact: true })
+    .inputValue();
   await page.evaluate(() => {
     window.__initialGrowthRuntime = window.__growthRuntime;
   });
@@ -1632,15 +1665,29 @@ test("neuron archetype cards update all three targets without changing the cellu
     async () =>
       (await import("/assets/js/models/neural-growth.js")).CURATED_NEURONS,
   );
-  await expect(page.locator(".neuron-gallery__card")).toHaveCount(7);
   await expect(page.locator('[data-parameter="targetChannel"]')).toBeHidden();
   for (const neuron of neurons) {
-    const card = page.locator(`[data-neuron-id="${neuron.id}"]`);
+    const dialog = await inspectGrowthNeuron(
+      page,
+      neuron.layer,
+      neuron.channel,
+    );
+    const card = dialog.locator(
+      '.neuron-explorer__card[data-channel="' + neuron.channel + '"]',
+    );
     await expect(card).toContainText(neuron.name);
     await expect(card).toContainText(neuron.desc);
     await expect(card).toContainText(neuron.layer);
-    await card.click();
-    await expect(card).toHaveAttribute("aria-pressed", "true");
+    await dialog
+      .getByRole("button", { name: "Use as Dream target", exact: true })
+      .click();
+    await expect(
+      page.locator(
+        'dialog.neuron-explorer .neuron-explorer__card[data-channel="' +
+          neuron.channel +
+          '"]',
+      ),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
       neuron.layer,
     );
@@ -1649,7 +1696,7 @@ test("neuron archetype cards update all three targets without changing the cellu
     ).toHaveValue(String(neuron.channel));
     await expect(
       page.getByLabel("DREAM STRENGTH exact value", { exact: true }),
-    ).toHaveValue(String(neuron.strength));
+    ).toHaveValue(strength);
     await expect(page.locator(".modulation-toggle:visible")).toHaveCount(15);
     expect(await state(page)).toEqual(before);
   }
@@ -1669,11 +1716,6 @@ test("manual channel exploration follows every layer ceiling and clamps deep-to-
   await selectGrowth(page);
   await page.locator("#step-growth").click();
   const before = await state(page);
-  const toggle = page.getByRole("button", {
-    name: "Manual Channel Explorer",
-    exact: true,
-  });
-  await toggle.click();
   const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
   const slider = page.getByLabel("DREAM NEURON", { exact: true });
   const layer = page.getByLabel("DREAM LAYER", { exact: true });
@@ -1684,37 +1726,34 @@ test("manual channel exploration follows every layer ceiling and clamps deep-to-
   );
   for (const [id, depth] of Object.entries(depths)) {
     await layer.selectOption(id);
-    await expect(channel).toBeVisible();
+    await expect(channel).toBeHidden();
     await expect(channel).toHaveAttribute("max", String(depth - 1));
     await expect(slider).toHaveAttribute("max", String(depth - 1));
   }
-  await layer.selectOption("mixed_7b");
-  await channel.fill("1800");
+  await chooseGrowthNeuron(page, "mixed_7b", 1800);
   await expect(channel).toHaveValue("1800");
   await layer.selectOption("mixed_5b");
   await expect(channel).toHaveValue("255");
   await layer.selectOption("mixed_7b");
   await expect(channel).toHaveValue("255");
-  await slider.evaluate((input) => {
-    input.value = "1900";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await chooseGrowthNeuron(page, "mixed_7b", 1900);
   await expect(channel).toHaveValue("1900");
-  await page.locator('[data-neuron-id="curve"]').click();
+  await chooseGrowthNeuron(page, "mixed_6c", 144);
   await expect(channel).toHaveValue("144");
   await expect(channel).toHaveAttribute("max", "767");
-  await channel.fill("145");
-  await expect(page.locator('[data-neuron-id="curve"]')).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await toggle.click();
+  await chooseGrowthNeuron(page, "mixed_6c", 145);
+  const dialog = await inspectGrowthNeuron(page, "mixed_6c", 144);
+  await expect(
+    dialog.locator('.neuron-explorer__card[data-channel="144"]'),
+  ).toHaveAttribute("aria-pressed", "false");
+  await dialog
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
+    .click();
   await expect(channel).toBeHidden();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   expect(await state(page)).toEqual(before);
 });
 
-test("live archetype changes preserve playback and deliver the selected guidance targets", async ({
+test("live explorer target changes preserve playback and deliver the selected guidance targets", async ({
   page,
 }) => {
   await selectGrowth(page);
@@ -1740,18 +1779,19 @@ test("live archetype changes preserve playback and deliver the selected guidance
     "128",
   );
   await page.getByLabel("DREAM CADENCE exact value", { exact: true }).fill("1");
+  await page.getByLabel("DREAM STRENGTH exact value", { exact: true }).fill("0.3");
   await page.getByLabel("DREAM GUIDANCE", { exact: true }).selectOption("on");
   await page.evaluate(() => {
     window.__initialGrowthRuntime = window.__growthRuntime;
   });
   await page.locator("#toggle-animation").click();
   let previousSteps = 0;
-  for (const [id, layer, channel] of [
-    ["semantic", "mixed_7b", 312],
-    ["hatch", "mixed_5b", 120],
-    ["ensemble", "mixed_6c", -1],
+  for (const [layer, channel] of [
+    ["mixed_7b", 312],
+    ["mixed_5b", 120],
+    ["mixed_6c", -1],
   ]) {
-    await page.locator(`[data-neuron-id="${id}"]`).click();
+    await chooseGrowthNeuron(page, layer, channel);
     await expect
       .poll(() =>
         page.evaluate(
@@ -1781,7 +1821,7 @@ test("live archetype changes preserve playback and deliver the selected guidance
   await page.locator("#toggle-animation").click();
 });
 
-test("neuron gallery stays inside the sidebar and restores channels above the old ceiling", async ({
+test("neuron explorer fits narrow layouts and restores channels above the old ceiling", async ({
   page,
 }) => {
   await selectGrowth(page);
@@ -1790,27 +1830,30 @@ test("neuron gallery stays inside the sidebar and restores channels above the ol
   for (const width of [360, 900, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     const sizes = await page.locator(".neuron-gallery").evaluate((gallery) => {
-      const strip = gallery.querySelector(".neuron-gallery__strip");
       const sidebar = gallery.closest(".input-panel");
       return {
         sidebar: sidebar.clientWidth,
         content: sidebar.scrollWidth,
-        strip: strip.clientWidth,
-        cards: strip.scrollWidth,
+        gallery: gallery.clientWidth,
       };
     });
     expect(sizes.content).toBeLessThanOrEqual(sizes.sidebar + 1);
-    expect(sizes.cards).toBeGreaterThan(sizes.strip);
+    expect(sizes.gallery).toBeLessThanOrEqual(sizes.sidebar);
+    const dialog = await inspectGrowthNeuron(page, "mixed_7b", 1800);
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    ).toBe(true);
+    await dialog
+      .getByRole("button", { name: "Close neuron explorer", exact: true })
+      .click();
   }
-  await page.locator('[data-neuron-id="semantic"]').click();
-  await page
-    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
-    .click();
+  await chooseGrowthNeuron(page, "mixed_7b", 1800);
   const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
-  await channel.fill("1800");
   await page.locator("#run-experiment").click();
   await expect(page.locator("#status-message")).toHaveText("Frame saved");
-  await page.locator('[data-neuron-id="hatch"]').click();
+  await chooseGrowthNeuron(page, "mixed_5b", 120);
   await expect(channel).toHaveValue("120");
   await page.locator('[data-view="saved"]').click();
   await page
@@ -1841,11 +1884,8 @@ test("advanced inception guidance and state dynamics configure controls cleanly"
   const neuronInput = page.getByLabel("DREAM NEURON exact value", {
     exact: true,
   });
-  await page
-    .getByRole("button", { name: "Manual Channel Explorer", exact: true })
-    .click();
-  await expect(neuronInput).toBeVisible();
-  await neuronInput.fill("42");
+  await chooseGrowthNeuron(page, "mixed_6c", 42);
+  await expect(neuronInput).toHaveValue("42");
 
   const jitterSelect = page.locator('select[aria-label="DREAM JITTER"]');
   await expect(jitterSelect).toHaveValue("on");

@@ -1,7 +1,7 @@
 import { clamp } from "./utils.js";
 import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
 
-export const AUDIO_MODULATION_SOURCES = Object.freeze([
+const AUDIO_MODULATION_SOURCES = Object.freeze([
   { value: "none", label: "NONE" },
   { value: "bass", label: "BASS / MUSIC" },
   { value: "kick", label: "KICK" },
@@ -17,16 +17,16 @@ function routeId(modelId, parameterKey) {
   return `${modelId}:${parameterKey}`;
 }
 
-export const modulationMatrixState = new Map();
+const modulationMatrixState = new Map();
 
-export function defaultAudioRoute() {
+function defaultAudioRoute() {
   return {
     source: "none",
     depth: DEFAULT_DEPTH,
   };
 }
 
-export function sanitizeAudioRoute(route) {
+function sanitizeAudioRoute(route) {
   const source = VALID_SOURCES.has(route?.source) ? route.source : "none";
   return {
     source,

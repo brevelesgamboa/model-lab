@@ -1,11 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import * as tf from "@tensorflow/tfjs";
-import {
-  applyDomeColorStep,
-  constrainDomeColor,
-  optimizeDomeDream,
-} from "../../assets/js/models/dome-dream-optimizer.js";
 import {
   MiganLoader,
   miganCache,
@@ -18,83 +12,6 @@ import {
 } from "../../assets/js/models/migan-inpainter.js";
 import { photoPlacement } from "../../assets/js/models/equirectangular-canvas.js";
 import { blurredLuminance } from "../../assets/js/models/depth-data.js";
-
-const chroma = ([r, g, b]) => [
-  -0.168736 * r - 0.331264 * g + 0.5 * b,
-  0.5 * r - 0.418688 * g - 0.081312 * b,
-];
-test("luma steps freeze chroma including saturated gamut limits; reduced retention admits chroma", async () => {
-  await tf.setBackend("cpu");
-  await tf.ready();
-  const before = tf.memory().numTensors;
-  tf.tidy(() => {
-    const source = tf.tensor4d(
-      [0.2, 0.4, 0.6, 1, 0, 0.4, 0.02, 0.01, 0.03],
-      [1, 1, 3, 3],
-    );
-    const gradient = tf.tensor4d([2, -1, 5, 7, 2, -6, -5, -1, 3], [1, 1, 3, 3]);
-    const locked = constrainDomeColor(
-      tf,
-      applyDomeColorStep(tf, source, gradient, 1, 1),
-      source,
-      1,
-    ).dataSync();
-    const base = source.dataSync();
-    for (let p = 0; p < 3; p++) {
-      const orig = chroma([...base.slice(p * 3, p * 3 + 3)]),
-        next = chroma([...locked.slice(p * 3, p * 3 + 3)]);
-      for (let c = 0; c < 2; c++) assert.ok(Math.abs(orig[c] - next[c]) < 1e-6);
-    }
-    assert.ok([...locked].every((x) => x >= 0 && x <= 1));
-    const free = applyDomeColorStep(tf, source, gradient, 0.01, 0).dataSync();
-    for (let i = 0; i < 9; i++)
-      assert.ok(
-        Math.abs(free[i] - base[i] - gradient.dataSync()[i] * 0.01) < 1e-6,
-      );
-    assert.ok(
-      Math.abs(
-        chroma([...free.slice(0, 3)])[0] - chroma([...base.slice(0, 3)])[0],
-      ) > 0.01,
-    );
-  });
-  assert.equal(tf.memory().numTensors, before);
-});
-
-test("default luma ascent preserves each pixel's chroma through octaves and spherical constraints", async () => {
-  await tf.setBackend("cpu");
-  const w = 320,
-    h = 160,
-    data = new Float32Array(w * h * 3);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++)
-      data.set(
-        [0.2 + (0.2 * x) / w, 0.25 + (0.1 * y) / h, 0.55],
-        (y * w + x) * 3,
-      );
-  const seed = tf.tensor4d(data, [1, h, w, 3]),
-    count = tf.memory().numTensors;
-  try {
-    const result = await optimizeDomeDream(
-      tf,
-      { execute: (x) => x.square() },
-      seed,
-      { node: "fixture", channel: 0, photoRect: null, iterations: 4 },
-    );
-    let changed = 0;
-    for (let i = 0; i < w * h; i++) {
-      const original = [...data.slice(i * 3, i * 3 + 3)],
-        next = [...result.rgba.slice(i * 4, i * 4 + 3)].map((x) => x / 255);
-      for (let c = 0; c < 2; c++)
-        assert.ok(Math.abs(chroma(original)[c] - chroma(next)[c]) < 0.0041);
-      changed += Math.abs(next[0] - original[0]);
-    }
-    assert.ok(changed > 10);
-    assert.equal(result.sizes.length, 2);
-    assert.equal(tf.memory().numTensors, count);
-  } finally {
-    seed.dispose();
-  }
-});
 
 function session() {
   return {

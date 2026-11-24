@@ -26,7 +26,7 @@ export function createPlaneMesh(resolution = 256) {
   return { vertices, indices, resolution };
 }
 
-export function multiplyMatrices(a, b) {
+function multiplyMatrices(a, b) {
   const result = new Float32Array(16);
   for (let column = 0; column < 4; column++)
     for (let row = 0; row < 4; row++)

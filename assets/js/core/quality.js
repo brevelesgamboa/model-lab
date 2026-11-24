@@ -1,4 +1,4 @@
-export const PROFILES = {
+const PROFILES = {
   economy: {
     label: "ECONOMY / 384",
     size: 384,

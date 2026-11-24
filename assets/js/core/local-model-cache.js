@@ -2,12 +2,12 @@ import { DEPTH_MODEL_ROOT } from "../models/depth-data.js";
 
 // Version the graph cache when the bundled checkpoint changes. Depth URLs are
 // pinned to a repository revision. No uploaded photos enter this cache.
-export const MODEL_CACHE_NAME = "latent-field-models-10256b8f-c3b67641-v1";
-export const INCEPTION_MODEL_URL = new URL(
+const MODEL_CACHE_NAME = "latent-field-models-10256b8f-c3b67641-v1";
+const INCEPTION_MODEL_URL = new URL(
   "../../../models/inception/model.json",
   import.meta.url,
 ).href;
-export const DEPTH_MODEL_URLS = ["model_q4.onnx", "model_q4.onnx_data"].map(
+const DEPTH_MODEL_URLS = ["model_q4.onnx", "model_q4.onnx_data"].map(
   (name) => DEPTH_MODEL_ROOT + name,
 );
 

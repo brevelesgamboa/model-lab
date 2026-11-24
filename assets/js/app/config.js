@@ -1,9 +1,8 @@
-export const OLD_BRAND = ["unknown", "sight"].join("-");
+const OLD_BRAND = ["unknown", "sight"].join("-");
 export const QUALITY_STORAGE_KEY = "latent-field-quality-v1";
 export const LEGACY_QUALITY_STORAGE_KEY = OLD_BRAND + "-quality-v4";
 export const PANEL_STORAGE_KEY = "latent-field-panels-v1";
 export const LEGACY_PANEL_STORAGE_KEY = OLD_BRAND + "-panels-v4";
-export const MOTION_SPEEDS = { slow: 0.38, normal: 0.82, fast: 1.65 };
 export const FRACTAL_ROUTE_IDS = new Set(["folded-fractal"]);
 export const FRACTAL_EXPLORE_ROUTE_IDS = new Set([
   ...FRACTAL_ROUTE_IDS,

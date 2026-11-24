@@ -534,5 +534,5 @@ export function createExportController({
     }
   }
 
-  return { savePng, saveGif, renderHighQuality };
+  return { savePng, saveGif };
 }

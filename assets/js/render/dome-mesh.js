@@ -42,36 +42,6 @@ export function createDomeMesh(resolution = 256) {
   return { vertices, indices, resolution };
 }
 
-export function raycastSphereUV(rayDir, isMirrored = true) {
-  const x = rayDir[0],
-    y = rayDir[1],
-    z = rayDir[2];
-  const len = Math.hypot(x, y, z);
-  if (len < 1e-9) return { u: 0.5, v: 0.5 };
-  const nx = x / len,
-    ny = y / len,
-    nz = z / len;
-
-  const sphereU = Math.atan2(nx, -nz) / TAU + 0.5;
-  const sphereV = Math.asin(clamp(ny, -1, 1)) / Math.PI + 0.5;
-
-  if (!isMirrored) {
-    return { u: sphereU, v: 1.0 - sphereV };
-  }
-
-  const rawX = sphereU - 0.25;
-  const rawY = sphereV - 0.25;
-  const mod2 = (val) => ((val % 2) + 2) % 2;
-  let mirX = Math.abs(mod2(rawX * 2 - 1) - 1);
-  const mirY = Math.abs(mod2(rawY * 2 - 1) - 1);
-
-  const cap = Math.min(sphereV, 1.0 - sphereV) / 0.08;
-  const capSmooth = cap <= 0 ? 0 : cap >= 1 ? 1 : cap * cap * (3 - 2 * cap);
-  mirX = 0.5 * (1 - capSmooth) + mirX * capSmooth;
-
-  return { u: mirX, v: 1.0 - mirY };
-}
-
 export class DomeCamera {
   constructor() {
     this.reset();

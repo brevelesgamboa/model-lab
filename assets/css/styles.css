@@ -32,7 +32,6 @@
   --purple-light: var(--text-primary);
   --cyan: var(--accent-mod);
   --danger: #ef4444;
-  --success: var(--accent-live);
   --accent: var(--text-primary);
   --ui: var(--font-sans);
   --mono: var(--font-mono);
@@ -360,10 +359,6 @@ a {
   color: var(--text-secondary);
   font-size: 13px;
 }
-.reset-button span {
-  font-size: 9px;
-  letter-spacing: 0.06em;
-}
 .field {
   display: grid;
   gap: 8px;
@@ -654,24 +649,6 @@ summary {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
-.dome-nca-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.dome-nca-slider-row input[type="range"] {
-  flex: 1;
-}
-.dome-nca-slider-row .control-val {
-  min-width: 36px;
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  text-align: right;
-  color: var(--text-secondary);
-}
-.output-panel:fullscreen > .dome-tools {
-  display: none;
-}
 .control-fine-group {
   flex: 0 0 auto;
   display: grid;
@@ -900,15 +877,6 @@ input[type="range"]::-moz-range-progress {
   overflow: hidden;
   background: var(--bg-void);
 }
-.panel-heading--output {
-  position: absolute;
-  top: 18px;
-  left: 20px;
-  right: 20px;
-  margin: 0;
-  z-index: 5;
-  pointer-events: none;
-}
 #output-resolution {
   color: var(--text-secondary);
   border: 1px solid var(--border-dim);
@@ -921,11 +889,6 @@ input[type="range"]::-moz-range-progress {
   content: " PX";
   font-size: 8px;
   color: var(--text-muted);
-}
-.viewport-kind {
-  color: var(--text-muted);
-  font-size: 8px;
-  letter-spacing: 0.1em;
 }
 .output-stage {
   flex: 1;
@@ -984,25 +947,6 @@ input[type="range"]::-moz-range-progress {
   font-size: 8px;
   pointer-events: none;
   letter-spacing: 0.05em;
-}
-.viewport-caption {
-  position: absolute;
-  bottom: 13px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 8px;
-  letter-spacing: 0.07em;
-  pointer-events: none;
-}
-.viewport-crosshair {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-.caption-dot {
-  margin: 0 4px;
 }
 .fractal-tools,
 .neural-dream-tools {
@@ -1170,11 +1114,6 @@ input[type="range"]::-moz-range-progress {
   gap: 13px;
   white-space: nowrap;
 }
-.status-divider {
-  height: 12px;
-  width: 1px;
-  background: var(--border-active);
-}
 #live-fps {
   color: #a4a9b4;
   font: 9px var(--font-mono);
@@ -1185,10 +1124,6 @@ input[type="range"]::-moz-range-progress {
   align-items: center;
   gap: 9px;
   min-width: 0;
-}
-.audio-monitor__label {
-  color: var(--text-muted);
-  font-size: 8px;
 }
 .audio-monitor__spectrum {
   display: block;
@@ -1232,20 +1167,11 @@ input[type="range"]::-moz-range-progress {
   height: 100vh;
   background: var(--bg-void);
 }
-.output-panel:fullscreen > .panel-heading,
-.output-panel:fullscreen > .fractal-tools,
-.output-panel:fullscreen > .neural-dream-tools,
-.output-panel:fullscreen > .viewport-caption {
-  display: none;
-}
 .output-panel:fullscreen .output-frame {
   width: 100%;
   height: 100%;
 }
 .output-panel:fullscreen .render-state {
-  display: none;
-}
-.output-panel.is-hq-viewer:fullscreen > .output-stage {
   display: none;
 }
 /* Narrow screens keep the renderer visible; Parameters remains available via the header. */
@@ -1323,8 +1249,7 @@ input[type="range"]::-moz-range-progress {
     gap: 7px;
     padding-inline: 8px;
   }
-  .status-feedback,
-  .audio-monitor__label {
+  .status-feedback {
     display: none;
   }
   .status-telemetry {
@@ -1337,18 +1262,12 @@ input[type="range"]::-moz-range-progress {
     padding-inline: 5px;
     font-size: 8px;
   }
-  .live-indicator {
-    gap: 0;
-  }
   #live-fps {
     font-size: 8px;
   }
   #toggle-animation {
     padding-right: 6px;
     margin-right: 0;
-  }
-  .viewport-kind {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1847,20 +1766,6 @@ input[type="range"]::-moz-range-progress {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
-}
-
-.hq-renders {
-  border-top: 1px solid var(--line);
-  padding-top: 10px;
-  max-height: 140px;
-  overflow: auto;
-}
-
-.hq-renders__head {
-  display: flex;
-  justify-content: space-between;
-  font: 10px var(--ui);
-  color: var(--dim);
 }
 
 .hq-render-list {
@@ -2450,8 +2355,7 @@ input[type="range"]::-moz-range-progress {
   max-height: 58dvh;
   padding: 3px;
 }
-.neuron-explorer__background-options,
-.neuron-background-progress {
+.neuron-explorer__background-options {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2466,9 +2370,6 @@ input[type="range"]::-moz-range-progress {
 }
 .neuron-explorer__background-options {
   margin-top: 10px;
-}
-.neuron-background-progress {
-  grid-column: 1 / -1;
 }
 .neuron-explorer__background p {
   flex-basis: 100%;
@@ -2988,18 +2889,6 @@ input[type="range"]::-moz-range-progress {
   }
   .quality-control select {
     width: 49px;
-    font-size: 8px;
-  }
-  .masthead__tools .utility-pill {
-    font-size: 8px;
-    padding: 3px 4px;
-    letter-spacing: 0;
-  }
-  .masthead__tools #toggle-audio-input,
-  .masthead__tools #toggle-audio-visualizer {
-    padding-right: 15px;
-  }
-  .masthead__tools #open-visualizer-settings {
     font-size: 8px;
   }
 }
@@ -3647,9 +3536,6 @@ input[type="range"]::-moz-range-progress {
   .canvas-status-bar .output-actions button {
     padding-inline: 8px;
   }
-  .canvas-status-bar .audio-monitor__spectrum {
-    width: 56px;
-  }
 }
 @media (max-width: 800px) {
   .app-window {
@@ -3677,12 +3563,6 @@ input[type="range"]::-moz-range-progress {
   .canvas-status-bar {
     gap: 7px;
     padding-inline: 7px;
-  }
-  .canvas-status-bar .live-indicator {
-    font-size: 0;
-  }
-  .canvas-status-bar .audio-monitor {
-    display: none;
   }
   .canvas-status-bar .output-actions button {
     padding-inline: 6px;

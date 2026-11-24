@@ -43,7 +43,15 @@ async function upload(page) {
     mimeType: "image/png",
     buffer: Buffer.from(encoded, "base64"),
   });
-  await expect(page.locator("#dome-generate")).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(() => [
+        window.__dome.hasPhoto,
+        window.__dome.depthState,
+        window.__dome.featureState,
+      ]),
+    )
+    .toEqual([true, "ready", "ready"]);
 }
 
 test("optional model prompt, bad-file fallback, cancellation and late worker results leave mirrored rendering intact", async ({
@@ -71,12 +79,11 @@ test("optional model prompt, bad-file fallback, cancellation and late worker res
   );
   await page.locator("#dome-outpainting").selectOption("migan");
   await expect(page.locator("#dome-migan-card")).toBeVisible();
-  await expect(page.locator("#dome-generate")).toBeDisabled();
-  await expect(page.locator("#dome-generate")).toBeHidden();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
   await page.locator("#dome-migan-cancel").click();
   await expect(page.locator("#dome-outpainting")).toHaveValue("mirrored");
   await expect(page.locator("#dome-migan-card")).toBeHidden();
-  await expect(page.locator("#dome-generate")).toBeVisible();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
   await page.locator("#dome-outpainting").selectOption("migan");
   await expect(page.locator("#dome-migan-card")).toBeVisible();
   await page.locator("#dome-migan-file").setInputFiles({
@@ -93,7 +100,7 @@ test("optional model prompt, bad-file fallback, cancellation and late worker res
   await page.locator("#dome-migan-cancel").click();
   await page.waitForTimeout(300);
   await expect(page.locator("#dome-migan-card")).toBeHidden();
-  await expect(page.locator("#dome-generate")).toBeEnabled();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
   expect(
     await page.evaluate(() => [
       window.__dome.outpaintingMode,
@@ -115,7 +122,12 @@ test("mirrored geometry closes rear and poles and grayscale stays neutral with o
     target.width = 256;
     target.height = 256;
     const p = Object.fromEntries(d.controls.map((c) => [c.key, c.default]));
-    Object.assign(p, { gain: 0, edgeCoupling: 0, chromaticDispersion: 0 });
+    Object.assign(p, {
+      gain: 0,
+      edgeCoupling: 0,
+      chromaticDispersion: 0,
+      ncaSheen: 0,
+    });
     let maxChroma = 0,
       minSum = Infinity;
     for (const [yaw, pitch] of [
@@ -217,7 +229,7 @@ test("real MI-GAN file picker compiles, caches bytes and reuses IndexedDB after 
     rect: true,
     gl: 0,
   });
-  await expect(page.locator("#dome-generate")).toBeHidden();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
   const hasAiDepth = await page.evaluate(
     () =>
       window.__dome.aiDepthMap !== null &&
@@ -225,7 +237,7 @@ test("real MI-GAN file picker compiles, caches bytes and reuses IndexedDB after 
   );
   expect(hasAiDepth).toBe(true);
   await page.locator("#dome-outpainting").selectOption("mirrored");
-  await expect(page.locator("#dome-generate")).toBeVisible();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
   const mirroredAiDepth = await page.evaluate(() => window.__dome.aiDepthMap);
   expect(mirroredAiDepth).toBe(null);
   await page.locator("#dome-outpainting").selectOption("migan");

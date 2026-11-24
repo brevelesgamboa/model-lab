@@ -1,5 +1,4 @@
 import { INCEPTION_LAYER_CHANNELS } from "../models/neural-growth/inception-layers.js";
-import { createNeuronPreview } from "./neuron-preview.js";
 
 const PAGE_SIZE = 12;
 const previewKey = (layer, channel) => `${layer}_${channel}`;
@@ -42,9 +41,6 @@ export function createNeuronExplorer({
       neuron.name,
     ]),
   );
-
-  const preview = createNeuronPreview({ parameters, previewBridge });
-  const selectedPreview = preview.element;
 
   const dialog = document.createElement("dialog");
   dialog.className = "neuron-explorer";
@@ -212,33 +208,22 @@ export function createNeuronExplorer({
   const backgroundNote = document.createElement("p");
   backgroundNote.textContent =
     "Skips cached previews. Continues when this panel closes; stops when you close this tab.";
-  const compactBackground = document.createElement("div");
-  compactBackground.className = "neuron-background-progress";
-  compactBackground.hidden = true;
-  const compactStatus = document.createElement("span");
-  compactStatus.setAttribute("role", "status");
-  compactBackground.append(compactStatus);
-  selectedPreview.append(compactBackground);
-  const backgroundActions = [];
-  for (const parent of [backgroundOptions, compactBackground]) {
-    const pause = document.createElement("button");
-    pause.type = "button";
-    pause.className = "mini-button";
-    const cancel = document.createElement("button");
-    cancel.type = "button";
-    cancel.className = "mini-button";
-    cancel.textContent = "Cancel background cache";
-    pause.addEventListener("click", () =>
-      previewBridge.pauseBackgroundPreviews(
-        previewBridge.backgroundPreviewStatus.phase !== "paused",
-      ),
-    );
-    cancel.addEventListener("click", () =>
-      previewBridge.cancelBackgroundPreviews(),
-    );
-    parent.append(pause, cancel);
-    backgroundActions.push({ pause, cancel });
-  }
+  const pauseBackground = document.createElement("button");
+  pauseBackground.type = "button";
+  pauseBackground.className = "mini-button";
+  const cancelBackground = document.createElement("button");
+  cancelBackground.type = "button";
+  cancelBackground.className = "mini-button";
+  cancelBackground.textContent = "Cancel background cache";
+  pauseBackground.addEventListener("click", () =>
+    previewBridge.pauseBackgroundPreviews(
+      previewBridge.backgroundPreviewStatus.phase !== "paused",
+    ),
+  );
+  cancelBackground.addEventListener("click", () =>
+    previewBridge.cancelBackgroundPreviews(),
+  );
+  backgroundOptions.append(pauseBackground, cancelBackground);
   backgroundOptions.prepend(
     scopeLabel,
     rangeInputs,
@@ -311,18 +296,15 @@ export function createNeuronExplorer({
     const text = !status?.total
       ? "Starts only when you click."
       : `${prefix} · ${status.completed}/${status.total}${status.failed ? ` · ${status.failed} failed` : ""}${active && status.current ? ` · ${Math.round(status.progress * 100)}% of current preview` : ""}`;
-    backgroundStatus.textContent = compactStatus.textContent = text;
+    backgroundStatus.textContent = text;
     backgroundSummary.textContent = active
       ? `${prefix} · ${status.completed}/${status.total}`
       : "Generate previews in background";
-    compactBackground.hidden = !active;
-    for (const { pause, cancel } of backgroundActions) {
-      pause.hidden = cancel.hidden = !active;
-      pause.textContent =
-        status?.phase === "paused"
-          ? "Resume background cache"
-          : "Pause background cache";
-    }
+    pauseBackground.hidden = cancelBackground.hidden = !active;
+    pauseBackground.textContent =
+      status?.phase === "paused"
+        ? "Resume background cache"
+        : "Pause background cache";
   }
   startBackground.addEventListener("click", () => {
     void previewBridge.startBackgroundPreviews(backgroundChoices());
@@ -608,7 +590,6 @@ export function createNeuronExplorer({
 
   function update(parameters) {
     values = parameters;
-    preview.update(parameters);
     for (const { card, layer, channel } of visibleCards)
       card.setAttribute(
         "aria-pressed",
@@ -842,13 +823,11 @@ export function createNeuronExplorer({
   update(parameters);
   updateBackground();
   return {
-    selectedPreview,
     open,
     update,
     dispose() {
       disposed = true;
       clearTimeout(searchTimer);
-      preview.dispose();
       detailAbort?.abort();
       unsubscribe?.();
       unsubscribeStorage?.();

@@ -52,7 +52,7 @@ export async function initializeExperiment() {
   return { owner, checkpoints, environment };
 }
 
-export function phenotypeStats(runtime) {
+function phenotypeStats(runtime) {
   const bytes = runtime.readPhenotypeRgb(runtime.size, runtime.size);
   const n = runtime.size,
     means = [0, 0, 0],
@@ -98,7 +98,7 @@ export function phenotypeStats(runtime) {
   };
 }
 
-export function scoreTargets(environment, bytes, size) {
+function scoreTargets(environment, bytes, size) {
   const tf = globalThis.tf;
   return tf.tidy(() => {
     const image = motionImage(tf, bytes, size, size);
@@ -116,7 +116,7 @@ export function scoreTargets(environment, bytes, size) {
   });
 }
 
-export function createCase(environment, config) {
+function createCase(environment, config) {
   const {
     pattern,
     seed = 17,

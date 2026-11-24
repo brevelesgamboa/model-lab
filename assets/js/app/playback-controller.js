@@ -52,7 +52,6 @@ export function createPlaybackController({
 
   return {
     sync,
-    suspend,
     withExclusiveCompute,
     isActive: () => active,
     isSuspended: () => suspensions > 0,

@@ -18,10 +18,8 @@ function normalizeResult(page) {
   if (!info || !String(info.mime || "").startsWith("image/")) return null;
   const metadata = info.extmetadata || {};
   return {
-    pageId: page.pageid,
     title: String(page.title || "Untitled file").replace(/^File:/, ""),
     thumbnailUrl: info.thumburl || info.url,
-    originalUrl: info.url,
     descriptionUrl: info.descriptionurl,
     width: info.width,
     height: info.height,
@@ -30,9 +28,7 @@ function normalizeResult(page) {
       metadataValue(metadata, "LicenseShortName") ||
       metadataValue(metadata, "UsageTerms") ||
       "UNKNOWN",
-    licenseUrl: metadata?.LicenseUrl?.value || "",
     artist: metadataValue(metadata, "Artist") || "Unknown creator",
-    credit: metadataValue(metadata, "Credit"),
     description: metadataValue(metadata, "ImageDescription"),
   };
 }

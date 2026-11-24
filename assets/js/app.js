@@ -75,7 +75,6 @@ import {
   getAudioRoute,
   hasActiveAudioRoute,
   hasModulationSource,
-  getModulationLevel,
   restoreAudioMatrix,
   setAudioRoute,
   updateModulationBounds,
@@ -530,7 +529,7 @@ function saveQualityMode(mode) {
   }
 }
 
-export function setStatus(message) {
+function setStatus(message) {
   elements.statusMessage.textContent = displayMessage(message);
 }
 
@@ -757,7 +756,6 @@ function updateLfoCount() {
 
 function effectiveParametersAt(timeSeconds) {
   const output = {};
-  const modulatedKeys = [];
   const modulationFrame = {};
   const audioLevels =
     rhythmController.status === "active" ? rhythmController.getLevels() : null;
@@ -792,11 +790,6 @@ function effectiveParametersAt(timeSeconds) {
       const audioRoute = canModulate
         ? getAudioRoute(currentModel.id, definition.key)
         : { source: "none", depth: 0 };
-      const audioLevel =
-        audioRoute.source === "none"
-          ? 0
-          : getModulationLevel(audioRoute.source, audioLevels);
-      const kickLevel = clamp(Number(audioLevels?.kick) || 0, 0, 1);
       const effectiveValue = applyAudioModulation(
         definition,
         oscillatorValue,
@@ -815,28 +808,18 @@ function effectiveParametersAt(timeSeconds) {
         audioValue: Number(effectiveValue),
         effectiveValue: Number(coercedEffectiveValue),
         audioSource: audioRoute.source,
-        audioLevel,
-        kickLevel,
         lfoActive,
         lfoDepth: lfoActive ? Number(lfoConfig.depth) : 0,
-        audioDepth: audioRoute.source === "none" ? 0 : audioRoute.depth,
         lfoPhase: lfoActive ? lfoPhaseAt(lfoConfig, timeSeconds) : 0,
         lfoPolarity: lfoConfig?.polarity || "bipolar",
         lfoSignal: lfoActive
           ? lfoSignalAt(lfoConfig, lfoPhaseAt(lfoConfig, timeSeconds))
           : 0,
       };
-      if (
-        currentLfoState[definition.key]?.enabled ||
-        audioRoute.source !== "none"
-      ) {
-        modulatedKeys.push(definition.key);
-      }
     } else {
       output[definition.key] = baseValue;
     }
   });
-  Object.defineProperty(output, "__modulatedKeys", { value: modulatedKeys });
   Object.defineProperty(output, "__modulationFrame", {
     value: modulationFrame,
   });
@@ -1402,12 +1385,6 @@ function randomizedValue(definition) {
 
 async function randomizeParameters() {
   if (currentModel.supportsRandomize === false) return;
-  if (currentModel.id === "about") {
-    setStatus(
-      "SAVE RUN SUPPORTS PARAMETERIZED MODELS; USE SAVE PNG FOR SOURCE IMAGES",
-    );
-    return;
-  }
   const constrained = typeof currentModel.randomizeParameters === "function";
   const attempts =
     constrained && typeof currentModel.isInteresting === "function" ? 8 : 1;

@@ -189,7 +189,6 @@ export function createDreamController({
   }
 
   return {
-    isActive,
     update,
     sourceChanged,
     loadModel,

@@ -227,7 +227,7 @@ export function floodFillSelect(
 /**
  * Extracts a crisp boundary contour outline canvas for Photoshop/Paint.NET selection glow.
  */
-export function extractContourBoundary(sourceCanvas) {
+function extractContourBoundary(sourceCanvas) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
   const ctx = sourceCanvas.getContext("2d");
@@ -1385,10 +1385,5 @@ export function createSpatialMaskController({
     renderOverlay,
     renderContextualOptions,
     onSpatialFocusSelect,
-    getActiveTool: () => activeTool,
-    setPreviewVisible: (v) => {
-      previewVisible = Boolean(v);
-      updateToolbarState();
-    },
   };
 }

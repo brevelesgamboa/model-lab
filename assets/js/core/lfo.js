@@ -18,7 +18,7 @@ export function defaultLfoConfig() {
   };
 }
 
-export function waveformValue(waveform, cycles) {
+function waveformValue(waveform, cycles) {
   const phase = cycles - Math.floor(cycles);
   switch (waveform) {
     case "triangle":

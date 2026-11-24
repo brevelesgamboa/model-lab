@@ -15,10 +15,3 @@ export function terminal(command, message, type = "info") {
     terminalOutput.firstElementChild.remove();
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
-
-export function clearTerminal() {
-  const terminalOutput = getTerminalOutput();
-  if (terminalOutput) {
-    terminalOutput.replaceChildren();
-  }
-}

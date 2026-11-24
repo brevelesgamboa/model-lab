@@ -150,15 +150,6 @@ export const ExperimentStore = {
     return complete;
   },
 
-  update(id, patch) {
-    const records = readRecords();
-    const index = records.findIndex((entry) => entry.id === id);
-    if (index < 0) return null;
-    records[index] = normalizeRecord({ ...records[index], ...patch });
-    writeRecords(records);
-    return records[index];
-  },
-
   remove(id) {
     const records = readRecords();
     const next = records.filter((entry) => entry.id !== id);

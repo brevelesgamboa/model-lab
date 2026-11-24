@@ -68,7 +68,7 @@ The 15-step bake runs in a worker at two scales, with periodic horizontal jitter
 
 **Dome settings → Local Model Cache** checks the actual Inception graph/shards and pinned depth files in Cache Storage. Inference saves downloaded model files when storage is available; **Cache model files** explicitly fills any missing files. **Persist Offline** asks the browser to protect origin storage from automatic eviction. A browser may decline; granted persistence is managed in browser site settings. Photos and baked textures remain in RAM, separate from the model-file cache. Keep the app open or the local server running for other app assets.
 
-PNG/GIF export the current view. Failed or cancelled synthesis keeps the previous view. The independent **3D Cortical Topography** route is preserved. Hardware verification: `node tools/verify-full-dome-dream.mjs path/to/photo.jpg` (development server on 8081, or pass its URL as the second argument).
+PNG/GIF export the current view. Failed or cancelled synthesis keeps the previous view. The independent **3D Cortical Topography** route is preserved.
 
 ### Cortical Stack export handoff
 

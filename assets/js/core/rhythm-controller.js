@@ -38,7 +38,6 @@ export class RhythmController {
     this.frequencyData = null;
     this.floatFrequencyData = null;
     this.timeDomainData = null;
-    this.timeDomainData = null;
     this.status = "idle";
     this.error = null;
     this.levels = SILENT_LEVELS;
@@ -81,24 +80,6 @@ export class RhythmController {
       this.emitState();
     }
     return next;
-  }
-
-  // Kept as read-only compatibility helpers. Runtime code uses status directly.
-  get active() {
-    return (
-      this.status === "active" &&
-      Boolean(this.analyser) &&
-      this.context?.state === "running"
-    );
-  }
-
-  get hasSignal() {
-    return this.status === "active" && this.levels.hasSignal;
-  }
-
-  get frequencyBinWidth() {
-    if (!this.context || !this.analyser) return 0;
-    return this.context.sampleRate / this.analyser.fftSize;
   }
 
   getFrequencyData() {
@@ -373,24 +354,6 @@ export class RhythmController {
     return count > 0 ? Math.sqrt(powerSum / count) : 0;
   }
 
-  rmsBand(minimumHz, maximumHz) {
-    if (!this.analyser || !this.frequencyData || !this.context) return 0;
-    const binWidth = this.context.sampleRate / this.analyser.fftSize;
-    if (binWidth <= 0) return 0;
-    const first = Math.max(0, Math.ceil(minimumHz / binWidth));
-    const last = Math.min(
-      this.frequencyData.length - 1,
-      Math.floor(maximumHz / binWidth),
-    );
-    if (last < first) return 0;
-    let squares = 0;
-    for (let index = first; index <= last; index += 1) {
-      const value = this.frequencyData[index] / 255;
-      squares += value * value;
-    }
-    return Math.sqrt(squares / (last - first + 1));
-  }
-
   update(frameTimestamp = performance.now()) {
     const numericTimestamp = Number(frameTimestamp);
     const timestamp = Number.isFinite(numericTimestamp)
@@ -581,5 +544,3 @@ export class RhythmController {
 }
 
 export const rhythmController = new RhythmController();
-
-export default rhythmController;
