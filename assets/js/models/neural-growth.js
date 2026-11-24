@@ -8,7 +8,6 @@ import {
   PATTERNS,
   getPattern,
 } from "./neural-growth/patterns.js";
-import { AUDIO_PROFILES } from "./neural-growth/audio-profiles.js";
 import { NEURAL_GROWTH_AUDIO_EFFECTS } from "./neural-growth/audio-effects.js";
 import {
   ResonanceConfig,
@@ -194,10 +193,6 @@ export class NeuralGrowthModel {
     return NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath
       ? this._effectivePan
       : STILL_PAN;
-  }
-
-  get cameraMotion() {
-    return this._cameraMotion;
   }
 
   _simulationSizeOptions() {
@@ -2790,7 +2785,6 @@ export class NeuralGrowthModel {
             effectiveMode = "infuse";
             opts.strength = 1.0;
           } else if (mode === "shockwave") {
-            opts.shockwaveImpact = this._parameters.shockwaveImpact || "color";
             opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
             opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
             opts.strength = 1.0;
@@ -2824,7 +2818,7 @@ export class NeuralGrowthModel {
     }
   }
 
-  triggerRipple(x, y, customRadius = null, maxAmplitude = null) {
+  triggerRipple(x, y, _customRadius = null, maxAmplitude = null) {
     if (!this.ready) return false;
     const size = this.simulationSize;
     const originX = Math.max(
@@ -2835,19 +2829,11 @@ export class NeuralGrowthModel {
       0,
       Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
     );
-    const reach = "canvas";
-    let radius = 16;
-    if (reach === "canvas") {
-      const d1 = Math.hypot(originX, originY);
-      const d2 = Math.hypot(size - originX, originY);
-      const d3 = Math.hypot(originX, size - originY);
-      const d4 = Math.hypot(size - originX, size - originY);
-      radius = Math.ceil(Math.max(d1, d2, d3, d4));
-    } else {
-      const chosen =
-        Number(customRadius || this._parameters?.brushRadius) || 16;
-      radius = Math.max(8, Math.min(96, Math.round(chosen)));
-    }
+    const d1 = Math.hypot(originX, originY);
+    const d2 = Math.hypot(size - originX, originY);
+    const d3 = Math.hypot(originX, size - originY);
+    const d4 = Math.hypot(size - originX, size - originY);
+    const radius = Math.ceil(Math.max(d1, d2, d3, d4));
     const amp =
       maxAmplitude !== null && Number.isFinite(Number(maxAmplitude))
         ? Number(maxAmplitude)
@@ -2951,8 +2937,6 @@ export class NeuralGrowthModel {
   triggerKickInput(strength = 1.0, timestamp = null) {
     if (!NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave) return false;
     if (!this.ready) return false;
-    const impact = this._parameters?.shockwaveImpact || "color";
-    if (impact === "none") return false;
 
     const now = typeof timestamp === "number" ? timestamp : performance.now();
     const elapsed = now - (this._lastKickInputTime || 0);
@@ -3062,5 +3046,3 @@ export class NeuralGrowthModel {
     this._checkpoints.clear();
   }
 }
-
-export { AUDIO_PROFILES };
