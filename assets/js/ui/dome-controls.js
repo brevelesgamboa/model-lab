@@ -33,7 +33,6 @@ export function createDomeOutpaintingControls(
   }
   select.addEventListener("change", () => {
     if (!isActive() || !canInteract()) return;
-    model.cancelDream();
     if (select.value === "mirrored") model.useMirrored();
     else void model.prepareInpainting();
   });

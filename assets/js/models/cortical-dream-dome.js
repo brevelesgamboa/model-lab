@@ -2,6 +2,7 @@ import { DomeCamera } from "../render/dome-mesh.js";
 import {
   createDomeGraphics,
   disposeDomeGraphics,
+  uploadDream360,
 } from "../render/dome-graphics.js";
 import { AsyncCanvasMetrics } from "../core/async-canvas-metrics.js";
 import {
@@ -17,11 +18,6 @@ import {
 
 import { MiganInpainter } from "./migan-inpainter.js";
 import { projectPhotoMap } from "./equirectangular-canvas.js";
-import {
-  DomeDreamBaker,
-  bakeFullDome360,
-  uploadDream360,
-} from "./inception-dream-bake.js";
 import { TextureNcaRuntime } from "./neural-growth/runtime.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
 import { PATTERNS } from "./neural-growth/patterns.js";
@@ -247,7 +243,6 @@ export class CorticalDreamDomeModel {
     this.camera = new DomeCamera();
     this.estimator = new DepthEstimator();
     this.featureEstimator = new FeatureHeatmapEstimator();
-    this.baker = new DomeDreamBaker();
     this.inpainter = new MiganInpainter();
     this.outpaintingMode = "mirrored";
     this.inpaintState = "idle";
@@ -255,9 +250,6 @@ export class CorticalDreamDomeModel {
     this.aiDepthMap = null;
     this.aiDepthAbort = null;
     this.aiDepthEstimator = new DepthEstimator();
-    this.bakeState = "idle";
-    this.bakeProgress = 0;
-    this.bakeStatus = "Generate a 360 dream field when ready";
     this.selectedLayer = "mixed_5b";
     this.selectedChannel = 120;
     this.sourceVersion = 0;
@@ -460,12 +452,6 @@ export class CorticalDreamDomeModel {
     this.featureStatus = "Upload a photo to map a neuron";
     this.depthError = this.featureError = null;
     this.prepareSurround();
-    this.bakeState = "idle";
-    this.bakeStatus =
-      "Upload a photo, then generate the surrounding dream field";
-    this.bakeMetrics = null;
-    this.bakeError = null;
-    this.bakeProgress = 0;
     this.selectedLayer = "mixed_5b";
     this.selectedChannel = 120;
     this.uploadSource();
@@ -484,7 +470,7 @@ export class CorticalDreamDomeModel {
     this.mirrorSeed.photoRect = null;
     this.aiSeed = null;
     this.outpaintingMode = "mirrored";
-    this.seed360 = this.panorama = this.mirrorSeed;
+    this.panorama = this.mirrorSeed;
     this.photoRect = null;
     this.inpaintState = "idle";
     this.inpaintNotice = "";
@@ -499,21 +485,16 @@ export class CorticalDreamDomeModel {
     }
     this.aiDepthEstimator?.cancel();
     this.aiDepthMap = null;
-    this.cancelDream();
     this.outpaintingMode = "mirrored";
     this.inpaintState = "idle";
     this.inpaintInfo = null;
     this.inpaintNotice = message;
-    this.seed360 = this.panorama = this.mirrorSeed;
+    this.panorama = this.mirrorSeed;
     this.photoRect = null;
-    this.bakeState = "idle";
-    this.bakeProgress = 0;
-    this.bakeStatus = "Mirrored photo · synthesize when ready";
     this.uploadSource();
     this.onStateChange();
   }
   async prepareInpainting(file) {
-    this.cancelDream();
     const version = ++this.inpaintVersion;
     const sourceVersion = this.sourceVersion;
     this.inpaintState = "loading";
@@ -542,21 +523,17 @@ export class CorticalDreamDomeModel {
         sourceVersion !== this.sourceVersion
       )
         return;
-      this.cancelDream();
       if (this.aiDepthAbort) {
         this.aiDepthAbort.abort();
         this.aiDepthAbort = null;
       }
       this.aiDepthEstimator?.cancel();
       this.aiSeed = panorama;
-      this.seed360 = this.panorama = panorama;
+      this.panorama = panorama;
       this.photoRect = panorama.photoRect;
       this.outpaintingMode = "migan";
       this.inpaintState = "ready";
       this.inpaintNotice = "";
-      this.bakeState = "idle";
-      this.bakeProgress = 0;
-      this.bakeStatus = "AI panorama ready";
       this.aiDepthMap = luminanceDepth(panorama);
       this.uploadSource();
       this.onStateChange();
@@ -931,12 +908,6 @@ export class CorticalDreamDomeModel {
       this.depthMap = luminanceDepth(this.source);
       this.featureMap = emptyFeatureMap();
       this.prepareSurround();
-      this.bakeState = "idle";
-      this.bakeStatus =
-        "Photo preserved in front · generate the surrounding dream field when ready";
-      this.bakeMetrics = null;
-      this.bakeError = null;
-      this.bakeProgress = 0;
       this.depthState = this.featureState = "pending";
       this.depthStatus = "Brightness preview";
       this.featureStatus = "Preparing neuron map…";
@@ -1004,7 +975,6 @@ export class CorticalDreamDomeModel {
     }
     this.selectedLayer = validated.layer;
     this.selectedChannel = validated.channel;
-    this.cancelDream();
     this.featureAbort?.abort();
     this.featureMap = emptyFeatureMap();
     this.uploadGeometry();
@@ -1068,79 +1038,6 @@ export class CorticalDreamDomeModel {
       if (this.featureAbort === abort) this.featureAbort = null;
     }
   }
-  async generateDream(iterations = 15) {
-    if (
-      !this.hasPhoto ||
-      this.bakeState === "baking" ||
-      this.outpaintingMode === "migan" ||
-      ["loading", "missing"].includes(this.inpaintState)
-    )
-      return;
-    const version = this.sourceVersion,
-      layer = this.selectedLayer || "mixed_5b",
-      channel = Number.isInteger(this.selectedChannel)
-        ? this.selectedChannel
-        : 120;
-    const abort = new AbortController();
-    this.bakeAbort = abort;
-    this.bakeState = "baking";
-    this.bakeProgress = 0;
-    this.bakeError = null;
-    this.bakeStatus = "Synthesizing 360 Universe: 0%…";
-    this.onStateChange();
-    try {
-      const g = await this.ensureGraphics();
-      if (abort.signal.aborted || version !== this.sourceVersion) return;
-      const result = await bakeFullDome360(
-        this.gl,
-        this.seed360,
-        layer,
-        channel,
-        iterations,
-        (percent, message) => {
-          if (abort.signal.aborted || version !== this.sourceVersion) return;
-          this.bakeProgress = percent;
-          this.bakeStatus =
-            message || `Synthesizing 360 Universe: ${percent}%…`;
-          this.onStateChange();
-        },
-        {
-          baker: this.baker,
-          texture: g.textures[0],
-          signal: abort.signal,
-          colorRetention: 1,
-        },
-      );
-      if (abort.signal.aborted || version !== this.sourceVersion) return;
-      this.panorama = result.canvas;
-      this.uploadSource();
-      const { canvas: _canvas, texture: _texture, ...stats } = result;
-      this.bakeMetrics = stats;
-      this.bakeState = "ready";
-      this.bakeStatus = `360 dream ready · ${result.iterations} steps · ${(result.bakeMs / 1000).toFixed(1)} s synthesis`;
-      this.onStateChange();
-    } catch (error) {
-      if (error.name !== "AbortError" && !abort.signal.aborted) {
-        this.bakeState = "error";
-        this.bakeError = error.message;
-        this.bakeStatus =
-          "Dream bake unavailable · your previous view is preserved";
-        this.onStateChange();
-      }
-    } finally {
-      if (this.bakeAbort === abort) this.bakeAbort = null;
-    }
-  }
-  cancelDream() {
-    this.bakeAbort?.abort();
-    this.bakeAbort = null;
-    this.baker.cancel();
-    if (this.bakeState === "baking") {
-      this.bakeState = "cancelled";
-      this.bakeStatus = "Dream bake cancelled · previous view preserved";
-      this.onStateChange();
-    }
-  }
   onParameterChange(key, value) {
     if (key === "photoProtection") {
       this.photoProtection = Number(value);
@@ -1175,7 +1072,6 @@ export class CorticalDreamDomeModel {
       this.inpaintState = "idle";
       this.inpaintNotice = "Inpainting cancelled · previous view preserved";
     }
-    this.cancelDream();
     this.ncaAbort?.abort();
     this.ncaAbort = null;
     this.depthAbort?.abort();
@@ -1333,8 +1229,6 @@ export class CorticalDreamDomeModel {
         depthRuns: this.estimator.runs,
         featureRuns: this.featureEstimator.runs,
         sourceName: this.sourceName,
-        dreamBakes: this.baker.runs,
-        dreamState: this.bakeState,
       },
     };
   }

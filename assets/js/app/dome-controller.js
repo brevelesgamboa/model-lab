@@ -60,7 +60,6 @@ export function createDomeController({
       elements.domeDriftToggle.checked = Boolean(model.autonomousDrift);
     }
     elements.domeTools.hidden = !active;
-    elements.domeBakeOverlay.hidden = !active || model.bakeState !== "baking";
     elements.canvas.classList.toggle("has-dome-camera", active);
     if (active) elements.canvas.setAttribute("tabindex", "0");
     else elements.canvas.removeAttribute("tabindex");
@@ -68,8 +67,7 @@ export function createDomeController({
       endGesture();
       return;
     }
-    if (model.bakeState === "baking") endGesture();
-    const fullPipeline = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus} · ${model.bakeStatus}`;
+    const fullPipeline = `${model.sourceName} · ${model.depthStatus} · ${model.featureStatus}`;
     if (fullPipeline !== lastLoggedPipeline) {
       lastLoggedPipeline = fullPipeline;
       terminal("DOME", fullPipeline, "info");
@@ -87,9 +85,7 @@ export function createDomeController({
         dupInput.tabIndex = -1;
       }
     }
-    elements.domeBakeLabel.textContent = model.bakeStatus;
-    elements.domeBakeProgress.value = model.bakeProgress;
-    const nextKey = `${model.depthState}:${model.featureState}:${model.bakeState}`;
+    const nextKey = `${model.depthState}:${model.featureState}`;
     if (nextKey !== cacheKey) {
       cacheKey = nextKey;
       void cache.refresh();
@@ -101,7 +97,7 @@ export function createDomeController({
       model.depthState,
       model.featureState,
     ].includes("loading");
-    elements.domeResetView.disabled = model.bakeState === "baking";
+    elements.domeResetView.disabled = false;
   }
   model.onStateChange = () => {
     update();
@@ -133,7 +129,6 @@ export function createDomeController({
   elements.domeRetry.addEventListener("click", () => {
     if (isActive() && canInteract()) void model.retryMaps().catch(report);
   });
-  elements.domeCancelBake.addEventListener("click", () => model.cancelDream());
   elements.domeDriftToggle?.addEventListener("change", () => {
     if (!isActive()) return;
     const enabled = elements.domeDriftToggle.checked;
@@ -144,7 +139,6 @@ export function createDomeController({
     if (
       !isActive() ||
       !canInteract() ||
-      model.bakeState === "baking" ||
       ![0, 1, 2].includes(event.button)
     )
       return;
@@ -169,7 +163,6 @@ export function createDomeController({
       !gesture ||
       event.pointerId !== gesture.id ||
       !isActive() ||
-      model.bakeState === "baking" ||
       !canInteract()
     )
       return;
@@ -208,7 +201,7 @@ export function createDomeController({
     if (isActive()) event.preventDefault();
   });
   elements.canvas.addEventListener("keydown", (event) => {
-    if (!isActive() || !canInteract() || model.bakeState === "baking") return;
+    if (!isActive() || !canInteract()) return;
     const direction = {
       ArrowLeft: [12, 0],
       ArrowRight: [-12, 0],

@@ -872,7 +872,7 @@ export function createSpatialMaskController({
       elements.neuralDreamSpatialTools.hidden = !active;
     }
 
-    const brushBtn = elements.spatialToolBrush || elements.spatialToolWand;
+    const brushBtn = elements.spatialToolBrush;
     if (brushBtn) {
       brushBtn.disabled = !sourceLoaded;
       brushBtn.classList.toggle(

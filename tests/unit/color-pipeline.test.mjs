@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { uploadDream360 } from "../../assets/js/models/inception-dream-bake.js";
+import { uploadDream360 } from "../../assets/js/render/dome-graphics.js";
 import {
   packMiganInputs,
   compositeMigan,

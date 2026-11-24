@@ -417,7 +417,6 @@ export class InceptionDreamModel {
       feather: 0.25,
       inverted: false,
     };
-    this.detailFusion = 0.22;
   }
 
   get id() {
@@ -455,9 +454,6 @@ export class InceptionDreamModel {
       inferenceBackend: "WebGPU / WebGL with gradient verification",
       privacy: "Local image processing",
     };
-  }
-  get animated() {
-    return true;
   }
   get usesInternalClock() {
     return true;
