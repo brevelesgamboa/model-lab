@@ -2516,7 +2516,6 @@ export class NeuralGrowthModel {
         displayFilter: parameters.displayFilter,
         showBarrier,
         ripples: this._activeRipples || [],
-        dyeColor: parameters.dyeColor,
         channelView: parameters.channelView,
         echoDecay: parameters.echoDecay,
         echoDrift: parameters.echoDrift,
@@ -2785,8 +2784,6 @@ export class NeuralGrowthModel {
             effectiveMode = "infuse";
             opts.strength = 1.0;
           } else if (mode === "shockwave") {
-            opts.ringRadius = Math.max(6, Math.round(radius * 0.12));
-            opts.ringWidth = Math.max(6, Math.min(24, radius * 0.1));
             opts.strength = 1.0;
           } else if (mode === "infuse") {
             opts.strength = 1.2;
@@ -3027,7 +3024,6 @@ export class NeuralGrowthModel {
         displayFilter: options.displayFilter ?? this._parameters.displayFilter,
         showBarrier: options.showBarrier ?? false,
         ripples: options.ripples ?? [],
-        dyeColor: options.dyeColor ?? this._parameters.dyeColor,
         channelView: options.channelView ?? this._parameters.channelView,
         echoDecay: options.echoDecay ?? this._parameters.echoDecay,
         echoDrift: options.echoDrift ?? this._parameters.echoDrift,

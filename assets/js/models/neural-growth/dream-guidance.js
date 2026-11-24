@@ -389,7 +389,7 @@ export function gradientDataToRgbaBytes(
 export class DreamGuidanceBridge {
   constructor({
     getInceptionModel = null,
-    archetypes = [],
+    archetypes: _archetypes = [],
     generatePreview = generateNeuronPreview,
     previewStorage = new NeuronPreviewCache(),
     random = Math.random,
@@ -405,7 +405,6 @@ export class DreamGuidanceBridge {
     this._random = random;
     this._gradientSigma = gradientSigma;
     this.previewCache = new Map();
-    this._archetypes = archetypes;
     this._generatePreview = generatePreview;
     this._previewQueue = new Map();
     this._previewEntries = new Map();

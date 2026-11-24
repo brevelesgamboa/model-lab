@@ -89,8 +89,6 @@ export const AUDIO_PROFILES = Object.freeze({
   }),
 });
 
-export const AUDIO_PROFILE_KEYS = Object.freeze(Object.keys(AUDIO_PROFILES));
-
 export function matchesAudioProfile(profileId, context = {}) {
   const profile = AUDIO_PROFILES[profileId];
   if (!profile) return false;

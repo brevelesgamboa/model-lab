@@ -15,15 +15,6 @@ export class CameraMotionEngine {
     this.lastTimestamp = -1;
   }
 
-  reset() {
-    this.kickPulse = 0.0;
-    this.smoothBass = 0.0;
-    this.driftPhase = 0.0;
-    this.panX = 0.0;
-    this.panY = 0.0;
-    this.lastTimestamp = -1;
-  }
-
   update(levels, timestamp, parameters = {}) {
     const mode = parameters.cameraBreathing || "off";
     const strength = Math.max(

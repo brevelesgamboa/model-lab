@@ -12,7 +12,6 @@ import {
   validateSeed,
   validateSize,
 } from "./reference.js";
-import { hexToRgb } from "../../core/utils.js";
 import { ResonanceConfig } from "./resonance-config.js";
 import {
   MOTION_GRID_SIZE,
@@ -472,8 +471,6 @@ uniform sampler2D u_state;
 uniform sampler2D u_barrier;
 uniform ivec2 u_center;
 uniform float u_radius;
-uniform float u_ringRadius;
-uniform float u_ringWidth;
 uniform float u_strength;
 uniform int u_mode;
 uniform vec3 u_dyeColor;
@@ -505,11 +502,6 @@ void main() {
     if (dist <= rMod) {
       float sigma = max(2.0, rMod * 0.45);
       weight = exp(-(dist * dist) / (2.0 * sigma * sigma)) * u_strength;
-    }
-  } else if (u_ringRadius > 0.0) {
-    float diff = dist - u_ringRadius;
-    if (abs(diff) <= 3.5 * u_ringWidth) {
-      weight = exp(-(diff * diff) / (2.0 * u_ringWidth * u_ringWidth)) * u_strength;
     }
   } else if (dist <= u_radius) {
     weight = smoothstep(u_radius, u_radius * 0.35, dist);
@@ -595,8 +587,6 @@ void main() {
     } else {
       out_color = current;
     }
-  } else if (u_mode == 3) {
-    out_color = current;
   } else {
     out_color = mix(current, vec4(127.0 / 255.0), weight);
   }
@@ -609,8 +599,6 @@ uniform int u_palette;
 uniform float u_palettePhase;
 uniform int u_showBarrier;
 uniform int u_rippleCount;
-uniform int u_rippleStyle;
-uniform vec3 u_rippleTint;
 uniform vec4 u_ripple0;
 uniform vec4 u_ripple1;
 uniform vec4 u_ripple2;
@@ -622,7 +610,7 @@ uniform float u_zoom;
 uniform vec2 u_pan;
 uniform int u_displayFilter;
 
-vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int style) {
+vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude) {
   if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return vec2(0.0);
   vec2 origin = rippleData.xy;
   float progress = rippleData.z;
@@ -636,26 +624,9 @@ vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude, int s
   float timeFade = 1.0 - progress;
   timeFade = timeFade * timeFade;
   float wave = sin(diff * (3.14159265 / waveWidth));
-  if (style == 3) {
-    wave = wave + 0.45 * sin(diff * (6.28318530 / waveWidth));
-  }
   wave = wave * spatialEnv * timeFade * amplitude;
   vec2 dir = dist > 0.5 ? delta / dist : vec2(0.0);
   return dir * wave;
-}
-
-float computeRippleGlow(vec2 pos, vec4 rippleData, float amplitude) {
-  if (rippleData.z <= 0.0 || rippleData.z >= 1.0) return 0.0;
-  vec2 origin = rippleData.xy;
-  float progress = rippleData.z;
-  float maxRadius = rippleData.w;
-  float dist = length(pos - origin);
-  float currentRadius = progress * maxRadius;
-  float diff = dist - currentRadius;
-  float waveWidth = max(8.0, maxRadius * 0.12);
-  float spatialEnv = exp(-(diff * diff) / (2.0 * waveWidth * waveWidth));
-  float timeFade = 1.0 - progress;
-  return spatialEnv * timeFade * timeFade * amplitude;
 }
 
 vec3 hueShift(vec3 color, float angle) {
@@ -773,45 +744,19 @@ void main() {
   vec2 pos = srcOffset + u_pan * float(u_size) + uv * srcExtent;
 
   vec2 disp = vec2(0.0);
-  float totalGlow = 0.0;
-  if (u_rippleCount > 0) {
-    disp += computeRippleDisplacement(pos, u_ripple0, u_rippleAmps.x, u_rippleStyle);
-    if (u_rippleStyle == 2) totalGlow += computeRippleGlow(pos, u_ripple0, u_rippleAmps.x);
-  }
-  if (u_rippleCount > 1) {
-    disp += computeRippleDisplacement(pos, u_ripple1, u_rippleAmps.y, u_rippleStyle);
-    if (u_rippleStyle == 2) totalGlow += computeRippleGlow(pos, u_ripple1, u_rippleAmps.y);
-  }
-  if (u_rippleCount > 2) {
-    disp += computeRippleDisplacement(pos, u_ripple2, u_rippleAmps.z, u_rippleStyle);
-    if (u_rippleStyle == 2) totalGlow += computeRippleGlow(pos, u_ripple2, u_rippleAmps.z);
-  }
-  if (u_rippleCount > 3) {
-    disp += computeRippleDisplacement(pos, u_ripple3, u_rippleAmps.w, u_rippleStyle);
-    if (u_rippleStyle == 2) totalGlow += computeRippleGlow(pos, u_ripple3, u_rippleAmps.w);
-  }
+  if (u_rippleCount > 0) disp += computeRippleDisplacement(pos, u_ripple0, u_rippleAmps.x);
+  if (u_rippleCount > 1) disp += computeRippleDisplacement(pos, u_ripple1, u_rippleAmps.y);
+  if (u_rippleCount > 2) disp += computeRippleDisplacement(pos, u_ripple2, u_rippleAmps.z);
+  if (u_rippleCount > 3) disp += computeRippleDisplacement(pos, u_ripple3, u_rippleAmps.w);
   float dispLen = length(disp);
   if (dispLen > 1.8) {
     disp = (disp / dispLen) * 1.8;
   }
-  vec3 rawRgb;
-  vec2 pBase = pos - disp;
-  if (u_channelView == 0 && dispLen > 0.001 && u_rippleStyle == 1) {
-    float r = sampleGroup(pos - disp * 1.35, 0).r * 0.5 + 0.5;
-    float g = sampleGroup(pos - disp * 1.00, 0).g * 0.5 + 0.5;
-    float b = sampleGroup(pos - disp * 0.65, 0).b * 0.5 + 0.5;
-    rawRgb = vec3(r, g, b);
-  } else {
-    rawRgb = sampleRawColor(pBase);
-  }
+  vec3 rawRgb = sampleRawColor(pos - disp);
 
   // Soft highlight compression: smoothly rolls off intense highlights above 0.5
   vec3 rgb = rawRgb / (1.0 + max(vec3(0.0), rawRgb - 0.5) * 0.85);
   rgb = clamp(rgb, 0.0, 1.0);
-
-  if (u_rippleStyle == 2 && totalGlow > 0.001) {
-    rgb = clamp(rgb + u_rippleTint * totalGlow * 0.75, 0.0, 1.0);
-  }
 
   float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
 
@@ -1312,7 +1257,6 @@ export class TextureNcaRuntime {
           "u_showBarrier",
           "u_lockBarrier",
           "u_rippleCount",
-          "u_rippleStyle",
           "u_channelView",
           "u_displayFilter",
           "u_stepSeed",
@@ -1648,9 +1592,6 @@ export class TextureNcaRuntime {
       dyeColor = [0, 0.94, 1],
       strokeAngle = 0,
       lockBarrier = true,
-      shockwaveImpact = "color",
-      ringRadius = 0,
-      ringWidth = 8,
       strength = 1.0,
     } = {},
   ) {
@@ -1731,26 +1672,18 @@ export class TextureNcaRuntime {
       ];
     }
     let modeCode = 0;
-    let effectiveRingRadius = Number(ringRadius) || 0;
-    let effectiveRingWidth =
-      Number(ringWidth) || Math.max(6, Math.min(24, radius * 0.12));
     let effectiveStrength = Number(strength) ?? 1.0;
     let effectiveRadius = radius;
     if (mode === "noise") modeCode = 1;
     else if (mode === "dye") modeCode = 2;
     else if (mode === "invert") modeCode = 4;
     else if (mode === "shockwave") {
-      const impact = shockwaveImpact || "color";
-      if (impact === "color") {
-        modeCode = 5;
-        effectiveRadius = Math.min(
-          12,
-          Math.max(6, Math.round(this.size * 0.05)),
-        );
-        effectiveStrength = 0.18;
-      } else {
-        modeCode = 3;
-      }
+      modeCode = 5;
+      effectiveRadius = Math.min(
+        12,
+        Math.max(6, Math.round(this.size * 0.05)),
+      );
+      effectiveStrength = 0.18;
     } else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
     else if (mode === "kick_hidden_perturb" || mode === "infuse") modeCode = 7;
@@ -1762,8 +1695,6 @@ export class TextureNcaRuntime {
       {
         u_center: [x, y],
         u_radius: effectiveRadius,
-        u_ringRadius: effectiveRingRadius,
-        u_ringWidth: effectiveRingWidth,
         u_strength: effectiveStrength,
         u_mode: modeCode,
         u_dyeColor: Array.isArray(dyeColor) ? dyeColor : [0, 0.94, 1],
@@ -1798,8 +1729,6 @@ export class TextureNcaRuntime {
       displayFilter = "smooth",
       showBarrier = false,
       ripples = [],
-      shockwaveStyle = "refract",
-      dyeColor = "#00f0ff",
       channelView = "phenotype",
       echoDecay = 0.0,
       echoDrift = 0.25,
@@ -1839,20 +1768,6 @@ export class TextureNcaRuntime {
     };
     const channelViewCode = channelViewModes[channelView] ?? 0;
 
-    const rippleStyles = { refract: 0, chromatic: 1, glow: 2, harmonic: 3 };
-    const rippleStyleCode = rippleStyles[shockwaveStyle] ?? 0;
-    const dyeRgb =
-      typeof dyeColor === "string"
-        ? hexToRgb(dyeColor)
-        : Array.isArray(dyeColor)
-          ? dyeColor
-          : [0, 240, 255];
-    const rippleTint = [
-      (dyeRgb[0] || 0) / 255,
-      (dyeRgb[1] || 0) / 255,
-      (dyeRgb[2] || 0) / 255,
-    ];
-
     const activeRipples = Array.isArray(ripples) ? ripples.slice(0, 4) : [];
     const rippleCount = activeRipples.length;
     const now = performance.now();
@@ -1886,7 +1801,7 @@ export class TextureNcaRuntime {
       this.canvas.height = extent;
     }
 
-    const filterModes = { smooth: 0, crisp: 1, ultra: 0, cas: 0, hybrid: 0 };
+    const filterModes = { smooth: 0, crisp: 1 };
     const filterCode = filterModes[displayFilter] ?? 0;
     const z = Math.max(1, Math.min(8, Number(zoom) || 1));
 
@@ -1894,8 +1809,6 @@ export class TextureNcaRuntime {
       u_palette: paletteCode,
       u_palettePhase: palettePhaseRad,
       u_showBarrier: showBarrier ? 1 : 0,
-      u_rippleStyle: rippleStyleCode,
-      u_rippleTint: rippleTint,
       u_channelView: channelViewCode,
       u_viewport: [extent, extent],
       u_zoom: z,

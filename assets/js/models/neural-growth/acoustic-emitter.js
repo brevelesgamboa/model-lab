@@ -34,11 +34,6 @@ export class AcousticEmitter {
     this.frequencyLut = null;
   }
 
-  reset() {
-    this.runningAverages.fill(0);
-    this.lastTriggerTimes.fill(-9999);
-  }
-
   buildFrequencyLut(sampleRate = 48000, fftSize = 2048) {
     const binWidth = sampleRate / fftSize;
     const minHz = 30;
