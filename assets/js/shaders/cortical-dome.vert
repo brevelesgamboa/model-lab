@@ -7,11 +7,12 @@ uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform sampler2D u_depth;
 uniform sampler2D u_neural;
+uniform sampler2D u_nca_texture;
 uniform float u_depth_extrude;
 uniform float u_neural_extrude;
+uniform float u_nca_extrude;
 #include <cortical-waves>
 #include <dome-mapping>
-out vec2 v_uv;
 out vec3 v_worldPos;
 out vec3 v_normal;
 out float v_waveVal;
@@ -25,8 +26,11 @@ float domeWave(vec2 uv) {
 float domeRadius(vec2 uv) {
   vec2 mapped = domePhotoUV(uv);
   vec2 scalarUV = vec2(mapped.x, 1.0 - mapped.y);
+  vec3 ncaRgb = texture(u_nca_texture, scalarUV).rgb;
+  float ncaVitality = dot(ncaRgb, vec3(0.299, 0.587, 0.114));
   return max(1.0, 5.0 - texture(u_depth, scalarUV).r * u_depth_extrude
     - texture(u_neural, scalarUV).r * u_neural_extrude
+    - ncaVitality * u_nca_extrude
     - domeWave(uv) * u_gain * 0.4);
 }
 vec3 domePoint(vec2 uv) {
@@ -43,11 +47,14 @@ void main() {
   vec2 scalarUV = vec2(mapUV.x, 1.0 - mapUV.y);
   float d = texture(u_depth, scalarUV).r;
   float n = texture(u_neural, scalarUV).r;
+  vec3 ncaRgb = texture(u_nca_texture, scalarUV).rgb;
+  float ncaVitality = dot(ncaRgb, vec3(0.299, 0.587, 0.114));
   float waveVal = domeWave(a_uv);
   float radius = max(1.0, 5.0 - d * u_depth_extrude
-    - n * u_neural_extrude - waveVal * u_gain * 0.4);
+    - n * u_neural_extrude
+    - ncaVitality * u_nca_extrude
+    - waveVal * u_gain * 0.4);
   vec3 worldPos = a_position * radius;
-  v_uv = a_uv;
   v_worldPos = worldPos;
   // Smooth normals from the same cached fields, interpolated across the mesh.
   // This avoids lighting every triangle as a separate hard-edged tile.

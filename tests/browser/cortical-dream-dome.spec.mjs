@@ -202,12 +202,11 @@ test("photo/target replacements reject stale maps; controls, navigation, camera 
     "photo-96.png",
   );
   const depthRuns = await page.evaluate(() => window.__dome.estimator.runs);
-  const target = page.getByLabel("DREAM TARGET", { exact: true });
-  await target.selectOption("1");
+  await page.evaluate(() => window.__dome.setNeuronTarget("mixed_6a", 42));
   await expect
     .poll(() => page.evaluate(() => window.__dome.featureState))
     .toBe("loading");
-  await target.selectOption("2");
+  await page.evaluate(() => window.__dome.setNeuronTarget("Conv2d_4a_3x3", 42));
   await ready(page);
   expect(await page.evaluate(() => window.__dome.featureMap.layer)).toBe(
     "Conv2d_4a_3x3",
@@ -233,8 +232,8 @@ test("photo/target replacements reject stale maps; controls, navigation, camera 
   await page.locator("#model-select").selectOption("cortical-topography");
   await expect(page.locator("#cortical-tools")).toBeVisible();
   await page.locator("#model-select").selectOption("cortical-dream-dome");
-  await expect(page.locator("#dome-status")).toContainText(
-    "Conv2d_4a_3x3:42 ready",
+  expect(await page.evaluate(() => window.__dome.featureMap?.layer)).toBe(
+    "Conv2d_4a_3x3",
   );
   expect(
     await page.evaluate(() => [
@@ -249,16 +248,16 @@ test("photo/target replacements reject stale maps; controls, navigation, camera 
       window.__dome.gl.getError(),
     ]),
   ).toEqual([false, false, 0]);
-  // Reset is a parameter-set operation, rather than a select input event.
+  // Reset is a parameter-set operation; featureTarget is no longer a control so the active neuron target is preserved.
   await page.locator("#reset-parameters").click();
   await ready(page);
   expect(await page.evaluate(() => window.__dome.featureMap.layer)).toBe(
-    "mixed_5b",
+    "Conv2d_4a_3x3",
   );
   expect(await page.evaluate(() => window.__dome.estimator.runs)).toBe(
     depthRuns,
   );
-  await target.selectOption("1");
+  await page.evaluate(() => window.__dome.setNeuronTarget("mixed_6a", 42));
   await expect
     .poll(() =>
       page.evaluate(() => Boolean(window.__dome.featureEstimator.pending)),
@@ -541,7 +540,7 @@ test("actual dome vertex displacement closes rear/pole seams and aligns depth an
   expect(result.error).toBe(0);
 });
 
-test("dome browse button connects neuron explorer, supports custom neurons, and color retention control is absent", async ({
+test("dream target UI is hidden from dome drawer, color retention control is absent, and section grouping matches spec", async ({
   page,
 }) => {
   await openDome(page);
@@ -560,52 +559,158 @@ test("dome browse button connects neuron explorer, supports custom neurons, and 
     page.locator('details[data-section="optics"]'),
   ).not.toHaveAttribute("open", "");
 
-  // Verify custom neuron controls toggle with custom dropdown selection
-  const customControls = page.locator("#dome-custom-neuron-controls");
-  await expect(customControls).toBeHidden();
+  // Verify Dream Target panel and button are removed from Cortical Dream Dome drawer
+  await expect(page.locator("#dream-synthesis-section")).not.toBeAttached();
+  await expect(page.locator("#dome-archetypes")).not.toBeAttached();
+  await expect(page.locator("#dome-generate")).not.toBeAttached();
+  await expect(page.locator("#dome-custom-neuron-controls")).not.toBeAttached();
+});
 
-  const select = page.locator("#dome-archetypes");
-  await select.selectOption("-1");
-  await expect(customControls).toBeVisible();
+test("cortical dream dome wires live NCA controls, presets, resolution, and renders frames without errors", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
 
-  // Stepper controls
-  const channelInput = page.locator("#dome-custom-ch-input");
-  const initialCh = parseInt(await channelInput.inputValue(), 10);
-  await page.locator("#dome-custom-ch-inc").click();
-  expect(parseInt(await channelInput.inputValue(), 10)).toBe(initialCh + 1);
-  await page.locator("#dome-custom-ch-dec").click();
-  expect(parseInt(await channelInput.inputValue(), 10)).toBe(initialCh);
+  await openDome(page);
 
-  // Selecting preset archetype hides custom controls
-  await select.selectOption("0");
-  await expect(customControls).toBeHidden();
+  // Autonomous Drift toggle is visible and checked by default
+  const driftToggle = page.locator("#dome-drift-toggle");
+  await expect(driftToggle).toBeVisible();
+  await expect(driftToggle).toBeChecked();
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.autonomousDrift))
+    .toBe(true);
 
-  // Verify browse button opens explorer dialog
-  const browseBtn = page.locator("#dome-browse-neurons");
+  // Manual yield: mouse interaction on canvas immediately stops drift and unchecks toggle
+  const canvas = page.locator("#output-canvas");
+  await canvas.hover();
+  await page.mouse.down();
+  await expect(driftToggle).not.toBeChecked();
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.autonomousDrift))
+    .toBe(false);
+  await page.mouse.up();
+
+  // Re-checking restores autonomous drift
+  await driftToggle.check();
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.autonomousDrift))
+    .toBe(true);
+
+  // NCA section is visible
+  const ncaSection = page.locator("#dome-nca-section");
+  await expect(ncaSection).toBeVisible();
+
+  // Manual reseed button is hidden from UI to keep interface clean
+  await expect(page.locator("#dome-nca-reseed")).toBeHidden();
+
+  // Active preset label exists and default is Membrane Field
+  const presetLabel = page.locator("#dome-nca-preset-label");
+  await expect(presetLabel).toBeVisible();
+  await expect(presetLabel).toHaveText("Membrane Field");
+
+  // Vertical stacking check: NCA Grid resolution select is positioned below the preset row
+  const browseBtn = page.locator("#dome-browse-nca");
+  const resSelect = page.locator("#dome-nca-resolution");
+  await expect(resSelect).toBeVisible();
+  await expect(resSelect).toHaveValue("256");
+
+  const browseBox = await browseBtn.boundingBox();
+  const resBox = await resSelect.boundingBox();
+  expect(resBox.y).toBeGreaterThan(browseBox.y);
+
+  // Zero horizontal overflow check on dome-nca-section
+  const hasOverflow = await page.evaluate(() => {
+    const el = document.getElementById("dome-nca-section");
+    return el ? el.scrollWidth > el.clientWidth : false;
+  });
+  expect(hasOverflow).toBe(false);
+
+  await resSelect.selectOption("128");
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.ncaSize))
+    .toBe(128);
+
+  // Verify there is only ONE Bio-Sheen Opacity slider (no duplicates)
+  await expect(page.locator('input[aria-label="Bio-Sheen Opacity"]')).toHaveCount(1);
+
+  // Sliders for relief (ncaExtrude in Geometry & Depth) and sheen (ncaSheen)
+  const extrudeSlider = page.locator('input[aria-label="NCA RELIEF"]');
+  await expect(extrudeSlider).toBeVisible();
+  await extrudeSlider.fill("0.35");
+  await extrudeSlider.dispatchEvent("input");
+  await extrudeSlider.dispatchEvent("change");
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.ncaExtrude))
+    .toBeCloseTo(0.35, 2);
+
+  const sheenSlider = page.locator("#dome-nca-sheen");
+  const sheenVal = page.locator("#dome-nca-sheen-val");
+  await expect(sheenSlider).toBeVisible();
+  await expect(sheenVal).toBeVisible();
+  await sheenSlider.fill("0.85");
+  await sheenSlider.dispatchEvent("input");
+  await sheenSlider.dispatchEvent("change");
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.ncaSheen))
+    .toBeCloseTo(0.85, 2);
+  await expect(sheenVal).toHaveText("0.85");
+
+  // Photo core protection slider
+  const protectSlider = page.locator("#dome-photo-protection");
+  const protectVal = page.locator("#dome-photo-protection-val");
+  await expect(protectSlider).toBeVisible();
+  await expect(protectVal).toBeVisible();
+  await protectSlider.fill("0.3");
+  await protectSlider.dispatchEvent("input");
+  await protectSlider.dispatchEvent("change");
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.photoProtection))
+    .toBeCloseTo(0.3, 2);
+  await expect(protectVal).toHaveText("0.30");
+
+  // Guidance placeholder containers exist in DOM
+  await expect(page.locator("#dome-nca-sheen-guidance")).toBeAttached();
+  await expect(page.locator("#dome-photo-protection-guidance")).toBeAttached();
+
+  // Browse Gallery button opens growth gallery dialog and selects a pattern
   await expect(browseBtn).toBeVisible();
   await browseBtn.click();
 
-  const dialog = page.getByRole("dialog", {
-    name: "Neuron explorer",
-    exact: true,
+  const galleryDialog = page.locator("#growth-gallery-dialog");
+  await expect(galleryDialog).toBeVisible();
+
+  // Click on a pattern card in the gallery (e.g. xeno-reef)
+  const patternCard = galleryDialog.locator(
+    '.growth-gallery__card[data-pattern-id="xeno-reef"]',
+  );
+  await patternCard.click();
+  await expect(galleryDialog).toBeHidden();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__dome?.ncaPresetId))
+    .toBe("xeno-reef");
+  await expect(presetLabel).toHaveText("Xeno Reef");
+
+  // Automatic vitality loop: test that evaluateNcaVitality operates and triggers spores when needed
+  const autoLoopOk = await page.evaluate(() => {
+    const dome = window.__dome;
+    if (!dome) return false;
+    const initialVitality = dome.ncaVitality;
+    // Simulate low vitality
+    const res = dome.evaluateNcaVitality({ vitality: 0.03, delta: 0.001 });
+    return (
+      res.triggered &&
+      dome.ncaActiveSpores.length > 0 &&
+      typeof initialVitality === "number"
+    );
   });
-  await expect(dialog).toBeVisible();
+  expect(autoLoopOk).toBe(true);
 
-  // Search and select a neuron
-  await dialog.getByLabel("Explorer layer", { exact: true }).selectOption("mixed_6c");
-  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("215");
-  await dialog.locator('.neuron-explorer__card[data-channel="215"]').click();
-  await dialog.getByRole("button", { name: "Use as Dream target", exact: true }).click();
-  await expect(dialog).not.toBeVisible();
+  // Wait a couple of frames to ensure live NCA steps, drains spores, and renders without errors
+  await page.waitForTimeout(600);
 
-  // Verify custom target updated on dome select and model
-  await expect(select).toHaveValue("-1");
-  const option = select.locator('option[value="-1"]');
-  await expect(option).not.toHaveAttribute("hidden");
-  await expect(option).toContainText("mixed_6c");
-  await expect(option).toContainText("215");
-
-  expect(await page.evaluate(() => window.__dome.selectedLayer)).toBe("mixed_6c");
-  expect(await page.evaluate(() => window.__dome.selectedChannel)).toBe(215);
-  expect(await page.evaluate(() => window.__dome._isCustomNeuron)).toBe(true);
+  expect(errors).toEqual([]);
 });
+

@@ -11,6 +11,9 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     trace: "retain-on-failure",
     launchOptions: {
+      executablePath:
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+        "/usr/bin/chromium-browser",
       args: [
         "--no-sandbox",
         "--use-gl=angle",

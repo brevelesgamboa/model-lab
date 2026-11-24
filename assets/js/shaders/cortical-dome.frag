@@ -2,14 +2,16 @@
 precision highp float;
 precision highp int;
 uniform sampler2D u_dream_360;
-uniform vec3 u_viewDir;
-uniform float u_color_retention;
+uniform sampler2D u_depth;
+uniform sampler2D u_neural;
+uniform sampler2D u_nca_texture;
 uniform float u_edge_coupling;
 uniform float u_dispersion;
+uniform float u_nca_sheen;
+uniform float u_photo_protection;
 uniform vec3 u_viewPos;
 #include <cortical-waves>
 #include <dome-mapping>
-in vec2 v_uv;
 in vec3 v_worldPos;
 in vec3 v_normal;
 in float v_waveVal;
@@ -80,5 +82,54 @@ void main() {
   float fresnel = pow(1.0 - facing, 3.0);
   vec3 rim = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + v_waveVal * 2.5 + u_time * 0.12);
   color += rim * fresnel * u_gain * 0.25;
+
+  // Living Bio-Sheen & Contour Eruption
+  vec2 mapped = domePhotoUV(uv);
+  vec2 scalarUV = vec2(mapped.x, 1.0 - mapped.y);
+  
+  // Forward axis is (0, 0, -1); frontAlignment measures focal photo proximity
+  vec3 dir = normalize(v_worldPos);
+  float frontAlignment = dot(dir, vec3(0.0, 0.0, -1.0));
+  
+  // Photo core protection: computes elliptical distance in photo UV space
+  // so the portrait core stays protected in both primary view and mirrored tiles
+  float uvDist = length((mapped - vec2(0.5)) * vec2(1.0, 1.2));
+  float protectVal = clamp(u_photo_protection, 0.0, 1.0);
+  float coreRadius = mix(0.12, 0.75, protectVal);
+  float photoMask = smoothstep(coreRadius - 0.18, coreRadius + 0.12, uvDist);
+  
+  // Forward focal cone receives enhanced clarity under high protection
+  float focalClarity = smoothstep(0.2, 0.85, frontAlignment) * protectVal;
+  float surroundFactor = clamp(photoMask * (1.0 - focalClarity * 0.75), 0.0, 1.0);
+  
+  // Depth contour gradient: detects silhouette boundaries and foreground edges
+  float depthDX = texture(u_depth, scalarUV + vec2(0.006, 0.0)).r - texture(u_depth, scalarUV - vec2(0.006, 0.0)).r;
+  float depthDY = texture(u_depth, scalarUV + vec2(0.0, 0.006)).r - texture(u_depth, scalarUV - vec2(0.0, 0.006)).r;
+  float depthContour = smoothstep(0.03, 0.22, length(vec2(depthDX, depthDY)) * 4.0 + length(edge) * 2.5);
+  
+  // Inception neural feature activation
+  float neuralVal = texture(u_neural, scalarUV).r;
+  float neuralContour = smoothstep(0.18, 0.65, neuralVal);
+  
+  // Eruption mask: active in surround, selective along contours and neural features in photo
+  float eruptionMask = clamp(surroundFactor + (depthContour * 0.85 + neuralContour * 0.65) * (1.0 - surroundFactor * 0.4), 0.0, 1.0);
+  
+  // Sample live NCA phenotype
+  vec3 ncaColor = texture(u_nca_texture, scalarUV).rgb;
+  float ncaLum = dot(ncaColor, vec3(0.299, 0.587, 0.114));
+  
+  float sheen = clamp(u_nca_sheen, 0.0, 1.0) * eruptionMask;
+  if (sheen > 0.001) {
+    vec3 bioVeins = ncaColor * (0.8 + ncaLum * 1.2);
+    vec3 ncaDispersion = (N * 0.5 + 0.5) * ncaLum * 0.08;
+    
+    // Screen/soft blend prevents blowing out bright pixels to pure white:
+    vec3 illuminated = color + (1.0 - color) * (bioVeins + ncaDispersion) * sheen * 0.75;
+    color = mix(color, illuminated, sheen * 0.8);
+    
+    // Subtle membrane pigment tinting in dark/mid contours without crushing contrast
+    color = mix(color, ncaColor * color * 1.5, sheen * (1.0 - ncaLum) * 0.35);
+  }
+
   out_color = vec4(color, 1.0);
 }

@@ -265,6 +265,7 @@ const domeController = createDomeController({
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
   },
+  openGrowthGallery: (options) => growthController.openGallery(options),
 });
 const controlsController = createControlsController({
   elements,
@@ -950,6 +951,7 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   const control = controlElements.get(definition.key);
   const next = coerceRangeValue(definition, value);
   currentParameters[definition.key] = next;
+  currentModel?.onParameterChange?.(definition.key, next);
   if (["targetChannel", "dreamStrength"].includes(definition.key)) {
     controlsController.syncNeuronGallery();
   }
@@ -1616,7 +1618,8 @@ function modelNeedsAnimation() {
       (currentModel.id === "neural-growth" &&
         NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave &&
         currentParameters.beatShockwave &&
-        currentParameters.beatShockwave !== "off"))
+        currentParameters.beatShockwave !== "off") ||
+      currentModel.id === "cortical-dream-dome")
   )
     return true;
   if (currentModel.usesInternalClock) return false;
@@ -1667,6 +1670,13 @@ function animationLoop(timestamp) {
   }
   if (currentView === "lab" && currentModel.id === "neural-growth") {
     growthController.onAudioFrame(
+      rhythmController.getLevels(),
+      timestamp,
+      rhythmController,
+    );
+  }
+  if (currentView === "lab" && currentModel.id === "cortical-dream-dome") {
+    domeController.onAudioFrame?.(
       rhythmController.getLevels(),
       timestamp,
       rhythmController,

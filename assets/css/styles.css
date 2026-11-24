@@ -589,6 +589,102 @@ summary {
 .dome-bake-overlay[hidden] {
   display: none;
 }
+.dome-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.dome-toggle-row .field__label {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.075em;
+}
+.dome-toggle-row input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent-mod, #5a8bff);
+  width: 15px;
+  height: 15px;
+}
+.dome-nca-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.dome-nca-panel .field {
+  margin: 0;
+}
+.field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.field__header > span:first-child,
+.field__label {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.075em;
+}
+.dome-nca-preset-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+}
+.dome-nca-preset-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dome-nca-preset-row .mini-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.control-value,
+.range-value,
+.control-val {
+  min-width: 36px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.dome-nca-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dome-nca-slider-row input[type="range"] {
+  flex: 1;
+}
+.dome-nca-slider-row .control-val {
+  min-width: 36px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  text-align: right;
+  color: var(--text-secondary);
+}
 .dome-bake-overlay progress {
   width: min(280px, 70vw);
 }
@@ -3831,41 +3927,4 @@ input[type="range"]::-moz-range-progress {
   .dome-spinner {
     animation: none;
   }
-}
-
-.dome-synthesis-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 6px;
-}
-
-.dome-synthesis-panel[hidden] {
-  display: none !important;
-}
-
-.dome-custom-neuron {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-}
-
-.dome-custom-neuron[hidden] {
-  display: none !important;
-}
-
-.dome-custom-neuron__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.dome-custom-neuron__header .field {
-  flex: 1;
-  margin: 0;
 }

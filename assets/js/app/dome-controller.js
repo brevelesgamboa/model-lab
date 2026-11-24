@@ -1,6 +1,6 @@
 import {
   createDomeOutpaintingControls,
-  createDomeNeuronControls,
+  createDomeNcaControls,
 } from "../ui/dome-controls.js";
 import { createLocalModelCacheControls } from "../ui/local-model-cache.js";
 import { terminal } from "../ui/terminal.js";
@@ -12,6 +12,7 @@ export function createDomeController({
   render,
   canInteract,
   onParameterChange,
+  openGrowthGallery,
 }) {
   let gesture = null;
   let cacheKey = null;
@@ -24,12 +25,13 @@ export function createDomeController({
     isActive,
     canInteract,
   );
-  const neuronControls = createDomeNeuronControls(
+  const ncaControls = createDomeNcaControls(
     elements,
     model,
     isActive,
     canInteract,
     onParameterChange,
+    { openGrowthGallery },
   );
   const redraw = () => {
     if (isActive()) void render();
@@ -42,10 +44,21 @@ export function createDomeController({
     elements.canvas.classList.remove("is-looking");
     elements.canvas.classList.remove("is-panning");
   }
+  function stopDrift() {
+    if (model.autonomousDrift) {
+      model.setAutonomousDrift?.(false);
+      if (elements.domeDriftToggle) {
+        elements.domeDriftToggle.checked = false;
+      }
+    }
+  }
   function update() {
     const active = isActive();
     outpainting.update();
-    neuronControls.update();
+    ncaControls.update();
+    if (elements.domeDriftToggle) {
+      elements.domeDriftToggle.checked = Boolean(model.autonomousDrift);
+    }
     elements.domeTools.hidden = !active;
     elements.domeBakeOverlay.hidden = !active || model.bakeState !== "baking";
     elements.canvas.classList.toggle("has-dome-camera", active);
@@ -61,38 +74,19 @@ export function createDomeController({
       lastLoggedPipeline = fullPipeline;
       terminal("DOME", fullPipeline, "info");
     }
-    const compactFeature = model.featureStatus?.split(" · ")[0] || "";
-    const compactDepth = model.depthStatus?.split(" · ")[0] || "";
-    elements.domeStatus.textContent =
-      [compactFeature, compactDepth].filter(Boolean).join(" · ") ||
-      "Photo ready · Depth cached";
-    elements.domeStatus.title = fullPipeline;
-    const isMigan =
-      model.outpaintingMode === "migan" ||
-      ["loading", "missing"].includes(model.inpaintState);
-    if (elements.dreamSynthesisSection) {
-      elements.dreamSynthesisSection.hidden = isMigan;
-      elements.dreamSynthesisSection.style.display = isMigan ? "none" : "block";
-    }
-    const targetBlock = elements.parameterControls?.querySelector(
-      '.control-block[data-parameter="featureTarget"]',
+    const sheenBlock = elements.parameterControls?.querySelector(
+      '.control-block[data-parameter="ncaSheen"]',
     );
-    if (targetBlock) {
-      targetBlock.hidden = true;
-      targetBlock.style.display = "none";
-      const dupSelect = targetBlock.querySelector("select");
-      if (dupSelect) {
-        dupSelect.removeAttribute("aria-label");
-        dupSelect.setAttribute("aria-hidden", "true");
-        dupSelect.tabIndex = -1;
+    if (sheenBlock) {
+      sheenBlock.hidden = true;
+      sheenBlock.style.display = "none";
+      const dupInput = sheenBlock.querySelector("input, select");
+      if (dupInput) {
+        dupInput.removeAttribute("aria-label");
+        dupInput.setAttribute("aria-hidden", "true");
+        dupInput.tabIndex = -1;
       }
     }
-    elements.domeGenerate.hidden = isMigan;
-    elements.domeGenerate.disabled =
-      isMigan ||
-      !model.hasPhoto ||
-      model.bakeState === "baking" ||
-      [model.depthState, model.featureState].includes("loading");
     elements.domeBakeLabel.textContent = model.bakeStatus;
     elements.domeBakeProgress.value = model.bakeProgress;
     const nextKey = `${model.depthState}:${model.featureState}:${model.bakeState}`;
@@ -100,13 +94,6 @@ export function createDomeController({
       cacheKey = nextKey;
       void cache.refresh();
     }
-    elements.domeStatus.title = [
-      model.depthError,
-      model.featureError,
-      model.bakeError,
-    ]
-      .filter(Boolean)
-      .join(" · ");
     elements.domeRetry.hidden =
       !model.hasPhoto ||
       ![model.depthState, model.featureState].includes("fallback");
@@ -116,22 +103,17 @@ export function createDomeController({
     ].includes("loading");
     elements.domeResetView.disabled = model.bakeState === "baking";
   }
-  let lastSyncedTarget = null;
   model.onStateChange = () => {
-    if (
-      onParameterChange &&
-      model.selectedTarget !== undefined &&
-      model.selectedTarget !== lastSyncedTarget
-    ) {
-      lastSyncedTarget = model.selectedTarget;
-      onParameterChange("featureTarget", model.selectedTarget);
-    }
     update();
     redraw();
   };
   const report = (error) => {
     if (isActive() && error.name !== "AbortError")
-      elements.domeStatus.textContent = `Could not prepare the photo: ${error.message}`;
+      terminal(
+        "DOME",
+        `Could not prepare the photo: ${error.message}`,
+        "error",
+      );
   };
   elements.domeImage.addEventListener("change", () => {
     const file = elements.domeImage.files?.[0];
@@ -151,10 +133,13 @@ export function createDomeController({
   elements.domeRetry.addEventListener("click", () => {
     if (isActive() && canInteract()) void model.retryMaps().catch(report);
   });
-  elements.domeGenerate.addEventListener("click", () => {
-    if (isActive() && canInteract()) void model.generateDream().catch(report);
-  });
   elements.domeCancelBake.addEventListener("click", () => model.cancelDream());
+  elements.domeDriftToggle?.addEventListener("change", () => {
+    if (!isActive()) return;
+    const enabled = elements.domeDriftToggle.checked;
+    model.setAutonomousDrift?.(enabled);
+    redraw();
+  });
   elements.canvas.addEventListener("pointerdown", (event) => {
     if (
       !isActive() ||
@@ -163,15 +148,20 @@ export function createDomeController({
       ![0, 1, 2].includes(event.button)
     )
       return;
+    stopDrift();
     event.preventDefault();
     gesture = {
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      pan: event.button !== 0 || event.shiftKey,
+      pan: event.button !== 0,
     };
     elements.canvas.focus({ preventScroll: true });
-    elements.canvas.setPointerCapture(event.pointerId);
+    try {
+      elements.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* Synthetic or untracked pointer ID */
+    }
     elements.canvas.classList.add(gesture.pan ? "is-panning" : "is-looking");
   });
   elements.canvas.addEventListener("pointermove", (event) => {
@@ -201,6 +191,7 @@ export function createDomeController({
     "wheel",
     (event) => {
       if (!isActive() || !canInteract()) return;
+      stopDrift();
       event.preventDefault();
       const scale =
         event.deltaMode === 1
@@ -225,6 +216,7 @@ export function createDomeController({
       ArrowDown: [0, -12],
     }[event.key];
     if (!direction) return;
+    stopDrift();
     event.preventDefault();
     model.camera.look(...direction);
     redraw();
@@ -232,5 +224,9 @@ export function createDomeController({
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) endGesture();
   });
-  return { update };
+  function onAudioFrame(levels, timestamp, rhythmController = null) {
+    if (!isActive() || !levels) return;
+    model.onAudioFrame?.(levels, timestamp, rhythmController);
+  }
+  return { update, onAudioFrame, stopDrift };
 }

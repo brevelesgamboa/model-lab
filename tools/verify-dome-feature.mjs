@@ -126,8 +126,8 @@ try {
       await page.mouse.up();
       await page.waitForTimeout(200);
 
-      const statusText = await page.locator("#dome-status").textContent();
-      console.log(`  -> Dome status: ${statusText}`);
+      const presetLabel = await page.locator("#dome-nca-preset-label").textContent().catch(() => "N/A");
+      console.log(`  -> Active preset label: ${presetLabel}`);
 
       // Verify pixel color from center of canvas (ensure natural warm/red hues, zero inverted color)
       const pixel = await page.evaluate(() => {

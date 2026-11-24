@@ -49,6 +49,8 @@ export function createGrowthController({
   let recents = loadStorageJson(RECENTS_KEY, []);
   let currentTab = "all";
   let searchQuery = "";
+  let customSelectHandler = null;
+  let customActivePatternResolver = null;
 
   function saveFavorites() {
     saveStorageJson(FAVORITES_KEY, [...favorites]);
@@ -136,6 +138,17 @@ export function createGrowthController({
   }
 
   function selectPattern(patternId) {
+    if (customSelectHandler) {
+      addRecent(patternId);
+      const handler = customSelectHandler;
+      customSelectHandler = null;
+      customActivePatternResolver = null;
+      const pattern = PATTERNS.find((p) => p.id === patternId);
+      handler(patternId, pattern);
+      renderGalleryGrid();
+      elements.growthGalleryDialog?.close();
+      return;
+    }
     const model = activeModel();
     if (!model) return;
     addRecent(patternId);
@@ -204,7 +217,10 @@ export function createGrowthController({
     if (!elements.growthGalleryGrid) return;
     const model = activeModel();
     const activePatternId =
-      model?.activePattern || model?.parameters?.pattern || "mixed4c-439";
+      customActivePatternResolver?.() ||
+      model?.activePattern ||
+      model?.parameters?.pattern ||
+      "mixed4c-439";
     const filtered = getFilteredPatterns();
 
     if (elements.growthGalleryCount) {
@@ -711,15 +727,26 @@ export function createGrowthController({
     }
   });
 
+  function openGallery({ onSelect, getActivePatternId } = {}) {
+    customSelectHandler = onSelect || null;
+    customActivePatternResolver = getActivePatternId || null;
+    updateTabCounts();
+    renderGalleryGrid();
+    renderRecents();
+    elements.growthGalleryDialog?.showModal();
+    elements.growthGallerySearch?.focus();
+  }
+
   // Gallery events
   if (elements.openGrowthGallery && elements.growthGalleryDialog) {
     updateTabCounts();
     listen(elements.openGrowthGallery, "click", () => {
-      updateTabCounts();
-      renderGalleryGrid();
-      renderRecents();
-      elements.growthGalleryDialog.showModal();
-      elements.growthGallerySearch?.focus();
+      openGallery();
+    });
+
+    listen(elements.growthGalleryDialog, "close", () => {
+      customSelectHandler = null;
+      customActivePatternResolver = null;
     });
 
     listen(elements.closeGrowthGallery, "click", () => {
@@ -1006,6 +1033,7 @@ export function createGrowthController({
   return {
     update,
     onAudioFrame,
+    openGallery,
     dispose: () => listeners.forEach((remove) => remove()),
   };
 }

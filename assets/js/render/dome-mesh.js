@@ -42,6 +42,36 @@ export function createDomeMesh(resolution = 256) {
   return { vertices, indices, resolution };
 }
 
+export function raycastSphereUV(rayDir, isMirrored = true) {
+  const x = rayDir[0],
+    y = rayDir[1],
+    z = rayDir[2];
+  const len = Math.hypot(x, y, z);
+  if (len < 1e-9) return { u: 0.5, v: 0.5 };
+  const nx = x / len,
+    ny = y / len,
+    nz = z / len;
+
+  const sphereU = Math.atan2(nx, -nz) / TAU + 0.5;
+  const sphereV = Math.asin(clamp(ny, -1, 1)) / Math.PI + 0.5;
+
+  if (!isMirrored) {
+    return { u: sphereU, v: 1.0 - sphereV };
+  }
+
+  const rawX = sphereU - 0.25;
+  const rawY = sphereV - 0.25;
+  const mod2 = (val) => ((val % 2) + 2) % 2;
+  let mirX = Math.abs(mod2(rawX * 2 - 1) - 1);
+  const mirY = Math.abs(mod2(rawY * 2 - 1) - 1);
+
+  const cap = Math.min(sphereV, 1.0 - sphereV) / 0.08;
+  const capSmooth = cap <= 0 ? 0 : cap >= 1 ? 1 : cap * cap * (3 - 2 * cap);
+  mirX = 0.5 * (1 - capSmooth) + mirX * capSmooth;
+
+  return { u: mirX, v: 1.0 - mirY };
+}
+
 export class DomeCamera {
   constructor() {
     this.reset();
@@ -49,6 +79,7 @@ export class DomeCamera {
   reset() {
     this.yaw = 0;
     this.pitch = 0;
+    this.roll = 0;
     this.dolly = 0;
     this.scrollDolly = 0;
     this.target = [0, 0, 0];
@@ -82,8 +113,21 @@ export class DomeCamera {
       sp = Math.sin(this.pitch),
       cp = Math.cos(this.pitch);
     const direction = [sy * cp, sp, -cy * cp];
-    const right = [cy, 0, sy];
-    const up = [-sy * sp, cp, cy * sp];
+    const baseRight = [cy, 0, sy];
+    const baseUp = [-sy * sp, cp, cy * sp];
+    const roll = this.roll || 0;
+    const sr = Math.sin(roll);
+    const cr = Math.cos(roll);
+    const right = [
+      baseRight[0] * cr + baseUp[0] * sr,
+      baseRight[1] * cr + baseUp[1] * sr,
+      baseRight[2] * cr + baseUp[2] * sr,
+    ];
+    const up = [
+      -baseRight[0] * sr + baseUp[0] * cr,
+      -baseRight[1] * sr + baseUp[1] * cr,
+      -baseRight[2] * sr + baseUp[2] * cr,
+    ];
     const back = [-direction[0], -direction[1], -direction[2]];
     const totalDolly = (this.dolly || 0) + (this.scrollDolly || 0);
     const tgt = this.target || [0, 0, 0];

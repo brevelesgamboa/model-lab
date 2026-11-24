@@ -10,13 +10,10 @@ import {
   uploadDepthTexture,
 } from "./depth-estimator.js";
 import {
-  FEATURE_TARGETS,
   FeatureHeatmapEstimator,
   emptyFeatureMap,
   validateFeatureTarget,
 } from "./inception-feature-map.js";
-import { CURATED_NEURONS } from "./neural-growth.js";
-import { DreamGuidanceBridge } from "./neural-growth/dream-guidance.js";
 
 import { MiganInpainter } from "./migan-inpainter.js";
 import { projectPhotoMap } from "./equirectangular-canvas.js";
@@ -25,6 +22,51 @@ import {
   bakeFullDome360,
   uploadDream360,
 } from "./inception-dream-bake.js";
+import { TextureNcaRuntime } from "./neural-growth/runtime.js";
+import { validateCheckpoint } from "./neural-growth/reference.js";
+import { PATTERNS } from "./neural-growth/patterns.js";
+
+export const DOME_NCA_PRESETS = Object.freeze([
+  {
+    id: "membrane-field",
+    name: "Membrane Field",
+    url: new URL(
+      "../../../models/neural-growth/organic-structures/membrane-field.json",
+      import.meta.url,
+    ),
+  },
+  {
+    id: "filament-network",
+    name: "Filament Network",
+    url: new URL(
+      "../../../models/neural-growth/organic-structures/filament-network.json",
+      import.meta.url,
+    ),
+  },
+  {
+    id: "xeno-reef",
+    name: "Xeno Reef",
+    url: new URL(
+      "../../../models/neural-growth/organic-structures/xeno-reef.json",
+      import.meta.url,
+    ),
+  },
+  {
+    id: "mixed4c-439",
+    name: "Vesicle Study",
+    url: new URL(
+      "../../../models/neural-growth/checkpoint.json",
+      import.meta.url,
+    ),
+  },
+]);
+
+async function defaultLoadCheckpoint(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok)
+    throw new Error(`Checkpoint request failed (${response.status}).`);
+  return response.json();
+}
 
 const range = (key, label, max, value, help, min = 0, modulation = true) => ({
   key,
@@ -38,76 +80,8 @@ const range = (key, label, max, value, help, min = 0, modulation = true) => ({
   help,
   modulation,
 });
-export const DOME_ARCHETYPES = Object.freeze([
-  {
-    id: "cellular-nodes",
-    name: "Cellular & Ocular Nodes",
-    layer: "mixed_5b",
-    channel: 120,
-    strength: 0.2,
-    desc: "Eye-like centers, organic rings, and cell clusters with biological relief.",
-  },
-  {
-    id: "ribbed-arches",
-    name: "Ribbed Arches & Terraces",
-    layer: "mixed_6a",
-    channel: 42,
-    strength: 0.2,
-    desc: "Architectural ribbing, stepped terraces, and structural lattice curves.",
-  },
-  {
-    id: "webbing-filaments",
-    name: "Webbing & Micro-filaments",
-    layer: "Conv2d_4a_3x3",
-    channel: 42,
-    strength: 0.2,
-    desc: "High-frequency lace, filamentous mesh, and delicate geometric webbing.",
-  },
-  {
-    id: "biological-lattices",
-    name: "Biological Lattices",
-    layer: "mixed_6d",
-    channel: 182,
-    strength: 0.2,
-    desc: "Dense vesicular lattice networks and organic sponge-like scaffolding.",
-  },
-  {
-    id: "crystalline-spires",
-    name: "Crystalline Spires",
-    layer: "mixed_7b",
-    channel: 314,
-    strength: 0.2,
-    desc: "Faceted mineral columns, prismatic facets, and spire-like geometry.",
-  },
-]);
-
-export const DOME_NEURON_ARCHETYPES = Object.freeze([
-  ...DOME_ARCHETYPES,
-  ...CURATED_NEURONS,
-]);
-
-export const FEATURE_TARGET_DESCRIPTIONS = Object.fromEntries(
-  DOME_ARCHETYPES.map((a) => [a.layer, a.name]),
-);
 
 const CONTROLS = [
-  {
-    key: "featureTarget",
-    label: "DREAM TARGET",
-    type: "select",
-    default: 0,
-    options: [
-      ...FEATURE_TARGETS.map(({ layer, channel }, value) => ({
-        value,
-        label: `${FEATURE_TARGET_DESCRIPTIONS[layer] || layer} (${layer} · #${channel})`,
-      })),
-      {
-        value: -1,
-        label: "Custom neuron target",
-      },
-    ],
-    help: "Chooses the neuron for photo relief and the next 360 dream bake. Changing it refreshes relief once; click Synthesize Dream to bake a new field. Labels suggest motifs; individual channels do not guarantee these structures.",
-  },
   range(
     "depthScale",
     "3D EXTRUSION",
@@ -121,6 +95,30 @@ const CONTROLS = [
     1,
     0.35,
     "Pulls regions inward where the chosen neuron responds strongly.",
+  ),
+  range(
+    "ncaExtrude",
+    "NCA RELIEF",
+    1.5,
+    0.45,
+    "Dynamic biological 3D extrusion driven by live NCA cell vitality.",
+    0,
+  ),
+  range(
+    "ncaSheen",
+    "BIO-SHEEN OPACITY",
+    1.0,
+    0.65,
+    "Bioluminescent membrane sheen and vein opacity composited onto the dome.",
+    0,
+  ),
+  range(
+    "photoProtection",
+    "PHOTO CORE PROTECTION",
+    1.0,
+    0.65,
+    "Shields the core photographic portrait from biological NCA overgrowth and sheen.",
+    0.0,
   ),
   {
     key: "waveMode",
@@ -196,35 +194,11 @@ const CONTROLS = [
   ),
 ];
 
-class LazyDomeDreamBridge extends DreamGuidanceBridge {
-  constructor(options) {
-    super(options);
-    this._previewsActive = false;
-  }
-  loadPreviews() {
-    if (!this._previewsActive) {
-      return Promise.resolve(this.previewCache);
-    }
-    return super.loadPreviews();
-  }
-  activatePreviews() {
-    if (!this._previewsActive) {
-      this._previewsActive = true;
-      return super.loadPreviews();
-    }
-    return Promise.resolve(this.previewCache);
-  }
-  requestPreview(layer, channel, options) {
-    this._previewsActive = true;
-    return super.requestPreview(layer, channel, options);
-  }
-}
-
 export const DOME_CONTROL_SECTIONS = Object.freeze([
   {
     id: "geometry",
     label: "Geometry & Depth",
-    keys: ["depthScale", "neuralSwell", "cameraDolly", "featureTarget"],
+    keys: ["depthScale", "neuralSwell", "ncaExtrude", "cameraDolly"],
   },
   {
     id: "waves",
@@ -239,7 +213,10 @@ export const DOME_CONTROL_SECTIONS = Object.freeze([
 ]);
 
 export class CorticalDreamDomeModel {
-  constructor() {
+  constructor({
+    loadCheckpoint = defaultLoadCheckpoint,
+    createNcaRuntime = (opts) => new TextureNcaRuntime(opts),
+  } = {}) {
     this.id = "cortical-dream-dome";
     this.name = "Cortical Dream Dome (360)";
     this.family = "IMMERSIVE PHOTO / DEPTH / INCEPTION FEATURES";
@@ -278,42 +255,75 @@ export class CorticalDreamDomeModel {
     this.aiDepthMap = null;
     this.aiDepthAbort = null;
     this.aiDepthEstimator = new DepthEstimator();
-    this.colorRetention = 1;
     this.bakeState = "idle";
     this.bakeProgress = 0;
     this.bakeStatus = "Generate a 360 dream field when ready";
-    this.selectedTarget = 0;
     this.selectedLayer = "mixed_5b";
     this.selectedChannel = 120;
-    this._lastSeenParamFeatureTarget = null;
-    this._isCustomNeuron = false;
-    this.neuronArchetypes = DOME_NEURON_ARCHETYPES;
-    this.dreamBridge = new LazyDomeDreamBridge({ archetypes: DOME_NEURON_ARCHETYPES });
     this.sourceVersion = 0;
     this.graphicsEpoch = 0;
+    this._loadCheckpoint = loadCheckpoint;
+    this._createNcaRuntime = createNcaRuntime;
+    this.ncaPreset = "membrane-field";
+    this.ncaPresetName = "Membrane Field";
+    this.ncaSize = 256;
+    this.ncaRuntime = null;
+    this.ncaCanvas = null;
+    this.ncaExtrude = 0.45;
+    this.ncaSheen = 0.65;
+    this.photoProtection = 0.65;
+    this.ncaCheckpoints = new Map();
+    this.ncaLoading = false;
+    this.ncaAbort = null;
+    this.ncaVitality = 0.5;
+    this.ncaActivityDelta = 1.0;
+    this.ncaLastSample = null;
+    this.ncaFramesSinceWatchdog = 0;
+    this.ncaWatchdogInterval = 30;
+    this.ncaStagnationCounter = 0;
+    this.ncaActiveSpores = [];
+    this.ncaProbeCanvas = null;
+    this.ncaProbeCtx = null;
+    this.ncaFramesSinceLastBloom = 0;
+    this.autonomousDrift = true;
+    this.driftPhase = 0;
+    this.audioBass = 0;
+    this.audioActivity = 0;
+    this.lastBeatTimestamp = 0;
+    this.beatArmed = true;
+    this.lastRenderTime = 0;
+    this.currentAudioLevels = null;
+    this.lastAudioTimestamp = 0;
     this.onStateChange = () => {};
     this.metrics = new AsyncCanvasMetrics(() => this.onStateChange());
-    this.source = document.createElement("canvas");
-    this.canvas = document.createElement("canvas");
-    this.gl = this.canvas.getContext("webgl2", {
-      alpha: false,
-      antialias: true,
-      depth: true,
-      preserveDrawingBuffer: true,
-      powerPreference: "high-performance",
-    });
-    this.canvas.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-      this.cancel();
-      this.graphicsEpoch++;
-      this.graphics = null;
-      this.graphicsPromise = null;
-      this.onStateChange();
-    });
-    this.canvas.addEventListener("webglcontextrestored", () =>
-      this.onStateChange(),
-    );
-    this.useDemo();
+    if (typeof document !== "undefined") {
+      this.source = document.createElement("canvas");
+      this.canvas = document.createElement("canvas");
+      this.gl = this.canvas.getContext("webgl2", {
+        alpha: false,
+        antialias: true,
+        depth: true,
+        preserveDrawingBuffer: true,
+        powerPreference: "high-performance",
+      });
+      this.canvas.addEventListener("webglcontextlost", (event) => {
+        event.preventDefault();
+        this.cancel();
+        this.graphicsEpoch++;
+        this.graphics = null;
+        this.graphicsPromise = null;
+        this.onStateChange();
+      });
+      this.canvas.addEventListener("webglcontextrestored", () =>
+        this.onStateChange(),
+      );
+      this.useDemo();
+    } else {
+      this.source = null;
+      this.canvas = null;
+      this.gl = null;
+    }
+    this.initNcaPromise = this.initNca();
   }
   get available() {
     return Boolean(this.gl) && !this.gl.isContextLost();
@@ -321,8 +331,95 @@ export class CorticalDreamDomeModel {
   get backend() {
     return "WEBGL2 / 360° INDEXED DOME";
   }
+  get ncaPresetId() {
+    return this.ncaPreset;
+  }
   isDynamic(p) {
-    return p.gain > 0 && p.speed > 0;
+    return (
+      (p.gain > 0 && p.speed > 0) ||
+      (p.ncaExtrude > 0 || p.ncaSheen > 0) ||
+      Boolean(this.ncaRuntime)
+    );
+  }
+  setAutonomousDrift(enabled) {
+    this.autonomousDrift = Boolean(enabled);
+    if (!this.autonomousDrift && this.camera) {
+      this.camera.roll = 0;
+    }
+  }
+  updateAutonomousDrift(dt, levels = null) {
+    if (!this.autonomousDrift) {
+      if (this.camera && this.camera.roll) {
+        this.camera.roll *= 0.85;
+        if (Math.abs(this.camera.roll) < 0.0001) this.camera.roll = 0;
+      }
+      return;
+    }
+    const safeDt = Math.max(0.001, Math.min(0.1, Number(dt) || 0.016));
+    this.driftPhase = (this.driftPhase || 0) + safeDt;
+    const bass = levels
+      ? Math.min(1, Math.max(0, Number(levels.bass) || 0))
+      : (this.audioBass || 0);
+    const boost = 1.0 + 0.45 * bass;
+
+    const yawDelta = safeDt * 0.045 * boost;
+    if (this.camera) {
+      this.camera.look(-yawDelta / 0.006, 0);
+
+      const pitchDelta =
+        Math.cos(this.driftPhase * 0.55) * 0.006 * safeDt * boost;
+      const limit = (85 * Math.PI) / 180;
+      this.camera.pitch = Math.max(
+        -limit,
+        Math.min(limit, this.camera.pitch + pitchDelta),
+      );
+
+      this.camera.roll = Math.sin(this.driftPhase * 0.38) * 0.016 * boost;
+    }
+  }
+  onAudioFrame(levels, timestamp, _rhythmController = null) {
+    if (!levels) return false;
+    this.currentAudioLevels = levels;
+    const kick = Number(levels.kickOnset ?? levels.kick) || 0;
+    const now = typeof timestamp === "number" ? timestamp : performance.now();
+    let triggered = false;
+
+    if (kick < 0.25) {
+      this.beatArmed = true;
+    }
+
+    const elapsed = now - (this.lastBeatTimestamp || 0);
+    if (this.beatArmed && kick >= 0.5 && elapsed >= 160) {
+      this.lastBeatTimestamp = now;
+      this.beatArmed = false;
+      triggered = true;
+
+      const s = this.ncaSize || 256;
+      const kickIntensity = Math.min(1.0, Math.max(0.3, kick));
+      this.injectSoftSpores({
+        count: Math.random() < 0.35 ? 2 : 1,
+        radius: Math.max(6, Math.round(s * (0.06 + 0.05 * kickIntensity))),
+        maxStrength: 0.35 * kickIntensity,
+        duration: Math.round(10 + 6 * kickIntensity),
+        mode: Math.random() < 0.5 ? "kick_perturb" : "kick_color",
+      });
+    }
+
+    const dt = Math.min(
+      0.1,
+      Math.max(0.001, (now - (this.lastAudioTimestamp || now)) / 1000),
+    );
+    this.lastAudioTimestamp = now;
+    const alpha = Math.min(1.0, dt * 7.0);
+    const targetBass = Number(levels.bass) || 0;
+    const targetActivity = Number(levels.activity) || 0;
+    this.audioBass =
+      (this.audioBass || 0) + (targetBass - (this.audioBass || 0)) * alpha;
+    this.audioActivity =
+      (this.audioActivity || 0) +
+      (targetActivity - (this.audioActivity || 0)) * alpha;
+
+    return triggered;
   }
   getCanvasMetrics(canvas, refresh) {
     return this.metrics.read(canvas, refresh);
@@ -369,11 +466,8 @@ export class CorticalDreamDomeModel {
     this.bakeMetrics = null;
     this.bakeError = null;
     this.bakeProgress = 0;
-    this.selectedTarget = 0;
     this.selectedLayer = "mixed_5b";
     this.selectedChannel = 120;
-    this._lastSeenParamFeatureTarget = 0;
-    this._isCustomNeuron = false;
     this.uploadSource();
     this.onStateChange();
   }
@@ -507,6 +601,228 @@ export class CorticalDreamDomeModel {
       if (this.aiDepthAbort === abort) this.aiDepthAbort = null;
     }
   }
+  async initNca(presetId = this.ncaPreset, size = this.ncaSize) {
+    if (this.disposed) return;
+    this.ncaLoading = true;
+    this.ncaPreset = presetId;
+    this.ncaSize = size;
+    const domePreset = DOME_NCA_PRESETS.find((p) => p.id === presetId);
+    const catalogPattern = PATTERNS.find((p) => p.id === presetId);
+    this.ncaPresetName =
+      domePreset?.name || catalogPattern?.name || this.ncaPresetName || presetId;
+    this.ncaAbort?.abort();
+    const abort = new AbortController();
+    this.ncaAbort = abort;
+    try {
+      let checkpoint = this.ncaCheckpoints.get(presetId);
+      if (!checkpoint) {
+        const url =
+          domePreset?.url ||
+          catalogPattern?.checkpointUrl ||
+          DOME_NCA_PRESETS[0].url;
+        const raw = await this._loadCheckpoint(url, abort.signal);
+        if (abort.signal.aborted || this.disposed) return;
+        checkpoint = validateCheckpoint(raw);
+        this.ncaCheckpoints.set(presetId, checkpoint);
+      }
+      if (abort.signal.aborted || this.disposed) return;
+      if (this.ncaRuntime) {
+        this.ncaRuntime.dispose();
+        this.ncaRuntime = null;
+      }
+      this.ncaRuntime = this._createNcaRuntime({
+        model: checkpoint,
+        size: this.ncaSize,
+        seed: 1,
+      });
+      this.seedNcaInitial();
+      this.onStateChange();
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("Failed to initialize NCA for dome:", err);
+      }
+    } finally {
+      if (this.ncaAbort === abort) this.ncaAbort = null;
+      this.ncaLoading = false;
+    }
+  }
+  seedNcaInitial() {
+    if (!this.ncaRuntime || this.ncaRuntime.disposed || this.ncaRuntime.lost)
+      return;
+    this.ncaRuntime.restart(1);
+    const s = this.ncaSize;
+    const center = Math.floor(s / 2);
+    const r = Math.max(8, Math.floor(s * 0.08));
+    this.ncaRuntime.disturb(center, center, r, "noise");
+    this.ncaRuntime.disturb(
+      Math.floor(center - s * 0.2),
+      center,
+      Math.floor(r * 0.7),
+      "dye",
+      { dyeColor: [0, 0.9, 1] },
+    );
+    this.ncaRuntime.disturb(
+      Math.floor(center + s * 0.2),
+      center,
+      Math.floor(r * 0.7),
+      "dye",
+      { dyeColor: [1, 0.5, 0.1] },
+    );
+    for (let i = 0; i < 12; i++) {
+      this.ncaRuntime.step(1);
+    }
+  }
+  reseedNca() {
+    this.seedNcaInitial();
+    this.onStateChange();
+  }
+  injectSoftSpores({
+    count = 2,
+    radius = null,
+    maxStrength = 0.32,
+    duration = 12,
+    mode = null,
+  } = {}) {
+    if (!this.ncaRuntime || this.ncaRuntime.disposed || this.ncaRuntime.lost)
+      return [];
+    const s = this.ncaSize;
+    const rad = radius ?? Math.max(8, Math.round(s * 0.08));
+    const modes = ["kick_perturb", "noise", "kick_color"];
+    const created = [];
+    for (let i = 0; i < count; i++) {
+      const selectedMode = mode || modes[(Math.random() * modes.length) | 0];
+      const x = Math.floor(s * (0.15 + Math.random() * 0.7));
+      const y = Math.floor(s * (0.15 + Math.random() * 0.7));
+      const spore = {
+        x,
+        y,
+        radius: Math.max(4, Math.round(rad * (0.8 + Math.random() * 0.4))),
+        maxStrength: maxStrength * (0.8 + Math.random() * 0.4),
+        duration: Math.max(3, duration),
+        frame: 0,
+        mode: selectedMode,
+      };
+      this.ncaActiveSpores.push(spore);
+      created.push(spore);
+    }
+    return created;
+  }
+  stepActiveSpores() {
+    if (!this.ncaRuntime || this.ncaRuntime.disposed || this.ncaRuntime.lost)
+      return;
+    if (this.ncaActiveSpores.length === 0) return;
+    for (let i = this.ncaActiveSpores.length - 1; i >= 0; i--) {
+      const spore = this.ncaActiveSpores[i];
+      const progress = (spore.frame + 0.5) / spore.duration;
+      const strength = spore.maxStrength * Math.sin(Math.PI * progress);
+      if (strength > 0.001) {
+        this.ncaRuntime.disturb(spore.x, spore.y, spore.radius, spore.mode, {
+          strength,
+        });
+      }
+      spore.frame++;
+      if (spore.frame >= spore.duration) {
+        this.ncaActiveSpores.splice(i, 1);
+      }
+    }
+  }
+  evaluateNcaVitality(simulated = null) {
+    if (!this.ncaRuntime || this.ncaRuntime.disposed || this.ncaRuntime.lost)
+      return { vitality: 0, delta: 0, triggered: false };
+
+    let vitality = 0.5;
+    let delta = 1.0;
+
+    if (simulated !== null) {
+      vitality = Number(simulated.vitality ?? 0.5);
+      delta = Number(simulated.delta ?? 1.0);
+    } else if (
+      typeof document !== "undefined" &&
+      this.ncaCanvas &&
+      this.ncaCanvas.width > 0
+    ) {
+      if (!this.ncaProbeCanvas) {
+        this.ncaProbeCanvas = document.createElement("canvas");
+        this.ncaProbeCanvas.width = 16;
+        this.ncaProbeCanvas.height = 16;
+        this.ncaProbeCtx = this.ncaProbeCanvas.getContext("2d", {
+          willReadFrequently: true,
+        });
+      }
+      if (this.ncaProbeCtx) {
+        this.ncaProbeCtx.drawImage(this.ncaCanvas, 0, 0, 16, 16);
+        const img = this.ncaProbeCtx.getImageData(0, 0, 16, 16);
+        const data = img.data;
+        let sumLum = 0;
+        let diffSum = 0;
+        const hasPrev = Boolean(this.ncaLastSample);
+
+        for (let i = 0; i < 256; i++) {
+          const idx = i * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          sumLum += lum;
+          if (hasPrev) {
+            const dr = Math.abs(r - this.ncaLastSample[idx]);
+            const dg = Math.abs(g - this.ncaLastSample[idx + 1]);
+            const db = Math.abs(b - this.ncaLastSample[idx + 2]);
+            diffSum += (dr + dg + db) / (3 * 255);
+          }
+        }
+
+        vitality = sumLum / 256;
+        delta = hasPrev ? diffSum / 256 : 1.0;
+
+        if (!this.ncaLastSample) {
+          this.ncaLastSample = new Uint8Array(1024);
+        }
+        this.ncaLastSample.set(data);
+      }
+    }
+
+    this.ncaVitality = vitality;
+    this.ncaActivityDelta = delta;
+
+    const isLowVitality = vitality < 0.10 || vitality > 0.96;
+    const isStagnant = delta < 0.008;
+
+    let triggered = false;
+    if (isLowVitality || isStagnant) {
+      this.ncaStagnationCounter++;
+      if (this.ncaStagnationCounter >= 2 || vitality < 0.04) {
+        this.injectSoftSpores({ count: 2, maxStrength: 0.35, duration: 10 });
+        this.ncaStagnationCounter = 0;
+        triggered = true;
+      }
+    } else {
+      this.ncaStagnationCounter = Math.max(0, this.ncaStagnationCounter - 1);
+    }
+
+    this.ncaFramesSinceLastBloom =
+      (this.ncaFramesSinceLastBloom || 0) + this.ncaWatchdogInterval;
+    if (this.ncaFramesSinceLastBloom >= 800) {
+      this.injectSoftSpores({ count: 1, maxStrength: 0.22, duration: 8 });
+      this.ncaFramesSinceLastBloom = 0;
+      triggered = true;
+    }
+
+    return { vitality, delta, triggered };
+  }
+  async setNcaPreset(presetId, patternData = null) {
+    if (patternData?.name) {
+      this.ncaPresetName = patternData.name;
+    }
+    if (this.ncaPreset === presetId && this.ncaRuntime) return;
+    await this.initNca(presetId, this.ncaSize);
+    this.injectSoftSpores({ count: 3, maxStrength: 0.35, duration: 12 });
+  }
+  async setNcaResolution(size) {
+    const s = Number(size) === 128 ? 128 : 256;
+    if (this.ncaSize === s && this.ncaRuntime) return;
+    await this.initNca(this.ncaPreset, s);
+  }
   uploadSource() {
     if (!this.graphics || !this.available) return;
     const gl = this.gl,
@@ -515,6 +831,20 @@ export class CorticalDreamDomeModel {
     uploadDream360(gl, g.textures[0], this.panorama);
     if (this.outpaintingMode === "mirrored")
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    if (this.ncaCanvas && g.textures[3]) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, g.textures[3]);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        this.ncaCanvas,
+      );
+    }
     this.uploadGeometry();
   }
   uploadGeometry() {
@@ -662,15 +992,8 @@ export class CorticalDreamDomeModel {
       if (this.depthAbort === abort) this.depthAbort = null;
     }
   }
-  setNeuronTarget(layer, channel, forceCustom = false) {
+  setNeuronTarget(layer, channel) {
     const validated = validateFeatureTarget(layer, channel);
-    const idx = FEATURE_TARGETS.findIndex(
-      (t) => t.layer === validated.layer && t.channel === validated.channel,
-    );
-    const isCustom = forceCustom || idx < 0;
-    this.selectedTarget = isCustom ? -1 : idx;
-    this._isCustomNeuron = isCustom;
-    this._lastSeenParamFeatureTarget = this.selectedTarget;
     if (
       this.selectedLayer === validated.layer &&
       this.selectedChannel === validated.channel &&
@@ -785,7 +1108,7 @@ export class CorticalDreamDomeModel {
           baker: this.baker,
           texture: g.textures[0],
           signal: abort.signal,
-          colorRetention: this.colorRetention,
+          colorRetention: 1,
         },
       );
       if (abort.signal.aborted || version !== this.sourceVersion) return;
@@ -819,22 +1142,17 @@ export class CorticalDreamDomeModel {
     }
   }
   onParameterChange(key, value) {
-    if (key === "featureTarget" && Number.isInteger(value)) {
-      if (value === -1) {
-        this._isCustomNeuron = true;
-        this._lastSeenParamFeatureTarget = -1;
-        this.selectedTarget = -1;
-        return false;
-      }
-      if (FEATURE_TARGETS[value]) {
-        this._isCustomNeuron = false;
-        this._lastSeenParamFeatureTarget = value;
-        if (value !== this.selectedTarget) {
-          const target = FEATURE_TARGETS[value];
-          this.setNeuronTarget(target.layer, target.channel);
-        }
-        return false;
-      }
+    if (key === "photoProtection") {
+      this.photoProtection = Number(value);
+      return true;
+    }
+    if (key === "ncaExtrude") {
+      this.ncaExtrude = Number(value);
+      return true;
+    }
+    if (key === "ncaSheen") {
+      this.ncaSheen = Number(value);
+      return true;
     }
     return false;
   }
@@ -858,6 +1176,8 @@ export class CorticalDreamDomeModel {
       this.inpaintNotice = "Inpainting cancelled · previous view preserved";
     }
     this.cancelDream();
+    this.ncaAbort?.abort();
+    this.ncaAbort = null;
     this.depthAbort?.abort();
     this.featureAbort?.abort();
     this.depthAbort = this.featureAbort = null;
@@ -874,19 +1194,9 @@ export class CorticalDreamDomeModel {
     }
   }
   async render(target, p, timeSeconds = 0) {
-    // Parameter resets/presets reach this path outside individual UI events.
-    if (
-      p.featureTarget !== undefined &&
-      p.featureTarget !== this._lastSeenParamFeatureTarget
-    ) {
-      this._lastSeenParamFeatureTarget = p.featureTarget;
-      if (p.featureTarget >= 0 && FEATURE_TARGETS[p.featureTarget]) {
-        this._isCustomNeuron = false;
-        this.onParameterChange("featureTarget", p.featureTarget);
-      } else if (p.featureTarget === -1) {
-        this._isCustomNeuron = true;
-      }
-    }
+    if (p.ncaExtrude !== undefined) this.ncaExtrude = p.ncaExtrude;
+    if (p.ncaSheen !== undefined) this.ncaSheen = p.ncaSheen;
+    if (p.photoProtection !== undefined) this.photoProtection = p.photoProtection;
     const version = this.sourceVersion;
     const g = await this.ensureGraphics(),
       gl = this.gl;
@@ -909,16 +1219,74 @@ export class CorticalDreamDomeModel {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(g.program);
     gl.bindVertexArray(g.vao);
-    for (const [i, name] of ["dream_360", "depth", "neural"].entries()) {
+
+    if (
+      this.ncaRuntime &&
+      !this.ncaRuntime.disposed &&
+      !this.ncaRuntime.lost &&
+      typeof document !== "undefined"
+    ) {
+      this.ncaRuntime.step(1);
+      this.stepActiveSpores();
+
+      this.ncaFramesSinceWatchdog = (this.ncaFramesSinceWatchdog || 0) + 1;
+      if (this.ncaFramesSinceWatchdog >= (this.ncaWatchdogInterval || 30)) {
+        this.ncaFramesSinceWatchdog = 0;
+        this.evaluateNcaVitality();
+      }
+
+      if (!this.ncaCanvas) {
+        this.ncaCanvas = document.createElement("canvas");
+        this.ncaCanvas.width = this.ncaSize;
+        this.ncaCanvas.height = this.ncaSize;
+      }
+      if (
+        this.ncaCanvas.width !== this.ncaSize ||
+        this.ncaCanvas.height !== this.ncaSize
+      ) {
+        this.ncaCanvas.width = this.ncaSize;
+        this.ncaCanvas.height = this.ncaSize;
+      }
+      this.ncaRuntime.draw(this.ncaCanvas, { palette: "native" });
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, g.textures[3]);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        this.ncaCanvas,
+      );
+    }
+
+    for (const [i, name] of [
+      "dream_360",
+      "depth",
+      "neural",
+      "nca_texture",
+    ].entries()) {
       gl.activeTexture(gl.TEXTURE0 + i);
       gl.bindTexture(gl.TEXTURE_2D, g.textures[i]);
       gl.uniform1i(g.uniforms[name], i);
     }
+    const nowSec =
+      typeof timeSeconds === "number" ? timeSeconds : performance.now() / 1000;
+    const dt = this.lastRenderTime
+      ? Math.max(0.001, Math.min(0.1, nowSec - this.lastRenderTime))
+      : 0.016;
+    this.lastRenderTime = nowSec;
+
+    if (this.autonomousDrift) {
+      this.updateAutonomousDrift(dt, this.currentAudioLevels);
+    }
+
     this.camera.dolly = p.cameraDolly ?? 0.8;
     const camera = this.camera.matrices(target.width / target.height);
     gl.uniformMatrix4fv(g.uniforms.view, false, camera.view);
     gl.uniformMatrix4fv(g.uniforms.proj, false, camera.projection);
-    gl.uniform3fv(g.uniforms.viewDir, camera.direction);
     gl.uniform3fv(g.uniforms.viewPos, camera.position);
     gl.uniform2f(g.uniforms.aspect, 1, 1);
     gl.uniform2f(g.uniforms.fovea, 0.5, 0.5);
@@ -927,17 +1295,30 @@ export class CorticalDreamDomeModel {
       g.uniforms.mirrored_wrap,
       this.outpaintingMode === "mirrored" ? 1 : 0,
     );
+
+    const audioBass = this.audioBass || 0;
+    const audioActivity = this.audioActivity || 0;
+    const effectiveGain = p.gain * (1.0 + 0.35 * audioBass);
+    const effectiveSpeed = p.speed * (1.0 + 0.25 * audioActivity);
+    const baseDispersion = p.chromaticDispersion ?? 0.35;
+    const effectiveDispersion = Math.min(
+      1.0,
+      baseDispersion * (1.0 + 0.3 * audioBass + 0.2 * audioActivity),
+    );
+
     for (const [name, value] of Object.entries({
-      color_retention: this.colorRetention ?? 1,
       time: timeSeconds,
       frequency: p.frequency,
-      speed: p.speed,
-      gain: p.gain,
+      speed: effectiveSpeed,
+      gain: effectiveGain,
       depth_extrude: p.extrude ?? p.depthScale ?? 0.6,
       neural_extrude: p.neuralSwell,
+      nca_extrude: p.ncaExtrude ?? this.ncaExtrude ?? 0.45,
+      nca_sheen: p.ncaSheen ?? this.ncaSheen ?? 0.65,
+      photo_protection: p.photoProtection ?? this.photoProtection ?? 0.65,
       eccentricity: p.eccentricity,
       edge_coupling: p.edgeCoupling ?? 0.35,
-      dispersion: p.chromaticDispersion ?? 0.35,
+      dispersion: effectiveDispersion,
     }))
       gl.uniform1f(g.uniforms[name], value);
     gl.drawElements(gl.TRIANGLES, g.count, gl.UNSIGNED_SHORT, 0);
@@ -961,6 +1342,21 @@ export class CorticalDreamDomeModel {
     this.disposed = true;
     this.graphicsEpoch++;
     this.cancel();
+    if (this.ncaRuntime) {
+      this.ncaRuntime.dispose();
+      this.ncaRuntime = null;
+    }
+    this.ncaCanvas = null;
+    if (this.ncaProbeCanvas) {
+      this.ncaProbeCanvas = null;
+      this.ncaProbeCtx = null;
+    }
+    this.ncaLastSample = null;
+    this.ncaActiveSpores = [];
+    this.currentAudioLevels = null;
+    this.audioBass = 0;
+    this.audioActivity = 0;
+    this.driftPhase = 0;
     if (this.graphics && this.available)
       disposeDomeGraphics(this.gl, this.graphics);
     this.graphics = null;

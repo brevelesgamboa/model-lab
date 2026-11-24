@@ -293,6 +293,16 @@
                       Retry missing maps
                     </button>
                   </div>
+                  <label class="field dome-toggle-row" for="dome-drift-toggle">
+                    <span class="field__label">Autonomous Drift</span>
+                    <input
+                      type="checkbox"
+                      id="dome-drift-toggle"
+                      class="dome-drift-toggle"
+                      checked
+                      aria-label="Autonomous Drift"
+                    />
+                  </label>
                   <label class="field"
                     >Outpainting mode
                     <select id="dome-outpainting">
@@ -300,45 +310,46 @@
                       <option value="migan">AI Inpainter (MI-GAN)</option>
                     </select>
                   </label>
-                  <div id="dream-synthesis-section" class="dome-synthesis-panel">
-                    <label class="field" for="dome-archetypes">Dream Target
-                      <select id="dome-archetypes" aria-label="DREAM TARGET">
-                        <option value="0">Cellular &amp; Ocular Nodes (mixed_5b · ch 120)</option>
-                        <option value="1">Ribbed Arches &amp; Terraces (mixed_6a · ch 42)</option>
-                        <option value="2">Webbing &amp; Micro-filaments (Conv2d_4a · ch 42)</option>
-                        <option value="3">Biological Lattices (mixed_6d · ch 182)</option>
-                        <option value="4">Crystalline Spires (mixed_7b · ch 314)</option>
-                        <option value="-1">Custom neuron target</option>
+                  <div id="dome-nca-section" class="dome-nca-panel">
+                    <div class="field">
+                      <span class="field__label">Active Growth Pattern</span>
+                      <div class="dome-nca-preset-row">
+                        <span id="dome-nca-preset-label" class="dome-nca-preset-label">Membrane Field</span>
+                        <button id="dome-browse-nca" class="mini-button mini-button--highlight" type="button">Browse Gallery…</button>
+                      </div>
+                    </div>
+                    <label class="field" for="dome-nca-resolution">
+                      <span class="field__label">NCA Grid</span>
+                      <select id="dome-nca-resolution" aria-label="NCA Grid Resolution">
+                        <option value="256">256 × 256</option>
+                        <option value="128">128 × 128</option>
                       </select>
                     </label>
-                    <div id="dome-custom-neuron-controls" class="dome-custom-neuron" hidden>
-                      <div class="dome-custom-neuron__header">
-                        <label class="field" for="dome-custom-layer">Layer
-                          <select id="dome-custom-layer" aria-label="Custom Dream Layer"></select>
-                        </label>
-                        <div class="control-fine-group">
-                          <button type="button" class="nudge-button" id="dome-custom-ch-dec" data-direction="-1" aria-label="Decrease channel">-</button>
-                          <input type="text" id="dome-custom-ch-input" class="control-fine-input" value="120" aria-label="Custom neuron channel">
-                          <button type="button" class="nudge-button" id="dome-custom-ch-inc" data-direction="1" aria-label="Increase channel">+</button>
-                        </div>
+                    <label class="field" for="dome-nca-sheen">
+                      <div class="field__header">
+                        <span class="field__label">Bio-Sheen Opacity</span>
+                        <span id="dome-nca-sheen-val" class="control-value range-value control-val">0.65</span>
                       </div>
-                      <input type="range" id="dome-custom-ch-slider" class="control-range-input" min="0" max="767" step="1" value="120" aria-label="Custom neuron channel slider">
+                      <input type="range" id="dome-nca-sheen" min="0" max="1" step="0.01" value="0.65" aria-label="Bio-Sheen Opacity">
+                      <div id="dome-nca-sheen-guidance" class="control-guidance" hidden>
+                        <span class="control-guidance__tag"></span>
+                        <span class="control-guidance__text"></span>
+                      </div>
+                    </label>
+                    <label class="field" for="dome-photo-protection">
+                      <div class="field__header">
+                        <span class="field__label">Photo Core Protection</span>
+                        <span id="dome-photo-protection-val" class="control-value range-value control-val">0.65</span>
+                      </div>
+                      <input type="range" id="dome-photo-protection" min="0" max="1" step="0.01" value="0.65" aria-label="Photo Core Protection">
+                      <div id="dome-photo-protection-guidance" class="control-guidance" hidden>
+                        <span class="control-guidance__tag"></span>
+                        <span class="control-guidance__text"></span>
+                      </div>
+                    </label>
+                    <div class="cortical-tools__actions" hidden style="display: none;">
+                      <button id="dome-nca-reseed" class="mini-button" type="button">Reseed / Pulse</button>
                     </div>
-                    <button
-                      id="dome-browse-neurons"
-                      class="mini-button neuron-gallery__browse"
-                      type="button"
-                    >
-                      Browse neuron previews
-                    </button>
-                    <button
-                      id="dome-generate"
-                      class="mini-button mini-button--highlight"
-                      type="button"
-                      disabled
-                    >
-                      Synthesize Dream
-                    </button>
                   </div>
                   <p
                     id="dome-migan-status"
@@ -390,12 +401,6 @@
                   </button>
                   <p
                     id="dome-migan-notice"
-                    class="field__help"
-                    role="status"
-                    aria-live="polite"
-                  ></p>
-                  <p
-                    id="dome-status"
                     class="field__help"
                     role="status"
                     aria-live="polite"

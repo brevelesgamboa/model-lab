@@ -54,14 +54,27 @@ export async function createDomeGraphics(gl, isCurrent) {
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const texture = gl.createTexture();
       textures.push(texture);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, i === 3 ? gl.REPEAT : gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      if (i === 3) {
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          1,
+          1,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          new Uint8Array([0, 0, 0, 255]),
+        );
+      }
     }
     const uniforms = Object.fromEntries(
       [
@@ -69,10 +82,12 @@ export async function createDomeGraphics(gl, isCurrent) {
         "proj",
         "dream_360",
         "mirrored_wrap",
-        "color_retention",
         "depth",
         "neural",
-        "viewDir",
+        "nca_texture",
+        "nca_extrude",
+        "nca_sheen",
+        "photo_protection",
         "time",
         "wave_mode",
         "frequency",
