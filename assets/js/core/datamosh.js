@@ -10,8 +10,7 @@ function cellNoise(x, y, salt = 0) {
   return ((value ^ (value >>> 16)) >>> 0) / 4294967295;
 }
 
-export function applyDatamosh(canvas, scratchCanvas, enabled = true) {
-  if (!enabled) return;
+export function applyDatamosh(canvas, scratchCanvas) {
   const amount = DEFAULT_MOSH_AMOUNT;
   const size = canvas.width;
   const block = PIXEL_CLUSTER_SIZE;

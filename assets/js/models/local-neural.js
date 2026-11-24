@@ -110,9 +110,6 @@ export class LocalNeuralModel {
       inferenceBackend: "WebGL / CPU",
     };
   }
-  get animated() {
-    return true;
-  }
   get available() {
     return Boolean(this.metadata);
   }
@@ -278,7 +275,7 @@ export class LocalNeuralModel {
     return output;
   }
 
-  async decodeToCanvas(targetCanvas, latent, parameters = {}) {
+  async decodeToCanvas(targetCanvas, latent) {
     const generation = this.generation;
     const tf = await ensureTensorFlow();
     const { decoder } = await this.ensureModels();
@@ -299,11 +296,7 @@ export class LocalNeuralModel {
       }
       const lowContext = this.lowCanvas.getContext("2d", { alpha: false });
       lowContext.putImageData(image, 0, 0);
-      applyDatamosh(
-        this.lowCanvas,
-        this.effectCanvas,
-        parameters.datamosh !== false,
-      );
+      applyDatamosh(this.lowCanvas, this.effectCanvas);
       const context = targetCanvas.getContext("2d", { alpha: false });
       context.save();
       context.fillStyle = "#000";
@@ -331,7 +324,7 @@ export class LocalNeuralModel {
       if (!this.metadata)
         throw new Error("Train a model in Experiments first.");
       const latent = this.buildLatent(parameters, timeSeconds);
-      const drawn = await this.decodeToCanvas(canvas, latent, parameters);
+      const drawn = await this.decodeToCanvas(canvas, latent);
       return {
         backend: this.backend,
         status: drawn ? "ready" : "cancelled",

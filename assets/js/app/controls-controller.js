@@ -767,8 +767,6 @@ export function createControlsController({
         block.append(help);
       }
       parent.append(block);
-      if (definition.key === "targetChannel" && neuronGallery?.selectedPreview)
-        parent.append(neuronGallery.selectedPreview);
       block
         .querySelectorAll('input[type="range"]')
         .forEach(updateRangeProgress);

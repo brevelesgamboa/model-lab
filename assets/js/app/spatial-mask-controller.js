@@ -937,10 +937,6 @@ export function createSpatialMaskController({
         activeTool === "brush",
       );
       elements.canvas.classList.toggle(
-        "is-wand-active",
-        activeTool === "wand",
-      );
-      elements.canvas.classList.toggle(
         "is-spotlight-active",
         activeTool === "spotlight" || spatialFocus === "spotlight",
       );
