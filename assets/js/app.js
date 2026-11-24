@@ -66,7 +66,6 @@ import {
   FRACTAL_ROUTE_IDS,
   LEGACY_PANEL_STORAGE_KEY,
   LEGACY_QUALITY_STORAGE_KEY,
-  LOOP_PRESETS,
   PANEL_STORAGE_KEY,
   QUALITY_STORAGE_KEY,
 } from "./app/config.js";
@@ -120,7 +119,6 @@ let hqRendering = false;
 let liveResolutionScale = 1;
 let canvasGesture = null;
 const touchPoints = new Map();
-let loopPresetState = { id: "off", startedAt: 0, base: null };
 let smoothedRenderMs = 12;
 let fpsFrameCount = 0;
 let reportedFps = 0;
@@ -470,7 +468,6 @@ const { savePng, saveGif } = createExportController({
     gifEncoding,
     hqRendering,
     pending: renderer.getPending(),
-    loopPresetState,
   }),
   onBusyChange(type, active) {
     if (type === "gif") gifEncoding = active;
@@ -479,7 +476,6 @@ const { savePng, saveGif } = createExportController({
   },
   renderCurrentFrame,
   effectiveParametersAt,
-  selectedLoopPreset,
   updateFractalTools,
   setStatus,
   getVisualizerOverlay: () => visualizerOverlay,
@@ -575,79 +571,6 @@ function isFractalRoute(model = currentModel) {
 
 function supportsCanvasExploration(model = currentModel) {
   return FRACTAL_EXPLORE_ROUTE_IDS.has(model?.id);
-}
-
-function wrapUnit(value) {
-  return ((Number(value) % 1) + 1) % 1;
-}
-
-function selectedLoopPreset() {
-  return (
-    LOOP_PRESETS.find((preset) => preset.id === loopPresetState.id) ||
-    LOOP_PRESETS[0]
-  );
-}
-
-function loopPhaseAt(timeSeconds) {
-  const preset = selectedLoopPreset();
-  if (!preset.duration) return 0;
-  const elapsed = Number(timeSeconds) - Number(loopPresetState.startedAt || 0);
-  return (((elapsed / preset.duration) % 1) + 1) % 1;
-}
-
-function applyLoopPreset(base, phase) {
-  const output = { ...base };
-  const wave = Math.sin(phase * Math.PI * 2);
-  const waveQuarter = Math.cos(phase * Math.PI * 2);
-  const presetId = loopPresetState.id;
-
-  if (currentModel.id === "folded-fractal") {
-    output.pulse = 0;
-    output.grain = Math.min(Number(output.grain) || 0, 0.02);
-    if (presetId === "orbit") {
-      output.rotation = Number(base.rotation) + wave * 14;
-      output.scale = Number(base.scale) + waveQuarter * 0.09;
-      output.palette = wrapUnit(Number(base.palette) + phase);
-    } else if (presetId === "pulse") {
-      output.scale = Number(base.scale) + wave * 0.12;
-      output.gain = Number(base.gain) + waveQuarter * 0.08;
-    } else if (presetId === "color") {
-      output.palette = wrapUnit(Number(base.palette) + phase);
-    } else if (presetId === "echo") {
-      output.rotation = Number(base.rotation) + wave * 9;
-      output.ghosting = clamp(0.28 + waveQuarter * 0.16, 0, 0.5);
-      output.palette = wrapUnit(Number(base.palette) + phase * 0.5);
-    }
-  }
-
-  return sanitizedStoredParameters(currentModel, output);
-}
-
-function setLoopPreset(presetId, { log = true, render = true } = {}) {
-  const preset =
-    LOOP_PRESETS.find((entry) => entry.id === presetId) || LOOP_PRESETS[0];
-  loopPresetState = {
-    id: preset.id,
-    startedAt: lastTimeSeconds,
-    base: deepClone(currentParameters),
-  };
-  if (elements.loopPreset) {
-    elements.loopPreset.value = preset.id;
-  }
-  if (preset.id !== "off") {
-    setAnimation(true, { log: false });
-  }
-  if (render) renderCurrentFrame({ forceAnalysis: true });
-  if (log)
-    terminal(
-      "LOOP",
-      preset.id === "off"
-        ? "loop preset stopped"
-        : preset.name + " / " + preset.duration + " second seamless cycle",
-    );
-  setStatus(
-    preset.id === "off" ? "LOOP PRESET OFF" : preset.name + " LOOP ACTIVE",
-  );
 }
 
 function pointOnOutputCanvas(event) {
@@ -822,13 +745,6 @@ function zoomCanvasWithWheel(event) {
   zoomExplorerAt(pointOnOutputCanvas(event), multiplier);
 }
 
-function baseParametersAt(timeSeconds) {
-  if (selectedLoopPreset().duration && loopPresetState.base) {
-    return applyLoopPreset(loopPresetState.base, loopPhaseAt(timeSeconds));
-  }
-  return { ...currentParameters };
-}
-
 function activeLfoCount() {
   return Object.values(currentLfoState || {}).filter(
     (config) => config?.enabled,
@@ -839,27 +755,18 @@ function updateLfoCount() {
   elements.lfoCount.textContent = String(activeLfoCount());
 }
 
-function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
+function effectiveParametersAt(timeSeconds) {
   const output = {};
   const modulatedKeys = [];
   const modulationFrame = {};
   const audioLevels =
     rhythmController.status === "active" ? rhythmController.getLevels() : null;
-  let baseParameters = baseParametersAt(timeSeconds);
-  if (
-    loopPhase !== null &&
-    selectedLoopPreset().duration &&
-    loopPresetState.base
-  ) {
-    baseParameters = applyLoopPreset(loopPresetState.base, loopPhase);
-  }
-  const loopActive = selectedLoopPreset().duration > 0;
   currentModel.controls.forEach((definition) => {
-    const baseValue = baseParameters[definition.key];
+    const baseValue = currentParameters[definition.key];
     if (definition.type === "range") {
       const canModulate = supportsModulation(currentModel, definition);
       const lfoActive = Boolean(
-        canModulate && currentLfoState[definition.key]?.enabled && !loopActive,
+        canModulate && currentLfoState[definition.key]?.enabled,
       );
       let lfoConfig = currentLfoState[definition.key];
       let effectiveBase = baseValue;
@@ -879,10 +786,9 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
           lfoConfig = { ...lfoConfig, depth: scaledDepth };
         }
       }
-      const oscillatorValue =
-        loopActive || !canModulate
-          ? effectiveBase
-          : applyLfo(definition, effectiveBase, lfoConfig, timeSeconds);
+      const oscillatorValue = !canModulate
+        ? effectiveBase
+        : applyLfo(definition, effectiveBase, lfoConfig, timeSeconds);
       const audioRoute = canModulate
         ? getAudioRoute(currentModel.id, definition.key)
         : { source: "none", depth: 0 };
@@ -934,10 +840,6 @@ function effectiveParametersAt(timeSeconds, { loopPhase = null } = {}) {
   Object.defineProperty(output, "__modulationFrame", {
     value: modulationFrame,
   });
-  if (Number.isFinite(baseParameters.__seedB))
-    output.__seedB = baseParameters.__seedB;
-  if (Number.isFinite(baseParameters.__seedMix))
-    output.__seedMix = baseParameters.__seedMix;
   return output;
 }
 
@@ -1181,8 +1083,6 @@ function applyParameterSet(
   currentParameters = sanitizedStoredParameters(currentModel, parameters);
   controlsController.syncNeuronGallery();
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
-  if (selectedLoopPreset().duration)
-    loopPresetState.base = deepClone(currentParameters);
 
   currentModel.controls.forEach((definition) => {
     const control = controlElements.get(definition.key);
@@ -1211,8 +1111,6 @@ function applyParameterSet(
 
 function markPresetCustom() {
   controlsController.setPreset("");
-  if (selectedLoopPreset().duration)
-    loopPresetState.base = deepClone(currentParameters);
 }
 
 function initializeFractalToolOptions() {
@@ -1248,10 +1146,7 @@ function updateFractalTools() {
   elements.fractalTools.hidden = !canExplore;
   elements.fractalExamplesTool.hidden = currentModel.id !== "fractal-functions";
 
-  if (!canExplore) {
-    loopPresetState = { id: "off", startedAt: lastTimeSeconds, base: null };
-    return;
-  }
+  if (!canExplore) return;
 
   elements.exploreHint.textContent =
     currentModel.id === "fractal-functions"
@@ -1374,8 +1269,6 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
     setStatus("BUILD OR IMPORT A LOCAL MODEL IN EXPERIMENTS");
     return false;
   }
-
-  loopPresetState = { id: "off", startedAt: lastTimeSeconds, base: null };
 
   if (currentModel) {
     currentModel.cancel?.();
@@ -1515,8 +1408,6 @@ async function randomizeParameters() {
     );
     return;
   }
-  if (selectedLoopPreset().duration)
-    setLoopPreset("off", { log: false, render: false });
   const constrained = typeof currentModel.randomizeParameters === "function";
   const attempts =
     constrained && typeof currentModel.isInteresting === "function" ? 8 : 1;
@@ -1624,7 +1515,6 @@ function modelNeedsAnimation() {
     return true;
   if (currentModel.usesInternalClock) return false;
   if (hasActiveLfo(currentLfoState)) return true;
-  if (selectedLoopPreset().duration) return true;
   const effective = effectiveParametersAt(lastTimeSeconds);
   return Boolean(currentModel.isDynamic?.(effective));
 }
@@ -1796,18 +1686,7 @@ function makeThumbnail() {
 }
 
 function materializeVisibleParameters(parameters) {
-  const visible = { ...parameters };
-  if (Number.isFinite(Number(visible.__seedB))) {
-    const amount = clamp(Number(visible.__seedMix) || 0, 0, 1);
-    const smooth = amount * amount * (3 - 2 * amount);
-    visible.seed = Math.round(
-      Number(visible.seed) +
-        (Number(visible.__seedB) - Number(visible.seed)) * smooth,
-    );
-  }
-  delete visible.__seedB;
-  delete visible.__seedMix;
-  return sanitizedStoredParameters(currentModel, visible);
+  return sanitizedStoredParameters(currentModel, { ...parameters });
 }
 
 async function saveCurrentRun() {

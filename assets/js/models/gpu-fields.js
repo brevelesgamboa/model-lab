@@ -20,8 +20,6 @@ precision highp float;
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_seed;
-uniform float u_seed_b;
-uniform float u_seed_mix;
 uniform float u_p0;
 uniform float u_p1;
 uniform float u_p2;
@@ -39,11 +37,6 @@ out vec4 out_color;
 
 const float PI = 3.141592653589793;
 
-float blendedSeed() {
-  float amount = u_seed_mix * u_seed_mix * (3.0 - 2.0 * u_seed_mix);
-  return mix(u_seed, u_seed_b, amount);
-}
-
 mat2 rotate2d(float angle) {
   float c = cos(angle);
   float s = sin(angle);
@@ -52,7 +45,7 @@ mat2 rotate2d(float angle) {
 
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32 + blendedSeed());
+  p += dot(p, p + 45.32 + u_seed);
   return fract(p.x * p.y);
 }
 
@@ -80,8 +73,8 @@ vec3 chromaticField(vec2 uv) {
 
   vec2 q = mirrored;
   q += warp * 0.17 * vec2(
-    sin(q.y * frequency * 0.83 + warpTime + blendedSeed() * 0.01),
-    cos(q.x * frequency * 0.77 - warpTime * 0.91 + blendedSeed() * 0.013)
+    sin(q.y * frequency * 0.83 + warpTime + u_seed * 0.01),
+    cos(q.x * frequency * 0.77 - warpTime * 0.91 + u_seed * 0.013)
   );
   q += warp * 0.09 * vec2(
     sin((q.x + q.y) * frequency * 1.31 - warpTime * 0.7),
@@ -95,7 +88,7 @@ vec3 chromaticField(vec2 uv) {
   float bands = sin((q.x * q.y) * frequency * 2.3 + time * 0.35);
   float value = interference * 0.67 + bands * 0.33;
 
-  vec3 color = harmonicPalette(value * 0.28 + time * 0.025 + blendedSeed() * 0.0007, chroma);
+  vec3 color = harmonicPalette(value * 0.28 + time * 0.025 + u_seed * 0.0007, chroma);
   float neutral = 0.5 + 0.5 * value;
   color = mix(vec3(neutral), color, chroma);
   color *= 0.78 + 0.34 * (0.5 + 0.5 * radial);
@@ -132,7 +125,7 @@ vec3 foldedFractal(vec2 uv) {
     float fi = float(index);
     p = mix(p, abs(p), symmetry);
     float radiusSquared = max(dot(p, p), 0.075);
-    p = abs(p) / radiusSquared - vec2(0.78 + 0.08 * sin(blendedSeed() * 0.01), 0.52 + 0.07 * cos(blendedSeed() * 0.013));
+    p = abs(p) / radiusSquared - vec2(0.78 + 0.08 * sin(u_seed * 0.01), 0.52 + 0.07 * cos(u_seed * 0.013));
     p = rotate2d(rotation * 0.31 + 0.19 + sin(time * 0.2 + fi) * 0.025) * p;
     float ring = abs(length(p) - (0.72 + 0.08 * sin(time + fi)));
     orbit = min(orbit, ring);
@@ -208,9 +201,6 @@ function rotatePoint(x, y, angle) {
 class GpuFieldModel {
   constructor(variant) {
     this.variant = variant;
-    if (typeof variant.randomize === "function") {
-      this.randomizeParameters = variant.randomize;
-    }
     this.gpuCanvas = document.createElement("canvas");
     this.gpuCanvas.width = 512;
     this.gpuCanvas.height = 512;
@@ -241,8 +231,6 @@ class GpuFieldModel {
         "u_resolution",
         "u_time",
         "u_seed",
-        "u_seed_b",
-        "u_seed_mix",
         "u_p0",
         "u_p1",
         "u_p2",
@@ -283,9 +271,6 @@ class GpuFieldModel {
   get description() {
     return this.variant.description;
   }
-  get animated() {
-    return true;
-  }
   get available() {
     return true;
   }
@@ -294,9 +279,6 @@ class GpuFieldModel {
   }
   get controls() {
     return this.variant.controls;
-  }
-  get presets() {
-    return this.variant.presets || [];
   }
 
   isDynamic(parameters) {
@@ -340,14 +322,7 @@ class GpuFieldModel {
       this.gpuCanvas.height,
     );
     gl.uniform1f(this.uniforms.u_time, timeSeconds);
-    const baseSeed = Number(parameters.seed) || 1;
-    const seedMix = clamp(Number(parameters.__seedMix) || 0, 0, 1);
-    gl.uniform1f(this.uniforms.u_seed, baseSeed);
-    gl.uniform1f(
-      this.uniforms.u_seed_b,
-      Number(parameters.__seedB) || baseSeed,
-    );
-    gl.uniform1f(this.uniforms.u_seed_mix, seedMix);
+    gl.uniform1f(this.uniforms.u_seed, Number(parameters.seed) || 1);
     for (let index = 0; index < 10; index += 1) {
       gl.uniform1f(this.uniforms[`u_p${index}`], Number(mapped[index]) || 0);
     }
@@ -374,12 +349,7 @@ class GpuFieldModel {
     const width = this.cpuCanvas.width;
     const height = this.cpuCanvas.height;
     const image = this.cpuContext.createImageData(width, height);
-    const baseSeed = Number(parameters.seed) || 1;
-    const seedAmount = clamp(Number(parameters.__seedMix) || 0, 0, 1);
-    const smoothSeed = seedAmount * seedAmount * (3 - 2 * seedAmount);
-    const seed =
-      baseSeed +
-      ((Number(parameters.__seedB) || baseSeed) - baseSeed) * smoothSeed;
+    const seed = Number(parameters.seed) || 1;
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {

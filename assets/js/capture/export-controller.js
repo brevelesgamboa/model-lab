@@ -16,7 +16,6 @@ export function createExportController({
   onBusyChange,
   renderCurrentFrame,
   effectiveParametersAt,
-  selectedLoopPreset,
   updateFractalTools,
   setStatus,
   getVisualizerOverlay = () => null,
@@ -288,14 +287,7 @@ export function createExportController({
       const filename = outputFilename("png", width, height);
       downloadBlob(blob, filename);
 
-      const seedMix = Number(parameters.__seedMix) || 0;
-      const smoothSeed = seedMix * seedMix * (3 - 2 * seedMix);
-      const visibleSeed = Math.round(
-        Number(parameters.seed) +
-          ((Number(parameters.__seedB) || Number(parameters.seed)) -
-            Number(parameters.seed)) *
-            smoothSeed,
-      );
+      const visibleSeed = Math.round(Number(parameters.seed));
       const record = {
         id:
           "HQ-" +
@@ -491,21 +483,14 @@ export function createExportController({
       willReadFrequently: true,
     });
     const frames = [];
-    const loopPreset = selectedLoopPreset();
-    const fps = loopPreset.duration ? 15 : 12;
-    const frameCount = loopPreset.duration
-      ? Math.round(loopPreset.duration * fps)
-      : getState().quality.gifFrames;
+    const fps = 12;
+    const frameCount = getState().quality.gifFrames;
     const startTime = getState().time;
 
     try {
       for (let index = 0; index < frameCount; index += 1) {
-        const loopPhase = loopPreset.duration ? index / frameCount : null;
-        const frameTime = loopPreset.duration
-          ? getState().loopPresetState.startedAt +
-            loopPhase * loopPreset.duration
-          : startTime + index / fps;
-        const effective = effectiveParametersAt(frameTime, { loopPhase });
+        const frameTime = startTime + index / fps;
+        const effective = effectiveParametersAt(frameTime);
         await Promise.resolve(
           getState().model.render(captureCanvas, effective, frameTime),
         );
@@ -530,14 +515,7 @@ export function createExportController({
       });
       const filename = outputFilename("gif", captureSize, captureSize);
       downloadBlob(blob, filename);
-      terminal(
-        "FILE",
-        filename +
-          " written / " +
-          frameCount +
-          " frames" +
-          (loopPreset.duration ? " / seamless " + loopPreset.name : ""),
-      );
+      terminal("FILE", filename + " written / " + frameCount + " frames");
       setStatus("GIF EXPORTED");
     } catch (error) {
       console.error(error);

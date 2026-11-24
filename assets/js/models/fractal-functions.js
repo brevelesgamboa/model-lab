@@ -226,17 +226,6 @@ function choose(random, values) {
   ];
 }
 
-function wrapUnit(value) {
-  return ((Number(value) % 1) + 1) % 1;
-}
-
-function circularMixUnit(a, b, amount) {
-  let delta = wrapUnit(b) - wrapUnit(a);
-  if (delta > 0.5) delta -= 1;
-  if (delta < -0.5) delta += 1;
-  return wrapUnit(Number(a) + delta * amount);
-}
-
 export class FractalFunctionModel {
   constructor() {
     this.gpuCanvas = document.createElement("canvas");
@@ -309,9 +298,6 @@ export class FractalFunctionModel {
   }
   get description() {
     return "Mandelbrot, Julia, Tricorn, and Burning Ship equations expose iteration, escape time, orbit traps, zoom, and parameter sensitivity. Parameter LFO modulation and audio reactivity keep the view active without changing its base state.";
-  }
-  get animated() {
-    return true;
   }
   get available() {
     return true;
@@ -596,40 +582,13 @@ export class FractalFunctionModel {
     );
   }
 
-  interpolateStates(stateA, stateB, mixValue) {
-    const mix = clamp(Number(mixValue), 0, 1);
-    const equationA = Math.round(Number(stateA?.equation ?? 0));
-    const equationB = Math.round(Number(stateB?.equation ?? equationA));
-    if (equationA !== equationB) {
-      // Coordinate systems for different families are not directly compatible.
-      // Switch complete states instead of crossing an often-empty region between them.
-      return { ...(mix < 0.5 ? stateA : stateB) };
-    }
-    const output = {};
-    this.controls.forEach((definition) => {
-      const a = stateA?.[definition.key] ?? definition.default;
-      const b = stateB?.[definition.key] ?? definition.default;
-      if (definition.type === "select") {
-        output[definition.key] = mix < 0.5 ? a : b;
-      } else if (definition.key === "paletteShift") {
-        output[definition.key] = circularMixUnit(a, b, mix);
-      } else {
-        const value = Number(a) + (Number(b) - Number(a)) * mix;
-        output[definition.key] =
-          definition.format === "integer" ? Math.round(value) : value;
-      }
-    });
-    return output;
-  }
-
   render(targetCanvas, parameters, timeSeconds = 0) {
     const started = performance.now();
-    const renderParameters = parameters;
-    if (this.gl) this.renderWebGl(targetCanvas, renderParameters, timeSeconds);
-    else this.renderCpu(targetCanvas, renderParameters, timeSeconds);
-    const equation = Math.round(clamp(renderParameters.equation, 0, 3));
-    const zoom = 10 ** clamp(renderParameters.zoomExponent, -0.2, 5.5);
-    const iterations = Math.round(clamp(renderParameters.iterations, 30, 700));
+    if (this.gl) this.renderWebGl(targetCanvas, parameters, timeSeconds);
+    else this.renderCpu(targetCanvas, parameters, timeSeconds);
+    const equation = Math.round(clamp(parameters.equation, 0, 3));
+    const zoom = 10 ** clamp(parameters.zoomExponent, -0.2, 5.5);
+    const iterations = Math.round(clamp(parameters.iterations, 30, 700));
     return {
       backend: this.backend,
       modelMetrics: {

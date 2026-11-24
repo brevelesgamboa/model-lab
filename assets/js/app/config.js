@@ -11,24 +11,6 @@ export const FRACTAL_EXPLORE_ROUTE_IDS = new Set([
 ]);
 export const HQ_DB_NAME = "latent-field-hq-renders-v1";
 export const HQ_STORE_NAME = "renders";
-export const FRACTAL_PROCESS_COPY = {
-  fold: "The coordinates mirror at the center, turning one shape into a balanced pair.",
-  rotate:
-    "Each pass turns the folded space, so the next symmetry lands at a new angle.",
-  invert:
-    "Near and far swap around a small radius, pulling fine detail out of simple coordinates.",
-  translate:
-    "The space shifts before the next pass, stopping every layer from stacking in the same place.",
-  repeat:
-    "The same short recipe runs again. Tiny parameter changes build a very different structure.",
-};
-export const LOOP_PRESETS = [
-  { id: "off", name: "OFF", duration: 0 },
-  { id: "orbit", name: "SLOW ORBIT", duration: 6 },
-  { id: "pulse", name: "SOFT PULSE", duration: 4 },
-  { id: "color", name: "COLOR CYCLE", duration: 5 },
-  { id: "echo", name: "ECHO DRIFT", duration: 6 },
-];
 
 export const CLASSIC_FRACTAL_VIEWS = [
   {
