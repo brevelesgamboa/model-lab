@@ -873,6 +873,7 @@ function makeModulationPanel(definition, config, supportsLfo) {
       modelParameterState.set(currentModel.id, deepClone(currentParameters));
     },
     onChange({ config: nextConfig, active, activated }) {
+      currentModel.noteManualControlEdit?.();
       currentLfoState[definition.key] = nextConfig;
       modelLfoState.set(currentModel.id, deepClone(currentLfoState));
       markPresetCustom();
@@ -898,6 +899,7 @@ function applyParameterSet(
     presetName = "",
   } = {},
 ) {
+  currentModel.noteManualControlEdit?.();
   currentParameters = sanitizedStoredParameters(currentModel, parameters);
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
 

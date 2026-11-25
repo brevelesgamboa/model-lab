@@ -1975,6 +1975,9 @@ test("automatic spores honor dye, toroidal feathering, RGBA8 precision and barri
       positive,
       negative,
       maxOutside,
+      latentUnchanged: data.every(
+        (value, index) => index % 12 < 4 || value === 127,
+      ),
       error: runtime.gl.getError(),
     };
   });
@@ -1983,6 +1986,7 @@ test("automatic spores honor dye, toroidal feathering, RGBA8 precision and barri
   expect(result.implicit).not.toEqual(result.explicit);
   expect(result.protected).toEqual([127, 127, 127]);
   expect(result.maxOutside).toBe(0);
+  expect(result.latentUnchanged).toBe(true);
   expect(result.positive).toBeGreaterThan(0);
   expect(result.negative).toBeGreaterThan(0);
 });
@@ -2063,4 +2067,237 @@ test("production audio modulation stays fractional and freezes when the clock pa
   expect(await page.evaluate(() => window.__growthRuntime.gl.getError())).toBe(
     0,
   );
+});
+
+test("vitality monitoring uses fenced readback by default and recovery is a saved opt-in switch", async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    const render = NeuralGrowthModel.prototype.render;
+    NeuralGrowthModel.prototype.render = function (...args) {
+      window.__vitalityModel = this;
+      return render.apply(this, args);
+    };
+  });
+  await selectGrowth(page);
+  const toggle = page.getByRole("switch", {
+    name: "Automatic recovery",
+    exact: true,
+  });
+  await expect(toggle).not.toBeChecked();
+  await expect(page.locator("[data-vitality-status]")).toContainText(
+    "recovery off",
+  );
+  await page.evaluate(() => {
+    const runtime = window.__growthRuntime,
+      gl = runtime.gl;
+    window.__probeReads = { pbo: 0, cpu: 0, copies: 0 };
+    const read = gl.readPixels.bind(gl),
+      copy = gl.getBufferSubData.bind(gl);
+    gl.readPixels = (...args) => {
+      window.__probeReads[typeof args.at(-1) === "number" ? "pbo" : "cpu"]++;
+      return read(...args);
+    };
+    gl.getBufferSubData = (...args) => {
+      window.__probeReads.copies++;
+      return copy(...args);
+    };
+  });
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__growthRuntime.vitalityProbe?.steps ?? 0),
+    )
+    .toBeGreaterThan(0);
+  await page.locator("#toggle-animation").click();
+  const stats = await page.evaluate(() => ({
+    ...window.__probeReads,
+    slots: window.__growthRuntime._vitalityProbe.slots.length,
+    error: window.__growthRuntime.gl.getError(),
+  }));
+  expect(stats.pbo).toBeGreaterThan(0);
+  expect(stats.copies).toBeGreaterThan(0);
+  expect(stats.cpu).toBe(0);
+  expect(stats.slots).toBe(2);
+  expect(stats.error).toBe(0);
+  const before = await state(page);
+  await toggle.check();
+  await expect(toggle).toBeChecked();
+  expect(await state(page)).toEqual(before);
+  await page.locator("#run-experiment").click();
+  await expect(page.locator("#status-message")).toHaveText("Frame saved");
+  const record = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
+  );
+  expect(record.parameters.automaticRecovery).toBe(true);
+  await toggle.uncheck();
+  await page.locator('[data-view="saved"]').click();
+  await page
+    .locator(".run-card")
+    .getByRole("button", { name: "Restore", exact: true })
+    .click();
+  const simulation = page.locator('[data-section="simulation"]');
+  if ((await simulation.getAttribute("open")) === null)
+    await simulation.locator(":scope > summary").click();
+  await expect(toggle).toBeChecked();
+});
+
+test("erase protection blocks automatic spores, survives until cleared, and resets with the field", async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    const render = NeuralGrowthModel.prototype.render;
+    NeuralGrowthModel.prototype.render = function (...args) {
+      window.__vitalityModel = this;
+      return render.apply(this, args);
+    };
+  });
+  await selectGrowth(page);
+  const result = await page.evaluate(() => {
+    const model = window.__vitalityModel,
+      runtime = window.__growthRuntime,
+      size = runtime.size;
+    model.queueDisturbance(size / 2, size / 2, 20, "erase");
+    model._drainDisturbances();
+    const before = runtime.readState();
+    runtime.disturb(size / 2, size / 2, 8, "noise", {
+      automatic: true,
+      strength: 1,
+      quantizationPhase: 1,
+    });
+    const after = runtime.readState();
+    return {
+      protected: model._recoveryIntent.cells.some(Boolean),
+      unchanged: before.every((value, index) => value === after[index]),
+      held: model._vitalityWatchdog.manualUntil - performance.now(),
+      error: runtime.gl.getError(),
+    };
+  });
+  expect(result.protected).toBe(true);
+  expect(result.unchanged).toBe(true);
+  expect(result.held).toBeGreaterThan(7500);
+  expect(result.error).toBe(0);
+  await page
+    .getByRole("button", { name: "Clear erase protection", exact: true })
+    .click();
+  expect(
+    await page.evaluate(() =>
+      window.__vitalityModel._recoveryIntent.cells.some(Boolean),
+    ),
+  ).toBe(false);
+  await page.evaluate(() =>
+    window.__vitalityModel.queueDisturbance(20, 20, 12, "erase"),
+  );
+  await page.locator("#restart-growth").click();
+  expect(
+    await page.evaluate(() =>
+      window.__vitalityModel._recoveryIntent.cells.some(Boolean),
+    ),
+  ).toBe(false);
+  expect(await page.evaluate(() => window.__growthRuntime.isDormant())).toBe(
+    false,
+  );
+});
+
+test("raw vitality moments detect checkerboards, hidden activity and clipping without display effects", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const result = await page.evaluate(async () => {
+    const runtime = window.__growthRuntime,
+      size = runtime.size;
+    const data = new Uint8Array(size * size * 12).fill(150);
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++)
+        for (let channel = 0; channel < 3; channel++)
+          data[(y * size + x) * 12 + channel] = (x + y) % 2 ? 190 : 64;
+    runtime.writeState(data);
+    runtime.steps = 100;
+    let timestamp = 10000;
+    async function collect() {
+      const previous = runtime.vitalityProbe;
+      runtime.monitorVitality(timestamp, 5);
+      timestamp += 16;
+      for (let i = 0; i < 120; i++) {
+        await new Promise(requestAnimationFrame);
+        const probe = runtime.monitorVitality(timestamp++, 5);
+        if (probe && probe !== previous) return probe;
+      }
+      throw new Error("GPU vitality fence did not complete");
+    }
+    const first = await collect();
+    runtime.draw(document.createElement("canvas"), {
+      palette: "neon",
+      zoom: 4,
+      pan: [0.2, -0.3],
+      echoDecay: 0.8,
+      ripples: [
+        {
+          x: 0,
+          y: 0,
+          radius: 30,
+          amplitude: 1,
+          startTime: performance.now() - 100,
+          duration: 1,
+        },
+      ],
+    });
+    runtime.steps++;
+    timestamp += 600;
+    const display = await collect();
+    for (let index = 0; index < data.length; index++)
+      if (index % 12 >= 3) data[index] = index % 2 ? 180 : 100;
+    runtime.writeState(data); // Explicit writes invalidate generations/history.
+    runtime.steps++;
+    timestamp += 600;
+    await collect();
+    // Change hidden channels through a GPU disturbance, retaining prior history.
+    runtime.disturb(size / 2, size / 2, size / 2, "noise", {
+      automatic: true,
+      strength: 1,
+      quantizationPhase: 2,
+    });
+    runtime.steps++;
+    timestamp += 600;
+    const hidden = await collect();
+    runtime.writeState(new Uint8Array(data.length).fill(255));
+    runtime.steps++;
+    timestamp += 600;
+    const clipped = await collect();
+    runtime.disturb(size / 2, size / 2, size / 2, "freeze");
+    runtime.steps++;
+    timestamp += 600;
+    const partial = await collect();
+    runtime.clearBarrier();
+    runtime.gl.bindFramebuffer(
+      runtime.gl.FRAMEBUFFER,
+      runtime.barrier.framebuffer,
+    );
+    runtime.gl.clearColor(1, 0, 0, 1);
+    runtime.gl.clear(runtime.gl.COLOR_BUFFER_BIT);
+    runtime.invalidateVitality();
+    runtime.steps++;
+    timestamp += 600;
+    const frozen = await collect();
+    return {
+      contrast: first.rgbContrast,
+      displayed: display.rgbContrast,
+      delta: hidden.hiddenDelta,
+      clipping: clipped.clipping,
+      partial: partial.coverage,
+      frozen: frozen.coverage,
+      error: runtime.gl.getError(),
+    };
+  });
+  expect(result.error).toBe(0);
+  expect(result.contrast).toBeGreaterThan(0.2);
+  expect(result.displayed).toBeCloseTo(result.contrast, 4);
+  expect(result.delta).toBeGreaterThan(0.01);
+  expect(result.clipping).toBeGreaterThan(0.99);
+  expect(result.partial).toBeLessThan(1);
+  expect(result.frozen).toBe(0);
 });

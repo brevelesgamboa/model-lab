@@ -13,6 +13,8 @@ import {
   ResonanceConfig,
   RESONANCE_PRESETS,
 } from "./neural-growth/resonance-config.js";
+import { VitalityWatchdog, RecoveryIntentMask, INTENT_SIZE } from "./neural-growth/vitality-watchdog.js";
+
 const STILL_PAN = Object.freeze([0, 0]);
 
 async function loadCheckpoint(signal, pattern) {
@@ -81,6 +83,10 @@ export class NeuralGrowthModel {
     this._accumulator = 0;
     this._queuedDisturbances = [];
     this._audioResponse = new AudioResponse();
+    this._vitalityWatchdog = new VitalityWatchdog();
+    this._recoveryIntent = new RecoveryIntentMask();
+    this._vitalityActiveSeconds = 0;
+    this._recoveryIndex = 0;
     this._palettePhaseAccumulator = 0.0;
     this._lastPaletteTime = null;
     this._capabilities = capabilities;
@@ -839,6 +845,10 @@ export class NeuralGrowthModel {
         help: "Gentle cellular color mixing on accepted kicks; yields to manual brushes. Total mixing stays below 0.08 per second.",
       },
       {
+        key: "automaticRecovery", label: "Automatic recovery", type: "toggle", default: false,
+        help: "Monitoring is always active. Opt in to gentle recovery only after a learned healthy baseline and repeated collapse evidence. Erased areas remain protected; manual edits hold recovery for eight seconds.",
+      },
+      {
         key: "brushRadius",
         label: "BRUSH RADIUS",
         type: "range",
@@ -1369,7 +1379,10 @@ export class NeuralGrowthModel {
   }
 
   setClockRunning(running) {
-    if (!running) this.cancelAudio();
+    if (!running) {
+      this.cancelAudio({all: true});
+      this._vitalityWatchdog.suspend();
+    }
     if (this._clockRunning !== Boolean(running)) {
       this._lastTick = null;
       this._accumulator = 0;
@@ -1656,6 +1669,9 @@ export class NeuralGrowthModel {
   }
 
   onParameterChange(key, value) {
+    if (key !== "pattern" || value !== this._requestedPattern) this.noteManualControlEdit();
+    if (key === "automaticRecovery" && value !== true)
+      this._audioResponse.cancel("recovery");
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
     }
@@ -1675,6 +1691,7 @@ export class NeuralGrowthModel {
       key === "geometryCenterY" ||
       key === "geometrySoftness" ||
       key === "barrierLock" ||
+      key === "automaticRecovery" ||
       key === "audioPreset" ||
       key === "audioRippleAmount" ||
       key === "audioSporeAmount" ||
@@ -1711,6 +1728,7 @@ export class NeuralGrowthModel {
       return true;
     }
     if (key !== "pattern" || value === this._requestedPattern) return false;
+    this.cancelAudio({ all: true });
     getPattern(value);
     this._requestedPattern = value;
     this._epoch += 1;
@@ -1842,8 +1860,15 @@ export class NeuralGrowthModel {
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
         });
+        const preserveProtection = Boolean(this._runtime && this._activePattern === pattern.id && this._runtime.seed === parameters.seed && !this._needsRuntime);
+        if (preserveProtection) this._recoveryIntent.resize(this._runtime.size, parameters.simulationSize);
         this._runtime?.dispose();
         this._runtime = candidate;
+        if (!preserveProtection) this._recoveryIntent.clear();
+        this._syncRecoveryProtection();
+        this._vitalityActiveSeconds = 0;
+        this._vitalityWatchdog.suspend();
+        this.cancelAudio({all: true});
         this._activePattern = pattern.id;
         this._needsRuntime = false;
         this._lastTick = null;
@@ -1852,6 +1877,7 @@ export class NeuralGrowthModel {
       } else if (this._runtime.seed !== parameters.seed) {
         runtimeOperation = true;
         this._runtime.restart(parameters.seed);
+        this._resetVitality();
         this._lastTick = null;
         this._accumulator = 0;
       }
@@ -1860,16 +1886,22 @@ export class NeuralGrowthModel {
         this._accumulator = 0;
       }
       this._parameters = parameters;
+      if (parameters.automaticRecovery !== true) this._audioResponse.cancel("recovery");
       this.lastError = null;
       this._failedConfiguration = null;
       runtimeOperation = true;
       this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
-        this._audioResponse.step(performance.now(), this.simulationSize,
-          (...args) => this._runtime.disturb(...args), hexToRgb(parameters.dyeColor || "#00f0ff"));
+        if (globalThis.document?.hidden) this.cancelAudio({ all: true });
+        else this._audioResponse.step(
+          performance.now(), this.simulationSize,
+          (...args) => this._runtime.disturb(...args),
+          hexToRgb(parameters.dyeColor || "#00f0ff"),
+        );
         if (this._lastTick !== null) {
           const delta = Math.max(0, timeSeconds - this._lastTick);
           const speed = Math.max(0, Number(parameters.growthSpeed) || 0);
+          if (speed > 0) this._vitalityActiveSeconds += Math.min(.25, delta);
           this._accumulator += delta * speed;
           const maxStepsPerFrame = 3;
           const count = Math.min(
@@ -1903,6 +1935,7 @@ export class NeuralGrowthModel {
           this._accumulator = Math.max(0, this._accumulator);
         }
         this._lastTick = timeSeconds;
+        this._monitorVitality(performance.now());
       }
       const outlineMode = parameters.barrierOutline || "auto";
       const showBarrier =
@@ -2009,7 +2042,8 @@ export class NeuralGrowthModel {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
     this._queuedDisturbances = [];
-    this.cancelAudio();
+    this.cancelAudio({all: true});
+    this._resetVitality();
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -2043,6 +2077,12 @@ export class NeuralGrowthModel {
       1,
       Math.min(Math.floor(size / 2), Math.round(radius)),
     );
+    this._vitalityWatchdog.noteManualEdit(performance.now());
+    if (!["freeze", "thaw", "groom"].includes(mode)) {
+      if (this._recoveryIntent.edit(clampedX, clampedY, clampedRadius, size, mode === "erase" || mode === "prune")) {
+        this._syncRecoveryProtection();
+      }
+    }
     if (mode === "shockwave") {
       this.triggerRipple(clampedX, clampedY, clampedRadius);
     }
@@ -2148,18 +2188,89 @@ export class NeuralGrowthModel {
 
   clearBarrier() {
     if (this.ready) {
+      this._vitalityWatchdog.noteManualEdit(performance.now());
+      this._audioResponse.interact(this._audioResponse.pointerDown, performance.now());
       this._runRuntime(() => this._runtime?.clearBarrier());
     }
   }
 
-  cancelAudio() {
-    this._audioResponse.cancel();
+  noteManualControlEdit() {
+    this._vitalityWatchdog.noteManualEdit(performance.now());
+    this._audioResponse.cancel("recovery");
+  }
+
+  get vitalityStatus() {
+    return this._vitalityWatchdog.assessment.status;
+  }
+
+  _syncRecoveryProtection() {
+    const runtime = this._runtime;
+    if (runtime && !runtime.disposed && !runtime.lost && !runtime.gl?.isContextLost?.()) runtime.setProtectionMask?.(this._recoveryIntent.cells);
+  }
+
+  _resetVitality() {
+    this._recoveryIntent.clear();
+    this._syncRecoveryProtection();
+    this._vitalityActiveSeconds = 0;
+    this._vitalityWatchdog.noteManualEdit(performance.now());
+  }
+
+  clearRecoveryProtection() {
+    this._recoveryIntent.clear();
+    this._syncRecoveryProtection();
+    this._vitalityWatchdog.noteManualEdit(performance.now());
+    this._audioResponse.cancel("all");
+  }
+
+  _monitorVitality(timestamp) {
+    const runtime = this._runtime;
+    if (!this._clockRunning || !runtime || globalThis.document?.hidden) return;
+    const probe = runtime.monitorVitality?.(
+      timestamp,
+      this._vitalityActiveSeconds,
+    );
+    if (!probe) return;
+    const result = this._vitalityWatchdog.observe(probe, {
+      checkpoint: this._activePattern,
+      size: runtime.size,
+      generation: runtime.generation,
+      timestamp,
+      enabled: this._parameters.automaticRecovery === true,
+      pointerDown: this._audioResponse.pointerDown,
+      protectionRevision: this._recoveryIntent.signature,
+    });
+    if (!result.recover) return;
+    let queued = false;
+    // Start at different eligible coarse cells on successive attempts. The GPU
+    // intent/barrier tests still protect every individual fragment of a spore.
+    const offset = (++this._recoveryIndex * 397) % INTENT_SIZE ** 2;
+    for (
+      let index = 0, count = 0;
+      index < probe.eligible.length && count < 2;
+      index++
+    ) {
+      const tile = (index + offset) % probe.eligible.length;
+      const x = ((tile % INTENT_SIZE) + 0.5) / INTENT_SIZE;
+      const y = (Math.floor(tile / INTENT_SIZE) + 0.5) / INTENT_SIZE;
+      if (probe.eligible[tile] < 192 || !this._recoveryIntent.allows(x, y))
+        continue;
+      if (this._audioResponse.queueRecovery(timestamp, x, y)) {
+        queued = true;
+        count++;
+      }
+    }
+    if (queued) this._vitalityWatchdog.recordRecovery(timestamp);
+  }
+
+  cancelAudio({all = false} = {}) {
+    this._audioResponse.cancel(all ? "all" : "audio");
     this._activeRipples =
       this._activeRipples?.filter((r) => !r.automatic) || [];
   }
 
   notePointerInteraction(down, timestamp = performance.now()) {
     this._audioResponse.interact(down, timestamp);
+    this._vitalityWatchdog.noteManualEdit(timestamp);
   }
 
   onAudioFrame(levels, timestamp, parameters, enabled = true) {
@@ -2170,7 +2281,7 @@ export class NeuralGrowthModel {
       enabled && this.ready && this._clockRunning,
     );
     if (!enabled || !levels?.hasSignal || !this._clockRunning)
-      this.cancelAudio();
+      this.cancelAudio({all: !enabled || !this._clockRunning});
     if (event)
       this.triggerRipple(
         event.x * this.simulationSize,
@@ -2230,7 +2341,8 @@ export class NeuralGrowthModel {
   }
 
   renderSnapshot(canvas, options = {}) {
-    this.cancelAudio();
+    this.cancelAudio({all: true});
+    this._vitalityWatchdog.suspend();
     if (!this.ready)
       throw new Error(
         this.lastError || "Wait for Neural Growth to initialize.",

@@ -26,6 +26,10 @@ export function sanitizeParameters(model, stored, { continuous = false } = {}) {
         (entry) => String(entry.value) === String(value),
       );
       if (option) parameters[definition.key] = option.value;
+    } else if (definition.type === "toggle") {
+      if (typeof value === "boolean") parameters[definition.key] = value;
+      else if (value === "true" || value === "false")
+        parameters[definition.key] = value === "true";
     } else if (definition.type === "color") {
       if (
         typeof value === "string" &&
@@ -71,7 +75,7 @@ export function validateModelDefinition(model) {
     if (
       !control.key ||
       keys.has(control.key) ||
-      !["range", "number", "select", "color"].includes(control.type)
+      !["range", "number", "select", "color", "toggle"].includes(control.type)
     ) {
       throw new Error(`Invalid control schema in ${model.id}: ${control.key}`);
     }
@@ -86,6 +90,11 @@ export function validateModelDefinition(model) {
           `Invalid default option in ${model.id}: ${control.key}`,
         );
       }
+    } else if (control.type === "toggle") {
+      if (typeof control.default !== "boolean")
+        throw new Error(
+          `Invalid toggle default in ${model.id}: ${control.key}`,
+        );
     } else if (control.type === "color") {
       if (
         typeof control.default !== "string" ||

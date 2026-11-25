@@ -69,14 +69,17 @@ export class AudioResponse {
     this.manualUntil = -Infinity;
     this.sequence = 0;
   }
-  cancel() {
-    this.active.length = 0;
-    this.lastStep = null;
+  cancel(kind = "audio") {
+    this.active =
+      kind === "all"
+        ? []
+        : this.active.filter((spore) => (spore.kind || "audio") !== kind);
+    if (!this.active.length) this.lastStep = null;
   }
   interact(down, timestamp) {
     this.pointerDown = Boolean(down);
     this.manualUntil = timestamp + SPORE_POLICY.manualYield;
-    this.cancel();
+    this.cancel("all");
   }
   update(levels, timestamp, parameters, enabled = true) {
     const changedSession = this.generation !== levels?.generation;
@@ -119,6 +122,8 @@ export class AudioResponse {
       this.sequence += 1;
       this.active.push({
         start: timestamp,
+        kind: "audio",
+        mode: "kick_color",
         amount: amount * strength,
         x: (this.sequence * 0.61803398875) % 1,
         y: (this.sequence * 0.41421356237) % 1,
@@ -128,6 +133,24 @@ export class AudioResponse {
     return ripple > 0
       ? { ripple, x: (id * 0.61803398875) % 1, y: (id * 0.41421356237) % 1 }
       : null;
+  }
+  queueRecovery(timestamp, x, y) {
+    if (
+      this.pointerDown ||
+      timestamp < this.manualUntil ||
+      this.active.length >= SPORE_POLICY.maximum
+    )
+      return false;
+    this.active.push({
+      start: timestamp,
+      x,
+      y,
+      amount: SPORE_POLICY.rate,
+      kind: "recovery",
+      mode: "noise",
+    });
+    if (this.lastStep === null) this.lastStep = timestamp;
+    return true;
   }
   step(timestamp, size, disturb, dyeColor) {
     const previous = this.lastStep;
@@ -151,7 +174,7 @@ export class AudioResponse {
         Math.floor(spore.x * size),
         Math.floor(spore.y * size),
         Math.max(1, Math.round(SPORE_POLICY.radius * size)),
-        "kick_color",
+        spore.mode || "kick_color",
         {
           strength,
           dyeColor,

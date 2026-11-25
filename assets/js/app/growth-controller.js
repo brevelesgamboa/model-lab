@@ -505,6 +505,18 @@ export function createGrowthController({
       renderModelTechnicalInfo(elements, model);
       lastInfo = model.technicalInfo;
     }
+    const vitalityOutput = elements.parameterControls?.querySelector(
+      "[data-vitality-status]",
+    );
+    if (vitalityOutput) {
+      const state = String(model.vitalityStatus || "learning").replaceAll(
+        "-",
+        " ",
+      );
+      const label = `Monitoring · ${state}${model.parameters?.automaticRecovery ? "" : " · recovery off"}`;
+      if (vitalityOutput.textContent !== label)
+        vitalityOutput.textContent = label;
+    }
     const stats = model.getStats();
     elements.growthStatus.textContent = model.lastError
       ? `${model.lastError} Use Restart to retry.`

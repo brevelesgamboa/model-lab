@@ -40,6 +40,8 @@ function setup(context, { load = async () => checkpoint, failSize = 0, initialSi
         size,
         seed,
         steps: 0,
+        generation: 1,
+        setProtectionMask(cells) { this.protection = Uint8Array.from(cells); this.generation++; },
         restarts: 0,
         draws: 0,
         disturbances: [],
@@ -57,6 +59,7 @@ function setup(context, { load = async () => checkpoint, failSize = 0, initialSi
           this.seed = value;
           this.steps = 0;
           this.restarts += 1;
+          this.generation++;
         },
         disturb(...values) {
           this.disturbances.push(values);
@@ -1410,4 +1413,129 @@ test("legacy guidance parameters are ignored while pure NCA state and temporal c
   assert.equal(runtimes[0].steps, 1);
   assert.equal(runtimes[0].lastStepOptions.latentMomentum, 0.4);
   for (const key of Object.keys(retired)) assert.equal(Object.hasOwn(runtimes[0].lastStepOptions, key), false, key);
+});
+
+test("automatic recovery is a boolean opt-in and old runs keep it disabled", () => {
+  const model = new NeuralGrowthModel();
+  const control = model.controls.find(({ key }) => key === "automaticRecovery");
+  assert.equal(control.type, "toggle");
+  assert.equal(control.default, false);
+  assert.equal(
+    sanitizeParameters(model, { audioProfile: "dynamic" }).automaticRecovery,
+    false,
+  );
+  assert.equal(
+    sanitizeParameters(model, { automaticRecovery: true }).automaticRecovery,
+    true,
+  );
+  assert.equal(
+    sanitizeParameters(model, { automaticRecovery: "false" }).automaticRecovery,
+    false,
+  );
+  assert.equal(
+    sanitizeParameters(model, { automaticRecovery: "yes" }).automaticRecovery,
+    false,
+  );
+});
+
+test("monitoring remains active when recovery is off; opt-in queues bounded recovery without direct GPU writes", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  const runtime = runtimes[0];
+  runtime.steps = 100;
+  model._vitalityActiveSeconds = 5;
+  model.setClockRunning(true);
+  let collapsed = false;
+  runtime.monitorVitality = () => ({
+    generation: runtime.generation,
+    steps: runtime.steps++,
+    activeSeconds: 5,
+    rgbContrast: collapsed ? 0.001 : 0.1,
+    hiddenEnergy: collapsed ? 0.001 : 0.2,
+    hiddenDelta: collapsed ? 0 : 0.01,
+    clipping: 0,
+    rgbDelta: 0,
+    coverage: 1,
+    eligible: new Uint8Array(1024).fill(255),
+  });
+  for (let i = 0; i < 4; i++) model._monitorVitality(i * 500);
+  collapsed = true;
+  for (let i = 4; i < 7; i++) model._monitorVitality(i * 500);
+  assert.equal(model.vitalityStatus, "collapsed");
+  assert.equal(model._audioResponse.active.length, 0);
+  model.onParameterChange("automaticRecovery", true);
+  for (let i = 0; i < 3; i++) model._monitorVitality(20000 + i * 500);
+  assert.equal(model._audioResponse.active.length, 2);
+  assert.equal(model._queuedDisturbances.length, 0);
+  assert.equal(runtime.disturbances.length, 0);
+  model.onAudioFrame(
+    { hasSignal: false, generation: 1, beatId: 0 },
+    4016,
+    params,
+  );
+  assert.equal(
+    model._audioResponse.active.length,
+    2,
+    "Audio silence must not cancel independent recovery",
+  );
+  const now = performance.now();
+  model._audioResponse.lastStep = now - 16;
+  for (const spore of model._audioResponse.active) spore.start = now - 100;
+  await model.render(canvas, { ...params, automaticRecovery: true }, 0.1, {
+    advanceSimulation: true,
+  });
+  assert.ok(runtime.disturbances.length > 0);
+  assert.equal(runtime.disturbances[0][3], "noise");
+  assert.equal(runtime.disturbances[0][4].automatic, true);
+  assert.equal(runtime.disturbances[0][4].lockBarrier, true);
+  model.onParameterChange("rotation", 45);
+  assert.equal(model._audioResponse.active.length, 0);
+  assert.ok(model._vitalityWatchdog.manualUntil > performance.now() + 7900);
+  model._audioResponse.queueRecovery(performance.now(), .5, .5);
+  await model.render(canvas, params, .2);
+  assert.equal(model._audioResponse.active.length, 0, "Restored disabled settings must cancel pending recovery");
+  model.setClockRunning(false);
+  assert.equal(model._audioResponse.active.length, 0);
+});
+
+test("manual erase protection survives grid resizing and clears only through paint, reset or explicit action", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  model.queueDisturbance(0, 0, 12, "erase");
+  assert.ok(model._recoveryIntent.cells.some(Boolean));
+  assert.ok(model._vitalityWatchdog.manualUntil > performance.now() + 7900);
+  await model.render(canvas, { ...params, simulationSize: 256 }, 0);
+  assert.equal(model._recoveryIntent.allows(0.01, 0.01), false);
+  assert.equal(model._recoveryIntent.allows(0.51, 0.51), false);
+  assert.deepEqual(
+    [...runtimes[1].protection],
+    [...model._recoveryIntent.cells],
+  );
+  model.queueDisturbance(4, 4, 12, "noise");
+  assert.equal(model._recoveryIntent.allows(0.015, 0.015), true);
+  assert.ok(model._recoveryIntent.cells.some(Boolean));
+  model.clearRecoveryProtection();
+  assert.equal(model._recoveryIntent.cells.some(Boolean), false);
+  model.queueDisturbance(50, 50, 12, "erase");
+  model.restart();
+  assert.equal(model._recoveryIntent.cells.some(Boolean), false);
+  assert.equal(model._vitalityActiveSeconds, 0);
+});
+
+test("explicit context-loss retry clears CPU intent without uploading into the lost runtime", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  model.queueDisturbance(20, 20, 10, "erase");
+  const lost = runtimes[0];
+  lost.lost = true;
+  lost.setProtectionMask = () => {
+    throw new Error("Must not upload into a lost context");
+  };
+  model._fail(new Error("The WebGL context was lost"));
+  assert.doesNotThrow(() => model.restart());
+  assert.equal(model._recoveryIntent.cells.some(Boolean), false);
+  await model.render(canvas, params, 0);
+  assert.equal(model.ready, true);
+  assert.equal(runtimes.length, 2);
+  assert.equal(lost.disposed, true);
 });

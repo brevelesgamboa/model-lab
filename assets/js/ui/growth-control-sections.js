@@ -58,6 +58,6 @@ export const GROWTH_CONTROL_SECTIONS = Object.freeze([
   {
     id: "simulation",
     label: "Simulation",
-    keys: ["simulationSize", "topology"],
+    keys: ["simulationSize", "topology", "automaticRecovery"],
   },
 ]);

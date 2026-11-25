@@ -19,6 +19,11 @@ import {
   motionFieldStats,
 } from "./motion-field.js";
 
+import { GpuVitalityProbe, PROBE_SIZE, SNAPSHOT_SIZE } from "./vitality-probe.js";
+import { INTENT_SIZE } from "./vitality-watchdog.js";
+
+let nextRuntimeGeneration = 0;
+
 export const SPIRAL_MAX_PITCH_DEGREES = 89;
 export const SPIRAL_MAX_PITCH_RADIANS = (SPIRAL_MAX_PITCH_DEGREES * Math.PI) / 180;
 
@@ -67,6 +72,82 @@ vec4 decodeState(vec4 value) { return (value - 127.0 / 255.0) * 4.0; }
 vec4 encodeState(vec4 value) { return value / 4.0 + 127.0 / 255.0; }
 ivec2 wrapCell(ivec2 p) { return (p % u_size + u_size) % u_size; }
 `;
+
+// Fixed stratified sites cover the whole torus and retain identical positions
+// between probes. Moments, energy and clipping are measured before reduction.
+const PROBE_SAMPLING = `
+ivec2 probeCell(ivec2 site) {
+  uint hash = uint(site.x) * 1664525u + uint(site.y) * 1013904223u;
+  hash ^= hash >> 16;
+  vec2 jitter = vec2(float(hash & 65535u), float((hash >> 16) & 65535u)) / 65536.0;
+  return min(ivec2((vec2(site) + jitter) * float(u_size) / ${SNAPSHOT_SIZE}.0), ivec2(u_size - 1));
+}
+`;
+const VITALITY_SNAPSHOT = `${PREFIX}
+uniform sampler2D u_state;
+${PROBE_SAMPLING}
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  int group = p.x / ${SNAPSHOT_SIZE};
+  ivec2 xy = probeCell(ivec2(p.x % ${SNAPSHOT_SIZE}, p.y));
+  out_color = texelFetch(u_state, ivec2(xy.x + group * u_size, xy.y), 0);
+}`;
+const VITALITY_PROBE = `${PREFIX}
+uniform sampler2D u_state;
+uniform sampler2D u_previous;
+uniform sampler2D u_barrier;
+uniform sampler2D u_intent;
+uniform int u_hasHistory;
+${PROBE_SAMPLING}
+vec2 encode16(float value) {
+  float bits = floor(clamp(value, 0.0, 1.0) * 65535.0 + 0.5);
+  return vec2(floor(bits / 256.0), mod(bits, 256.0)) / 255.0;
+}
+float clipped(vec4 value) {
+  return dot(vec4(lessThanEqual(value, vec4(2.0 / 255.0))), vec4(1.0))
+    + dot(vec4(greaterThanEqual(value, vec4(253.0 / 255.0))), vec4(1.0));
+}
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  int lane = p.x / ${PROBE_SIZE};
+  ivec2 tile = ivec2(p.x % ${PROBE_SIZE}, p.y);
+  vec3 rgb = vec3(0.0), squared = vec3(0.0);
+  float energy = 0.0, delta = 0.0, clip = 0.0, coverage = 0.0, rgbEnergy = 0.0, rgbDelta = 0.0;
+  for (int sy = 0; sy < 2; sy++) for (int sx = 0; sx < 2; sx++) {
+    ivec2 site = tile * 2 + ivec2(sx, sy);
+    ivec2 xy = probeCell(site);
+    ivec2 intentCell = min(xy * ${INTENT_SIZE} / u_size, ivec2(${INTENT_SIZE - 1}));
+    if (texelFetch(u_barrier, xy, 0).r > 0.5 || texelFetch(u_intent, intentCell, 0).r > 0.5) continue;
+    vec4 a = texelFetch(u_state, xy, 0);
+    vec4 b = texelFetch(u_state, ivec2(xy.x + u_size, xy.y), 0);
+    vec4 c = texelFetch(u_state, ivec2(xy.x + u_size * 2, xy.y), 0);
+    vec4 oldA = texelFetch(u_previous, site, 0);
+    vec4 oldB = texelFetch(u_previous, ivec2(site.x + ${SNAPSHOT_SIZE}, site.y), 0);
+    vec4 oldC = texelFetch(u_previous, ivec2(site.x + ${SNAPSHOT_SIZE * 2}, site.y), 0);
+    vec4 hb = (b - 127.0 / 255.0) * 2.0, hc = (c - 127.0 / 255.0) * 2.0;
+    float ha = (a.a - 127.0 / 255.0) * 2.0;
+    vec4 db = b - oldB, dc = c - oldC;
+    float da = a.a - oldA.a;
+    rgb += a.rgb;
+    squared += a.rgb * a.rgb;
+    energy += sqrt((dot(hb, hb) + dot(hc, hc) + ha * ha) / 9.0);
+    delta += u_hasHistory == 1 ? sqrt((dot(db, db) + dot(dc, dc) + da * da) / 9.0) : 0.0;
+    clip += (clipped(a) + clipped(b) + clipped(c)) / 12.0;
+    rgbEnergy += dot(abs(a.rgb - 127.0 / 255.0), vec3(1.0 / 3.0));
+    rgbDelta += u_hasHistory == 1 ? dot(abs(a.rgb - oldA.rgb), vec3(1.0 / 3.0)) : 0.0;
+    coverage += 1.0;
+  }
+  float divisor = max(coverage, 1.0);
+  rgb /= divisor; squared /= divisor;
+  vec2 values;
+  if (lane == 0) values = rgb.rg;
+  else if (lane == 1) values = vec2(rgb.b, squared.r);
+  else if (lane == 2) values = squared.gb;
+  else if (lane == 3) values = vec2(energy, delta) / divisor;
+  else if (lane == 4) values = vec2(clip / divisor, coverage / 4.0);
+  else values = vec2(rgbEnergy, rgbDelta) / divisor;
+  out_color = vec4(encode16(values.x), encode16(values.y));
+}`;
 
 const PERCEPTION = `${PREFIX}
 uniform sampler2D u_state;
@@ -472,6 +553,8 @@ void main() {
 const DISTURB = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_barrier;
+uniform sampler2D u_intent;
+uniform int u_hasIntent;
 uniform ivec2 u_center;
 uniform float u_radius;
 uniform float u_strength;
@@ -522,6 +605,10 @@ void main() {
     out_color = texelFetch(u_state, p, 0);
     return;
   }
+  if (u_automatic == 1 && u_hasIntent == 1 && texelFetch(u_intent, xy * ${INTENT_SIZE} / u_size, 0).r > 0.5) {
+    out_color = texelFetch(u_state, p, 0);
+    return;
+  }
   vec4 current = texelFetch(u_state, p, 0);
   if (u_mode == 1) {
     vec2 coord = vec2(p);
@@ -529,7 +616,8 @@ void main() {
     float n2 = fract(sin(dot(coord + vec2(17.1, 41.3), vec2(39.346, 11.135))) * 23421.631);
     float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
     float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
-    out_color = mix(current, vec4(n1, n2, n3, n4), weight);
+    vec4 target = vec4(n1, n2, n3, n4);
+    out_color = mix(current, target, weight);
   } else if (u_mode == 2) {
     if (group == 0) {
       vec4 targetState = encodeState(vec4((u_dyeColor - 0.5) * 2.0, 1.0));
@@ -554,13 +642,7 @@ void main() {
       if (u_explicitDye == 1) standoutRgb = u_dyeColor;
       vec4 targetState = encodeState(vec4((standoutRgb - 0.5) * 2.0, 1.0));
       out_color = mix(current, targetState, weight);
-      if (u_automatic == 1) {
-        // Unbiased RGBA8 rounding, decorrelated across pixels/channels and time.
-        // Never increase the requested mixing weight just to cross one byte.
-        vec4 seed = vec4(dot(vec2(xy), vec2(12.9898, 78.233))) + vec4(0.0, 17.1, 41.3, 73.5);
-        vec4 threshold = fract(sin(seed) * 43758.5453 + u_quantizationPhase * 0.61803398875);
-        out_color = floor(clamp(out_color, 0.0, 1.0) * 255.0 + threshold) / 255.0;
-      }
+
     } else {
       out_color = current;
     }
@@ -606,6 +688,15 @@ void main() {
   } else {
     out_color = mix(current, vec4(127.0 / 255.0), weight);
   }
+  if (u_automatic == 1) {
+    // Unbiased RGBA8 rounding, decorrelated across pixels/channels and time.
+    // Never increase the requested mixing weight just to cross one byte.
+    vec4 seed = vec4(dot(vec2(xy), vec2(12.9898, 78.233))) + vec4(0.0, 17.1, 41.3, 73.5);
+    vec4 threshold = fract(sin(seed) * 43758.5453 + u_quantizationPhase * 0.61803398875);
+    vec4 rounded = floor(clamp(out_color, 0.0, 1.0) * 255.0 + threshold) / 255.0;
+    out_color = mix(current, rounded, notEqual(out_color, current));
+  }
+
 }`;
 
 const VISUALIZE = `${PREFIX}
@@ -1036,6 +1127,10 @@ export class TextureNcaRuntime {
     }
     this.model = model;
     this.steps = 0;
+    this.generation = ++nextRuntimeGeneration;
+    this._vitalityProbe = null;
+    this._protectionTexture = null;
+    this._protectionBytes = null;
     this.disposed = false;
     this.lost = false;
     this.textures = [];
@@ -1046,10 +1141,7 @@ export class TextureNcaRuntime {
     this.canvas = document.createElement("canvas");
     this.canvas.width = size;
     this.canvas.height = size;
-    this.onContextLost = (event) => {
-      event.preventDefault();
-      this.lost = true;
-    };
+    this.onContextLost = (event) => this.handleContextLoss(event);
     this.canvas.addEventListener("webglcontextlost", this.onContextLost);
     this.gl = this.canvas.getContext("webgl2", {
       alpha: false,
@@ -1282,6 +1374,8 @@ export class TextureNcaRuntime {
           "u_orientMode",
           "u_showBarrier",
           "u_lockBarrier",
+          "u_hasHistory",
+          "u_hasIntent",
           "u_explicitDye",
           "u_automatic",
           "u_rippleCount",
@@ -1300,6 +1394,8 @@ export class TextureNcaRuntime {
 
   restart(seed = this.seed) {
     this.assertActive();
+    this.invalidateVitality();
+    if (this._protectionTexture) this.setProtectionMask(new Uint8Array(INTENT_SIZE ** 2));
     this.seed = validateSeed(seed);
     this.layout = createSparseLayout(this.size, seed);
     this.lastOffset = [0, 0];
@@ -1579,6 +1675,7 @@ export class TextureNcaRuntime {
     } = {},
   ) {
     this.assertActive();
+    if (!automatic) this.invalidateVitality();
     if (
       ![x, y, radius].every(Number.isFinite) ||
       !Number.isInteger(x) ||
@@ -1676,8 +1773,9 @@ export class TextureNcaRuntime {
     this.run(
       "disturb",
       this.nextState,
-      { u_state: this.state, u_barrier: this.barrier },
+      { u_state: this.state, u_barrier: this.barrier, u_intent: this._protectionTexture || this.barrier },
       {
+        u_hasIntent: this._protectionTexture ? 1 : 0,
         u_center: [x, y],
         u_radius: effectiveRadius,
         u_strength: effectiveStrength,
@@ -1694,6 +1792,7 @@ export class TextureNcaRuntime {
 
   clearBarrier() {
     this.assertActive();
+    this.invalidateVitality();
     const gl = this.gl;
     for (const buffer of [this.barrier, this.nextBarrier]) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.framebuffer);
@@ -1928,6 +2027,7 @@ export class TextureNcaRuntime {
 
   writeState(data) {
     this.assertActive();
+    this.invalidateVitality();
     if (
       !(data instanceof Uint8Array) ||
       data.length !== this.size * this.size * CHANNELS
@@ -1983,21 +2083,118 @@ export class TextureNcaRuntime {
     return mask;
   }
 
-  isDormant() {
-    if (this.disposed || this.lost) return false;
+  handleContextLoss(event) {
+    event?.preventDefault?.();
+    this.lost = true;
+    this.invalidateVitality();
+    this._vitalityProbe?.dispose();
+  }
+
+  invalidateVitality() {
+    this.generation = ++nextRuntimeGeneration;
+    this._vitalityProbe?.invalidate(this.generation);
+  }
+
+  setProtectionMask(cells) {
+    if (!(cells instanceof Uint8Array) || cells.length !== INTENT_SIZE ** 2)
+      throw new Error("Protection requires a 32 by 32 intent mask.");
+    this.assertActive();
+    if (!this._protectionTexture)
+      this._protectionTexture = this.allocate(INTENT_SIZE, INTENT_SIZE, false);
+    if (!this._protectionBytes)
+      this._protectionBytes = new Uint8Array(INTENT_SIZE ** 2 * 4);
+    for (let index = 0; index < cells.length; index++)
+      this._protectionBytes[index * 4] = cells[index];
     const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.state.framebuffer);
-    const pixels = new Uint8Array(8 * 8 * 4);
-    const offset = Math.max(0, Math.floor(this.size / 2) - 4);
-    gl.readPixels(offset, offset, 8, 8, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    let totalDiff = 0;
-    for (let i = 0; i < pixels.length; i += 4) {
-      totalDiff +=
-        Math.abs(pixels[i] - 127) +
-        Math.abs(pixels[i + 1] - 127) +
-        Math.abs(pixels[i + 2] - 127);
+    gl.bindTexture(gl.TEXTURE_2D, this._protectionTexture.texture);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0,
+      0,
+      0,
+      INTENT_SIZE,
+      INTENT_SIZE,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      this._protectionBytes,
+    );
+    this.invalidateVitality();
+  }
+
+  monitorVitality(timestamp, activeSeconds = 0) {
+    if (
+      this.disposed ||
+      this.lost ||
+      this._vitalityUnavailable ||
+      (this.steps <= 0 && !this._vitalityProbe)
+    )
+      return null;
+    if (this.gl.isContextLost()) {
+      this.handleContextLoss();
+      return null;
     }
-    return totalDiff < 64;
+    try {
+      if (!this._vitalityProbe) {
+        if (GpuVitalityProbe.supported(this.gl)) {
+          for (const [name, source] of Object.entries({
+            vitality: VITALITY_PROBE,
+            vitalitySnapshot: VITALITY_SNAPSHOT,
+          })) {
+            const handle = link(this.gl, source);
+            this.programs.push(handle);
+            this.program[name] = { handle, locations: new Map() };
+          }
+          if (!this._protectionTexture)
+            this.setProtectionMask(new Uint8Array(INTENT_SIZE ** 2));
+        }
+        this._vitalityProbe = new GpuVitalityProbe({
+          gl: this.gl,
+          size: this.size,
+          allocate: (...args) => this.allocate(...args),
+          render: (target, history, hasHistory) =>
+            this.run(
+              "vitality",
+              target,
+              {
+                u_state: this.state,
+                u_previous: history,
+                u_barrier: this.barrier,
+                u_intent: this._protectionTexture,
+              },
+              { u_hasHistory: hasHistory ? 1 : 0 },
+            ),
+          capture: (history) =>
+            this.run("vitalitySnapshot", history, { u_state: this.state }),
+        });
+      }
+      return this._vitalityProbe.update(timestamp, {
+        generation: this.generation,
+        steps: this.steps,
+        activeSeconds,
+      });
+    } catch (error) {
+      this._vitalityUnavailable = true;
+      this._vitalityError = error;
+      this._vitalityProbe?.dispose();
+      return null;
+    }
+  }
+
+  get vitalityProbe() {
+    return this._vitalityProbe?.latest ?? null;
+  }
+
+  isDormant() {
+    const probe = this.vitalityProbe;
+    return Boolean(
+      !this.disposed &&
+      !this.lost &&
+      !this.gl.isContextLost() &&
+      probe?.generation === this.generation &&
+      probe.coverage > 0.05 &&
+      probe.rgbEnergy < 0.005 &&
+      probe.hiddenEnergy < 0.005,
+    );
   }
 
   getStats() {
@@ -2021,6 +2218,8 @@ export class TextureNcaRuntime {
 
   dispose() {
     if (this.disposed) return;
+    this.invalidateVitality();
+    this._vitalityProbe?.dispose();
     this.disposed = true;
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
     if (this.gl) {
@@ -2037,6 +2236,8 @@ export class TextureNcaRuntime {
     this.textureBytes = 0;
     this._motionFieldTexture = null;
     this._motionFieldMax = 0;
+    this._protectionTexture = null;
+    this._protectionBytes = null;
     this.canvas.width = 1;
     this.canvas.height = 1;
   }

@@ -258,3 +258,23 @@ test("audio destinations are evaluated only once for an eligible accepted event"
   policy.update(levels(3, 300), 310, evaluate);
   assert.equal(evaluations, 1);
 });
+
+test("audio and recovery share one two-spore mixing budget and manual interaction cancels both", () => {
+  const policy = response(),
+    calls = [];
+  policy.update(levels(1, 0), 0, parameters);
+  assert.equal(policy.queueRecovery(0, 0.5, 0.5), true);
+  assert.equal(policy.queueRecovery(0, 0.7, 0.7), false);
+  for (let time = 16; time < 400; time += 16)
+    policy.step(time, 256, (...args) => calls.push(args), [0, 1, 1]);
+  assert.ok(calls.some((args) => args[3] === "noise"));
+  assert.ok(calls.some((args) => args[3] === "kick_color"));
+  assert.ok(
+    calls.reduce((sum, args) => sum + args[4].strength, 0) <= 0.08 * 0.4,
+  );
+  policy.update(levels(2, 400, { hasSignal: false }), 400, parameters);
+  assert.equal(policy.active.length, 1);
+  assert.equal(policy.active[0].kind, "recovery");
+  policy.interact(true, 410);
+  assert.equal(policy.active.length, 0);
+});

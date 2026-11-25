@@ -554,6 +554,43 @@ export function createControlsController({
         });
         block.append(label, select, guidance.container);
         controlElements.set(definition.key, { definition, select, guidance });
+      } else if (definition.type === "toggle") {
+        const toggle = document.createElement("input");
+        toggle.type = "checkbox";
+        toggle.checked = currentParameters[definition.key] === true;
+        toggle.setAttribute("role", "switch");
+        toggle.setAttribute("aria-label", definition.label);
+        const row = document.createElement("label");
+        row.className = "control-toggle";
+        row.append(toggle, document.createTextNode(definition.label));
+        toggle.addEventListener("change", () =>
+          onValue(definition, toggle.checked),
+        );
+        block.append(row);
+        if (
+          currentModel.id === "neural-growth" &&
+          definition.key === "automaticRecovery"
+        ) {
+          const note = document.createElement("p");
+          note.className = "recovery-note";
+          note.textContent =
+            "Erased areas stay protected until painted back or cleared.";
+          const clear = document.createElement("button");
+          clear.type = "button";
+          clear.className = "recovery-clear";
+          clear.textContent = "Clear erase protection";
+          clear.addEventListener("click", () => {
+            getModel().clearRecoveryProtection();
+            onValue(definition, getParameters()[definition.key]);
+          });
+          const status = document.createElement("output");
+          status.dataset.vitalityStatus = "";
+          status.className = "recovery-note";
+          status.setAttribute("aria-live", "polite");
+          status.textContent = "Monitoring · learning";
+          block.append(note, clear, status);
+        }
+        controlElements.set(definition.key, { definition, toggle });
       } else if (definition.type === "color") {
         block.classList.add("color-control");
         const label = makeLabel(definition);
@@ -716,6 +753,8 @@ export function createControlsController({
         control.fine.value = String(value);
         updateRangeProgress(control.slider);
         control.effectiveLabel.textContent = `VALUE ${formatControlValue(control.definition, value)}`;
+      } else if (control.toggle) {
+        control.toggle.checked = value === true;
       } else if (control.select) {
         control.select.value = String(value);
       } else if (control.pickerInput) {
