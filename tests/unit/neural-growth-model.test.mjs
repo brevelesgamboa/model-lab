@@ -153,6 +153,34 @@ test("redraws, palette, speed, rotation, topology, zoom, viewport and snapshots 
   assert.deepEqual(runtimes[0].disturbances, [[12, 34, 8]]);
 });
 
+test("snapshots inherit the active viewport and preserve echo history", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, { ...params, zoom: 4 }, 0);
+  Object.defineProperty(model, "effectivePan", { value: [0.2, -0.15] });
+  model.renderSnapshot({});
+  assert.equal(runtimes[0].lastDrawOptions.zoom, 4);
+  assert.deepEqual(runtimes[0].lastDrawOptions.pan, [0.2, -0.15]);
+  assert.equal(runtimes[0].lastDrawOptions.preserveEchoHistory, true);
+  model.renderSnapshot({}, { zoom: 2, pan: [-0.1, 0.3] });
+  assert.equal(runtimes[0].lastDrawOptions.zoom, 2);
+  assert.deepEqual(runtimes[0].lastDrawOptions.pan, [-0.1, 0.3]);
+});
+
+test("resonance slider bounds match stored limits and the default pattern resets its seed", () => {
+  const model = new NeuralGrowthModel();
+  for (const key of ["resonanceDrift", "resonanceFeedback", "resonanceNoise"]) {
+    const definition = model.controls.find((control) => control.key === key);
+    assert.equal(definition.min, model.normalizeStoredParameter(key, -100));
+    assert.equal(definition.max, model.normalizeStoredParameter(key, 100));
+    const steps = (definition.max - definition.min) / definition.step;
+    assert.ok(Math.abs(steps - Math.round(steps)) < 1e-10);
+    const sanitized = sanitizeParameters(model, { [key]: definition.max });
+    assert.equal(sanitized[key], definition.max);
+  }
+  assert.equal(getPattern(DEFAULT_PATTERN).startup.seed, defaultParameters(model).seed);
+  assert.deepEqual(model.parameterDefaultsForChange("pattern", DEFAULT_PATTERN), { seed: 1 });
+});
+
 test("default simulation size is 256 and pattern switching preserves simulation size", async () => {
   const model = new NeuralGrowthModel();
   const defaults = defaultParameters(model);
@@ -280,6 +308,22 @@ test("queueDisturbance and queueDisturbanceStroke bound queue depth and interpol
   await model.render(canvas, params, 3);
   assert.equal(runtimes[0].disturbances.length, 64);
   assert.deepEqual(runtimes[0].disturbances[63], [99, 99, 4]);
+});
+
+test("brush strokes across a panned torus seam stay near the cursor", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  model.queueDisturbanceStroke(126, 64, 2, 64, 2);
+  await model.render(canvas, params, 1);
+  assert.deepEqual(runtimes[0].disturbances, [
+    [126, 64, 2], [127, 64, 2], [0, 64, 2], [1, 64, 2], [2, 64, 2],
+  ]);
+  runtimes[0].disturbances.length = 0;
+  model.queueDisturbanceStroke(64, 2, 64, 126, 2);
+  await model.render(canvas, params, 2);
+  assert.deepEqual(runtimes[0].disturbances, [
+    [64, 2, 2], [64, 1, 2], [64, 0, 2], [64, 127, 2], [64, 126, 2],
+  ]);
 });
 
 test("interactive brushes dispatch chromophore, shockwave, stasis freeze/thaw and flow grooming", async (context) => {
@@ -1080,16 +1124,16 @@ test("resonance controls support modulation matrix routing and parameter bounds"
 
   // Bounds checks
   const driftCtrl = model.controls.find((c) => c.key === "resonanceDrift");
-  assert.equal(driftCtrl.min, -0.1);
-  assert.equal(driftCtrl.max, 0.1);
+  assert.equal(driftCtrl.min, -0.2);
+  assert.equal(driftCtrl.max, 0.2);
 
   const feedbackCtrl = model.controls.find((c) => c.key === "resonanceFeedback");
   assert.equal(feedbackCtrl.min, 0.0);
-  assert.equal(feedbackCtrl.max, 0.8);
+  assert.equal(feedbackCtrl.max, 0.95);
 
   const noiseCtrl = model.controls.find((c) => c.key === "resonanceNoise");
   assert.equal(noiseCtrl.min, 0.0);
-  assert.equal(noiseCtrl.max, 0.3);
+  assert.equal(noiseCtrl.max, 0.5);
 
   const warpCtrl = model.controls.find((c) => c.key === "resonanceWarp");
   assert.equal(warpCtrl.min, 0.0);

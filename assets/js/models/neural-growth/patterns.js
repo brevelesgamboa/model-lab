@@ -18,6 +18,13 @@ export const PATTERNS = Object.freeze([
     id: "mixed4c-439",
     technicalId: "mixed4c_439",
     name: "Vesicle Study",
+    startup: Object.freeze({
+      seedState: "zeros",
+      noiseStd: 0,
+      seed: 1,
+      gridSize: 128,
+      previewSteps: 96,
+    }),
     pack: "Inception References",
     category: "inception",
     checkpointUrl: new URL("../../../../models/neural-growth/checkpoint.json", import.meta.url),

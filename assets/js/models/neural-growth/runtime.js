@@ -22,6 +22,19 @@ import {
 export const SPIRAL_MAX_PITCH_DEGREES = 89;
 export const SPIRAL_MAX_PITCH_RADIANS = (SPIRAL_MAX_PITCH_DEGREES * Math.PI) / 180;
 
+const TRANSFORM_CODES = Object.freeze({
+  cartesian: 0,
+  vortex: 1,
+  spiral: 2,
+  julia: 3,
+  dipole: 4,
+  wave: 5,
+  saddle: 6,
+  kaleidoscope: 7,
+  vortex_pair: 8,
+  voronoi: 9,
+});
+
 // Guard the combined manual, audio and LFO values at the runtime boundary.
 export function clampGeometryTwist(transform, value) {
   const angle = Number(value);
@@ -606,6 +619,7 @@ vec2 computeRippleDisplacement(vec2 pos, vec4 rippleData, float amplitude) {
   float progress = rippleData.z;
   float maxRadius = rippleData.w;
   vec2 delta = pos - origin;
+  delta -= floor(delta / float(u_size) + 0.5) * float(u_size);
   float dist = length(delta);
   float currentRadius = progress * maxRadius;
   float diff = dist - currentRadius;
@@ -732,6 +746,7 @@ void main() {
   float srcExtent = float(u_size) / z;
   float srcOffset = (float(u_size) - srcExtent) * 0.5;
   vec2 pos = srcOffset + u_pan * float(u_size) + uv * srcExtent;
+  pos = mod(pos, float(u_size));
 
   vec2 disp = vec2(0.0);
   if (u_rippleCount > 0) disp += computeRippleDisplacement(pos, u_ripple0, u_rippleAmps.x);
@@ -779,7 +794,7 @@ void main() {
   }
 
   if (u_showBarrier == 1) {
-    ivec2 bCoord = ivec2(floor(clamp(pos, vec2(0.0), vec2(float(u_size - 1)))));
+    ivec2 bCoord = wrapCell(ivec2(floor(pos)));
     float bL = texelFetch(u_barrier, wrapCell(bCoord + ivec2(-1, 0)), 0).r;
     float bR = texelFetch(u_barrier, wrapCell(bCoord + ivec2(1, 0)), 0).r;
     float bD = texelFetch(u_barrier, wrapCell(bCoord + ivec2(0, -1)), 0).r;
@@ -812,9 +827,13 @@ uniform float u_geometryCenterX;
 uniform float u_geometryCenterY;
 uniform float u_geometrySoftness;
 uniform float u_foldCount;
+uniform float u_zoom;
+uniform vec2 u_pan;
 
 void main() {
-  vec2 pos = (v_uv - 0.5 - vec2(u_geometryCenterX, u_geometryCenterY)) * 2.0;
+  float zoom = max(u_zoom, 1.0);
+  vec2 world = fract(0.5 + (v_uv - 0.5) / zoom + u_pan);
+  vec2 pos = world * 2.0 - 1.0 - vec2(u_geometryCenterX, u_geometryCenterY);
   float r = length(pos);
   float phi = atan(pos.y, pos.x);
 
@@ -827,6 +846,20 @@ void main() {
       float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
       float pitch = clamp(u_twist, -${SPIRAL_MAX_PITCH_RADIANS}, ${SPIRAL_MAX_PITCH_RADIANS});
       theta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(pitch) + u_angle;
+    } else if (u_transform == 3) {
+      vec2 z = pos * 1.25;
+      vec2 c = vec2(-0.8, 0.156);
+      for (int i = 0; i < 5; i++) {
+        z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
+      }
+      theta = atan(z.y, z.x) + u_twist + u_angle;
+    } else if (u_transform == 4) {
+      vec2 p1 = pos - vec2(-0.45, 0.0);
+      vec2 p2 = pos - vec2(0.45, 0.0);
+      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
+      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
+      vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
+      theta = atan(flow.y, flow.x) + u_twist + u_angle;
     } else if (u_transform == 5) {
       float waveFreq = 6.2831853;
       float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + u_angle;
@@ -912,7 +945,7 @@ void main() {
     driftDir = vec2(cos(u_angle), sin(u_angle));
   }
 
-  float stepLen = u_drift * 0.006;
+  float stepLen = u_drift * 0.006 * zoom;
   vec2 uv_r = fract(v_uv - driftDir * (stepLen * 1.05));
   vec2 uv_g = fract(v_uv - driftDir * stepLen);
   vec2 uv_b = fract(v_uv - driftDir * (stepLen * 0.95));
@@ -1353,26 +1386,7 @@ export class TextureNcaRuntime {
     }
     if (!Number.isInteger(count) || count < 0 || count > 128)
       throw new RangeError("Step count must be between zero and 128.");
-    const transformCode =
-      this.coordinateTransform === "vortex"
-        ? 1
-        : this.coordinateTransform === "spiral"
-          ? 2
-          : this.coordinateTransform === "julia"
-            ? 3
-            : this.coordinateTransform === "dipole"
-              ? 4
-              : this.coordinateTransform === "wave"
-                ? 5
-                : this.coordinateTransform === "saddle"
-                  ? 6
-                  : this.coordinateTransform === "kaleidoscope"
-                    ? 7
-                    : this.coordinateTransform === "vortex_pair"
-                      ? 8
-                      : this.coordinateTransform === "voronoi"
-                        ? 9
-                        : 0;
+    const transformCode = TRANSFORM_CODES[this.coordinateTransform] ?? 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
         Math.floor(this.layout.random() * this.size),
@@ -1686,6 +1700,7 @@ export class TextureNcaRuntime {
       echoDrift = 0.25,
       echoMode = "field_advection",
       echoStyle = "phosphor",
+      preserveEchoHistory = false,
     } = options;
 
     const decay = Math.max(0.0, Math.min(0.98, Number(echoDecay) || 0.0));
@@ -1770,20 +1785,19 @@ export class TextureNcaRuntime {
     };
 
     if (decay > 0.001) {
-      if (
-        !this.echoTargets ||
-        this.echoTargets[0].width !== extent ||
-        this.echoTargets[0].height !== extent
-      ) {
-        // Playback, paused inspection and exports can use different display sizes.
-        for (const target of this.echoTargets || []) this.releaseTarget(target);
-        this.releaseTarget(this.currentFrameTarget);
+      // History has its own bounded resolution. Viewport changes and exports
+      // resize only the current image, leaving accumulated trails intact.
+      if (!this.echoTargets) {
+        const historyExtent = Math.min(768, extent);
         this.echoTargets = [
-          this.allocateEchoTarget(extent, extent),
-          this.allocateEchoTarget(extent, extent),
+          this.allocateEchoTarget(historyExtent, historyExtent),
+          this.allocateEchoTarget(historyExtent, historyExtent),
         ];
-        this.currentFrameTarget = this.allocate(extent, extent, true);
         this.echoIndex = 0;
+      }
+      if (this.currentFrameTarget?.width !== extent) {
+        this.releaseTarget(this.currentFrameTarget);
+        this.currentFrameTarget = this.allocate(extent, extent, true);
       }
 
       this.run(
@@ -1795,32 +1809,18 @@ export class TextureNcaRuntime {
 
       const readTarget = this.echoTargets[this.echoIndex];
       const writeTarget = this.echoTargets[1 - this.echoIndex];
-      const transformCode =
-        this.coordinateTransform === "ring"
-          ? 1
-          : this.coordinateTransform === "spiral"
-            ? 2
-            : this.coordinateTransform === "wave"
-              ? 5
-              : this.coordinateTransform === "saddle"
-                ? 6
-                : this.coordinateTransform === "kaleidoscope"
-                  ? 7
-                  : this.coordinateTransform === "vortex_pair"
-                    ? 8
-                    : this.coordinateTransform === "voronoi"
-                      ? 9
-                      : 0;
       this.run(
         "echo",
-        writeTarget,
+        null,
         { u_current: this.currentFrameTarget, u_history: readTarget },
         {
           u_decay: decay,
           u_drift: drift,
           u_mode: echoModeCode,
           u_style: echoStyleCode,
-          u_transform: transformCode,
+          u_transform: TRANSFORM_CODES[this.coordinateTransform] ?? 0,
+          u_zoom: z,
+          u_pan: visualizeUniforms.u_pan,
           u_twist: clampGeometryTwist(this.coordinateTransform, this.twist),
           u_angle: this.rotation,
           u_geometryStrength: clampGeometryStrength(this.geometryStrength),
@@ -1830,24 +1830,25 @@ export class TextureNcaRuntime {
           u_foldCount: this.foldCount,
         },
       );
-      this.echoIndex = 1 - this.echoIndex;
-
-      const gl = this.gl;
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, writeTarget.framebuffer);
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-      gl.blitFramebuffer(
-        0,
-        0,
-        extent,
-        extent,
-        0,
-        0,
-        extent,
-        extent,
-        gl.COLOR_BUFFER_BIT,
-        gl.NEAREST,
-      );
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (!preserveEchoHistory) {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, writeTarget.framebuffer);
+        gl.blitFramebuffer(
+          0,
+          0,
+          extent,
+          extent,
+          0,
+          0,
+          writeTarget.width,
+          writeTarget.height,
+          gl.COLOR_BUFFER_BIT,
+          gl.LINEAR,
+        );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.echoIndex = 1 - this.echoIndex;
+      }
     } else {
       this.run(
         "visualize",

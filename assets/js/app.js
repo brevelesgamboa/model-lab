@@ -28,7 +28,7 @@ import { createDomeController } from "./app/dome-controller.js";
 import { createExportController } from "./capture/export-controller.js";
 import { ModelRegistry } from "./core/model-registry.js";
 import { ExperimentStore } from "./core/experiment-store.js";
-import { analyzeCanvas } from "./core/canvas-metrics.js";
+import { AsyncCanvasMetrics } from "./core/async-canvas-metrics.js";
 import {
   qualityOptions,
   resolveQuality,
@@ -123,6 +123,12 @@ let currentView = "lab";
 let panelVisibility = readPanelVisibility();
 let qualityMode = readQualityMode();
 let qualityProfile = resolveQuality(qualityMode, capabilities);
+const canvasMetrics = new AsyncCanvasMetrics(() => {
+  if (!latestRender || currentModel.getCanvasMetrics) return;
+  const commonMetrics = canvasMetrics.value;
+  latestRender.commonMetrics = commonMetrics;
+  latestRender.metrics = { ...latestRender.metrics, ...commonMetrics };
+});
 
 const renderer = createRenderController({
   getSnapshot({
@@ -214,6 +220,13 @@ const growthController = createGrowthController({
   onParameterChange: (key, value) => {
     currentParameters[key] = value;
     currentModel?.onParameterChange?.(key, value);
+    const defaults = currentModel?.parameterDefaultsForChange?.(key, value);
+    if (defaults) {
+      currentParameters = sanitizedStoredParameters(currentModel, {
+        ...currentParameters,
+        ...defaults,
+      });
+    }
     if (key === "audioProfile") {
       applyAudioProfile(value);
     } else if (key !== "beatShockwave" && key !== "shockwaveIntensity") {
@@ -224,7 +237,7 @@ const growthController = createGrowthController({
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
-    if (!GROWTH_BRUSH_KEYS.includes(key)) controlsController.render();
+    if (!GROWTH_BRUSH_KEYS.includes(key)) controlsController.syncValues();
     growthController.update();
     renderCurrentFrame({ forceAnalysis: true });
   },
@@ -299,7 +312,7 @@ const controlsController = createControlsController({
           ...currentParameters,
           ...defaults,
         });
-        controlsController.render();
+        controlsController.syncValues();
       }
     }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
@@ -346,9 +359,7 @@ function acceptRenderedFrame({
     forceAnalysis || !latestRender || now - lastAnalyzedAt >= interval;
   const commonMetrics = model.getCanvasMetrics
     ? model.getCanvasMetrics(elements.canvas, shouldAnalyze)
-    : shouldAnalyze
-      ? analyzeCanvas(elements.canvas)
-      : latestRender.commonMetrics;
+    : canvasMetrics.read(elements.canvas, shouldAnalyze);
   if (shouldAnalyze) lastAnalyzedAt = now;
   latestRender = {
     backend: result?.backend || model.backend,
@@ -1039,26 +1050,7 @@ function applyParameterSet(
   currentParameters = sanitizedStoredParameters(currentModel, parameters);
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
 
-  currentModel.controls.forEach((definition) => {
-    const control = controlElements.get(definition.key);
-    const value = currentParameters[definition.key];
-    if (!control) return;
-    if (definition.type === "range") {
-      control.slider.value = String(value);
-      control.fine.value = String(value);
-      updateRangeProgress(control.slider);
-    } else if (definition.type === "select") {
-      control.select.value = String(value);
-    } else if (definition.type === "color") {
-      if (control.pickerInput) control.pickerInput.value = String(value);
-      if (control.hexInput)
-        control.hexInput.value = String(value).toUpperCase();
-      control.updateActivePreset?.(value);
-    } else if (control.input) {
-      control.input.value = String(value);
-    }
-    control.guidance?.update(value);
-  });
+  controlsController.syncValues();
   invalidateCurrentRun(message);
   controlsController.setPreset(presetName);
   if (render) renderCurrentFrame({ forceAnalysis: true });
@@ -1251,6 +1243,7 @@ function selectModel(modelId, { log = true, preserveTime = false } = {}) {
     frameCounter = 0;
   }
   latestRender = null;
+  canvasMetrics.reset();
   invalidateCurrentRun();
 
   elements.modelSelect.value = currentModel.id;
@@ -1955,7 +1948,7 @@ function attachEvents() {
     if (currentModel?.id === "neural-growth") {
       currentParameters.acousticInjection = mode;
       currentModel.onParameterChange?.("acousticInjection", mode);
-      controlsController.render();
+      controlsController.syncValues();
       terminal("ACOUSTIC", `field coupling set to ${mode}`);
       setStatus(`ACOUSTIC INJECTION: ${mode.toUpperCase()}`);
     }
@@ -2057,6 +2050,7 @@ function attachEvents() {
           currentModel.simulationSize / 2,
           currentModel.simulationSize / 2,
         );
+        growthController.schedulePausedRender();
       }
       return;
     }

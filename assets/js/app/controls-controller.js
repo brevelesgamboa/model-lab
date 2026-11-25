@@ -704,8 +704,31 @@ export function createControlsController({
     });
   }
 
+  function syncValues() {
+    const parameters = getParameters();
+    for (const [key, control] of controlElements) {
+      const value = parameters[key];
+      if (control.slider) {
+        control.slider.value = String(value);
+        control.fine.value = String(value);
+        updateRangeProgress(control.slider);
+        control.effectiveLabel.textContent = `VALUE ${formatControlValue(control.definition, value)}`;
+      } else if (control.select) {
+        control.select.value = String(value);
+      } else if (control.pickerInput) {
+        control.pickerInput.value = String(value);
+        control.hexInput.value = String(value).toUpperCase();
+        control.updateActivePreset(value);
+      } else if (control.input) {
+        control.input.value = String(value);
+      }
+      control.guidance?.update(value);
+    }
+  }
+
   return {
     render,
+    syncValues,
     setPreset: (name) => {
       if (presetSelect) presetSelect.value = name;
     },

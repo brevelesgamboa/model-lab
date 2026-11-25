@@ -382,7 +382,7 @@ test("PNG exports retain current, 2K and 4K sizes while live growth remains capp
   ).toBe(true);
 });
 
-test("display resizing releases replaced echo buffers and preserves simulation state", async ({
+test("display resizing and snapshots preserve echo history and simulation state", async ({
   page,
 }) => {
   await selectGrowth(page);
@@ -395,28 +395,70 @@ test("display resizing releases replaced echo buffers and preserves simulation s
     .poll(() =>
       page.evaluate(() => window.__growthRuntime.echoTargets?.[0].width),
     )
-    .toBe(1024);
+    .toBe(768);
   const before = await state(page);
-  const resources = await page.evaluate(
-    () => window.__growthRuntime.getStats().resources,
-  );
+  const resources = await page.evaluate(() => {
+    window.__echoHistory = window.__growthRuntime.echoTargets;
+    return window.__growthRuntime.getStats().resources;
+  });
   for (let cycle = 0; cycle < 3; cycle += 1) {
-    await page.locator("#toggle-animation").click();
-    await expect
-      .poll(() =>
-        page.evaluate(() => window.__growthRuntime.echoTargets[0].width),
-      )
-      .toBe(768);
-    await page.locator("#toggle-animation").click();
-    await expect
-      .poll(() =>
-        page.evaluate(() => window.__growthRuntime.echoTargets[0].width),
-      )
-      .toBe(1024);
+    for (const width of [768, 1024]) {
+      await page.locator("#toggle-animation").click();
+      await expect.poll(() => displaySize(page)).toMatchObject({ width });
+      expect(
+        await page.evaluate(
+          () => window.__growthRuntime.echoTargets === window.__echoHistory,
+        ),
+      ).toBe(true);
+    }
     expect(
       await page.evaluate(() => window.__growthRuntime.getStats().resources),
     ).toEqual(resources);
   }
+  const preserved = await page.evaluate(async () => {
+    const runtime = window.__growthRuntime;
+    const history = runtime.echoTargets;
+    const index = runtime.echoIndex;
+    async function hashes() {
+      return Promise.all(
+        history.map(async (target) => {
+          const pixels = new Uint8Array(target.width * target.height * 4);
+          const gl = runtime.gl;
+          gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+          gl.readPixels(
+            0,
+            0,
+            target.width,
+            target.height,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels,
+          );
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          return Array.from(
+            new Uint8Array(await crypto.subtle.digest("SHA-256", pixels)),
+          ).join(",");
+        }),
+      );
+    }
+    const before = await hashes();
+    for (const extent of [2048, 4096]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = extent;
+      runtime.draw(canvas, { echoDecay: 0.6, preserveEchoHistory: true });
+    }
+    return {
+      sameTargets: runtime.echoTargets === history,
+      sameIndex: runtime.echoIndex === index,
+      before,
+      after: await hashes(),
+      error: runtime.gl.getError(),
+    };
+  });
+  expect(preserved.sameTargets).toBe(true);
+  expect(preserved.sameIndex).toBe(true);
+  expect(preserved.after).toEqual(preserved.before);
+  expect(preserved.error).toBe(0);
   expect(await state(page)).toEqual(before);
 });
 
@@ -633,8 +675,186 @@ test("pointer disturbance uses the displayed field's bottom-up coordinates", asy
   );
   await expect
     .poll(() => page.evaluate(() => window.__lastDisturbance))
-    .toEqual([128, 191, 16]);
+    .toEqual([128, 192, 16]);
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    Object.defineProperty(NeuralGrowthModel.prototype, "effectivePan", {
+      get: () => [0.2, -0.1],
+    });
+  });
+  await page.getByLabel("ZOOM", { exact: true }).selectOption("2");
+  await canvas.scrollIntoViewIfNeeded();
+  const zoomedRect = await canvas.boundingBox();
+  const zoomedSide = Math.min(zoomedRect.width, zoomedRect.height);
+  await page.mouse.click(
+    zoomedRect.x + zoomedRect.width / 2,
+    zoomedRect.y + (zoomedRect.height - zoomedSide) / 2 + zoomedSide * 0.25,
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__lastDisturbance))
+    .toEqual([179, 134, 16]);
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    Object.defineProperty(NeuralGrowthModel.prototype, "effectivePan", {
+      get: () => [0.5, 0],
+    });
+    window.__seamDisturbances = [];
+    const runtime = window.__growthRuntime;
+    const disturb = runtime.disturb;
+    runtime.disturb = function (...args) {
+      window.__seamDisturbances.push(args);
+      return disturb.apply(this, args);
+    };
+  });
+  await page.getByLabel("ZOOM", { exact: true }).selectOption("4");
+  await canvas.scrollIntoViewIfNeeded();
+  const seamRect = await canvas.boundingBox();
+  const seamSide = Math.min(seamRect.width, seamRect.height);
+  const centerX = seamRect.x + seamRect.width / 2;
+  const centerY = seamRect.y + seamRect.height / 2;
+  await page.mouse.move(centerX - seamSide * 0.01, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + seamSide * 0.01, centerY);
+  await page.mouse.up();
+  await expect
+    .poll(() => page.evaluate(() => window.__seamDisturbances.length))
+    .toBeGreaterThan(1);
+  expect(
+    await page.evaluate(() =>
+      window.__seamDisturbances.every(([x]) => x < 4 || x > 252),
+    ),
+  ).toBe(true);
   expect((await state(page)).steps).toBe(2);
+});
+
+test("barrier outlines and ripple displacement wrap with the displayed torus", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const result = await page.evaluate(() => {
+    const runtime = window.__growthRuntime;
+    runtime.disturb(2, 128, 20, "dye", { dyeColor: [1, 0, 0] });
+    runtime.disturb(248, 128, 20, "freeze");
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const clock = performance.now.bind(performance);
+    const now = clock();
+    performance.now = () => now;
+    try {
+      const pixels = (options) => {
+        runtime.draw(canvas, options);
+        return canvas.getContext("2d").getImageData(0, 0, 256, 256).data;
+      };
+      const same = (a, b) => a.every((value, index) => value === b[index]);
+      const baseline = pixels({});
+      const barrier = pixels({ showBarrier: true });
+      const shiftedBarrier = pixels({ showBarrier: true, pan: [1, -1] });
+      const ripples = [
+        {
+          x: 2,
+          y: 128,
+          startTime: now - 350,
+          duration: 1,
+          radius: 48,
+          amplitude: 1.8,
+        },
+      ];
+      const ripple = pixels({ ripples });
+      const shiftedRipple = pixels({ ripples, pan: [1, -1] });
+      return {
+        visibleBarrier: !same(baseline, barrier),
+        visibleRipple: !same(baseline, ripple),
+        wrappedBarrier: same(barrier, shiftedBarrier),
+        wrappedRipple: same(ripple, shiftedRipple),
+        error: runtime.gl.getError(),
+      };
+    } finally {
+      performance.now = clock;
+    }
+  });
+  expect(result).toEqual({
+    visibleBarrier: true,
+    visibleRipple: true,
+    wrappedBarrier: true,
+    wrappedRipple: true,
+    error: 0,
+  });
+});
+
+test("pattern changes sync existing controls and keep modulation drawers open", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const block = page.locator('[data-parameter="rotation"]');
+  const toggle = block.locator(".modulation-toggle");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const pattern = await page.evaluate(async () => {
+    window.__rotationBlock = document.querySelector(
+      '[data-parameter="rotation"]',
+    );
+    window.__seedInput = document.querySelector('input[aria-label="SEED"]');
+    const { PATTERNS } =
+      await import("/assets/js/models/neural-growth/patterns.js");
+    return PATTERNS.find((entry) => entry.startup?.seed > 1);
+  });
+  await page.getByLabel("PATTERN", { exact: true }).selectOption(pattern.id);
+  await expect(page.getByLabel("SEED", { exact: true })).toHaveValue(
+    String(pattern.startup.seed),
+  );
+  await expect(page.locator("#step-growth")).toBeEnabled();
+  await page.getByLabel("PATTERN", { exact: true }).selectOption("mixed4c-439");
+  await expect(page.getByLabel("SEED", { exact: true })).toHaveValue("1");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(
+    await page.evaluate(
+      () =>
+        document.querySelector('[data-parameter="rotation"]') ===
+          window.__rotationBlock &&
+        document.querySelector('input[aria-label="SEED"]') ===
+          window.__seedInput,
+    ),
+  ).toBe(true);
+});
+
+test("paused K animates ripples and live frame metrics avoid main-thread pixel readback", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.__pixelReads = 0;
+    window.__metricCaptures = 0;
+    window.__rippleDraws = 0;
+    const read = CanvasRenderingContext2D.prototype.getImageData;
+    CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+      window.__pixelReads++;
+      return read.apply(this, args);
+    };
+    const capture = window.createImageBitmap;
+    window.createImageBitmap = function (...args) {
+      if (args[1]?.resizeWidth === 96) window.__metricCaptures++;
+      return capture.apply(this, args);
+    };
+    const runtime = window.__growthRuntime;
+    const draw = runtime.draw;
+    runtime.draw = function (...args) {
+      window.__rippleDraws++;
+      return draw.apply(this, args);
+    };
+  });
+  await page.keyboard.press("k");
+  await expect
+    .poll(() => page.evaluate(() => window.__rippleDraws))
+    .toBeGreaterThan(1);
+  await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: OFF");
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() => page.evaluate(() => window.__metricCaptures))
+    .toBeGreaterThan(1);
+  expect(await page.evaluate(() => window.__pixelReads)).toBe(0);
 });
 
 test("continuous pointer dragging during live growth does not interrupt or reset steps", async ({
@@ -1610,15 +1830,27 @@ test("restoring old audio settings preserves values and manual routes without pr
   });
 });
 
-
-
-test("pure NCA controls run without loading Inception guidance or sensor resources", async ({ page }) => {
+test("pure NCA controls run without loading Inception guidance or sensor resources", async ({
+  page,
+}) => {
   const inferenceRequests = [];
-  page.on("request", request => {
-    if (/models\/inception\/|inception-sensor|tensorflow.*\.js|tf\.min\.js/.test(request.url())) inferenceRequests.push(request.url());
+  page.on("request", (request) => {
+    if (
+      /models\/inception\/|inception-sensor|tensorflow.*\.js|tf\.min\.js/.test(
+        request.url(),
+      )
+    )
+      inferenceRequests.push(request.url());
   });
   await selectGrowth(page);
-  for (const key of ["dreamEnabled", "dreamStrength", "dreamCadence", "targetLayer", "targetChannel", "dreamChroma"]) {
+  for (const key of [
+    "dreamEnabled",
+    "dreamStrength",
+    "dreamCadence",
+    "targetLayer",
+    "targetChannel",
+    "dreamChroma",
+  ]) {
     await expect(page.locator(`[data-parameter="${key}"]`)).toHaveCount(0);
   }
   await expect(page.locator('[data-section="dream"]')).toHaveCount(0);

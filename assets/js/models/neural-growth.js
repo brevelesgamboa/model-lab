@@ -763,8 +763,8 @@ export class NeuralGrowthModel {
         key: "resonanceDrift",
         label: "PERCEPTION DRIFT",
         type: "range",
-        min: -0.1,
-        max: 0.1,
+        min: -0.2,
+        max: 0.2,
         step: 0.005,
         default: 0.0,
         help: "Dynamic angular drift rate injected into perception filter kernels across spatial gradients.",
@@ -774,8 +774,8 @@ export class NeuralGrowthModel {
         label: "STATE FEEDBACK",
         type: "range",
         min: 0.0,
-        max: 0.8,
-        step: 0.02,
+        max: 0.95,
+        step: 0.01,
         default: 0.0,
         help: "Temporal momentum and blending weight applied to non-RGB hidden channels (channels 4-11).",
       },
@@ -784,7 +784,7 @@ export class NeuralGrowthModel {
         label: "STOCHASTIC NOISE",
         type: "range",
         min: 0.0,
-        max: 0.3,
+        max: 0.5,
         step: 0.005,
         default: 0.0,
         help: "Bounded pseudo-random perturbation strength targeted strictly at hidden channels to test resilience.",
@@ -2244,15 +2244,18 @@ export class NeuralGrowthModel {
     options = {},
   ) {
     if (!this.ready) return;
-    const dx = x1 - x0;
-    const dy = y1 - y0;
+    const size = this.simulationSize;
+    const wrappedDelta = (delta) => delta - Math.round(delta / size) * size;
+    const wrap = (value) => ((Math.round(value) % size) + size) % size;
+    const dx = wrappedDelta(x1 - x0);
+    const dy = wrappedDelta(y1 - y0);
     const dist = Math.hypot(dx, dy);
     const strokeAngle = Math.atan2(dy, dx);
     const step = Math.max(1, radius * 0.5);
     const count = Math.min(32, Math.max(1, Math.ceil(dist / step)));
     for (let i = 0; i <= count; i += 1) {
       const t = count === 0 ? 0 : i / count;
-      this.queueDisturbance(x0 + dx * t, y0 + dy * t, radius, mode, {
+      this.queueDisturbance(wrap(x0 + dx * t), wrap(y0 + dy * t), radius, mode, {
         ...options,
         strokeAngle: options.strokeAngle ?? strokeAngle,
       });
@@ -2526,7 +2529,9 @@ export class NeuralGrowthModel {
           options.palettePhase !== undefined
             ? options.palettePhase
             : effectivePhaseRad,
-        zoom: options.zoom ?? 1,
+        zoom: options.zoom ?? this.effectiveZoom,
+        pan: options.pan ?? this.effectivePan,
+        preserveEchoHistory: true,
         displayFilter: options.displayFilter ?? this._parameters.displayFilter,
         showBarrier: options.showBarrier ?? false,
         ripples: options.ripples ?? [],

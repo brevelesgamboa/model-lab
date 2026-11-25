@@ -76,3 +76,81 @@ test("runtime guards combined audio and LFO pitch while retaining resonance uplo
     assert.equal(runtime.steps, step + 1);
   }
 });
+
+function drawRuntime() {
+  const uploads = new Map();
+  const released = [];
+  const copies = [];
+  const allocate = (width, height) => ({ width, height, framebuffer: {} });
+  const runtime = Object.assign(Object.create(TextureNcaRuntime.prototype), {
+    gl: {
+      isContextLost: () => false,
+      bindFramebuffer() {},
+      blitFramebuffer: (...args) => copies.push(args),
+    },
+    canvas: { width: 768, height: 768 },
+    size: 128,
+    steps: 0,
+    layout: { random: () => 0.5 },
+    model: { layers: [{ scale: 1 }, { scale: 1 }] },
+    weights: [{}, {}],
+    allocate,
+    allocateEchoTarget: allocate,
+    releaseTarget: (target) => released.push(target),
+    run: (name, _output, _inputs, uniforms) => uploads.set(name, uniforms),
+  });
+  const canvas = {
+    width: 768,
+    height: 768,
+    getContext: () => ({ drawImage() {} }),
+  };
+  return { runtime, canvas, uploads, released, copies };
+}
+
+test("echo and perception share every geometry transform code and viewport uniforms", () => {
+  const { runtime, canvas, uploads } = drawRuntime();
+  const transforms = [
+    "cartesian",
+    "vortex",
+    "spiral",
+    "julia",
+    "dipole",
+    "wave",
+    "saddle",
+    "kaleidoscope",
+    "vortex_pair",
+    "voronoi",
+  ];
+  for (const [code, coordinateTransform] of transforms.entries()) {
+    runtime.step(1, {
+      coordinateTransform,
+      geometryCenterX: 0.4,
+      geometryCenterY: -0.2,
+    });
+    runtime.draw(canvas, { echoDecay: 0.8, zoom: 4, pan: [0.125, -0.25] });
+    assert.equal(uploads.get("perception").u_transform, code);
+    assert.equal(uploads.get("echo").u_transform, code);
+    assert.equal(uploads.get("echo").u_zoom, uploads.get("visualize").u_zoom);
+    assert.deepEqual(uploads.get("echo").u_pan, uploads.get("visualize").u_pan);
+    assert.equal(uploads.get("echo").u_geometryCenterX, 0.4);
+    assert.equal(uploads.get("echo").u_geometryCenterY, -0.2);
+  }
+});
+
+test("echo history survives display resizing and snapshot draws never write history", () => {
+  const { runtime, canvas, released, copies } = drawRuntime();
+  runtime.step(0);
+  runtime.draw(canvas, { echoDecay: 0.8 });
+  const history = runtime.echoTargets;
+  for (const extent of [1024, 768, 1024, 2048, 4096, 768]) {
+    canvas.width = canvas.height = extent;
+    const index = runtime.echoIndex;
+    const count = copies.length;
+    const snapshot = extent >= 2048;
+    runtime.draw(canvas, { echoDecay: 0.8, preserveEchoHistory: snapshot });
+    assert.equal(runtime.echoTargets, history);
+    assert.equal(runtime.echoIndex, snapshot ? index : 1 - index);
+    assert.equal(copies.length, count + (snapshot ? 0 : 1));
+  }
+  assert.ok(history.every((target) => !released.includes(target)));
+});

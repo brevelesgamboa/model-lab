@@ -10,6 +10,29 @@ import { NEURAL_GROWTH_AUDIO_EFFECTS } from "../models/neural-growth/audio-effec
 const FAVORITES_KEY = "latent-field:growth-favorites";
 const RECENTS_KEY = "latent-field:growth-recents";
 
+// Invert VISUALIZE's viewport transform in bottom-up simulation coordinates.
+export function getGridCoords(event, model, rect) {
+  const side = Math.min(rect.width, rect.height);
+  if (!side) return null;
+  const x = (event.clientX - rect.left - (rect.width - side) / 2) / side;
+  const y = (event.clientY - rect.top - (rect.height - side) / 2) / side;
+  if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
+  const zoom = Math.max(
+    1,
+    Math.min(8, Number(model.effectiveZoom ?? model.parameters?.zoom) || 1),
+  );
+  const pan = model.effectivePan || [0, 0];
+  const wrap = (value) => ((value % 1) + 1) % 1;
+  const nx = wrap(0.5 + (x - 0.5) / zoom + pan[0]);
+  const ny = wrap(0.5 + (0.5 - y) / zoom + pan[1]);
+  return {
+    gx: Math.floor(nx * model.simulationSize),
+    gy: Math.floor(ny * model.simulationSize),
+    nx,
+    ny,
+  };
+}
+
 function loadStorageJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -159,8 +182,7 @@ export function createGrowthController({
       patternSelect.value = patternId;
       patternSelect.dispatchEvent(new Event("change"));
     } else {
-      model.onParameterChange("pattern", patternId);
-      render({ forceAnalysis: true });
+      onParameterChange?.("pattern", patternId);
     }
     renderGalleryGrid();
     elements.growthGalleryDialog?.close();
@@ -539,33 +561,8 @@ export function createGrowthController({
     });
   }
 
-  function getGridCoords(event, model) {
-    const rect = elements.canvas.getBoundingClientRect();
-    const side = Math.min(rect.width, rect.height);
-    if (!side) return null;
-    let x = (event.clientX - rect.left - (rect.width - side) / 2) / side;
-    let y = (event.clientY - rect.top - (rect.height - side) / 2) / side;
-    if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
-    const zoom = Math.max(
-      1,
-      Math.min(8, Number(model.effectiveZoom ?? model.parameters?.zoom) || 1),
-    );
-    const pan = model.effectivePan;
-    if (Array.isArray(pan) && (pan[0] !== 0 || pan[1] !== 0)) {
-      x -= pan[0];
-      y += pan[1];
-    }
-    if (zoom > 1) {
-      x = 0.5 + (x - 0.5) / zoom;
-      y = 0.5 + (y - 0.5) / zoom;
-    }
-    const size = model.simulationSize;
-    return {
-      gx: Math.max(0, Math.min(size - 1, Math.floor(x * size))),
-      gy: Math.max(0, Math.min(size - 1, size - 1 - Math.floor(y * size))),
-      nx: Math.max(0, Math.min(1, x)),
-      ny: Math.max(0, Math.min(1, 1 - y)),
-    };
+  function gridCoords(event, model) {
+    return getGridCoords(event, model, elements.canvas.getBoundingClientRect());
   }
 
   let lastPointerRippleTime = 0;
@@ -594,11 +591,11 @@ export function createGrowthController({
     } catch (_) {}
     if (event.shiftKey) {
       isCentering = true;
-      const coords = getGridCoords(event, model);
+      const coords = gridCoords(event, model);
       if (coords) updateCenterFromPointer(coords, model);
       return;
     }
-    const coords = getGridCoords(event, model);
+    const coords = gridCoords(event, model);
     if (!coords) return;
     lastCoord = coords;
     const radius = Number(model.parameters?.brushRadius) || 16;
@@ -636,11 +633,11 @@ export function createGrowthController({
     if (!model?.ready || pointerId !== event.pointerId || event.buttons !== 1)
       return;
     if (isCentering) {
-      const coords = getGridCoords(event, model);
+      const coords = gridCoords(event, model);
       if (coords) updateCenterFromPointer(coords, model);
       return;
     }
-    const coords = getGridCoords(event, model);
+    const coords = gridCoords(event, model);
     if (!coords) return;
     const radius = Number(model.parameters?.brushRadius) || 16;
     const mode = model.parameters?.disturbanceMode || "erase";
@@ -1032,6 +1029,7 @@ export function createGrowthController({
   listen(elements.canvas, "lostpointercapture", release);
   return {
     update,
+    schedulePausedRender,
     onAudioFrame,
     openGallery,
     dispose: () => listeners.forEach((remove) => remove()),
