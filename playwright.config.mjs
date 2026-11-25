@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 45_000,
   expect: { timeout: 10_000 },
+  // Balance individual tests across shards while keeping each runner serial.
+  fullyParallel: true,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   use: {
@@ -13,7 +15,7 @@ export default defineConfig({
     launchOptions: {
       executablePath:
         process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-        "/usr/bin/chromium-browser",
+        (process.env.CI ? undefined : "/usr/bin/chromium-browser"),
       args: [
         "--no-sandbox",
         "--use-gl=angle",
