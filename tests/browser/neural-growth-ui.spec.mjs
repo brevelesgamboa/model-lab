@@ -264,25 +264,46 @@ test.describe("Neural Growth fullscreen display resolution", () => {
     await expect
       .poll(() => page.evaluate(() => document.fullscreenElement?.id))
       .toBe("output-panel");
-    async function checkFullscreen() {
+    async function checkFullscreen(orientation) {
+      let measured = null;
       await expect
         .poll(async () => {
-          const { width, height } = await displaySize(page);
-          return Math.max(width, height);
-        })
-        .toBe(768);
-      await expect
-        .poll(() =>
-          page.locator("#output-canvas").evaluate((canvas) => {
+          measured = await page.locator("#output-canvas").evaluate((canvas) => {
             const bounds = canvas.getBoundingClientRect();
-            return Math.abs(
-              bounds.width / bounds.height - canvas.width / canvas.height,
-            );
-          }),
-        )
-        .toBeLessThan(0.01);
+            const runtime = window.__growthRuntime;
+            return {
+              width: canvas.width,
+              height: canvas.height,
+              runtimeWidth: runtime.canvas.width,
+              runtimeHeight: runtime.canvas.height,
+              boundsWidth: bounds.width,
+              boundsHeight: bounds.height,
+              aspectDiff: Math.abs(
+                bounds.width / bounds.height - canvas.width / canvas.height,
+              ),
+            };
+          });
+          const oriented =
+            orientation === "portrait"
+              ? measured.height > measured.width
+              : measured.width > measured.height;
+          return (
+            oriented &&
+            measured.width === measured.runtimeWidth &&
+            measured.height === measured.runtimeHeight &&
+            Math.max(measured.width, measured.height) > 768 &&
+            measured.width * measured.height <= 1920 * 1080 + 4096 &&
+            measured.aspectDiff < 0.01
+          );
+        })
+        .toBe(true);
+      expect(measured.width * measured.height).toBeLessThan(
+        Math.round(measured.boundsWidth * 2) *
+          Math.round(measured.boundsHeight * 2),
+      );
+      return measured;
     }
-    await checkFullscreen();
+    await checkFullscreen("landscape");
     // Chromium disallows native window resizing while fullscreen. Resize its
     // emulated viewport instead, which still delivers the app's resize event.
     const session = await page.context().newCDPSession(page);
@@ -292,17 +313,17 @@ test.describe("Neural Growth fullscreen display resolution", () => {
       deviceScaleFactor: 2,
       mobile: false,
     });
-    await checkFullscreen();
+    const livePortrait = await checkFullscreen("portrait");
     await page.keyboard.press("Space");
     await expect
       .poll(async () => {
         const { width, height } = await displaySize(page);
-        return Math.max(width, height);
+        return height > width ? width * height : 0;
       })
-      .toBeGreaterThan(768);
+      .toBeGreaterThan(livePortrait.width * livePortrait.height);
     expect(await state(page)).toEqual(before);
     await page.keyboard.press("Space");
-    await checkFullscreen();
+    await checkFullscreen("portrait");
     await page.keyboard.press("f");
     await expect
       .poll(() => displaySize(page))
@@ -2324,4 +2345,358 @@ test("raw vitality moments detect checkerboards, hidden activity and clipping wi
   expect(result.clipping).toBeGreaterThan(0.99);
   expect(result.partial).toBeLessThan(1);
   expect(result.frozen).toBe(0);
+});
+
+test("rectangular landscape and portrait runtime rendering is isotropic, toroidal, leak-free, and snapshot-safe", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  await selectGrowth(page);
+
+  const report = await page.evaluate(async () => {
+    const runtime = window.__growthRuntime;
+    const { gl, size } = runtime;
+
+    const drawToSize = (width, height, options = {}) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      runtime.draw(canvas, options);
+      return {
+        canvas,
+        data: canvas.getContext("2d").getImageData(0, 0, width, height).data,
+      };
+    };
+
+    const echoDims = () =>
+      runtime.echoTargets
+        ? runtime.echoTargets.map((target) => [target.width, target.height])
+        : null;
+
+    const hashTarget = async (target) => {
+      const pixels = new Uint8Array(target.width * target.height * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+      gl.readPixels(
+        0,
+        0,
+        target.width,
+        target.height,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixels,
+      );
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const digest = await crypto.subtle.digest("SHA-256", pixels);
+      return [...new Uint8Array(digest)]
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
+    };
+
+    const pixelAt = (data, width, x, y) => {
+      const idx = (Math.round(y) * width + Math.round(x)) * 4;
+      return [data[idx], data[idx + 1], data[idx + 2]];
+    };
+
+    const diffRgb = (a, b) =>
+      Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+
+    const axisSpan = (data, width, height, cx, cy, bg) => {
+      let minX = width;
+      let maxX = -1;
+      for (let x = Math.max(0, cx - 120); x <= Math.min(width - 1, cx + 120); x += 1) {
+        if (diffRgb(pixelAt(data, width, x, cy), bg) > 20) {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+        }
+      }
+      let minY = height;
+      let maxY = -1;
+      for (let y = Math.max(0, cy - 120); y <= Math.min(height - 1, cy + 120); y += 1) {
+        if (diffRgb(pixelAt(data, width, cx, y), bg) > 20) {
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+      }
+      return {
+        spanX: maxX - minX,
+        spanY: maxY - minY,
+      };
+    };
+
+    const neutral = new Uint8Array(size * size * 12).fill(128);
+    runtime.clearBarrier();
+    runtime.writeState(neutral);
+    const { data: bgLandscape } = drawToSize(640, 360, { zoom: 1, pan: [0, 0] });
+    const bgCorner = pixelAt(bgLandscape, 640, 10, 10);
+
+    // 1. Center disk stays circular (square texels) in both landscape & portrait.
+    runtime.disturb(size / 2, size / 2, 16, "dye", { dyeColor: [0, 1, 0] });
+    const landDisk = drawToSize(640, 360, { zoom: 1, pan: [0, 0] });
+    const landSpan = axisSpan(landDisk.data, 640, 360, 320, 180, bgCorner);
+    const portDisk = drawToSize(360, 480, { zoom: 1, pan: [0, 0] });
+    const portSpan = axisSpan(portDisk.data, 360, 480, 180, 240, bgCorner);
+
+    // 2. Toroidal edge repetition in landscape wings and portrait top/bottom wings.
+    runtime.writeState(neutral);
+    runtime.disturb(Math.round(size * 0.25), Math.round(size * 0.5), 14, "dye", {
+      dyeColor: [1, 0, 0],
+    });
+    runtime.disturb(Math.round(size * 0.5), Math.round(size * 0.05), 12, "dye", {
+      dyeColor: [0, 0.5, 1],
+    });
+    const landWrap = drawToSize(640, 360, { zoom: 1, pan: [0, 0] });
+    // Center x=320, minDim=360: x=0.25 is at 320 - 0.25*360 = 230; right wing 320 + 0.75*360 = 590 wraps to 0.25.
+    const landCore = pixelAt(landWrap.data, 640, 230, 180);
+    const landRightWing = pixelAt(landWrap.data, 640, 590, 180);
+
+    const portWrap = drawToSize(360, 480, { zoom: 1, pan: [0, 0] });
+    // Center y=240, minDim=360: ny=0.05 (WebGL bottom) is canvas y = 240 + 0.45*360 = 402;
+    // top wing canvas y = 240 - 0.55*360 = 42 maps to ny = 0.5 + 0.55 = 1.05 -> 0.05!
+    const portCore = pixelAt(portWrap.data, 360, 180, 402);
+    const portTopWing = pixelAt(portWrap.data, 360, 180, 42);
+
+    // 3. Echo FBO allocation, resize resource stability, vortex/julia + ripples + barrier outline.
+    runtime.clearBarrier();
+    runtime.writeState(neutral);
+    runtime.disturb(size / 2, size / 2, 16, "dye", { dyeColor: [1, 0.2, 0.1] });
+    runtime.disturb(Math.round(size * 0.25), size / 2, 14, "freeze");
+    const baseDrawOpts = {
+      zoom: 1,
+      pan: [0, 0],
+      echoDecay: 0.8,
+      echoDrift: 0.25,
+      echoMode: "field_advection",
+      echoStyle: "phosphor",
+      showBarrier: true,
+      ripples: [
+        {
+          x: size / 2,
+          y: size / 2,
+          radius: 36,
+          amplitude: 0.4,
+          startTime: performance.now() - 50,
+          duration: 1,
+        },
+      ],
+    };
+
+    runtime.step(0, { coordinateTransform: "vortex", twist: 25 });
+    drawToSize(640, 360, baseDrawOpts);
+    const dims640First = echoDims();
+    const res640First = { ...runtime.getStats().resources };
+
+    runtime.step(0, { coordinateTransform: "julia", twist: 0 });
+    drawToSize(360, 480, baseDrawOpts);
+    const dims360 = echoDims();
+    const res360 = { ...runtime.getStats().resources };
+
+    runtime.step(0, { coordinateTransform: "vortex", twist: 20 });
+    drawToSize(640, 360, baseDrawOpts);
+    const dims640Second = echoDims();
+    const res640Second = { ...runtime.getStats().resources };
+
+    // 4. Hi-res widescreen (>=768 long edge) + preserveEchoHistory 2048x2048 snapshot.
+    runtime.clearBarrier();
+    runtime.writeState(neutral);
+    runtime.disturb(size / 2, size / 2, 18, "dye", { dyeColor: [0, 1, 0.5] });
+    runtime.step(0, { coordinateTransform: "cartesian", twist: 0 });
+    for (let frame = 0; frame < 4; frame += 1) {
+      drawToSize(960, 540, {
+        ...baseDrawOpts,
+        echoMode: "radial_bloom",
+        showBarrier: false,
+        ripples: [],
+      });
+    }
+    const dims960 = echoDims();
+    const echoRefsBefore = [...runtime.echoTargets];
+    const echoIndexBefore = runtime.echoIndex;
+    const hashesBefore = [
+      await hashTarget(runtime.echoTargets[0]),
+      await hashTarget(runtime.echoTargets[1]),
+    ];
+
+    const snap2k = drawToSize(2048, 2048, {
+      ...baseDrawOpts,
+      echoMode: "radial_bloom",
+      showBarrier: false,
+      ripples: [],
+      preserveEchoHistory: true,
+    });
+    const echoRefsAfter = [...runtime.echoTargets];
+    const echoIndexAfter = runtime.echoIndex;
+    const hashesAfter = [
+      await hashTarget(runtime.echoTargets[0]),
+      await hashTarget(runtime.echoTargets[1]),
+    ];
+
+    // Snapshot center disk + echoed halo remains circular (not stretched to 16:9).
+    const snapBg = pixelAt(snap2k.data, 2048, 50, 50);
+    let snapMinX = 2048;
+    let snapMaxX = -1;
+    for (let x = 600; x <= 1448; x += 1) {
+      if (diffRgb(pixelAt(snap2k.data, 2048, x, 1024), snapBg) > 20) {
+        snapMinX = Math.min(snapMinX, x);
+        snapMaxX = Math.max(snapMaxX, x);
+      }
+    }
+    let snapMinY = 2048;
+    let snapMaxY = -1;
+    for (let y = 600; y <= 1448; y += 1) {
+      if (diffRgb(pixelAt(snap2k.data, 2048, 1024, y), snapBg) > 20) {
+        snapMinY = Math.min(snapMinY, y);
+        snapMaxY = Math.max(snapMaxY, y);
+      }
+    }
+
+    return {
+      landSpan,
+      portSpan,
+      landCoreDiff: diffRgb(landCore, bgCorner),
+      landWrapDiff: diffRgb(landCore, landRightWing),
+      portCoreDiff: diffRgb(portCore, bgCorner),
+      portWrapDiff: diffRgb(portCore, portTopWing),
+      dims640First,
+      dims360,
+      dims640Second,
+      dims960,
+      res640First,
+      res360,
+      res640Second,
+      sameEchoRefs:
+        echoRefsBefore[0] === echoRefsAfter[0] &&
+        echoRefsBefore[1] === echoRefsAfter[1],
+      sameEchoIndex: echoIndexBefore === echoIndexAfter,
+      sameEchoHashes:
+        hashesBefore[0] === hashesAfter[0] &&
+        hashesBefore[1] === hashesAfter[1],
+      snapSpanX: snapMaxX - snapMinX,
+      snapSpanY: snapMaxY - snapMinY,
+      glError: gl.getError(),
+    };
+  });
+
+  expect(report.glError).toBe(0);
+  expect(report.landSpan.spanX).toBeGreaterThan(25);
+  expect(Math.abs(report.landSpan.spanX - report.landSpan.spanY)).toBeLessThanOrEqual(2);
+  expect(report.portSpan.spanX).toBeGreaterThan(25);
+  expect(Math.abs(report.portSpan.spanX - report.portSpan.spanY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(report.landSpan.spanX - report.portSpan.spanX)).toBeLessThanOrEqual(2);
+  expect(report.landCoreDiff).toBeGreaterThan(40);
+  expect(report.landWrapDiff).toBeLessThanOrEqual(8);
+  expect(report.portCoreDiff).toBeGreaterThan(40);
+  expect(report.portWrapDiff).toBeLessThanOrEqual(8);
+
+  expect(report.dims640First).toEqual([
+    [640, 360],
+    [640, 360],
+  ]);
+  expect(report.dims360).toEqual([
+    [360, 480],
+    [360, 480],
+  ]);
+  expect(report.dims640Second).toEqual([
+    [640, 360],
+    [640, 360],
+  ]);
+  expect(report.dims960).toEqual([
+    [768, 432],
+    [768, 432],
+  ]);
+  expect(report.res640Second.textures).toBe(report.res640First.textures);
+  expect(report.res640Second.framebuffers).toBe(report.res640First.framebuffers);
+  expect(report.res640Second.bytes).toBe(report.res640First.bytes);
+  expect(report.res360.textures).toBe(report.res640First.textures);
+  expect(report.sameEchoRefs).toBe(true);
+  expect(report.sameEchoIndex).toBe(true);
+  expect(report.sameEchoHashes).toBe(true);
+  expect(report.snapSpanX).toBeGreaterThan(150);
+  expect(Math.abs(report.snapSpanX - report.snapSpanY)).toBeLessThanOrEqual(8);
+  expect(errors).toEqual([]);
+});
+
+test("widescreen fullscreen fills panel, wraps wing clicks cleanly, and generates 220x220 thumbnails", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  await selectGrowth(page);
+  await page.locator("#toggle-fullscreen").click();
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement?.id))
+    .toBe("output-panel");
+
+  await expect
+    .poll(async () => {
+      return page.evaluate(() => {
+        const panel = document.getElementById("output-panel").getBoundingClientRect();
+        const canvas = document.getElementById("output-canvas");
+        const rect = canvas.getBoundingClientRect();
+        return (
+          canvas.width > canvas.height &&
+          Math.abs(rect.width - panel.width) <= 2 &&
+          Math.abs(rect.height - panel.height) <= 2 &&
+          Math.abs(rect.width / rect.height - canvas.width / canvas.height) < 0.01
+        );
+      });
+    })
+    .toBe(true);
+
+  await page.evaluate(() => {
+    window.__wingDisturbances = [];
+    const runtime = window.__growthRuntime;
+    const disturb = runtime.disturb;
+    runtime.disturb = function (...args) {
+      window.__wingDisturbances.push(args.slice(0, 3));
+      return disturb.apply(this, args);
+    };
+  });
+
+  const rect = await page.locator("#output-canvas").boundingBox();
+  const minSide = Math.min(rect.width, rect.height);
+  // Click inside the left widescreen wing (-0.65 * minSide from center -> nx = 0.85, gx = 217).
+  await page.mouse.click(
+    rect.x + rect.width / 2 - minSide * 0.65,
+    rect.y + rect.height / 2,
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__wingDisturbances.at(-1)))
+    .toEqual([217, 128, 16]);
+
+  // Click inside the right widescreen wing (+0.65 * minSide from center -> nx = 0.15, gx = 38).
+  await page.mouse.click(
+    rect.x + rect.width / 2 + minSide * 0.65,
+    rect.y + rect.height / 2,
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__wingDisturbances.at(-1)))
+    .toEqual([38, 128, 16]);
+
+  // Save while still in rectangular widescreen fullscreen so thumbnail center-cropping runs.
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator("#status-message")).toContainText("saved");
+
+  await page.keyboard.press("f");
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement))
+    .toBe(null);
+
+  await page.locator('[data-view="saved"]').click();
+  await expect(page.locator(".run-card")).toHaveCount(1);
+  const thumbSize = await page
+    .locator(".run-card__image")
+    .first()
+    .evaluate(async (img) => {
+      await img.decode();
+      return { width: img.naturalWidth, height: img.naturalHeight };
+    });
+  expect(thumbSize).toEqual({ width: 220, height: 220 });
+  expect(errors).toEqual([]);
 });

@@ -107,9 +107,17 @@ test("audio visualizer overlay maintains fixed lean buffer resolution", () => {
   const visualizer = new AudioVisualizerOverlay(mockCanvas);
 
   visualizer.syncDimensions(targetCanvas);
-  // Fixed width 640 capped to lean buffer size
+  // Long edge 640 capped to lean buffer size
   assert.equal(mockCanvas.width, 640);
   assert.equal(mockCanvas.height, Math.round(640 * (1000 / 1440)));
+
+  visualizer.syncDimensions({ width: 900, height: 1200 });
+  assert.equal(mockCanvas.width, 480);
+  assert.equal(mockCanvas.height, 640);
+
+  visualizer.syncDimensions({ width: 2560, height: 1080 });
+  assert.equal(mockCanvas.width, 640);
+  assert.equal(mockCanvas.height, 270);
 });
 
 test("audio visualizer overlay updates options and notifies subscribers", () => {

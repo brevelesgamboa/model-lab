@@ -47,9 +47,6 @@ test("brush coordinates handle letterboxing, parameter zoom and wrapped edges", 
     nx: 0.25,
     ny: 0.625,
   });
-  assert.equal(getGridCoords(eventAt(-0.01, 0.5), model, rect), null);
-  assert.equal(getGridCoords(eventAt(1, 0.5), model, rect), null);
-  assert.equal(getGridCoords(eventAt(0.5, 1), model, rect), null);
   assert.equal(
     getGridCoords(eventAt(0.5, 0.5), model, { ...rect, height: 0 }),
     null,
@@ -61,10 +58,86 @@ test("brush coordinates handle letterboxing, parameter zoom and wrapped edges", 
     nx: 0.25,
     ny: 0.75,
   });
+
+  // Rectangular surface (default or matching rect): wings wrap toroidally,
+  // while clicks outside the element bounds still return null.
+  for (const surface of [null, { width: 600, height: 400 }]) {
+    const leftWing = getGridCoords(eventAt(-0.1, 0.5), model, rect, surface);
+    assert.deepEqual(leftWing, {
+      gx: 121,
+      gy: 96,
+      nx: 0.95,
+      ny: 0.75,
+    });
+    const rightWing = getGridCoords(eventAt(1.1, 0.5), model, rect, surface);
+    assert.deepEqual(rightWing, {
+      gx: 70,
+      gy: 96,
+      nx: 0.55,
+      ny: 0.75,
+    });
+    assert.equal(
+      getGridCoords({ clientX: 9.9, clientY: 220 }, model, rect, surface),
+      null,
+    );
+    assert.equal(
+      getGridCoords({ clientX: 610.1, clientY: 220 }, model, rect, surface),
+      null,
+    );
+  }
+
+  // Portrait rectangular surface wraps top/bottom wings toroidally around minSide.
   const tall = { left: 10, top: 20, width: 400, height: 600 };
-  assert.equal(getGridCoords({ clientX: 210, clientY: 70 }, model, tall), null);
+  for (const surface of [null, { width: 400, height: 600 }]) {
+    const topWing = getGridCoords(
+      { clientX: 210, clientY: 70 },
+      model,
+      tall,
+      surface,
+    );
+    assert.deepEqual(topWing, {
+      gx: 32,
+      gy: 8,
+      nx: 0.25,
+      ny: 0.0625,
+    });
+    const bottomWing = getGridCoords(
+      { clientX: 210, clientY: 570 },
+      model,
+      tall,
+      surface,
+    );
+    assert.deepEqual(bottomWing, {
+      gx: 32,
+      gy: 56,
+      nx: 0.25,
+      ny: 0.4375,
+    });
+    assert.equal(
+      getGridCoords({ clientX: 210, clientY: 19.9 }, model, tall, surface),
+      null,
+    );
+    assert.equal(
+      getGridCoords({ clientX: 210, clientY: 620.1 }, model, tall, surface),
+      null,
+    );
+  }
+
+  // Letterboxed square surface inside a rectangular container rejects sidebars.
+  const squareSurface = { width: 768, height: 768 };
+  assert.equal(getGridCoords(eventAt(-0.01, 0.5), model, rect, squareSurface), null);
+  assert.equal(getGridCoords(eventAt(1, 0.5), model, rect, squareSurface), null);
+  assert.equal(getGridCoords(eventAt(0.5, 1), model, rect, squareSurface), null);
+  assert.deepEqual(
+    getGridCoords(eventAt(0, 0.25), { simulationSize: 128, parameters: { zoom: 2 } }, rect, squareSurface),
+    { gx: 32, gy: 80, nx: 0.25, ny: 0.625 },
+  );
   assert.equal(
-    getGridCoords({ clientX: 210, clientY: 320 }, model, tall).gx,
+    getGridCoords({ clientX: 210, clientY: 70 }, model, tall, squareSurface),
+    null,
+  );
+  assert.equal(
+    getGridCoords({ clientX: 210, clientY: 320 }, model, tall, squareSurface).gx,
     32,
   );
 });

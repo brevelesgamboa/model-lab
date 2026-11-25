@@ -10,20 +10,40 @@ const FAVORITES_KEY = "latent-field:growth-favorites";
 const RECENTS_KEY = "latent-field:growth-recents";
 
 // Invert VISUALIZE's viewport transform in bottom-up simulation coordinates.
-export function getGridCoords(event, model, rect) {
-  const side = Math.min(rect.width, rect.height);
-  if (!side) return null;
-  const x = (event.clientX - rect.left - (rect.width - side) / 2) / side;
-  const y = (event.clientY - rect.top - (rect.height - side) / 2) / side;
-  if (x < 0 || x >= 1 || y < 0 || y >= 1) return null;
+export function getGridCoords(event, model, rect, surface = null) {
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  const bufferAspect =
+    surface?.width > 0 && surface?.height > 0
+      ? surface.width / surface.height
+      : rect.width / rect.height;
+  const rectAspect = rect.width / rect.height;
+  const contentWidth =
+    rectAspect > bufferAspect ? rect.height * bufferAspect : rect.width;
+  const contentHeight =
+    rectAspect > bufferAspect ? rect.height : rect.width / bufferAspect;
+  const minSide = Math.min(contentWidth, contentHeight);
+  if (!minSide) return null;
+  const contentLeft = rect.left + (rect.width - contentWidth) * 0.5;
+  const contentTop = rect.top + (rect.height - contentHeight) * 0.5;
+  const localX = event.clientX - contentLeft;
+  const localY = event.clientY - contentTop;
+  if (
+    localX < 0 ||
+    localX >= contentWidth ||
+    localY < 0 ||
+    localY >= contentHeight
+  )
+    return null;
+  const x = (localX - contentWidth * 0.5) / minSide;
+  const y = (localY - contentHeight * 0.5) / minSide;
   const zoom = Math.max(
     1,
     Math.min(8, Number(model.effectiveZoom ?? model.parameters?.zoom) || 1),
   );
   const pan = model.effectivePan || [0, 0];
   const wrap = (value) => ((value % 1) + 1) % 1;
-  const nx = wrap(0.5 + (x - 0.5) / zoom + pan[0]);
-  const ny = wrap(0.5 + (0.5 - y) / zoom + pan[1]);
+  const nx = wrap(0.5 + x / zoom + pan[0]);
+  const ny = wrap(0.5 - y / zoom + pan[1]);
   return {
     gx: Math.floor(nx * model.simulationSize),
     gy: Math.floor(ny * model.simulationSize),
@@ -574,7 +594,12 @@ export function createGrowthController({
   }
 
   function gridCoords(event, model) {
-    return getGridCoords(event, model, elements.canvas.getBoundingClientRect());
+    return getGridCoords(
+      event,
+      model,
+      elements.canvas.getBoundingClientRect(),
+      elements.canvas,
+    );
   }
 
   let lastPointerRippleTime = 0;

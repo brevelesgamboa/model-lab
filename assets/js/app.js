@@ -1457,7 +1457,22 @@ function makeThumbnail() {
   thumbnailContext.fillRect(0, 0, size, size);
   thumbnailContext.imageSmoothingEnabled = true;
   thumbnailContext.imageSmoothingQuality = "high";
-  thumbnailContext.drawImage(elements.canvas, 0, 0, size, size);
+  const srcWidth = elements.canvas.width || size;
+  const srcHeight = elements.canvas.height || size;
+  const crop = Math.min(srcWidth, srcHeight);
+  const sx = Math.max(0, (srcWidth - crop) * 0.5);
+  const sy = Math.max(0, (srcHeight - crop) * 0.5);
+  thumbnailContext.drawImage(
+    elements.canvas,
+    sx,
+    sy,
+    crop,
+    crop,
+    0,
+    0,
+    size,
+    size,
+  );
   return thumbnail.toDataURL("image/jpeg", 0.72);
 }
 
@@ -1561,11 +1576,17 @@ function togglePanel(key) {
   setStatus(`${label} PANEL ${panelVisibility[key] ? "SHOWN" : "HIDDEN"}`);
 }
 
+const MAX_LIVE_FULLSCREEN_PIXELS = 1920 * 1080;
+
 function fullscreenLiveDimensions() {
   const bounds = elements.outputStage.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const physicalWidth = Math.round((bounds.width || 1280) * dpr);
-  const physicalHeight = Math.round((bounds.height || 720) * dpr);
+  const effectiveDpr =
+    currentModel.id === "neural-growth" && playback.isActive()
+      ? Math.min(1.5, dpr)
+      : dpr;
+  const physicalWidth = Math.round((bounds.width || 1280) * effectiveDpr);
+  const physicalHeight = Math.round((bounds.height || 720) * effectiveDpr);
   const aspect = Math.max(
     0.2,
     (bounds.width || 1) / Math.max(1, bounds.height || 1),
@@ -1620,16 +1641,26 @@ function resizeLiveCanvas({ render = true } = {}) {
     playback.isSuspended()
   )
     return;
-  let { width, height } =
-    document.fullscreenElement === elements.outputPanel
-      ? fullscreenLiveDimensions()
-      : { width: qualityProfile.size, height: qualityProfile.size };
+  const isFullscreen = document.fullscreenElement === elements.outputPanel;
+  let { width, height } = isFullscreen
+    ? fullscreenLiveDimensions()
+    : { width: qualityProfile.size, height: qualityProfile.size };
   if (currentModel.id === "neural-growth" && playback.isActive()) {
-    // Display pixels are independent of the simulation grid and private exports.
-    const maxEdge = Math.min(768, qualityProfile.size);
-    const scale = Math.min(1, maxEdge / Math.max(width, height));
-    width = Math.max(1, Math.round(width * scale));
-    height = Math.max(1, Math.round(height * scale));
+    if (isFullscreen) {
+      // Fullscreen keeps rectangular fill under a 2.07M-pixel fill-rate cap.
+      const area = width * height;
+      if (area > MAX_LIVE_FULLSCREEN_PIXELS) {
+        const scale = Math.sqrt(MAX_LIVE_FULLSCREEN_PIXELS / area);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+    } else {
+      // Windowed display pixels stay square and independent of the NCA grid.
+      const maxEdge = Math.min(768, qualityProfile.size);
+      const scale = Math.min(1, maxEdge / Math.max(width, height));
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+    }
   }
   if (elements.canvas.width === width && elements.canvas.height === height)
     return;
@@ -1662,6 +1693,7 @@ function updateFullscreenUi() {
   elements.toggleFullscreen.textContent = active ? "EXIT" : "FULL";
   elements.toggleFullscreen.setAttribute("aria-pressed", String(active));
   if (active) {
+    requestAnimationFrame(() => resizeLiveFullscreenCanvas());
     window.setTimeout(() => resizeLiveFullscreenCanvas(), 40);
   } else {
     if (hqGallery.isActive()) hqGallery.closeViewer({ exitFullscreen: false });

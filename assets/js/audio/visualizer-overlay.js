@@ -312,12 +312,15 @@ export class AudioVisualizerOverlay {
 
   syncDimensions(targetCanvas) {
     if (!this.canvas || !targetCanvas) return;
-    const targetAspect = (targetCanvas.height || 1) / (targetCanvas.width || 1);
-    const fixedWidth = 640;
-    const fixedHeight = Math.max(
-      180,
-      Math.min(640, Math.round(fixedWidth * targetAspect)),
-    );
+    const targetWidth = Math.max(1, Number(targetCanvas.width) || 1);
+    const targetHeight = Math.max(1, Number(targetCanvas.height) || 1);
+    const landscape = targetWidth >= targetHeight;
+    const fixedWidth = landscape
+      ? 640
+      : Math.max(64, Math.min(640, Math.round(640 * (targetWidth / targetHeight))));
+    const fixedHeight = landscape
+      ? Math.max(64, Math.min(640, Math.round(640 * (targetHeight / targetWidth))))
+      : 640;
 
     if (
       this.canvas.width !== fixedWidth ||

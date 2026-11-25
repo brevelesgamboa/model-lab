@@ -844,12 +844,12 @@ vec3 sampleRawColor(vec2 p) {
 }
 
 void main() {
-  vec2 vpSize = u_viewport.x > 0 ? vec2(u_viewport) : vec2(float(u_size));
-  vec2 uv = gl_FragCoord.xy / vpSize;
+  vec2 vpSize = u_viewport.x > 0 && u_viewport.y > 0 ? vec2(u_viewport) : vec2(float(u_size));
+  float minDim = max(1.0, min(vpSize.x, vpSize.y));
+  vec2 centered = (gl_FragCoord.xy - 0.5 * vpSize) / minDim;
   float z = u_zoom > 0.0 ? u_zoom : 1.0;
   float srcExtent = float(u_size) / z;
-  float srcOffset = (float(u_size) - srcExtent) * 0.5;
-  vec2 pos = srcOffset + u_pan * float(u_size) + uv * srcExtent;
+  vec2 pos = (0.5 + u_pan) * float(u_size) + centered * srcExtent;
   pos = mod(pos, float(u_size));
 
   vec2 disp = vec2(0.0);
@@ -919,6 +919,9 @@ const ECHO_PASS = `${PREFIX}
 in vec2 v_uv;
 uniform sampler2D u_current;
 uniform sampler2D u_history;
+uniform ivec2 u_viewport;
+uniform ivec2 u_historyViewport;
+uniform float u_historyAspect;
 uniform float u_decay;
 uniform float u_drift;
 uniform int u_mode;
@@ -934,9 +937,33 @@ uniform float u_foldCount;
 uniform float u_zoom;
 uniform vec2 u_pan;
 
+float wrapEchoAxis(float u, float period, float halfTexel) {
+  if (abs(period - 1.0) <= 0.001) return fract(u);
+  if (u >= halfTexel && u <= 1.0 - halfTexel) return u;
+  if (period < 1.0) {
+    if (u < halfTexel) {
+      return clamp(u + ceil((halfTexel - u) / period) * period, halfTexel, 1.0 - halfTexel);
+    }
+    return clamp(u - ceil((u - (1.0 - halfTexel)) / period) * period, halfTexel, 1.0 - halfTexel);
+  }
+  return clamp(u, halfTexel, 1.0 - halfTexel);
+}
+
+vec2 wrapEchoUv(vec2 uv, vec2 period, vec2 histSize) {
+  vec2 halfTexel = 0.5 / max(histSize, vec2(1.0));
+  return vec2(
+    wrapEchoAxis(uv.x, period.x, halfTexel.x),
+    wrapEchoAxis(uv.y, period.y, halfTexel.y)
+  );
+}
+
 void main() {
   float zoom = max(u_zoom, 1.0);
-  vec2 world = fract(0.5 + (v_uv - 0.5) / zoom + u_pan);
+  vec2 vpSize = u_viewport.x > 0 && u_viewport.y > 0 ? vec2(u_viewport) : vec2(float(u_size));
+  float minDim = max(1.0, min(vpSize.x, vpSize.y));
+  vec2 aspectVec = vpSize / minDim;
+  vec2 centered = (v_uv - 0.5) * aspectVec;
+  vec2 world = fract(0.5 + centered / zoom + u_pan);
   vec2 pos = world * 2.0 - 1.0 - vec2(u_geometryCenterX, u_geometryCenterY);
   float r = length(pos);
   float phi = atan(pos.y, pos.x);
@@ -1050,9 +1077,15 @@ void main() {
   }
 
   float stepLen = u_drift * 0.006 * zoom;
-  vec2 uv_r = fract(v_uv - driftDir * (stepLen * 1.05));
-  vec2 uv_g = fract(v_uv - driftDir * stepLen);
-  vec2 uv_b = fract(v_uv - driftDir * (stepLen * 0.95));
+  vec2 histSize = u_historyViewport.x > 0 && u_historyViewport.y > 0 ? vec2(u_historyViewport) : vpSize;
+  float histRatio = u_historyAspect > 0.0 ? u_historyAspect : (histSize.x / max(1.0, histSize.y));
+  vec2 histAspectVec = histRatio >= 1.0 ? vec2(histRatio, 1.0) : vec2(1.0, 1.0 / histRatio);
+  vec2 period = zoom / histAspectVec;
+  vec2 uvStep = (driftDir * stepLen) / histAspectVec;
+  vec2 baseHistUv = 0.5 + centered / histAspectVec;
+  vec2 uv_r = wrapEchoUv(baseHistUv - uvStep * 1.05, period, histSize);
+  vec2 uv_g = wrapEchoUv(baseHistUv - uvStep, period, histSize);
+  vec2 uv_b = wrapEchoUv(baseHistUv - uvStep * 0.95, period, histSize);
 
   vec4 curr = texture(u_current, v_uv);
   vec3 prevRgb = vec3(
@@ -1879,16 +1912,17 @@ export class TextureNcaRuntime {
         : 1.2;
     }
 
-    const extent = Math.max(
+    const targetWidth = Math.max(1, Math.round(targetCanvas.width || this.size));
+    const targetHeight = Math.max(
       1,
-      Math.min(
-        targetCanvas.width || this.size,
-        targetCanvas.height || this.size,
-      ),
+      Math.round(targetCanvas.height || this.size),
     );
-    if (this.canvas.width !== extent || this.canvas.height !== extent) {
-      this.canvas.width = extent;
-      this.canvas.height = extent;
+    if (
+      this.canvas.width !== targetWidth ||
+      this.canvas.height !== targetHeight
+    ) {
+      this.canvas.width = targetWidth;
+      this.canvas.height = targetHeight;
     }
 
     const filterModes = { smooth: 0, crisp: 1 };
@@ -1900,7 +1934,7 @@ export class TextureNcaRuntime {
       u_palettePhase: palettePhaseRad,
       u_showBarrier: showBarrier ? 1 : 0,
       u_channelView: channelViewCode,
-      u_viewport: [extent, extent],
+      u_viewport: [targetWidth, targetHeight],
       u_zoom: z,
       u_pan: Array.isArray(pan) ? pan : [0, 0],
       u_displayFilter: filterCode,
@@ -1909,18 +1943,40 @@ export class TextureNcaRuntime {
 
     if (decay > 0.001) {
       // History has its own bounded resolution. Viewport changes and exports
-      // resize only the current image, leaving accumulated trails intact.
+      // resize rectangular targets cleanly while preserving snapshot history.
+      const historyScale = Math.min(
+        1,
+        768 / Math.max(targetWidth, targetHeight),
+      );
+      const historyWidth = Math.max(1, Math.round(targetWidth * historyScale));
+      const historyHeight = Math.max(
+        1,
+        Math.round(targetHeight * historyScale),
+      );
       if (!this.echoTargets) {
-        const historyExtent = Math.min(768, extent);
         this.echoTargets = [
-          this.allocateEchoTarget(historyExtent, historyExtent),
-          this.allocateEchoTarget(historyExtent, historyExtent),
+          this.allocateEchoTarget(historyWidth, historyHeight),
+          this.allocateEchoTarget(historyWidth, historyHeight),
+        ];
+        this.echoIndex = 0;
+      } else if (
+        !preserveEchoHistory &&
+        (this.echoTargets[0].width !== historyWidth ||
+          this.echoTargets[0].height !== historyHeight)
+      ) {
+        for (const target of this.echoTargets) this.releaseTarget(target);
+        this.echoTargets = [
+          this.allocateEchoTarget(historyWidth, historyHeight),
+          this.allocateEchoTarget(historyWidth, historyHeight),
         ];
         this.echoIndex = 0;
       }
-      if (this.currentFrameTarget?.width !== extent) {
+      if (
+        this.currentFrameTarget?.width !== targetWidth ||
+        this.currentFrameTarget?.height !== targetHeight
+      ) {
         this.releaseTarget(this.currentFrameTarget);
-        this.currentFrameTarget = this.allocate(extent, extent, true);
+        this.currentFrameTarget = this.allocate(targetWidth, targetHeight, true);
       }
 
       this.run(
@@ -1937,6 +1993,9 @@ export class TextureNcaRuntime {
         null,
         { u_current: this.currentFrameTarget, u_history: readTarget },
         {
+          u_viewport: [targetWidth, targetHeight],
+          u_historyViewport: [readTarget.width, readTarget.height],
+          u_historyAspect: readTarget.width / Math.max(1, readTarget.height),
           u_decay: decay,
           u_drift: drift,
           u_mode: echoModeCode,
@@ -1960,8 +2019,8 @@ export class TextureNcaRuntime {
         gl.blitFramebuffer(
           0,
           0,
-          extent,
-          extent,
+          targetWidth,
+          targetHeight,
           0,
           0,
           writeTarget.width,
@@ -1982,18 +2041,7 @@ export class TextureNcaRuntime {
     }
 
     context.imageSmoothingEnabled = false;
-    const drawX = Math.round((targetCanvas.width - extent) * 0.5);
-    const drawY = Math.round((targetCanvas.height - extent) * 0.5);
-    if (
-      drawX > 0 ||
-      drawY > 0 ||
-      targetCanvas.width !== extent ||
-      targetCanvas.height !== extent
-    ) {
-      context.fillStyle = "#101218";
-      context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-    }
-    context.drawImage(this.canvas, drawX, drawY, extent, extent);
+    context.drawImage(this.canvas, 0, 0, targetWidth, targetHeight);
   }
 
   readState() {
