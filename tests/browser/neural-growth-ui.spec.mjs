@@ -532,7 +532,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(17);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(15);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -1465,6 +1465,8 @@ test("retired controls are absent while normalized audio sources and LFOs remain
     "acousticPosition",
     "cameraBreathing",
     "cameraReactivity",
+    "audioRippleAmount",
+    "audioSporeAmount",
   ]) {
     await expect(page.locator(`[data-parameter="${key}"]`)).toHaveCount(0);
   }
@@ -1492,7 +1494,9 @@ test("retired controls are absent while normalized audio sources and LFOs remain
   });
   expect(record.modulation.rotation.enabled).toBe(true);
   expect(record.parameters).not.toHaveProperty("audioProfile");
-  expect(record.parameters.audioSporeAmount).toBe(0);
+  expect(record.parameters).not.toHaveProperty("audioSporeAmount");
+  expect(record.parameters).not.toHaveProperty("audioRippleAmount");
+  expect(record.parameters.audioPreset).toBe("off");
   await expect(page.locator("#toggle-audio-input")).toBeEnabled();
   await expect(page.locator("#audio-meter")).toBeVisible();
 });
@@ -1770,10 +1774,23 @@ test("restoring old audio settings preserves values and manual routes without pr
       acousticInjection: "dye",
       cameraBreathing: "punchy",
       cameraReactivity: 0.8,
+      audioPreset: "kick-spore",
+      audioRippleAmount: 0.9,
+      audioSporeAmount: 0.08,
       growthSpeed: 7,
       zoom: 2,
     });
     records[0].audioModulation.rotation = { source: "kick", depth: 0.3 };
+    records[0].audioModulation.audioRippleAmount = {
+      source: "audioBeat",
+      depth: 0.9,
+      owner: "preset",
+    };
+    records[0].audioModulation.audioSporeAmount = {
+      source: "audioBody",
+      depth: 0.75,
+      owner: "preset",
+    };
     records[0].modulation.rotation = {
       enabled: true,
       waveform: "sine",
@@ -1805,10 +1822,11 @@ test("restoring old audio settings preserves values and manual routes without pr
     "acousticInjection",
     "cameraBreathing",
     "cameraReactivity",
+    "audioRippleAmount",
+    "audioSporeAmount",
   ])
     expect(stored).not.toHaveProperty(key);
-  expect(stored.audioSporeAmount).toBe(0);
-  expect(stored.audioRippleAmount).toBe(0);
+  expect(stored.audioPreset).toBe("off");
   const control = page.locator('[data-parameter="rotation"]');
   await control.locator(".modulation-toggle").click();
   await expect(control.locator(".drawer-audio")).toHaveAttribute(
@@ -1823,8 +1841,16 @@ test("restoring old audio settings preserves values and manual routes without pr
   const resaved = await page.evaluate(
     () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
   );
-  for (const key of ["audioProfile", "acousticInjection", "cameraBreathing"])
+  for (const key of [
+    "audioProfile",
+    "acousticInjection",
+    "cameraBreathing",
+    "audioRippleAmount",
+    "audioSporeAmount",
+  ])
     expect(resaved.parameters).not.toHaveProperty(key);
+  expect(resaved.audioModulation).not.toHaveProperty("audioRippleAmount");
+  expect(resaved.audioModulation).not.toHaveProperty("audioSporeAmount");
   expect(resaved.audioModulation.rotation).toMatchObject({
     source: "kick",
     depth: 0.3,
@@ -1878,21 +1904,23 @@ test("audio presets preserve bases, existing LFOs, user routes and open drawers"
   await decay.locator('[data-field="enabled"]').check();
   await decay.locator('[data-field="depth"]').fill("15");
   const preset = page.getByLabel("AUDIO PRESET", { exact: true });
-  await preset.selectOption("kick-spore");
+  await expect(preset.locator("option")).toHaveCount(2);
+  await expect(preset.locator("option").nth(0)).toHaveAttribute("value", "off");
+  await expect(preset.locator("option").nth(1)).toHaveAttribute("value", "kick");
+  await preset.selectOption("kick");
   await expect(rotation.locator(".modulation-panel")).toBeVisible();
   await expect(rotation.locator(".fine-input")).toHaveValue("137");
   await expect(rotation.locator('[data-field="enabled"]')).toBeChecked();
   await expect(rotation.locator('[data-field="depth"]')).toHaveValue("23");
-  const ripple = page.locator('[data-parameter="audioRippleAmount"]');
-  await ripple.locator(".modulation-toggle").click();
-  await expect(ripple.locator('[data-field="audioSource"]')).toHaveValue(
+  await expect(decay.locator('[data-field="audioSource"]')).toHaveValue(
     "audioBeat",
   );
-  await ripple.locator('[data-field="audioDepth"]').fill("0.3");
-  await preset.selectOption("bass-trails");
-  await expect(decay.locator('[data-field="audioSource"]')).toHaveValue(
-    "audioActivity",
+  const phase = page.locator('[data-parameter="palettePhase"]');
+  await phase.locator(".modulation-toggle").click();
+  await expect(phase.locator('[data-field="audioSource"]')).toHaveValue(
+    "audioBeat",
   );
+  await phase.locator('[data-field="audioDepth"]').fill("0.3");
   await preset.selectOption("off");
   await expect(decay.locator('[data-field="enabled"]')).toBeChecked();
   await expect(decay.locator('[data-field="depth"]')).toHaveValue("15");
@@ -1902,16 +1930,12 @@ test("audio presets preserve bases, existing LFOs, user routes and open drawers"
     return audioMatrixForModel("neural-growth");
   });
   expect(routes.rotation).toMatchObject({ source: "audioAir", owner: "user" });
-  expect(routes.audioRippleAmount).toMatchObject({
+  expect(routes.palettePhase).toMatchObject({
     source: "audioBeat",
     depth: 0.3,
     owner: "user",
   });
   expect(routes).not.toHaveProperty("echoDecay");
-  expect(routes).not.toHaveProperty("audioSporeAmount");
-  await expect(page.getByLabel("AUDIO SPORES", { exact: true })).toHaveValue(
-    "0",
-  );
   await expect(rotation.locator(".fine-input")).toHaveValue("137");
 });
 

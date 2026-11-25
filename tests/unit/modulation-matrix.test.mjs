@@ -46,6 +46,25 @@ test("restoring retired Inception routes disables them while preserving Full/Kic
   restoreAudioMatrix(model, {}, []);
 });
 
+test("restoring retired audio destination routes drops them while keeping existing parameter routes", () => {
+  const model = "neural-growth";
+  restoreAudioMatrix(
+    model,
+    {
+      audioRippleAmount: { source: "audioBeat", depth: 0.9, owner: "preset" },
+      audioSporeAmount: { source: "audioBody", depth: 0.75, owner: "preset" },
+      echoDecay: { source: "audioBeat", depth: 0.8, owner: "preset", ceiling: 0.7 },
+      palettePhase: { source: "audioBeat", depth: 0.18, owner: "preset" },
+    },
+    ["rotation", "echoDecay", "palettePhase"],
+  );
+  assert.deepEqual(audioMatrixForModel(model), {
+    echoDecay: { source: "audioBeat", depth: 0.8, owner: "preset", ceiling: 0.7 },
+    palettePhase: { source: "audioBeat", depth: 0.18, owner: "preset" },
+  });
+  restoreAudioMatrix(model, {}, []);
+});
+
 test("source registry, legacy music alias and depth validation share a safe contract", () => {
   assert.deepEqual(
     MODULATION_SOURCES.map(({ value }) => value),

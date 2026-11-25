@@ -822,27 +822,7 @@ export class NeuralGrowthModel {
         type: "select",
         default: "off",
         options: AUDIO_PRESETS.map(({ value, label }) => ({ value, label })),
-        help: "Adds audio routes without changing base values, LFOs, or your own routes. Off removes only preset-owned routes.",
-      },
-      {
-        key: "audioRippleAmount",
-        label: "AUDIO RIPPLE",
-        type: "range",
-        min: 0,
-        max: 1.5,
-        step: 0.01,
-        default: 0,
-        help: "Optical ripple amplitude on accepted kicks. No cellular changes. Choose a source in MOD to follow audio.",
-      },
-      {
-        key: "audioSporeAmount",
-        label: "AUDIO SPORES",
-        type: "range",
-        min: 0,
-        max: 0.08,
-        step: 0.001,
-        default: 0,
-        help: "Gentle cellular color mixing on accepted kicks; yields to manual brushes. Total mixing stays below 0.08 per second.",
+        help: "Routes Kick (audioBeat) to visual echo and palette targets without changing base values, LFOs, or your own routes. Off removes only preset-owned routes.",
       },
       {
         key: "automaticRecovery", label: "Automatic recovery", type: "toggle", default: false,
@@ -1473,7 +1453,7 @@ export class NeuralGrowthModel {
     if (!stored || typeof stored !== "object") return stored;
     const next = { ...stored };
     // These keys never imply new routes or destinations. In particular the old
-    // dynamic profile cannot opt a saved field into cellular audio injection.
+    // dynamic profile or retired audio destinations cannot opt a saved field into effects.
     for (const key of [
       "audioProfile",
       "beatShockwave",
@@ -1483,8 +1463,16 @@ export class NeuralGrowthModel {
       "acousticPosition",
       "cameraBreathing",
       "cameraReactivity",
+      "audioRippleAmount",
+      "audioSporeAmount",
     ])
       delete next[key];
+    if (
+      "audioPreset" in next &&
+      !AUDIO_PRESETS.some(({ value }) => value === next.audioPreset)
+    ) {
+      delete next.audioPreset;
+    }
     return next;
   }
 
@@ -1693,8 +1681,6 @@ export class NeuralGrowthModel {
       key === "barrierLock" ||
       key === "automaticRecovery" ||
       key === "audioPreset" ||
-      key === "audioRippleAmount" ||
-      key === "audioSporeAmount" ||
       key === "channelView" ||
       key === "displayFilter" ||
       key === "brushRadius" ||
@@ -2273,23 +2259,10 @@ export class NeuralGrowthModel {
     this._vitalityWatchdog.noteManualEdit(timestamp);
   }
 
-  onAudioFrame(levels, timestamp, parameters, enabled = true) {
-    const event = this._audioResponse.update(
-      levels,
-      timestamp,
-      parameters,
-      enabled && this.ready && this._clockRunning,
-    );
-    if (!enabled || !levels?.hasSignal || !this._clockRunning)
-      this.cancelAudio({all: !enabled || !this._clockRunning});
-    if (event)
-      this.triggerRipple(
-        event.x * this.simulationSize,
-        event.y * this.simulationSize,
-        null,
-        event.ripple,
-        { automatic: true },
-      );
+  onAudioFrame(_levels, _timestamp, _parameters, enabled = true) {
+    if (!enabled || !this.ready || !this._clockRunning) {
+      this.cancelAudio({ all: true });
+    }
   }
 
   triggerRipple(

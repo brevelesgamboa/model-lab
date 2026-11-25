@@ -108,7 +108,7 @@ test("the production audio handler forwards intent with route and playback eligi
   });
   context.after(() => controller.dispose());
   const levels = { generation: 3, beatId: 2, hasSignal: true };
-  const parameters = { audioRippleAmount: 0.4 };
+  const parameters = { echoDecay: 0.4 };
   controller.onAudioFrame(levels, 1000, parameters, true);
   controller.onAudioFrame(levels, 1020, parameters, false);
   view = "saved";

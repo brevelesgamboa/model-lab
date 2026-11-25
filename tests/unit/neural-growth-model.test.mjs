@@ -664,10 +664,11 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(runtimes[0].disposed, false);
 });
 
-test("audio destinations default to zero while manual ripples and inspector remain independent", async (context) => {
+test("audio preset defaults to off while manual ripples and inspector remain independent", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
-  assert.equal(params.audioSporeAmount, 0);
-  assert.equal(params.audioRippleAmount, 0);
+  assert.equal(params.audioPreset, "off");
+  assert.equal(Object.hasOwn(params, "audioSporeAmount"), false);
+  assert.equal(Object.hasOwn(params, "audioRippleAmount"), false);
   await model.render(canvas, params, 0);
   assert.equal(model.triggerRipple(0, 0, 16, 0), true);
   assert.equal(model._activeRipples[0].x, 0);
@@ -1363,40 +1364,57 @@ test("temporal echoes configure controls, normalize values, and update dynamics"
   );
 });
 
-test("retired audio settings are dropped without enabling new effects or moving the viewport", async (context) => {
+test("retired audio settings and legacy presets are dropped without enabling new effects or moving the viewport", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
-  const retired = { audioProfile: "dynamic", beatShockwave: "on", shockwaveIntensity: 1, acousticInjection: "dye", acousticThreshold: .2, acousticPosition: "center", cameraBreathing: "punchy", cameraReactivity: 1 };
-  const restored = sanitizeParameters(model, { ...params, ...retired, zoom: 2 });
-  for (const key of Object.keys(retired)) assert.equal(Object.hasOwn(restored, key), false, key);
-  assert.equal(restored.audioSporeAmount, 0);
-  assert.equal(restored.audioRippleAmount, 0);
+  const retired = {
+    audioProfile: "dynamic",
+    beatShockwave: "on",
+    shockwaveIntensity: 1,
+    acousticInjection: "dye",
+    acousticThreshold: 0.2,
+    acousticPosition: "center",
+    cameraBreathing: "punchy",
+    cameraReactivity: 1,
+    audioRippleAmount: 0.9,
+    audioSporeAmount: 0.08,
+  };
+  const restored = sanitizeParameters(model, {
+    ...params,
+    ...retired,
+    audioPreset: "kick-spore",
+    zoom: 2,
+  });
+  for (const key of Object.keys(retired))
+    assert.equal(Object.hasOwn(restored, key), false, key);
+  assert.equal(restored.audioPreset, "off");
+  assert.equal(sanitizeParameters(model, { audioPreset: "kick" }).audioPreset, "kick");
   await model.render(canvas, restored, 0);
   assert.equal(model.effectiveZoom, 2);
-  assert.deepEqual(model.effectivePan, [0,0]);
+  assert.deepEqual(model.effectivePan, [0, 0]);
   assert.deepEqual(runtimes[0].disturbances, []);
 });
 
-test("audio spores drain only on clocked simulation renders and yield to manual interaction", async (context) => {
+test("audio frames never dispatch automatic spores or ripples; recovery spores drain only on clocked simulation renders", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
-  await model.render(canvas, {...params, rotation: 10.125, palettePhase: 12.25}, 0);
+  await model.render(canvas, { ...params, rotation: 10.125, palettePhase: 12.25 }, 0);
   assert.equal(model.parameters.rotation, 10.125);
   assert.equal(model.parameters.palettePhase, 12.25);
   model.setClockRunning(true);
   const now = performance.now();
-  const levels = {generation: 1, beatId: 1, hasSignal: true, beatStrength: 1, onsetTimestamp: now};
-  const amounts = {...params, audioSporeAmount: .08, audioRippleAmount: 1};
-  model.onAudioFrame(levels, now, amounts);
-  model.onAudioFrame({...levels, beatId: 2, onsetTimestamp: now + 10}, now + 10, amounts);
-  assert.equal(model._audioResponse.active.length, 1);
-  await model.render(canvas, params, .1);
+  const levels = { generation: 1, beatId: 1, hasSignal: true, beatStrength: 1, onsetTimestamp: now };
+  model.onAudioFrame(levels, now, params);
+  model.onAudioFrame({ ...levels, beatId: 2, onsetTimestamp: now + 10 }, now + 10, params);
+  assert.equal(model._audioResponse.active.length, 0);
+  assert.equal(model._activeRipples?.length || 0, 0);
+  assert.equal(model._audioResponse.queueRecovery(now, 0.5, 0.5), true);
+  await model.render(canvas, { ...params, automaticRecovery: true }, 0.1);
   assert.equal(runtimes[0].disturbances.length, 0);
   model.notePointerInteraction(true);
   assert.equal(model._audioResponse.active.length, 0);
   model.notePointerInteraction(false);
-  model.onAudioFrame({...levels, beatId: 3, onsetTimestamp: now + 20}, now + 20, amounts);
-  assert.equal(model._audioResponse.active.length, 0);
+  assert.equal(model._audioResponse.queueRecovery(now + 20, 0.5, 0.5), false);
   model.setClockRunning(false);
-  assert.equal(model._activeRipples.length, 0);
+  assert.equal(model._activeRipples?.length || 0, 0);
 });
 
 test("legacy guidance parameters are ignored while pure NCA state and temporal controls remain usable", async (context) => {
