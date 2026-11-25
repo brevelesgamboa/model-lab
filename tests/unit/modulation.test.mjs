@@ -6,6 +6,7 @@ import {
   rateFromPosition,
   positionFromRate,
   defaultLfoConfig,
+  sanitizeLfoConfig,
 } from "../../assets/js/core/lfo.js";
 import { displayMessage } from "../../assets/js/ui/messages.js";
 import { coerceRangeValue } from "../../assets/js/app/controls-controller.js";
@@ -33,7 +34,7 @@ test("signed modulation brackets cover the actual LFO and audio extrema", () => 
           values.push(
             applyAudioModulation(
               definition,
-              applyLfo(definition, base, config, time),
+              applyLfo(definition, base, config, time, false),
               { source: "kick", depth },
               { kick: level },
             ),
@@ -57,7 +58,12 @@ test("signed modulation brackets cover the actual LFO and audio extrema", () => 
   updateModulationBounds(result, definition, 50, 0, 0);
   assert.equal(result.widthPercent, 0);
   updateModulationBounds(result, { min: 1, max: 1 }, 1, 1, -1);
-  assert.deepEqual(result, { leftPercent: 0, widthPercent: 0 });
+  assert.deepEqual(result, {
+    leftPercent: 0,
+    widthPercent: 0,
+    wrapLeftPercent: 0,
+    wrapWidthPercent: 0,
+  });
 });
 
 test("the playhead phase uses the same clock, offset and rate limits as the oscillator", () => {
@@ -80,58 +86,39 @@ test("the playhead phase uses the same clock, offset and rate limits as the osci
   assert.equal(lfoPhaseAt({ ...config, rate: 100, phase: 0 }, 0.03125), 0.25);
 });
 
-test("the production audio handler ignores paused effects even when saved parameters enable them", (context) => {
-  const previousDocument = globalThis.document;
-  const previousWindow = globalThis.window;
+test("the production audio handler forwards intent with route and playback eligibility", (context) => {
+  const previousDocument = globalThis.document,
+    previousWindow = globalThis.window;
   globalThis.document = new EventTarget();
   globalThis.window = new EventTarget();
   context.after(() => {
-    if (previousDocument === undefined) delete globalThis.document;
-    else globalThis.document = previousDocument;
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
   });
-  const shockwaves = [];
-  const inputs = [];
-  const coupled = [];
-  const camera = [];
-  const spectrumReads = [];
+  const calls = [];
+  let view = "lab";
   const model = {
     id: "neural-growth",
-    ready: true,
-    isClockRunning: true,
-    parameters: { beatShockwave: "on" },
-    triggerBeatShockwave: (mode) => shockwaves.push(mode),
-    triggerKickInput: (strength, time) => {
-      inputs.push([strength, time]);
-      return true;
-    },
-    processAcousticInjection: (...args) => coupled.push(args),
-    processCameraMotion: (...args) => camera.push(args),
+    onAudioFrame: (...args) => calls.push(args),
   };
   const controller = createGrowthController({
     elements: {},
     getModel: () => model,
-    getView: () => "lab",
+    getView: () => view,
   });
   context.after(() => controller.dispose());
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1000, {
-    getFrequencyData: () => spectrumReads.push(true),
-  });
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.8 }, 1050);
-  controller.onAudioFrame({ hasSignal: false }, 1200);
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.75 }, 1300);
-  model.parameters.beatShockwave = "off";
-  controller.onAudioFrame({ hasSignal: false }, 1500);
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1600);
-  model.isClockRunning = false;
-  controller.onAudioFrame({ hasSignal: false }, 1800);
-  controller.onAudioFrame({ hasSignal: true, kickOnset: 0.9 }, 1900);
-  assert.deepEqual(inputs, []);
-  assert.deepEqual(shockwaves, []);
-  assert.deepEqual(coupled, []);
-  assert.deepEqual(camera, []);
-  assert.deepEqual(spectrumReads, []);
+  const levels = { generation: 3, beatId: 2, hasSignal: true };
+  const parameters = { audioRippleAmount: 0.4 };
+  controller.onAudioFrame(levels, 1000, parameters, true);
+  controller.onAudioFrame(levels, 1020, parameters, false);
+  view = "saved";
+  controller.onAudioFrame(levels, 1040, parameters, true);
+  assert.deepEqual(
+    calls.map((args) => args[3]),
+    [true, false, false],
+  );
+  assert.equal(calls[0][0], levels);
+  assert.equal(calls[0][2], parameters);
 });
 
 test("one-sided LFOs stay on the selected side and match their displayed bounds", () => {
@@ -171,7 +158,7 @@ test("one-sided LFOs stay on the selected side and match their displayed bounds"
   }
 });
 
-test("modulated angular endpoints stay at the bracket edge while manual entry can wrap", () => {
+test("angular modulation wraps at the seam while preserving continuous fractional motion", () => {
   const definition = { type: "range", min: 0, max: 360, step: 1, wrap: true };
   const config = {
     ...defaultLfoConfig(),
@@ -181,7 +168,18 @@ test("modulated angular endpoints stay at the bracket edge while manual entry ca
     polarity: "positive",
   };
   const peak = applyLfo(definition, 180, config, 0.25);
-  assert.equal(coerceRangeValue(definition, peak, false), 360);
+  assert.equal(peak, 0);
+  const result = applyAudioModulation(
+    definition,
+    applyLfo(definition, 350, { ...config, depth: 0.2 }, 0.25, false),
+    { source: "audioBeat", depth: 0.1 },
+    { kick: 0.125 },
+  );
+  assert.equal(result, 28.25);
+  const bounds = {};
+  updateModulationBounds(bounds, definition, 350, 0.2, 0.1, "positive");
+  assert.ok(bounds.wrapWidthPercent > 0);
+  assert.ok(bounds.leftPercent > 90);
   assert.equal(coerceRangeValue(definition, 360), 0);
 });
 
@@ -219,4 +217,15 @@ test("status and log messages use sentence case and preserve technical identifie
     displayMessage("GPU MODEL INCEPTIONV3 READY"),
     "GPU model InceptionV3 ready",
   );
+});
+
+test("partial stored LFOs preserve field defaults and ignore retired calmDepth", () => {
+  assert.deepEqual(sanitizeLfoConfig({ enabled: true }), {
+    ...defaultLfoConfig(),
+    enabled: true,
+  });
+  const config = sanitizeLfoConfig({ depth: NaN, rate: 0.2, calmDepth: 1 });
+  assert.equal(config.depth, 0.2);
+  assert.equal(config.rate, 0.2);
+  assert.equal(Object.hasOwn(config, "calmDepth"), false);
 });

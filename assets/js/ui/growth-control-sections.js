@@ -51,6 +51,11 @@ export const GROWTH_CONTROL_SECTIONS = Object.freeze([
     ],
   },
   {
+    id: "audio",
+    label: "Audio",
+    keys: ["audioPreset", "audioRippleAmount", "audioSporeAmount"],
+  },
+  {
     id: "simulation",
     label: "Simulation",
     keys: ["simulationSize", "topology"],

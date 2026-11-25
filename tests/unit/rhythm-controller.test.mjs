@@ -282,40 +282,126 @@ test("global detector settings clamp, preserve defaults and reject invalid input
   assert.equal(controller.setInputGain(Infinity), 0.1);
 });
 
-test("gain and kick thresholds affect live detection without reallocating FFT buffers", () => {
-  const low = configuredController();
-  const high = configuredController();
+test("gain cannot change raw-domain onset detection or replay a held tone", () => {
+  const low = configuredController(),
+    high = configuredController();
   low.controller.setInputGain(0.3);
   high.controller.setInputGain(2);
   low.mock.setTone(55, -24);
   high.mock.setTone(55, -24);
-  const lowLevels = low.controller.update(100);
-  const highLevels = high.controller.update(100);
-  assert.ok(highLevels.bass > lowLevels.bass);
-  assert.ok(highLevels.kickOnset > lowLevels.kickOnset);
-  assert.equal(high.controller.kickHit, true);
-  assert.equal(high.controller.lastKickHitTimestamp, 100);
+  const lo = low.controller.update(100),
+    hi = high.controller.update(100);
+  assert.ok(hi.bass > lo.bass);
+  assert.equal(hi.beatId, lo.beatId);
+  assert.equal(hi.beatStrength, lo.beatStrength);
+  const bytes = high.controller.frequencyData,
+    floats = high.controller.floatFrequencyData;
+  for (let t = 117; t < 3000; t += 17) {
+    high.controller.setInputGain(t % 2 ? 3 : 0.1);
+    assert.equal(high.controller.update(t).beatId, 1);
+  }
+  assert.equal(high.controller.frequencyData, bytes);
+  assert.equal(high.controller.floatFrequencyData, floats);
+});
 
-  for (const setting of ["offset", "gate"]) {
+test("accepted beat ids are unique, refractory and monotonic across reset and sessions", () => {
+  const { controller, mock } = configuredController();
+  mock.setTone(55, -8);
+  assert.equal(controller.update(0).beatId, 1);
+  assert.equal(controller.update(0).beatId, 1);
+  mock.setSilence();
+  controller.update(40);
+  mock.setTone(55, -8);
+  assert.equal(controller.update(100).beatId, 1);
+  mock.setSilence();
+  controller.update(140);
+  mock.setTone(55, -8);
+  const beat = controller.update(180);
+  assert.equal(beat.beatId, 2);
+  assert.equal(beat.onsetTimestamp, 180);
+  const generation = beat.generation;
+  controller.resetAnalysis();
+  assert.ok(controller.getLevels().generation > generation);
+  mock.setSilence();
+  controller.update(200);
+  mock.setTone(55, -8);
+  assert.equal(controller.update(400).beatId, 3);
+});
+
+test("float waveform gating preserves quiet bands, rejects DC and reuses both waveform interfaces", () => {
+  const { controller, mock } = configuredController();
+  let amplitude = 0.001;
+  mock.analyser.getFloatTimeDomainData = (buffer) => {
+    for (let i = 0; i < buffer.length; i++)
+      buffer[i] = amplitude * Math.sin(i * 0.13);
+  };
+  mock.analyser.getByteTimeDomainData = (buffer) => buffer.fill(128);
+  mock.setTone(4000, -35);
+  for (let t = 0; t <= 1000; t += 16) controller.update(t);
+  assert.equal(controller.getLevels().hasSignal, true);
+  assert.ok(controller.getLevels().air > controller.getLevels().body);
+  const floats = controller.floatTimeDomainData,
+    bytes = controller.getTimeDomainData();
+  amplitude = 0;
+  controller.update(1016);
+  assert.equal(controller.getLevels().hasSignal, false);
+  assert.equal(controller.floatTimeDomainData, floats);
+  assert.equal(controller.getTimeDomainData(), bytes);
+  mock.analyser.getFloatTimeDomainData = (buffer) => buffer.fill(0.5);
+  assert.equal(controller.update(1032).hasSignal, false);
+});
+
+test("silence, suspended contexts and hidden-tab gaps decay stale envelopes without false resume kicks", () => {
+  const { controller, mock } = configuredController();
+  mock.setTone(55, -8);
+  controller.update(0);
+  mock.context.state = "suspended";
+  for (let t = 16; t < 500; t += 16) controller.update(t);
+  assert.equal(controller.getLevels().hasSignal, false);
+  assert.ok(controller.getLevels().kick < 0.1);
+  mock.context.state = "running";
+  assert.equal(controller.update(500).beatId, 1);
+  const generation = controller.generation;
+  const resumed = controller.update(5000);
+  assert.ok(resumed.generation > generation);
+  assert.equal(resumed.beatId, 1);
+  mock.setSilence();
+  for (let t = 5016; t < 15000; t += 16) controller.update(t);
+  assert.ok(controller.getLevels().bass < 1e-6);
+  assert.ok(controller.getLevels().activity < 0.002);
+});
+
+test("band envelopes use their individual attack/release constants and activity releases slowly", () => {
+  for (const [key, frequency, attack, release] of [
+    ["bass", 70, 0.05, 0.35],
+    ["body", 500, 0.08, 0.45],
+    ["air", 4000, 0.025, 0.2],
+  ]) {
     const { controller, mock } = configuredController();
-    mock.setTone(55, -24);
-    if (setting === "offset") controller.setKickOffset(0.25);
-    else controller.setKickGate(0.2);
-    assert.equal(controller.update(100).kickOnset, 0);
-    assert.equal(controller.kickHit, false);
-    controller.setKickOffset(0);
-    controller.setKickGate(0);
-    const bytes = controller.frequencyData;
-    const floats = controller.floatFrequencyData;
-    assert.ok(controller.update(117).kickOnset > 0);
-    assert.equal(controller.frequencyData, bytes);
-    assert.equal(controller.floatFrequencyData, floats);
     mock.setSilence();
-    controller.update(217);
-    assert.equal(controller.kickHit, false);
-    controller.resetAnalysis();
-    assert.equal(controller.activityEnvelope, 0);
-    assert.equal(controller.lastKickHitTimestamp, -Infinity);
-    assert.equal(controller.kickOffset, 0);
+    controller.update(0);
+    mock.setTone(frequency, -20);
+    const hit = controller.update(50);
+    const limits = { bass: [28, 160], body: [160, 2000], air: [2000, 12000] };
+    const raw = controller.linearBandRMS(...limits[key]);
+    const floor = Math.min(0.0002, raw * 0.1);
+    const gain = Math.min(
+      12,
+      controller.inputGain / Math.max(0.025, controller.bandPeaks[key] - floor),
+    );
+    const target = Math.sqrt(Math.min(1, (raw - floor) * gain));
+    assert.ok(
+      Math.abs(hit[key] - target * (1 - Math.exp(-0.05 / attack))) < 1e-10,
+      key,
+    );
+    mock.setSilence();
+    const quiet = controller.update(100);
+    assert.ok(
+      Math.abs(quiet[key] - hit[key] * Math.exp(-0.05 / release)) < 1e-10,
+      key,
+    );
+    assert.ok(
+      Math.abs(quiet.activity - hit.activity * Math.exp(-0.05 / 1.5)) < 1e-10,
+    );
   }
 });

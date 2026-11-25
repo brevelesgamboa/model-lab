@@ -477,6 +477,9 @@ uniform float u_radius;
 uniform float u_strength;
 uniform int u_mode;
 uniform vec3 u_dyeColor;
+uniform int u_explicitDye;
+uniform int u_automatic;
+uniform float u_quantizationPhase;
 uniform int u_lockBarrier;
 vec3 rgbToHsv(vec3 c) {
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -499,7 +502,9 @@ void main() {
   delta = delta - round(delta / float(u_size)) * float(u_size);
   float dist = length(delta);
   float weight = 0.0;
-  if (u_mode == 5 || u_mode == 6 || u_mode == 7 || u_mode == 8) {
+  if (u_automatic == 1) {
+    weight = (1.0 - smoothstep(u_radius * 0.35, u_radius, dist)) * clamp(u_strength, 0.0, 1.0);
+  } else if (u_mode == 5 || u_mode == 6 || u_mode == 7 || u_mode == 8) {
     float angle = atan(delta.y, delta.x);
     float rMod = u_radius * (1.0 + 0.22 * cos(3.0 * angle + 1.25) + 0.12 * sin(5.0 * angle));
     if (dist <= rMod) {
@@ -509,7 +514,7 @@ void main() {
   } else if (dist <= u_radius) {
     weight = smoothstep(u_radius, u_radius * 0.35, dist);
   }
-  if (weight < 0.001) {
+  if (weight <= 0.0 || (u_automatic == 0 && weight < 0.001)) {
     out_color = texelFetch(u_state, p, 0);
     return;
   }
@@ -546,8 +551,16 @@ void main() {
         float targetVal = bgHsv.z < 0.5 ? 0.95 : 0.45;
         standoutRgb = hsvToRgb(vec3(targetHue, 0.95, targetVal));
       }
+      if (u_explicitDye == 1) standoutRgb = u_dyeColor;
       vec4 targetState = encodeState(vec4((standoutRgb - 0.5) * 2.0, 1.0));
       out_color = mix(current, targetState, weight);
+      if (u_automatic == 1) {
+        // Unbiased RGBA8 rounding, decorrelated across pixels/channels and time.
+        // Never increase the requested mixing weight just to cross one byte.
+        vec4 seed = vec4(dot(vec2(xy), vec2(12.9898, 78.233))) + vec4(0.0, 17.1, 41.3, 73.5);
+        vec4 threshold = fract(sin(seed) * 43758.5453 + u_quantizationPhase * 0.61803398875);
+        out_color = floor(clamp(out_color, 0.0, 1.0) * 255.0 + threshold) / 255.0;
+      }
     } else {
       out_color = current;
     }
@@ -1269,6 +1282,8 @@ export class TextureNcaRuntime {
           "u_orientMode",
           "u_showBarrier",
           "u_lockBarrier",
+          "u_explicitDye",
+          "u_automatic",
           "u_rippleCount",
           "u_channelView",
           "u_displayFilter",
@@ -1555,7 +1570,9 @@ export class TextureNcaRuntime {
     radius = 8,
     mode = "erase",
     {
-      dyeColor = [0, 0.94, 1],
+      dyeColor,
+      automatic = false,
+      quantizationPhase = 0,
       strokeAngle = 0,
       lockBarrier = true,
       strength = 1.0,
@@ -1638,7 +1655,9 @@ export class TextureNcaRuntime {
       ];
     }
     let modeCode = 0;
-    let effectiveStrength = Number(strength) ?? 1.0;
+    let effectiveStrength = Number.isFinite(Number(strength))
+      ? Math.max(0, Number(strength))
+      : 1.0;
     let effectiveRadius = radius;
     if (mode === "noise") modeCode = 1;
     else if (mode === "dye") modeCode = 2;
@@ -1664,7 +1683,10 @@ export class TextureNcaRuntime {
         u_strength: effectiveStrength,
         u_mode: modeCode,
         u_dyeColor: Array.isArray(dyeColor) ? dyeColor : [0, 0.94, 1],
-        u_lockBarrier: lockBarrier ? 1 : 0,
+        u_explicitDye: Array.isArray(dyeColor) ? 1 : 0,
+        u_automatic: automatic ? 1 : 0,
+        u_quantizationPhase: quantizationPhase % 4096,
+        u_lockBarrier: automatic || lockBarrier ? 1 : 0,
       },
     );
     [this.state, this.nextState] = [this.nextState, this.state];
@@ -1753,7 +1775,9 @@ export class TextureNcaRuntime {
         Math.min(1, (now - r.startTime) / (r.duration * 1000)),
       );
       rippleUniforms[`u_ripple${i}`] = [r.x, r.y, progress, r.radius];
-      rippleUniforms.u_rippleAmps[i] = r.amplitude || 1.2;
+      rippleUniforms.u_rippleAmps[i] = Number.isFinite(r.amplitude)
+        ? r.amplitude
+        : 1.2;
     }
 
     const extent = Math.max(

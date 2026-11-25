@@ -14,9 +14,6 @@ import {
   validateModelDefinition,
 } from "../../assets/js/core/model-contract.js";
 import {
-  detectAudioProfile,
-} from "../../assets/js/models/neural-growth/audio-profiles.js";
-import {
   ResonanceConfig,
   RESONANCE_PRESETS,
 } from "../../assets/js/models/neural-growth/resonance-config.js";
@@ -664,256 +661,28 @@ test("wrong checkpoint identity cannot be presented as an original pattern", asy
   assert.equal(runtimes[0].disposed, false);
 });
 
-test("audio settings retain their schema while beat effects stay paused and manual ripples work", async (context) => {
+test("audio destinations default to zero while manual ripples and inspector remain independent", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
+  assert.equal(params.audioSporeAmount, 0);
+  assert.equal(params.audioRippleAmount, 0);
   await model.render(canvas, params, 0);
-
-  const profileControl = model.controls.find((c) => c.key === "audioProfile");
-  assert.ok(profileControl);
-  assert.equal(profileControl.default, "off");
-  assert.deepEqual(
-    profileControl.options.map((o) => o.value),
-    ["off", "subtle", "continuous", "dynamic", "custom"],
-  );
-  assert.deepEqual(
-    profileControl.options.map((o) => o.label),
-    ["Off", "Subtle", "Continuous", "Dynamic", "Custom"],
-  );
-
-  const shockwaveControl = model.controls.find((c) => c.key === "beatShockwave");
-  assert.ok(shockwaveControl);
-  assert.equal(shockwaveControl.default, "on");
-  assert.deepEqual(
-    shockwaveControl.options.map((o) => o.value),
-    ["off", "on"],
-  );
-
-  const intensityControl = model.controls.find((c) => c.key === "shockwaveIntensity");
-  assert.ok(intensityControl);
-  assert.equal(intensityControl.default, 0.30);
-  assert.equal(intensityControl.min, 0.0);
-  assert.equal(intensityControl.max, 1.0);
-
-  // Removed legacy controls and discrete kick pruning/infusion
-  assert.equal(model.controls.find((c) => c.key === "quietPruning"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "kickPruning"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "kickInfusion"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "kickInfusionStrength"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "shockwaveReach"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "shockwaveStyle"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "shockwaveImpact"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "shading"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "reliefStrength"), undefined);
-  assert.equal(model.controls.find((c) => c.key === "lightAngle"), undefined);
-
-  const kickInputControl = model.controls.find((c) => c.key === "kickInputMode");
-  assert.equal(kickInputControl, undefined);
-
-  const channelControl = model.controls.find((c) => c.key === "channelView");
-  assert.ok(channelControl);
-  assert.equal(channelControl.default, "phenotype");
-  assert.deepEqual(
-    channelControl.options.map((o) => o.value),
-    [
-      "phenotype",
-      "vitality",
-      "fast_signals",
-      "memory_waves",
-      "energy_heat",
-      "xray",
-    ],
-  );
-
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "continuous"), null);
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "dynamic"), null);
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "subtle"), null);
-  assert.equal(model.parameterDefaultsForChange("audioProfile", "off"), null);
-
-  // Backward compatibility: legacy saved ambient and rhythm runs reopen as custom
-  assert.equal(model.normalizeStoredParameter("audioProfile", "ambient"), "custom");
-  assert.equal(model.normalizeStoredParameter("audioProfile", "rhythm"), "custom");
-  assert.equal(model.normalizeStoredParameter("audioProfile", "subtle"), "subtle");
-  assert.equal(model.normalizeStoredParameter("audioProfile", "continuous"), "continuous");
-  assert.equal(model.normalizeStoredParameter("beatShockwave", "center"), "on");
-  assert.equal(model.normalizeStoredParameter("beatShockwave", "off"), "off");
-  assert.equal(model.normalizeStoredParameter("shockwaveIntensity", 0.45), 0.45);
-  assert.equal(model.normalizeStoredParameter("channelView", "invalid"), "phenotype");
-  assert.equal(model.normalizeStoredParameter("channelView", "fast_signals"), "fast_signals");
-
-  assert.equal(detectAudioProfile({}), "off");
-
-  // Subtle route detection
-  const subtleRoutes = {
-    rotation: { source: "kick", depth: 0.20 },
-    twist: { source: "kick", depth: 0.01 },
-  };
-  assert.equal(detectAudioProfile(subtleRoutes), "subtle");
-
-  // Continuous route detection
-  const continuousRoutes = {
-    rotation: { source: "kick", depth: 0.05 },
-    twist: { source: "kick", depth: 0.05 },
-  };
-  assert.equal(detectAudioProfile(continuousRoutes), "continuous");
-
-  // Dynamic route detection
-  const dynamicRoutes = {
-    rotation: { source: "kick", depth: 0.10 },
-    twist: { source: "kick", depth: 0.06 },
-  };
-  assert.equal(detectAudioProfile(dynamicRoutes), "dynamic");
-
-  // Custom route detection
-  assert.equal(
-    detectAudioProfile({
-      rotation: { source: "kick", depth: 0.8 },
-    }),
-    "custom",
-  );
-
-  // Composite preset recognition with base values and LFOs
-  const subtleBase = {
-    growthSpeed: 60,
-    rotation: 185,
-    twist: 0,
-    coordinateTransform: "cartesian",
-    resonanceMode: "subtle",
-    beatShockwave: "on",
-    shockwaveIntensity: 0.25,
-  };
-  const subtleLfos = {
-    rotation: { enabled: false, rate: 0.05, depth: 0.80, phase: 0 },
-    twist: { enabled: true, rate: 0.04, depth: 0.72, phase: 0, waveform: "sine" },
-  };
-  assert.equal(
-    detectAudioProfile({
-      matrix: subtleRoutes,
-      parameters: subtleBase,
-      lfoState: subtleLfos,
-    }),
-    "subtle",
-  );
-
-  // Editing base values switches selection to custom
-  assert.equal(
-    detectAudioProfile({
-      matrix: subtleRoutes,
-      parameters: { ...subtleBase, rotation: 200 },
-      lfoState: subtleLfos,
-    }),
-    "custom",
-  );
-
-  // Editing LFO settings switches selection to custom
-  assert.equal(
-    detectAudioProfile({
-      matrix: subtleRoutes,
-      parameters: subtleBase,
-      lfoState: {
-        ...subtleLfos,
-        twist: { enabled: false },
-      },
-    }),
-    "custom",
-  );
-
-  // Continuous with Cartesian geometry fails recognition (must be vortex or other non-cartesian)
-  const continuousBase = {
-    growthSpeed: 100,
-    rotation: 180,
-    twist: 0,
-    coordinateTransform: "cartesian",
-    resonanceMode: "subtle",
-    beatShockwave: "on",
-    shockwaveIntensity: 0.35,
-  };
-  const continuousLfos = {
-    rotation: { enabled: true, rate: 0.05, depth: 1.00, phase: 0.50, waveform: "sine" },
-    twist: { enabled: true, rate: 0.01, depth: 0.50, phase: 0, waveform: "sine" },
-  };
-  assert.equal(
-    detectAudioProfile({
-      matrix: continuousRoutes,
-      parameters: continuousBase,
-      lfoState: continuousLfos,
-    }),
-    "custom",
-  );
-  assert.equal(
-    detectAudioProfile({
-      matrix: continuousRoutes,
-      parameters: { ...continuousBase, coordinateTransform: "vortex" },
-      lfoState: continuousLfos,
-    }),
-    "continuous",
-  );
-
-  // Dynamic composite preset recognition
-  const dynamicBase = {
-    growthSpeed: 45,
-    rotation: 180,
-    twist: 0,
-    coordinateTransform: "vortex",
-    resonanceMode: "full",
-    beatShockwave: "on",
-    shockwaveIntensity: 0.50,
-  };
-  const dynamicLfos = {
-    rotation: { enabled: true, rate: 0.05, depth: 1.00, calmDepth: 0.12, phase: 0.50, waveform: "sine" },
-    twist: { enabled: true, rate: 0.015, depth: 0.60, calmDepth: 0.08, phase: 0, waveform: "sine" },
-  };
-  assert.equal(
-    detectAudioProfile({
-      matrix: dynamicRoutes,
-      parameters: dynamicBase,
-      lfoState: dynamicLfos,
-    }),
-    "dynamic",
-  );
-  assert.equal(
-    detectAudioProfile({
-      matrix: dynamicRoutes,
-      parameters: { ...dynamicBase, growthSpeed: 60 },
-      lfoState: dynamicLfos,
-    }),
-    "custom",
-  );
-
-  // Legacy values and direct calls cannot re-enable the paused beat effect.
-  assert.equal(model.triggerBeatShockwave("off"), false);
-  assert.equal(model.triggerBeatShockwave("on"), false);
-  assert.equal(model.triggerBeatShockwave("on", { x: 30, y: 40 }), false);
-  assert.equal(model.triggerKickInput(1, 1000), false);
-  assert.equal(model.hasActiveRipples, false);
-  assert.equal(model._queuedDisturbances.length, 0);
-
-  // The direct brush ripple stays independent of audio.
-  assert.equal(model.triggerRipple(30, 40, 16), true);
-  const pointerPulse = model._activeRipples[0];
-  assert.equal(pointerPulse.x, 30);
-  assert.equal(pointerPulse.y, 40);
-
-  // Step advances without adding cell disturbances
-  model.step();
-  assert.equal(runtimes[0].disturbances.length, 0);
-
-  // Keep the stored intensity without letting it activate the effect.
-  model.onParameterChange("shockwaveIntensity", 0.65);
-  assert.equal(model.parameters.shockwaveIntensity, 0.65);
-  assert.equal(model.triggerBeatShockwave("on"), false);
-
-  await model.render(canvas, model.parameters, 0.1, { advanceSimulation: true });
-  assert.equal(runtimes[0].lastDrawOptions.channelView, "phenotype");
-  assert.equal(runtimes[0].lastDrawOptions.displayFilter, "smooth");
-
+  assert.equal(model.triggerRipple(0, 0, 16, 0), true);
+  assert.equal(model._activeRipples[0].x, 0);
+  assert.equal(model._activeRipples[0].y, 0);
+  assert.equal(model._activeRipples[0].radius, 16);
+  assert.equal(model._activeRipples[0].amplitude, 0);
+  for (let i = 0; i < 3; i++) model.triggerRipple(i, i, 16);
+  assert.equal(model.triggerRipple(20, 20, 16, 1, {automatic: true}), false);
+  model._activeRipples[1].automatic = true;
+  model.triggerRipple(8, 9, 16);
+  assert.equal(model._activeRipples.length, 4);
+  assert.equal(model._activeRipples.some((r) => r.automatic), false);
   model.onParameterChange("channelView", "fast_signals");
-  await model.render(canvas, model.parameters, 0.2, { advanceSimulation: true });
+  await model.render(canvas, model.parameters, 0.2);
   assert.equal(runtimes[0].lastDrawOptions.channelView, "fast_signals");
-
   model.queueDisturbance(20, 20, 10, "invert");
   model.step();
-  const distModes = runtimes[0].disturbances.map((d) => d[3]);
-  assert.equal(distModes[distModes.length - 1], "invert");
+  assert.equal(runtimes[0].disturbances.at(-1)[3], "invert");
 });
 
 test("simulationSize options and normalization adapt dynamically to hardware capabilities", () => {
@@ -1591,135 +1360,41 @@ test("temporal echoes configure controls, normalize values, and update dynamics"
   );
 });
 
-test("acoustic field injection configures controls, normalizes values and dispatches disturbances", () => {
-  const model = new NeuralGrowthModel();
-
-  // Control definitions
-  const injectCtrl = model.controls.find((c) => c.key === "acousticInjection");
-  assert.ok(injectCtrl && Array.isArray(injectCtrl.options));
-  assert.equal(injectCtrl.default, "off");
-
-  const threshCtrl = model.controls.find((c) => c.key === "acousticThreshold");
-  assert.ok(threshCtrl && threshCtrl.modulatable);
-  assert.equal(threshCtrl.default, 0.45);
-
-  const posCtrl = model.controls.find((c) => c.key === "acousticPosition");
-  assert.ok(posCtrl && Array.isArray(posCtrl.options));
-  assert.equal(posCtrl.default, "curve_peaks");
-
-  // Normalization
-  assert.equal(
-    model.normalizeStoredParameter("acousticInjection", "dye"),
-    "dye",
-  );
-  assert.equal(
-    model.normalizeStoredParameter("acousticInjection", "shockwave"),
-    "shockwave",
-  );
-  assert.equal(
-    model.normalizeStoredParameter("acousticInjection", "invalid"),
-    "off",
-  );
-  assert.equal(model.normalizeStoredParameter("acousticThreshold", 0.65), 0.65);
-  assert.equal(model.normalizeStoredParameter("acousticThreshold", 10.0), 0.8);
-  assert.equal(
-    model.normalizeStoredParameter("acousticPosition", "baseline"),
-    "baseline",
-  );
-  assert.equal(
-    model.normalizeStoredParameter("acousticPosition", "invalid"),
-    "curve_peaks",
-  );
-
-  // Parameter changes
-  assert.equal(model.onParameterChange("acousticInjection", "dye"), true);
-  assert.equal(model.parameters.acousticInjection, "dye");
-  assert.equal(model.onParameterChange("acousticThreshold", 0.3), true);
-  assert.equal(model.parameters.acousticThreshold, 0.3);
-  assert.equal(model.onParameterChange("acousticPosition", "baseline"), true);
-  assert.equal(model.parameters.acousticPosition, "baseline");
-
-  const rhythm = {
-    analyser: { fftSize: 2048 },
-    context: { sampleRate: 48000 },
-  };
-  const spectrum = new Uint8Array(1024).fill(0);
-  for (let i = 0; i < 30; i += 1) spectrum[i] = 250;
-
-  // With ready = false (initial uninitialized state): returns 0 cleanly
-  assert.equal(
-    model.processAcousticInjection(
-      spectrum,
-      { hasSignal: true },
-      1000,
-      rhythm,
-    ),
-    0,
-  );
-});
-
-test("camera breathing retains saved settings but does not move the viewport", () => {
-  const model = new NeuralGrowthModel();
-
-  // Controls
-  const breathCtrl = model.controls.find((c) => c.key === "cameraBreathing");
-  assert.ok(breathCtrl && Array.isArray(breathCtrl.options));
-  assert.equal(breathCtrl.default, "off");
-
-  const reactCtrl = model.controls.find((c) => c.key === "cameraReactivity");
-  assert.ok(reactCtrl && reactCtrl.modulatable);
-  assert.equal(reactCtrl.default, 0.50);
-
-  // Normalization
-  assert.equal(model.normalizeStoredParameter("cameraBreathing", "punchy"), "punchy");
-  assert.equal(model.normalizeStoredParameter("cameraBreathing", "invalid"), "off");
-  assert.equal(model.normalizeStoredParameter("cameraReactivity", 0.75), 0.75);
-  assert.equal(model.normalizeStoredParameter("cameraReactivity", 5.0), 1.0);
-  assert.equal(model.normalizeStoredParameter("cameraReactivity", -1.0), 0.1);
-
-  // Parameter change
-  assert.equal(model.onParameterChange("cameraBreathing", "punchy"), true);
-  assert.equal(model.parameters.cameraBreathing, "punchy");
-  assert.equal(model.onParameterChange("cameraReactivity", 0.8), true);
-  assert.equal(model.parameters.cameraReactivity, 0.8);
-
-  // Camera motion update
-  model._parameters = { ...model.parameters, zoom: 2 };
-  Object.defineProperty(model, "ready", { value: true, configurable: true });
-  const moving = model.processCameraMotion({ hasSignal: true, kickOnset: 0.9, bass: 0.5 }, 1000);
-  assert.equal(moving, false);
-  assert.equal(model.effectiveZoom, 2);
-  assert.deepEqual(model.effectivePan, [0, 0]);
-});
-
-test("restored audio effects cannot inject state or override manual zoom", async (context) => {
+test("retired audio settings are dropped without enabling new effects or moving the viewport", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);
-  const restored = {
-    ...params, audioProfile: "dynamic", beatShockwave: "on",
-    acousticInjection: "dye", cameraBreathing: "punchy", zoom: 2,
-  };
+  const retired = { audioProfile: "dynamic", beatShockwave: "on", shockwaveIntensity: 1, acousticInjection: "dye", acousticThreshold: .2, acousticPosition: "center", cameraBreathing: "punchy", cameraReactivity: 1 };
+  const restored = sanitizeParameters(model, { ...params, ...retired, zoom: 2 });
+  for (const key of Object.keys(retired)) assert.equal(Object.hasOwn(restored, key), false, key);
+  assert.equal(restored.audioSporeAmount, 0);
+  assert.equal(restored.audioRippleAmount, 0);
   await model.render(canvas, restored, 0);
-  const snapshot = { ...model.parameters };
-  model._acousticEmitter = { process() { throw new Error("Coupling must stay paused"); } };
-  model._cameraMotion.update = () => { throw new Error("Camera must stay paused"); };
-  model._effectiveZoom = 7;
-  model._effectivePan = [0.5, 0.5];
-  const levels = { hasSignal: true, kickOnset: 1, kick: 1, bass: 1 };
-  assert.equal(model.processAcousticInjection(new Uint8Array(512).fill(255), levels, 1000), 0);
-  assert.equal(model.processCameraMotion(levels, 1000), false);
-  assert.equal(model.triggerBeatShockwave("on"), false);
-  assert.equal(model.triggerKickInput(1, 1000), false);
-  await model.render(canvas, restored, 0.1);
-  assert.deepEqual(model.parameters, snapshot);
+  assert.equal(model.effectiveZoom, 2);
+  assert.deepEqual(model.effectivePan, [0,0]);
   assert.deepEqual(runtimes[0].disturbances, []);
-  assert.equal(runtimes[0].lastDrawOptions.zoom, 2);
-  assert.deepEqual(runtimes[0].lastDrawOptions.pan, [0, 0]);
-  assert.equal(model.hasActiveRipples, false);
 });
 
-
-
-
+test("audio spores drain only on clocked simulation renders and yield to manual interaction", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, {...params, rotation: 10.125, palettePhase: 12.25}, 0);
+  assert.equal(model.parameters.rotation, 10.125);
+  assert.equal(model.parameters.palettePhase, 12.25);
+  model.setClockRunning(true);
+  const now = performance.now();
+  const levels = {generation: 1, beatId: 1, hasSignal: true, beatStrength: 1, onsetTimestamp: now};
+  const amounts = {...params, audioSporeAmount: .08, audioRippleAmount: 1};
+  model.onAudioFrame(levels, now, amounts);
+  model.onAudioFrame({...levels, beatId: 2, onsetTimestamp: now + 10}, now + 10, amounts);
+  assert.equal(model._audioResponse.active.length, 1);
+  await model.render(canvas, params, .1);
+  assert.equal(runtimes[0].disturbances.length, 0);
+  model.notePointerInteraction(true);
+  assert.equal(model._audioResponse.active.length, 0);
+  model.notePointerInteraction(false);
+  model.onAudioFrame({...levels, beatId: 3, onsetTimestamp: now + 20}, now + 20, amounts);
+  assert.equal(model._audioResponse.active.length, 0);
+  model.setClockRunning(false);
+  assert.equal(model._activeRipples.length, 0);
+});
 
 test("legacy guidance parameters are ignored while pure NCA state and temporal controls remain usable", async (context) => {
   const { model, params, canvas, runtimes } = setup(context);

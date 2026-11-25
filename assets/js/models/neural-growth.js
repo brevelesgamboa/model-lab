@@ -8,21 +8,11 @@ import {
   PATTERNS,
   getPattern,
 } from "./neural-growth/patterns.js";
-import { NEURAL_GROWTH_AUDIO_EFFECTS } from "./neural-growth/audio-effects.js";
+import { AudioResponse, AUDIO_PRESETS } from "./neural-growth/audio-response.js";
 import {
   ResonanceConfig,
   RESONANCE_PRESETS,
 } from "./neural-growth/resonance-config.js";
-import {
-  AcousticEmitter,
-  ACOUSTIC_INJECTION_MODES,
-  ACOUSTIC_POSITION_MODES,
-} from "./neural-growth/acoustic-emitter.js";
-import {
-  CameraMotionEngine,
-  CAMERA_BREATHING_MODES,
-} from "./neural-growth/camera-motion.js";
-
 const STILL_PAN = Object.freeze([0, 0]);
 
 async function loadCheckpoint(signal, pattern) {
@@ -90,15 +80,9 @@ export class NeuralGrowthModel {
     this._lastTick = null;
     this._accumulator = 0;
     this._queuedDisturbances = [];
-    this._lastKickInputTime = 0;
-    this._kickInputBudget = 0;
-    this._kickInputIndex = 0;
+    this._audioResponse = new AudioResponse();
     this._palettePhaseAccumulator = 0.0;
     this._lastPaletteTime = null;
-    this._acousticEmitter = null;
-    this._cameraMotion = new CameraMotionEngine();
-    this._effectiveZoom = 1.0;
-    this._effectivePan = [0.0, 0.0];
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
@@ -106,16 +90,10 @@ export class NeuralGrowthModel {
   }
 
   get effectiveZoom() {
-    return NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath
-      ? this._effectiveZoom
-      : Number(this._parameters.zoom) || 1;
+    return Number(this._parameters.zoom) || 1;
   }
 
-  get effectivePan() {
-    return NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath
-      ? this._effectivePan
-      : STILL_PAN;
-  }
+  get effectivePan() { return STILL_PAN; }
 
   _simulationSizeOptions() {
     const maxTex = this._capabilities?.maxTextureSize ?? 0;
@@ -833,148 +811,32 @@ export class NeuralGrowthModel {
         },
       },
       {
-        key: "audioProfile",
-        label: "AUDIO REACT",
+        key: "audioPreset",
+        label: "AUDIO PRESET",
         type: "select",
         default: "off",
-        options: [
-          { value: "off", label: "Off" },
-          { value: "subtle", label: "Subtle" },
-          { value: "continuous", label: "Continuous" },
-          { value: "dynamic", label: "Dynamic" },
-          { value: "custom", label: "Custom" },
-        ],
-        help: "Audio-reactive presets configuring base parameters, modulation routes, and LFOs. Fully editable in parameter MOD panels.",
+        options: AUDIO_PRESETS.map(({ value, label }) => ({ value, label })),
+        help: "Adds audio routes without changing base values, LFOs, or your own routes. Off removes only preset-owned routes.",
       },
       {
-        key: "beatShockwave",
-        label: "BEAT SHOCKWAVE",
-        type: "select",
-        default: "on",
-        options: [
-          { value: "off", label: "Off" },
-          { value: "on", label: "On" },
-        ],
-        help: "Audio kick-driven optical water ripple on accepted beats.",
-      },
-      {
-        key: "shockwaveIntensity",
-        label: "SHOCKWAVE INTENSITY",
+        key: "audioRippleAmount",
+        label: "AUDIO RIPPLE",
         type: "range",
-        min: 0.0,
-        max: 1.0,
-        step: 0.05,
-        default: 0.30,
-        help: "Optical refraction depth for kick beat shockwaves.",
+        min: 0,
+        max: 1.5,
+        step: 0.01,
+        default: 0,
+        help: "Optical ripple amplitude on accepted kicks. No cellular changes. Choose a source in MOD to follow audio.",
       },
       {
-        key: "acousticInjection",
-        label: "AUDIO COUPLING",
-        type: "select",
-        default: "off",
-        options: [
-          {
-            value: "off",
-            label: "Off",
-            guidance: "Audio coupling disabled. Visualizer acts as display overlay.",
-          },
-          {
-            value: "dye",
-            label: "Dye (Color)",
-            guidance: "Frequencies inject soft watercolor pigments (cyan bass, emerald mids, magenta treble).",
-          },
-          {
-            value: "shockwave",
-            label: "Ripple",
-            guidance: "Transients emit expanding physical wavefronts that ripple through the cellular texture.",
-          },
-          {
-            value: "sprout",
-            label: "Sprout (Growth)",
-            guidance: "Transients awaken dormant cells and gently sprout fresh growth branches.",
-          },
-          {
-            value: "flow",
-            label: "Flow",
-            guidance: "Frequency energy pushes directional currents into cell hidden channels.",
-          },
-        ],
-        help: "Audio wave injects frequency-mapped physical disturbances directly into the cellular automata grid.",
-      },
-      {
-        key: "acousticThreshold",
-        label: "AUDIO SENSITIVITY",
+        key: "audioSporeAmount",
+        label: "AUDIO SPORES",
         type: "range",
-        min: 0.20,
-        max: 0.80,
-        step: 0.05,
-        default: 0.45,
-        modulatable: true,
-        help: "Audio transient onset sensitivity required to trigger an injection.",
-      },
-      {
-        key: "acousticPosition",
-        label: "AUDIO ORIGIN",
-        type: "select",
-        default: "curve_peaks",
-        options: [
-          {
-            value: "curve_peaks",
-            label: "Wave Peaks",
-            guidance: "Injections originate directly from the dynamic crests of the waveform.",
-          },
-          {
-            value: "baseline",
-            label: "Center Line",
-            guidance: "Injections originate along the horizontal center line.",
-          },
-          {
-            value: "center",
-            label: "Focal Center",
-            guidance: "Injections radiate outward from the active focal center.",
-          },
-        ],
-        help: "Spatial origin of audio disturbances across the simulation canvas.",
-      },
-      {
-        key: "cameraBreathing",
-        label: "CAMERA BREATH",
-        type: "select",
-        default: "off",
-        options: [
-          {
-            value: "off",
-            label: "Off",
-            guidance: "Camera stays fixed at manual zoom.",
-          },
-          {
-            value: "subtle",
-            label: "Subtle",
-            guidance: "Gentle kick accents with smooth recovery.",
-          },
-          {
-            value: "punchy",
-            label: "Punchy",
-            guidance: "Rhythmic zoom bounces and beat pulses.",
-          },
-          {
-            value: "drift",
-            label: "Drift & Breathe",
-            guidance: "Deep bass breathing combined with slow harmonic drift.",
-          },
-        ],
-        help: "Couples live audio to the camera viewport via optical zoom pulses and harmonic drift.",
-      },
-      {
-        key: "cameraReactivity",
-        label: "BREATH STRENGTH",
-        type: "range",
-        min: 0.10,
-        max: 1.00,
-        step: 0.05,
-        default: 0.50,
-        modulatable: true,
-        help: "Sensitivity scaling for audio-reactive camera zoom pulses and breathing.",
+        min: 0,
+        max: 0.08,
+        step: 0.001,
+        default: 0,
+        help: "Gentle cellular color mixing on accepted kicks; yields to manual brushes. Total mixing stays below 0.08 per second.",
       },
       {
         key: "brushRadius",
@@ -1498,10 +1360,7 @@ export class NeuralGrowthModel {
       ((this._clockRunning && Number(parameters.growthSpeed) > 0) ||
         this.hasActiveRipples ||
         Math.abs(Number(parameters?.paletteCycleSpeed || 0)) > 0.001 ||
-        Number(parameters?.echoDecay || 0) > 0.01 ||
-        (NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath &&
-          parameters?.cameraBreathing !== "off" &&
-          Boolean(this._cameraMotion?.isMoving)))
+        Number(parameters?.echoDecay || 0) > 0.01)
     );
   }
 
@@ -1510,6 +1369,7 @@ export class NeuralGrowthModel {
   }
 
   setClockRunning(running) {
+    if (!running) this.cancelAudio();
     if (this._clockRunning !== Boolean(running)) {
       this._lastTick = null;
       this._accumulator = 0;
@@ -1523,9 +1383,7 @@ export class NeuralGrowthModel {
     this._abort = null;
     this._loadingPattern = false;
     this._queuedDisturbances = [];
-    this._lastKickInputTime = 0;
-    this._kickInputBudget = 0;
-    this._kickInputIndex = 0;
+    this.cancelAudio();
     this.setClockRunning(false);
   }
 
@@ -1598,49 +1456,26 @@ export class NeuralGrowthModel {
     });
   }
 
+  migrateStoredParameters(stored) {
+    if (!stored || typeof stored !== "object") return stored;
+    const next = { ...stored };
+    // These keys never imply new routes or destinations. In particular the old
+    // dynamic profile cannot opt a saved field into cellular audio injection.
+    for (const key of [
+      "audioProfile",
+      "beatShockwave",
+      "shockwaveIntensity",
+      "acousticInjection",
+      "acousticThreshold",
+      "acousticPosition",
+      "cameraBreathing",
+      "cameraReactivity",
+    ])
+      delete next[key];
+    return next;
+  }
+
   normalizeStoredParameter(key, value) {
-    if (key === "audioProfile") {
-      if (value === "ambient" || value === "rhythm") {
-        return "custom";
-      }
-    }
-    if (key === "beatShockwave") {
-      if (value === "off") return "off";
-      return "on";
-    }
-    if (key === "shockwaveIntensity") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.0, Math.min(1.0, num));
-      }
-      return 0.30;
-    }
-    if (key === "acousticInjection") {
-      if (ACOUSTIC_INJECTION_MODES.includes(value)) return value;
-      return "off";
-    }
-    if (key === "acousticThreshold") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.20, Math.min(0.80, num));
-      }
-      return 0.45;
-    }
-    if (key === "acousticPosition") {
-      if (ACOUSTIC_POSITION_MODES.includes(value)) return value;
-      return "curve_peaks";
-    }
-    if (key === "cameraBreathing") {
-      if (CAMERA_BREATHING_MODES.includes(value)) return value;
-      return "off";
-    }
-    if (key === "cameraReactivity") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.10, Math.min(1.00, num));
-      }
-      return 0.50;
-    }
     if (key === "channelView") {
       const valid = [
         "phenotype",
@@ -1768,7 +1603,7 @@ export class NeuralGrowthModel {
     if (key === "palettePhase") {
       const num = Number(value);
       if (Number.isFinite(num)) {
-        return ((Math.round(num) % 360) + 360) % 360;
+        return ((num % 360) + 360) % 360;
       }
       return 0;
     }
@@ -1840,14 +1675,9 @@ export class NeuralGrowthModel {
       key === "geometryCenterY" ||
       key === "geometrySoftness" ||
       key === "barrierLock" ||
-      key === "audioProfile" ||
-      key === "beatShockwave" ||
-      key === "shockwaveIntensity" ||
-      key === "acousticInjection" ||
-      key === "acousticThreshold" ||
-      key === "acousticPosition" ||
-      key === "cameraBreathing" ||
-      key === "cameraReactivity" ||
+      key === "audioPreset" ||
+      key === "audioRippleAmount" ||
+      key === "audioSporeAmount" ||
       key === "channelView" ||
       key === "displayFilter" ||
       key === "brushRadius" ||
@@ -1893,7 +1723,7 @@ export class NeuralGrowthModel {
   }
 
   render(canvas, parameters, timeSeconds, { advanceSimulation = false } = {}) {
-    const sanitized = sanitizeParameters(this, parameters);
+    const sanitized = sanitizeParameters(this, parameters, { continuous: true });
     this.onParameterChange("pattern", sanitized.pattern);
     const epoch = this._epoch;
     const task = this._render(
@@ -2035,6 +1865,8 @@ export class NeuralGrowthModel {
       runtimeOperation = true;
       this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
+        this._audioResponse.step(performance.now(), this.simulationSize,
+          (...args) => this._runtime.disturb(...args), hexToRgb(parameters.dyeColor || "#00f0ff"));
         if (this._lastTick !== null) {
           const delta = Math.max(0, timeSeconds - this._lastTick);
           const speed = Math.max(0, Number(parameters.growthSpeed) || 0);
@@ -2084,10 +1916,7 @@ export class NeuralGrowthModel {
           (r) => now - r.startTime < r.duration * 1000,
         );
       }
-      const effectiveZoom =
-        NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath && this._effectiveZoom > 0
-          ? this._effectiveZoom
-          : parameters.zoom;
+      const effectiveZoom = parameters.zoom;
       this._runtime.draw(canvas, {
         palette: parameters.palette,
         palettePhase: effectivePhaseRad,
@@ -2180,9 +2009,7 @@ export class NeuralGrowthModel {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
     this._queuedDisturbances = [];
-    this._lastKickInputTime = 0;
-    this._kickInputBudget = 0;
-    this._kickInputIndex = 0;
+    this.cancelAudio();
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -2208,6 +2035,7 @@ export class NeuralGrowthModel {
   ) {
     if (!this.ready) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    this._audioResponse.interact(this._audioResponse.pointerDown, performance.now());
     const size = this.simulationSize;
     const clampedX = Math.max(0, Math.min(size - 1, Math.round(x)));
     const clampedY = Math.max(0, Math.min(size - 1, Math.round(y)));
@@ -2324,195 +2152,85 @@ export class NeuralGrowthModel {
     }
   }
 
-  triggerRipple(x, y, _customRadius = null, maxAmplitude = null) {
+  cancelAudio() {
+    this._audioResponse.cancel();
+    this._activeRipples =
+      this._activeRipples?.filter((r) => !r.automatic) || [];
+  }
+
+  notePointerInteraction(down, timestamp = performance.now()) {
+    this._audioResponse.interact(down, timestamp);
+  }
+
+  onAudioFrame(levels, timestamp, parameters, enabled = true) {
+    const event = this._audioResponse.update(
+      levels,
+      timestamp,
+      parameters,
+      enabled && this.ready && this._clockRunning,
+    );
+    if (!enabled || !levels?.hasSignal || !this._clockRunning)
+      this.cancelAudio();
+    if (event)
+      this.triggerRipple(
+        event.x * this.simulationSize,
+        event.y * this.simulationSize,
+        null,
+        event.ripple,
+        { automatic: true },
+      );
+  }
+
+  triggerRipple(
+    x,
+    y,
+    customRadius = null,
+    maxAmplitude = null,
+    { automatic = false } = {},
+  ) {
     if (!this.ready) return false;
     const size = this.simulationSize;
-    const originX = Math.max(
-      0,
-      Math.min(size - 1, Math.round(Number(x) || Math.floor(size / 2))),
-    );
-    const originY = Math.max(
-      0,
-      Math.min(size - 1, Math.round(Number(y) || Math.floor(size / 2))),
-    );
-    const d1 = Math.hypot(originX, originY);
-    const d2 = Math.hypot(size - originX, originY);
-    const d3 = Math.hypot(originX, size - originY);
-    const d4 = Math.hypot(size - originX, size - originY);
-    const radius = Math.ceil(Math.max(d1, d2, d3, d4));
-    const amp =
+    const coordinate = (value) =>
+      Math.max(
+        0,
+        Math.min(
+          size - 1,
+          Math.round(
+            Number.isFinite(Number(value)) && value !== null
+              ? Number(value)
+              : size / 2,
+          ),
+        ),
+      );
+    const radius =
+      customRadius !== null && Number.isFinite(Number(customRadius))
+        ? Math.max(0, Math.min(size / Math.sqrt(2), Number(customRadius)))
+        : size / Math.sqrt(2);
+    const amplitude =
       maxAmplitude !== null && Number.isFinite(Number(maxAmplitude))
-        ? Number(maxAmplitude)
+        ? Math.max(0, Math.min(1.5, Number(maxAmplitude)))
         : Math.min(1.5, Math.max(0.8, radius * 0.015));
-    const ripple = {
-      x: originX,
-      y: originY,
+    this._activeRipples = this._activeRipples || [];
+    // Automatic events never evict a manual ripple.
+    if (this._activeRipples.length >= 4) {
+      const audioIndex = this._activeRipples.findIndex((r) => r.automatic);
+      if (automatic && audioIndex < 0) return false;
+      this._activeRipples.splice(audioIndex >= 0 ? audioIndex : 0, 1);
+    }
+    this._activeRipples.push({
+      x: coordinate(x),
+      y: coordinate(y),
       radius,
-      amplitude: amp,
+      amplitude,
+      automatic,
       startTime: performance.now(),
       duration: 0.55,
-    };
-    if (!this._activeRipples) this._activeRipples = [];
-    this._activeRipples.push(ripple);
-    if (this._activeRipples.length > 4) {
-      this._activeRipples.shift();
-    }
-    return true;
-  }
-
-  triggerBeatShockwave(
-    mode = this._parameters.beatShockwave,
-    coords = null,
-    customRadius = null,
-  ) {
-    if (!NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave) return false;
-    if (!this.ready || !mode || mode === "off") return false;
-    const currentEnabled = this._parameters?.beatShockwave || "on";
-    if (currentEnabled === "off" && mode !== "on" && mode !== "center") return false;
-    const size = this.simulationSize;
-    let x = Math.floor(size / 2);
-    let y = Math.floor(size / 2);
-    if (
-      coords &&
-      Number.isFinite(coords.x) &&
-      Number.isFinite(coords.y)
-    ) {
-      x = coords.x;
-      y = coords.y;
-    }
-    const d1 = Math.hypot(x, y);
-    const d2 = Math.hypot(size - x, y);
-    const d3 = Math.hypot(x, size - y);
-    const d4 = Math.hypot(size - x, size - y);
-    const radius = customRadius ? Math.round(customRadius) : Math.ceil(Math.max(d1, d2, d3, d4));
-    const intensity = Number(this._parameters?.shockwaveIntensity ?? 0.30);
-    this.triggerRipple(x, y, radius, intensity);
-    return true;
-  }
-
-  processAcousticInjection(
-    spectrum,
-    levels,
-    timestamp,
-    rhythmController = null,
-  ) {
-    if (!NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling) return 0;
-    if (!this.ready || !this._parameters) return 0;
-    const mode = this._parameters.acousticInjection || "off";
-    if (mode === "off" || !levels?.hasSignal) return 0;
-
-    if (!this._acousticEmitter) {
-      this._acousticEmitter = new AcousticEmitter();
-    }
-
-    const count = this._acousticEmitter.process(spectrum, levels, timestamp, {
-      mode,
-      threshold: Number(this._parameters.acousticThreshold ?? 0.45),
-      position: this._parameters.acousticPosition || "curve_peaks",
-      simulationSize: this.simulationSize,
-      geometryCenter: [
-        Number(this._parameters.geometryCenterX) || 0,
-        Number(this._parameters.geometryCenterY) || 0,
-      ],
-      brushRadius: Number(this._parameters.brushRadius) || 16,
-      rhythmController,
-      queueDisturbance: (x, y, radius, distMode, opts) => {
-        this.queueDisturbance(x, y, radius, distMode, opts);
-      },
     });
-
-    return count;
-  }
-
-  processCameraMotion(levels, timestamp) {
-    if (!NEURAL_GROWTH_AUDIO_EFFECTS.cameraBreath) return false;
-    if (!this.ready || !this._parameters) return false;
-    if (!this._cameraMotion) {
-      this._cameraMotion = new CameraMotionEngine();
-    }
-    const motion = this._cameraMotion.update(levels, timestamp, this._parameters);
-    const baseZoom = Number(this._parameters.zoom) || 1;
-    this._effectiveZoom = Math.max(
-      1,
-      Math.min(8, baseZoom * (1.0 + motion.zoomOffset)),
-    );
-    this._effectivePan = [motion.panX, motion.panY];
-    return motion.isMoving;
-  }
-
-  triggerKickInput(strength = 1.0, timestamp = null) {
-    if (!NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave) return false;
-    if (!this.ready) return false;
-
-    const now = typeof timestamp === "number" ? timestamp : performance.now();
-    const elapsed = now - (this._lastKickInputTime || 0);
-
-    // Refractory lockout: at least 180 ms between kick inputs
-    if (elapsed < 180) return false;
-
-    // Leaky bucket cumulative rate limiter: max 3 injections per second
-    const drain = (elapsed / 1000) * 2.0;
-    this._kickInputBudget = Math.max(0, (this._kickInputBudget || 0) - drain);
-    if (this._kickInputBudget >= 3.0) return false;
-    this._kickInputBudget += 1.0;
-    this._lastKickInputTime = now;
-
-    // Conservative strength scaling: normalized kick onset amplitude mapped to [0.06, 0.20]
-    const norm = Math.max(0.0, Math.min(1.0, Number(strength) || 1.0));
-    const injectStrength = 0.06 + norm * 0.14;
-
-    // Deterministic spatial distribution without modifying simulation seed
-    this._kickInputIndex = (this._kickInputIndex || 0) + 1;
-    const idx = this._kickInputIndex;
-    const phi1 = 0.618033988749895;
-    const phi2 = 0.414213562373095;
-    const rFrac = Math.sqrt((idx * phi1) % 1.0);
-    const theta = 2 * Math.PI * ((idx * phi2) % 1.0);
-    const size = this.simulationSize;
-    const center = size / 2;
-    const maxR = size * 0.32;
-    const targetX = Math.max(
-      12,
-      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.cos(theta))),
-    );
-    const targetY = Math.max(
-      12,
-      Math.min(size - 13, Math.round(center + maxR * rFrac * Math.sin(theta))),
-    );
-
-    const patchRadius = 10;
-    const rgb = hexToRgb(this._parameters.dyeColor || "#00f0ff");
-    const lockBarrier = (this._parameters.barrierLock || "mask") === "mask";
-    const disturbMode = "kick_color";
-
-    this._runtime.disturb(targetX, targetY, patchRadius, disturbMode, {
-      dyeColor: rgb,
-      lockBarrier,
-      strength: injectStrength,
-    });
-
-    if (norm > 0.8) {
-      const satTheta = theta + Math.PI + 0.3;
-      const satR = maxR * 0.5 * rFrac;
-      const satX = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + satR * Math.cos(satTheta))),
-      );
-      const satY = Math.max(
-        12,
-        Math.min(size - 13, Math.round(center + satR * Math.sin(satTheta))),
-      );
-      this._runtime.disturb(satX, satY, 8, disturbMode, {
-        dyeColor: rgb,
-        lockBarrier,
-        strength: injectStrength * 0.75,
-      });
-    }
-
     return true;
   }
 
   renderSnapshot(canvas, options = {}) {
+    this.cancelAudio();
     if (!this.ready)
       throw new Error(
         this.lastError || "Wait for Neural Growth to initialize.",

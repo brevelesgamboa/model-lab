@@ -171,8 +171,8 @@ test("the compact drawer controls direction, phase and logarithmic rate without 
   await drawer
     .getByLabel("COORDINATE SCALE LFO depth percent", { exact: true })
     .fill("20");
-  await drawer.getByRole("button", { name: "Full", exact: true }).click();
-  await drawer.getByRole("button", { name: "Kick", exact: true }).click();
+  await drawer.locator('[data-field="audioSource"]').selectOption("audioBass");
+  await drawer.locator('[data-field="audioSource"]').selectOption("audioBeat");
   await drawer
     .getByLabel("COORDINATE SCALE audio modulation depth", { exact: true })
     .fill("0.5");
@@ -186,19 +186,19 @@ test("the compact drawer controls direction, phase and logarithmic rate without 
     name: "COORDINATE SCALE LFO amount",
     exact: true,
   });
-  const range = control.locator(".modulation-track__range");
-  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("40%");
-  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("20%");
+  const range = control.locator(".modulation-track__range").first();
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("15%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("45%");
   const polarity = drawer.getByLabel("COORDINATE SCALE modulation direction", {
     exact: true,
   });
   await polarity.selectOption("positive");
-  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("50%");
-  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("10%");
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("25%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("35%");
   await expect(strip).toHaveAttribute("aria-valuetext", "20%, above base");
   await polarity.selectOption("negative");
-  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("40%");
-  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("10%");
+  await expect.poll(() => range.evaluate((el) => el.style.left)).toBe("15%");
+  await expect.poll(() => range.evaluate((el) => el.style.width)).toBe("35%");
   await expect(strip).toHaveAttribute("aria-valuetext", "20%, below base");
   const phase = drawer.locator(".drawer-playhead");
   const first = await phase.getAttribute("x1");
@@ -225,7 +225,7 @@ test("the compact drawer controls direction, phase and logarithmic rate without 
   await drawer
     .getByLabel("COORDINATE SCALE waveform", { exact: true })
     .selectOption("triangle");
-  await drawer.getByRole("button", { name: "Off", exact: true }).click();
+  await drawer.locator('[data-field="audioSource"]').selectOption("none");
   await expect(
     drawer.getByLabel("COORDINATE SCALE audio modulation depth", {
       exact: true,
@@ -339,7 +339,7 @@ test("global detector settings synchronize across drawers independently of signe
   await expect(
     second.getByLabel("ITERATION ROTATION global kick gate", { exact: true }),
   ).toHaveValue("0.08");
-  await first.getByRole("button", { name: "Full", exact: true }).click();
+  await first.locator('[data-field="audioSource"]').selectOption("audioBass");
   await first
     .getByLabel("COORDINATE SCALE audio modulation depth", { exact: true })
     .fill("0.8");
@@ -366,13 +366,13 @@ test("global detector settings synchronize across drawers independently of signe
     gain: 1.7,
     offset: 0.1,
     gate: 0.08,
-    route: { source: "bass", depth: -0.8 },
+    route: { source: "audioBass", depth: -0.8, owner: "user" },
   });
   await page.locator("#model-select").selectOption("fractal-functions");
   await page.locator("#model-select").selectOption("folded-fractal");
   await expect(first.locator(".drawer-audio")).toHaveAttribute(
     "data-source",
-    "bass",
+    "audioBass",
   );
   await expect(
     first.getByLabel("COORDINATE SCALE audio modulation depth", {

@@ -64,6 +64,7 @@ test("growth sections default to Pattern and keep brush settings in the right ra
     "Geometry",
     "Temporal",
     "Display",
+    "Audio",
     "Simulation",
   ]);
   await expect(page.locator(".control-section[open] > summary")).toHaveText([
@@ -531,7 +532,7 @@ test("Growth controls, switching, navigation and viewport changes preserve GPU s
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await selectGrowth(page);
-  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(15);
+  await expect(page.locator(".modulation-toggle:visible")).toHaveCount(17);
   await expect(page.locator("#save-gif")).toBeDisabled();
   await expect(page.locator("#run-experiment")).toBeEnabled();
   await expect(page.locator("#randomize-all")).toBeHidden();
@@ -1451,7 +1452,7 @@ test("interactive brushes support top toolbar, color presets, ripple, freeze/tha
   ).toBe(false);
 });
 
-test("paused audio controls leave manual Full/Kick routes and LFOs available", async ({
+test("retired controls are absent while normalized audio sources and LFOs remain available", async ({
   page,
 }) => {
   await selectGrowth(page);
@@ -1470,12 +1471,12 @@ test("paused audio controls leave manual Full/Kick routes and LFOs available", a
   const control = page.locator('[data-parameter="rotation"]');
   await control.locator(".modulation-toggle").click();
   const drawer = control.locator(".modulation-drawer");
-  await drawer.getByRole("button", { name: "Full", exact: true }).click();
+  await drawer.locator('[data-field="audioSource"]').selectOption("audioBass");
   await expect(drawer.locator(".drawer-audio")).toHaveAttribute(
     "data-source",
-    "bass",
+    "audioBass",
   );
-  await drawer.getByRole("button", { name: "Kick", exact: true }).click();
+  await drawer.locator('[data-field="audioSource"]').selectOption("audioBeat");
   await drawer.locator('[data-field="audioDepth"]').fill("0.3");
   await drawer.locator('[data-field="enabled"]').check();
   await expect(page.locator("#toggle-animation")).toHaveText("CLOCK: ON");
@@ -1486,11 +1487,12 @@ test("paused audio controls leave manual Full/Kick routes and LFOs available", a
     () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
   );
   expect(record.audioModulation.rotation).toMatchObject({
-    source: "kick",
+    source: "audioBeat",
     depth: 0.3,
   });
   expect(record.modulation.rotation.enabled).toBe(true);
-  expect(record.parameters.audioProfile).toBe("off");
+  expect(record.parameters).not.toHaveProperty("audioProfile");
+  expect(record.parameters.audioSporeAmount).toBe(0);
   await expect(page.locator("#toggle-audio-input")).toBeEnabled();
   await expect(page.locator("#audio-meter")).toBeVisible();
 });
@@ -1720,13 +1722,12 @@ test("temporal echoes configure decay, drift and flow dynamics cleanly", async (
   ).toBe(false);
 });
 
-test("visualizer settings hide disabled coupling while keeping the display controls", async ({
+test("visualizer settings retain display controls with retired coupling removed", async ({
   page,
 }) => {
   await selectGrowth(page);
   await page.locator("#open-visualizer-settings").click();
-  await expect(page.locator("#visualizer-injection-select")).toBeHidden();
-  await expect(page.locator("#visualizer-injection-select")).toBeDisabled();
+  await expect(page.locator("#visualizer-injection-select")).toHaveCount(0);
   await expect(page.locator("#visualizer-mode-select")).toBeVisible();
   await expect(page.locator("#visualizer-style-select")).toBeVisible();
   await page.locator("#close-visualizer-settings").click();
@@ -1797,14 +1798,17 @@ test("restoring old audio settings preserves values and manual routes without pr
     .poll(() => page.evaluate(() => window.__growthDrawOptions?.zoom))
     .toBe(2);
   const stored = await page.evaluate(() => window.__growthModel.parameters);
-  expect(stored).toMatchObject({
-    audioProfile: "dynamic",
-    beatShockwave: "on",
-    shockwaveIntensity: 0.7,
-    acousticInjection: "dye",
-    cameraBreathing: "punchy",
-    cameraReactivity: 0.8,
-  });
+  for (const key of [
+    "audioProfile",
+    "beatShockwave",
+    "shockwaveIntensity",
+    "acousticInjection",
+    "cameraBreathing",
+    "cameraReactivity",
+  ])
+    expect(stored).not.toHaveProperty(key);
+  expect(stored.audioSporeAmount).toBe(0);
+  expect(stored.audioRippleAmount).toBe(0);
   const control = page.locator('[data-parameter="rotation"]');
   await control.locator(".modulation-toggle").click();
   await expect(control.locator(".drawer-audio")).toHaveAttribute(
@@ -1819,11 +1823,8 @@ test("restoring old audio settings preserves values and manual routes without pr
   const resaved = await page.evaluate(
     () => JSON.parse(localStorage.getItem("latent-field-saved-runs-v1"))[0],
   );
-  expect(resaved.parameters).toMatchObject({
-    audioProfile: "dynamic",
-    acousticInjection: "dye",
-    cameraBreathing: "punchy",
-  });
+  for (const key of ["audioProfile", "acousticInjection", "cameraBreathing"])
+    expect(resaved.parameters).not.toHaveProperty(key);
   expect(resaved.audioModulation.rotation).toMatchObject({
     source: "kick",
     depth: 0.3,
@@ -1859,4 +1860,207 @@ test("pure NCA controls run without loading Inception guidance or sensor resourc
   expect((await state(page)).steps).toBeGreaterThan(0);
   await expect(page.locator('[data-source="inception"]')).toHaveCount(0);
   expect(inferenceRequests).toEqual([]);
+});
+
+test("audio presets preserve bases, existing LFOs, user routes and open drawers", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const rotation = page.locator('[data-parameter="rotation"]');
+  await rotation.locator(".fine-input").fill("137");
+  await rotation.locator(".fine-input").dispatchEvent("change");
+  await rotation.locator(".modulation-toggle").click();
+  await rotation.locator('[data-field="enabled"]').check();
+  await rotation.locator('[data-field="depth"]').fill("23");
+  await rotation.locator('[data-field="audioSource"]').selectOption("audioAir");
+  const decay = page.locator('[data-parameter="echoDecay"]');
+  await decay.locator(".modulation-toggle").click();
+  await decay.locator('[data-field="enabled"]').check();
+  await decay.locator('[data-field="depth"]').fill("15");
+  const preset = page.getByLabel("AUDIO PRESET", { exact: true });
+  await preset.selectOption("kick-spore");
+  await expect(rotation.locator(".modulation-panel")).toBeVisible();
+  await expect(rotation.locator(".fine-input")).toHaveValue("137");
+  await expect(rotation.locator('[data-field="enabled"]')).toBeChecked();
+  await expect(rotation.locator('[data-field="depth"]')).toHaveValue("23");
+  const ripple = page.locator('[data-parameter="audioRippleAmount"]');
+  await ripple.locator(".modulation-toggle").click();
+  await expect(ripple.locator('[data-field="audioSource"]')).toHaveValue(
+    "audioBeat",
+  );
+  await ripple.locator('[data-field="audioDepth"]').fill("0.3");
+  await preset.selectOption("bass-trails");
+  await expect(decay.locator('[data-field="audioSource"]')).toHaveValue(
+    "audioActivity",
+  );
+  await preset.selectOption("off");
+  await expect(decay.locator('[data-field="enabled"]')).toBeChecked();
+  await expect(decay.locator('[data-field="depth"]')).toHaveValue("15");
+  const routes = await page.evaluate(async () => {
+    const { audioMatrixForModel } =
+      await import("/assets/js/core/modulation-matrix.js");
+    return audioMatrixForModel("neural-growth");
+  });
+  expect(routes.rotation).toMatchObject({ source: "audioAir", owner: "user" });
+  expect(routes.audioRippleAmount).toMatchObject({
+    source: "audioBeat",
+    depth: 0.3,
+    owner: "user",
+  });
+  expect(routes).not.toHaveProperty("echoDecay");
+  expect(routes).not.toHaveProperty("audioSporeAmount");
+  await expect(page.getByLabel("AUDIO SPORES", { exact: true })).toHaveValue(
+    "0",
+  );
+  await expect(rotation.locator(".fine-input")).toHaveValue("137");
+});
+
+test("automatic spores honor dye, toroidal feathering, RGBA8 precision and barriers", async ({
+  page,
+}) => {
+  await selectGrowth(page);
+  const result = await page.evaluate(() => {
+    const runtime = window.__growthRuntime;
+    const size = runtime.size,
+      center = Math.floor(size / 2);
+    const neutral = new Uint8Array(size * size * 12).fill(127);
+    const colorAt = (state, x, y) => [
+      ...state.slice((y * size + x) * 12, (y * size + x) * 12 + 3),
+    ];
+    runtime.writeState(neutral);
+    runtime.disturb(center, center, 8, "kick_color", {
+      dyeColor: [1, 0, 0],
+      strength: 1,
+    });
+    const explicit = colorAt(runtime.readState(), center, center);
+    runtime.writeState(neutral);
+    runtime.disturb(center, center, 8, "kick_color", { strength: 1 });
+    const implicit = colorAt(runtime.readState(), center, center);
+    runtime.writeState(neutral);
+    runtime.clearBarrier();
+    runtime.disturb(0, 0, 3, "freeze");
+    for (let i = 1; i <= 24; i++)
+      runtime.disturb(0, 0, 12, "kick_color", {
+        dyeColor: [1, 0, 0],
+        strength: 0.08 / 60,
+        automatic: true,
+        lockBarrier: false,
+        quantizationPhase: i,
+      });
+    const data = runtime.readState();
+    let positive = 0,
+      negative = 0,
+      maxOutside = 0;
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const distance = Math.hypot(
+          Math.min(x, size - x),
+          Math.min(y, size - y),
+        );
+        const color = colorAt(data, x, y);
+        if (distance >= 12)
+          maxOutside = Math.max(
+            maxOutside,
+            ...color.map((v) => Math.abs(v - 127)),
+          );
+        if (x < 10 && y < 10 && distance > 3)
+          positive += Math.abs(color[0] - 127);
+        if (x > size - 10 && y > size - 10 && distance > 3)
+          negative += Math.abs(color[0] - 127);
+      }
+    return {
+      explicit,
+      implicit,
+      protected: colorAt(data, 0, 0),
+      positive,
+      negative,
+      maxOutside,
+      error: runtime.gl.getError(),
+    };
+  });
+  expect(result.error).toBe(0);
+  expect(result.explicit[0]).toBeGreaterThan(result.explicit[1]);
+  expect(result.implicit).not.toEqual(result.explicit);
+  expect(result.protected).toEqual([127, 127, 127]);
+  expect(result.maxOutside).toBe(0);
+  expect(result.positive).toBeGreaterThan(0);
+  expect(result.negative).toBeGreaterThan(0);
+});
+
+test("production audio modulation stays fractional and freezes when the clock pauses", async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } =
+      await import("/assets/js/models/neural-growth.js");
+    const render = NeuralGrowthModel.prototype.render;
+    NeuralGrowthModel.prototype.render = function (
+      canvas,
+      parameters,
+      ...args
+    ) {
+      window.__audioGrowthModel = this;
+      window.__audioGrowthParameters = { ...parameters };
+      return render.call(this, canvas, parameters, ...args);
+    };
+  });
+  await selectGrowth(page);
+  await page.evaluate(async () => {
+    const { rhythmController } =
+      await import("/assets/js/core/rhythm-controller.js");
+    const { setAudioRoute } =
+      await import("/assets/js/core/modulation-matrix.js");
+    rhythmController.status = "active";
+    rhythmController.levels = {
+      generation: 1,
+      beatId: 0,
+      onsetTimestamp: -Infinity,
+      beatStrength: 0,
+      hasSignal: true,
+      bass: 0.123,
+      body: 0.2,
+      air: 0.1,
+      kick: 0,
+      activity: 0.2,
+    };
+    rhythmController.update = () => rhythmController.levels;
+    setAudioRoute("neural-growth", "rotation", {
+      source: "audioBass",
+      depth: 0.1,
+    });
+  });
+  await page.locator("#toggle-animation").click();
+  await expect
+    .poll(() => page.evaluate(() => window.__audioGrowthParameters.rotation))
+    .toBeCloseTo(2.214, 5);
+  await page.locator("#toggle-animation").click();
+  const frozen = await page.evaluate(
+    () => window.__audioGrowthParameters.rotation,
+  );
+  await page.evaluate(async () => {
+    const { rhythmController } =
+      await import("/assets/js/core/rhythm-controller.js");
+    rhythmController.levels = {
+      ...rhythmController.levels,
+      bass: 0.99,
+      beatId: 1,
+      onsetTimestamp: performance.now(),
+      beatStrength: 1,
+    };
+  });
+  await page
+    .getByLabel("DISPLAY PALETTE", { exact: true })
+    .selectOption("native");
+  await page.waitForTimeout(150);
+  expect(
+    await page.evaluate(() => window.__audioGrowthParameters.rotation),
+  ).toBe(frozen);
+  expect(
+    await page.evaluate(
+      () => window.__audioGrowthModel._audioResponse.active.length,
+    ),
+  ).toBe(0);
+  expect(await page.evaluate(() => window.__growthRuntime.gl.getError())).toBe(
+    0,
+  );
 });

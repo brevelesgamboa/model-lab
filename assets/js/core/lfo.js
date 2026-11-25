@@ -58,7 +58,44 @@ export function positionFromRate(rate, maximum = 0.5) {
   );
 }
 
-export function applyLfo(definition, baseValue, config, timeSeconds) {
+export function applyParameterBoundary(definition, value) {
+  const min = Number(definition.min),
+    max = Number(definition.max);
+  return definition.wrap && max > min
+    ? min + ((((Number(value) - min) % (max - min)) + max - min) % (max - min))
+    : clamp(Number(value), min, max);
+}
+
+export function sanitizeLfoConfig(candidate = {}) {
+  const defaults = defaultLfoConfig();
+  const finite = (key, min, max) =>
+    Number.isFinite(Number(candidate[key])) && candidate[key] !== null
+      ? clamp(Number(candidate[key]), min, max)
+      : defaults[key];
+  return {
+    enabled:
+      candidate.enabled === undefined
+        ? defaults.enabled
+        : Boolean(candidate.enabled),
+    waveform: LFO_WAVEFORMS.some(({ value }) => value === candidate.waveform)
+      ? candidate.waveform
+      : defaults.waveform,
+    rate: finite("rate", 0.005, 8),
+    depth: finite("depth", 0, 1),
+    phase: finite("phase", 0, 1),
+    polarity: ["positive", "negative"].includes(candidate.polarity)
+      ? candidate.polarity
+      : "bipolar",
+  };
+}
+
+export function applyLfo(
+  definition,
+  baseValue,
+  config,
+  timeSeconds,
+  bound = true,
+) {
   if (!config?.enabled || definition.type !== "range") return Number(baseValue);
   const minimum = Number(definition.min);
   const maximum = Number(definition.max);
@@ -68,7 +105,9 @@ export function applyLfo(definition, baseValue, config, timeSeconds) {
     clamp(config.depth, 0, 1) *
     range *
     0.5;
-  return clamp(Number(baseValue) + modulation, minimum, maximum);
+  return bound
+    ? applyParameterBoundary(definition, Number(baseValue) + modulation)
+    : Number(baseValue) + modulation;
 }
 
 export function hasActiveLfo(state) {

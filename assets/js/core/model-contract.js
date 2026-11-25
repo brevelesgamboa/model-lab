@@ -6,7 +6,8 @@ export function defaultParameters(model) {
   );
 }
 
-export function sanitizeParameters(model, stored) {
+export function sanitizeParameters(model, stored, { continuous = false } = {}) {
+  stored = model.migrateStoredParameters?.(stored) ?? stored;
   const parameters = defaultParameters(model);
   if (!stored || typeof stored !== "object") return parameters;
   // Resolve dependent bounds from the incoming set, not the previously rendered
@@ -35,7 +36,9 @@ export function sanitizeParameters(model, stored) {
     } else if (Number.isFinite(Number(value))) {
       const bounded = clamp(Number(value), definition.min, definition.max);
       parameters[definition.key] =
-        Number(definition.step) >= 1 ? Math.round(bounded) : bounded;
+        !continuous && Number(definition.step) >= 1
+          ? Math.round(bounded)
+          : bounded;
     }
   }
   return parameters;

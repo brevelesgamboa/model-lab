@@ -37,7 +37,7 @@ import {
 import { rhythmController } from "./core/rhythm-controller.js";
 import { terminal } from "./ui/terminal.js";
 import { displayMessage } from "./ui/messages.js";
-import { NEURAL_GROWTH_AUDIO_EFFECTS } from "./models/neural-growth/audio-effects.js";
+import { applyAudioPreset } from "./models/neural-growth/audio-response.js";
 import { GROWTH_BRUSH_KEYS } from "./ui/growth-control-sections.js";
 import { makeModulationPanel as buildModulationPanel } from "./ui/modulation-panel.js";
 import {
@@ -67,16 +67,15 @@ import {
 } from "./app/config.js";
 import {
   applyAudioModulation,
+  audioModulationDelta,
   audioMatrixForModel,
   getAudioRoute,
   hasActiveAudioRoute,
-  hasModulationSource,
   restoreAudioMatrix,
-  setAudioRoute,
   updateModulationBounds,
 } from "./core/modulation-matrix.js";
 import {
-  LFO_WAVEFORMS,
+  sanitizeLfoConfig,
   applyLfo,
   defaultLfoConfig,
   hasActiveLfo,
@@ -84,11 +83,6 @@ import {
   lfoSignalAt,
 } from "./core/lfo.js";
 import { clamp, deepClone, randomSeed } from "./core/utils.js";
-import {
-  AUDIO_PROFILES,
-  PROFILE_PARAMS,
-  detectAudioProfile,
-} from "./models/neural-growth/audio-profiles.js";
 
 const elements = collectElements();
 
@@ -227,14 +221,6 @@ const growthController = createGrowthController({
         ...defaults,
       });
     }
-    if (key === "audioProfile") {
-      applyAudioProfile(value);
-    } else if (key !== "beatShockwave" && key !== "shockwaveIntensity") {
-      checkAudioProfileMatch();
-    }
-    if (key === "acousticInjection" && elements.visualizerInjectionSelect) {
-      elements.visualizerInjectionSelect.value = value;
-    }
     modelParameterState.set(currentModel.id, deepClone(currentParameters));
     markPresetCustom();
     if (!GROWTH_BRUSH_KEYS.includes(key)) controlsController.syncValues();
@@ -288,16 +274,22 @@ const controlsController = createControlsController({
   onValue(definition, value) {
     currentParameters[definition.key] = value;
     if (
-      definition.key === "acousticInjection" &&
-      elements.visualizerInjectionSelect
-    ) {
-      elements.visualizerInjectionSelect.value = value;
-    }
-    if (
-      definition.key === "audioProfile" &&
+      definition.key === "audioPreset" &&
       currentModel.id === "neural-growth"
     ) {
-      applyAudioProfile(value);
+      applyAudioPreset(
+        currentModel.id,
+        value,
+        currentModel.controls
+          .filter((def) => supportsModulation(currentModel, def))
+          .map(({ key }) => key),
+      );
+      currentModel.cancelAudio();
+      for (const [key, control] of controlElements)
+        control.syncAudioRoute?.(getAudioRoute(currentModel.id, key));
+      updateLfoCount();
+      if (hasActiveAudioRoute(currentModel.id))
+        setAnimation(true, { log: false });
     }
     // Discard obsolete completion callbacks, without discarding GPU state.
     if (currentModel.onParameterChange?.(definition.key, value)) {
@@ -323,13 +315,6 @@ const controlsController = createControlsController({
     }
     if (currentModel.id === "neural-growth") {
       growthController.update();
-      if (
-        definition.key !== "audioProfile" &&
-        definition.key !== "beatShockwave" &&
-        definition.key !== "shockwaveIntensity"
-      ) {
-        checkAudioProfileMatch();
-      }
     }
     renderCurrentFrame({ forceAnalysis: true });
   },
@@ -535,20 +520,7 @@ function sanitizedLfoState(model, stored) {
   Object.keys(defaults).forEach((key) => {
     const candidate = stored?.[key];
     if (!candidate || typeof candidate !== "object") return;
-    defaults[key] = {
-      enabled: Boolean(candidate.enabled),
-      waveform: LFO_WAVEFORMS.some(
-        (entry) => entry.value === candidate.waveform,
-      )
-        ? candidate.waveform
-        : "sine",
-      rate: clamp(candidate.rate, 0.005, 8),
-      depth: clamp(candidate.depth, 0, 1),
-      phase: clamp(candidate.phase, 0, 1),
-      polarity: ["positive", "negative"].includes(candidate.polarity)
-        ? candidate.polarity
-        : "bipolar",
-    };
+    defaults[key] = sanitizeLfoConfig(candidate);
   });
   return defaults;
 }
@@ -743,71 +715,61 @@ function updateLfoCount() {
   elements.lfoCount.textContent = String(activeLfoCount());
 }
 
+let frozenAudioLevels = null;
 function effectiveParametersAt(timeSeconds) {
   const output = {};
   const modulationFrame = {};
-  const audioLevels =
-    rhythmController.status === "active" ? rhythmController.getLevels() : null;
+  // The analyser/UI keeps running while the simulation clock is paused. Render
+  // and export use the last playing envelopes, never a fresh paused audio frame.
+  if (playback.isActive() && !document.hidden && !gifEncoding && !hqRendering)
+    frozenAudioLevels = rhythmController.getLevels();
+  const audioLevels = frozenAudioLevels;
   currentModel.controls.forEach((definition) => {
     const baseValue = currentParameters[definition.key];
-    if (definition.type === "range") {
-      const canModulate = supportsModulation(currentModel, definition);
-      const lfoActive = Boolean(
-        canModulate && currentLfoState[definition.key]?.enabled,
-      );
-      let lfoConfig = currentLfoState[definition.key];
-      let effectiveBase = baseValue;
-      if (
-        currentModel.id === "neural-growth" &&
-        NEURAL_GROWTH_AUDIO_EFFECTS.audioReact &&
-        currentParameters.audioProfile === "dynamic"
-      ) {
-        const activity = clamp(Number(audioLevels?.activity) || 0, 0, 1);
-        if (definition.key === "growthSpeed") {
-          effectiveBase = Math.round(45 + 55 * activity);
-        }
-        if (lfoActive && lfoConfig?.calmDepth !== undefined) {
-          const scaledDepth =
-            lfoConfig.calmDepth +
-            (lfoConfig.depth - lfoConfig.calmDepth) * activity;
-          lfoConfig = { ...lfoConfig, depth: scaledDepth };
-        }
-      }
-      const oscillatorValue = !canModulate
-        ? effectiveBase
-        : applyLfo(definition, effectiveBase, lfoConfig, timeSeconds);
-      const audioRoute = canModulate
-        ? getAudioRoute(currentModel.id, definition.key)
-        : { source: "none", depth: 0 };
-      const effectiveValue = applyAudioModulation(
-        definition,
-        oscillatorValue,
-        audioRoute,
-        audioLevels,
-      );
-      const coercedEffectiveValue = coerceRangeValue(
-        definition,
-        effectiveValue,
-        false,
-      );
-      output[definition.key] = coercedEffectiveValue;
-      modulationFrame[definition.key] = {
-        baseValue: Number(effectiveBase),
-        oscillatorValue: Number(oscillatorValue),
-        audioValue: Number(effectiveValue),
-        effectiveValue: Number(coercedEffectiveValue),
-        audioSource: audioRoute.source,
-        lfoActive,
-        lfoDepth: lfoActive ? Number(lfoConfig.depth) : 0,
-        lfoPhase: lfoActive ? lfoPhaseAt(lfoConfig, timeSeconds) : 0,
-        lfoPolarity: lfoConfig?.polarity || "bipolar",
-        lfoSignal: lfoActive
-          ? lfoSignalAt(lfoConfig, lfoPhaseAt(lfoConfig, timeSeconds))
-          : 0,
-      };
-    } else {
+    if (definition.type !== "range") {
       output[definition.key] = baseValue;
+      return;
     }
+    const canModulate = supportsModulation(currentModel, definition);
+    const lfoConfig = currentLfoState[definition.key];
+    const lfoActive = Boolean(canModulate && lfoConfig?.enabled);
+    const oscillatorValue = applyLfo(
+      definition,
+      baseValue,
+      lfoActive ? lfoConfig : null,
+      timeSeconds,
+      false,
+    );
+    const audioRoute = canModulate
+      ? getAudioRoute(currentModel.id, definition.key)
+      : { source: "none", depth: 0 };
+    const effectiveValue = applyAudioModulation(
+      definition,
+      oscillatorValue,
+      audioRoute,
+      audioLevels,
+      baseValue,
+    );
+    output[definition.key] = effectiveValue;
+    modulationFrame[definition.key] = {
+      baseValue: Number(baseValue),
+      oscillatorValue,
+      audioValue:
+        oscillatorValue +
+        audioModulationDelta(definition, audioRoute, audioLevels),
+      effectiveValue,
+      audioSource: audioRoute.source,
+      audioDepth: audioRoute.source !== "none" ? audioRoute.depth : 0,
+      audioCeiling:
+        audioRoute.owner === "preset" ? (audioRoute.ceiling ?? null) : null,
+      lfoActive,
+      lfoDepth: lfoActive ? Number(lfoConfig.depth) : 0,
+      lfoPhase: lfoActive ? lfoPhaseAt(lfoConfig, timeSeconds) : 0,
+      lfoPolarity: lfoConfig?.polarity || "bipolar",
+      lfoSignal: lfoActive
+        ? lfoSignalAt(lfoConfig, lfoPhaseAt(lfoConfig, timeSeconds))
+        : 0,
+    };
   });
   Object.defineProperty(output, "__modulationFrame", {
     value: modulationFrame,
@@ -833,9 +795,6 @@ function syncRangeControl(definition, value, { render = true } = {}) {
   }
   modelParameterState.set(currentModel.id, deepClone(currentParameters));
   markPresetCustom();
-  if (currentModel.id === "neural-growth") {
-    checkAudioProfileMatch();
-  }
   invalidateCurrentRun("PARAMETERS CHANGED - SAVE WHEN READY");
   if (
     currentModel.id === "inception-dream" &&
@@ -901,111 +860,6 @@ function showParameterInfo(definition) {
   setStatus("Parameter details opened");
 }
 
-function applyAudioProfile(profileKey) {
-  if (!NEURAL_GROWTH_AUDIO_EFFECTS.audioReact) return;
-  if (currentModel.id !== "neural-growth") return;
-  if (profileKey === "custom") return;
-  const profile = AUDIO_PROFILES[profileKey];
-  if (!profile) return;
-
-  if (profile.base) {
-    Object.entries(profile.base).forEach(([key, val]) => {
-      currentParameters[key] = val;
-      const control = controlElements.get(key);
-      if (control) {
-        if (control.slider) {
-          control.slider.value = String(val);
-          updateRangeProgress(control.slider);
-        }
-        if (control.fine) control.fine.value = String(val);
-        if (control.select) control.select.value = String(val);
-        control.guidance?.update(val);
-      }
-    });
-  }
-
-  if (profileKey === "continuous" || profileKey === "dynamic") {
-    if (currentParameters.coordinateTransform === "cartesian") {
-      currentParameters.coordinateTransform = "vortex";
-      const control = controlElements.get("coordinateTransform");
-      if (control?.select) {
-        control.select.value = "vortex";
-        control.guidance?.update("vortex");
-      }
-    }
-  }
-
-  PROFILE_PARAMS.forEach((key) => {
-    const route = profile.routes?.[key] || { source: "none", depth: 0.25 };
-    setAudioRoute("neural-growth", key, route);
-    const control = controlElements.get(key);
-    control?.syncAudioRoute?.(route);
-
-    if (profile.lfos?.[key]) {
-      currentLfoState[key] = {
-        ...(currentLfoState[key] || defaultLfoConfig()),
-        ...profile.lfos[key],
-        polarity: "bipolar",
-      };
-    } else {
-      if (currentLfoState[key]) {
-        currentLfoState[key].enabled = false;
-      }
-    }
-    control?.syncLfoConfig?.(currentLfoState[key]);
-
-    const hasAudio = route.source !== "none";
-    const lfoActive = Boolean(currentLfoState[key]?.enabled);
-    const active = hasAudio || lfoActive;
-    control?.modulationToggle?.classList.toggle("is-active", active);
-    control?.modulationToggle?.setAttribute("aria-pressed", String(active));
-  });
-
-  const shouldAnimate =
-    hasActiveLfo(currentLfoState) || hasActiveAudioRoute("neural-growth");
-  if (shouldAnimate) {
-    setAnimation(true, { log: false });
-  }
-
-  modelParameterState.set(currentModel.id, deepClone(currentParameters));
-  modelLfoState.set(currentModel.id, deepClone(currentLfoState));
-  invalidateCurrentRun("AUDIO PROFILE APPLIED - SAVE WHEN READY");
-  updateLfoCount();
-  requestAnimationFrame(() =>
-    updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds)),
-  );
-  renderCurrentFrame({ forceAnalysis: true });
-
-  if (profileKey !== "off" && rhythmController.status !== "active") {
-    terminal(
-      "AUDIO",
-      "Loaded " +
-        profile.label +
-        ". Connect audio input (click EQ in status bar) to activate kick modulation.",
-    );
-  }
-}
-
-function checkAudioProfileMatch() {
-  if (!NEURAL_GROWTH_AUDIO_EFFECTS.audioReact) return;
-  if (currentModel.id !== "neural-growth") return;
-  const currentProfileKey = currentParameters.audioProfile || "off";
-  const matrix = audioMatrixForModel("neural-growth");
-  const detected = detectAudioProfile({
-    matrix,
-    parameters: currentParameters,
-    lfoState: currentLfoState,
-  });
-  if (currentProfileKey !== detected) {
-    currentParameters.audioProfile = detected;
-    modelParameterState.set("neural-growth", deepClone(currentParameters));
-    const control = controlElements.get("audioProfile");
-    if (control?.select) {
-      control.select.value = detected;
-    }
-  }
-}
-
 function makeModulationPanel(definition, config, supportsLfo) {
   return buildModulationPanel({
     definition,
@@ -1022,9 +876,6 @@ function makeModulationPanel(definition, config, supportsLfo) {
       currentLfoState[definition.key] = nextConfig;
       modelLfoState.set(currentModel.id, deepClone(currentLfoState));
       markPresetCustom();
-      if (currentModel.id === "neural-growth") {
-        checkAudioProfileMatch();
-      }
       invalidateCurrentRun("MODULATION CHANGED - SAVE WHEN READY");
       const control = controlElements.get(definition.key);
       control?.modulationToggle?.classList.toggle("is-active", active);
@@ -1107,15 +958,6 @@ function isDreamRoute(model = currentModel) {
 
 function renderParameterControls() {
   controlsController.render();
-  if (elements.visualizerInjectionSelect) {
-    elements.visualizerInjectionSelect.disabled =
-      !NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling;
-    elements.visualizerInjectionSelect.closest(
-      ".visualizer-control-row",
-    ).hidden = !NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling;
-    elements.visualizerInjectionSelect.value =
-      currentParameters?.acousticInjection || "off";
-  }
   updateLfoCount();
   updateEffectiveControlReadouts(effectiveParametersAt(lastTimeSeconds));
 }
@@ -1156,14 +998,18 @@ function updateModulationFeedback(parameters, timestamp) {
       definition,
       frame.baseValue,
       frame.lfoDepth,
-      0,
+      frame.audioDepth,
       frame.lfoPolarity,
+      frame.audioCeiling,
     );
     const left = `${Math.round(control.feedbackBounds.leftPercent * 1000) / 1000}%`;
     const width = `${Math.round(control.feedbackBounds.widthPercent * 1000) / 1000}%`;
     const base = `${Math.round(clamp(range > 0 ? (frame.baseValue - minimum) / range : 0) * 100000) / 1000}%`;
     const value = `${Math.round(clamp(range > 0 ? (frame.effectiveValue - minimum) / range : 0) * 100000) / 1000}%`;
-    const active = frame.lfoActive;
+    const active = frame.lfoActive || frame.audioSource !== "none";
+    control.modulationWrapRange.style.left = `${control.feedbackBounds.wrapLeftPercent}%`;
+    control.modulationWrapRange.style.width = `${control.feedbackBounds.wrapWidthPercent}%`;
+    control.modulationWrapRange.style.opacity = active ? "1" : "0.25";
     if (control.feedbackLeft !== left) {
       control.modulationRange.style.left = left;
       control.feedbackLeft = left;
@@ -1181,7 +1027,7 @@ function updateModulationFeedback(parameters, timestamp) {
       control.feedbackValue = value;
     }
     if (control.feedbackActive !== active) {
-      control.modulationRange.style.opacity = frame.lfoActive ? "1" : "0.25";
+      control.modulationRange.style.opacity = active ? "1" : "0.25";
       control.feedbackActive = active;
     }
     if (!control.modulationPanel.hidden)
@@ -1448,10 +1294,6 @@ function modelNeedsAnimation() {
   if (
     rhythmController.status === "active" &&
     (hasActiveAudioRoute(currentModel.id) ||
-      (currentModel.id === "neural-growth" &&
-        NEURAL_GROWTH_AUDIO_EFFECTS.beatShockwave &&
-        currentParameters.beatShockwave &&
-        currentParameters.beatShockwave !== "off") ||
       currentModel.id === "cortical-dream-dome")
   )
     return true;
@@ -1486,11 +1328,16 @@ function animationLoop(timestamp) {
   ) {
     visualizerOverlay.canvas.hidden = true;
   }
-  if (currentView === "lab" && currentModel.id === "neural-growth") {
+  if (currentModel.id === "neural-growth") {
     growthController.onAudioFrame(
       rhythmController.getLevels(),
       timestamp,
-      rhythmController,
+      () => effectiveParametersAt(lastTimeSeconds),
+      currentView === "lab" &&
+        playback.isActive() &&
+        !document.hidden &&
+        !gifEncoding &&
+        !hqRendering,
     );
   }
   if (currentView === "lab" && currentModel.id === "cortical-dream-dome") {
@@ -1865,15 +1712,10 @@ function restoreRun(record) {
   animationEpoch = performance.now() - lastTimeSeconds * 1000;
   const hasLfo = hasActiveLfo(currentLfoState);
   const hasAudio = hasActiveAudioRoute(currentModel.id);
-  const hasInputAudio =
-    hasModulationSource(currentModel.id, "bass") ||
-    hasModulationSource(currentModel.id, "kick");
+  const hasInputAudio = hasAudio;
   const shouldAnimate = hasLfo || hasAudio || Boolean(record.animationRunning);
   setAnimation(shouldAnimate, { log: false });
   renderParameterControls();
-  if (currentModel.id === "neural-growth") {
-    checkAudioProfileMatch();
-  }
   navigate("lab");
   renderCurrentFrame({ forceAnalysis: true, timeSeconds: lastTimeSeconds });
   elements.runId.textContent = record.id;
@@ -1943,25 +1785,7 @@ function attachEvents() {
   elements.toggleAudioInput.addEventListener("click", () =>
     toggleAudioInput(setAnimation, terminal, setStatus, renderCurrentFrame),
   );
-  initVisualizerUi(visualizerOverlay, elements, terminal, setStatus, (mode) => {
-    if (!NEURAL_GROWTH_AUDIO_EFFECTS.audioCoupling) return;
-    if (currentModel?.id === "neural-growth") {
-      currentParameters.acousticInjection = mode;
-      currentModel.onParameterChange?.("acousticInjection", mode);
-      controlsController.syncValues();
-      terminal("ACOUSTIC", `field coupling set to ${mode}`);
-      setStatus(`ACOUSTIC INJECTION: ${mode.toUpperCase()}`);
-    }
-  });
-  elements.openVisualizerSettings?.addEventListener("click", () => {
-    if (
-      elements.visualizerInjectionSelect &&
-      currentModel?.id === "neural-growth"
-    ) {
-      elements.visualizerInjectionSelect.value =
-        currentParameters?.acousticInjection || "off";
-    }
-  });
+  initVisualizerUi(visualizerOverlay, elements, terminal, setStatus);
   elements.neuralDreamImage.addEventListener(
     "change",
     dreamController.sourceChanged,

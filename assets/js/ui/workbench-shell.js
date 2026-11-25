@@ -4,6 +4,7 @@ import {
   rateFromPosition,
   positionFromRate,
 } from "../core/lfo.js";
+import { MODULATION_SOURCES } from "../core/modulation-matrix.js";
 import { rhythmController } from "../core/rhythm-controller.js";
 
 export function setBrushRailVisible(rail, acceptsBrushInput) {
@@ -80,7 +81,7 @@ export function createModulationDrawer({
     <div class="drawer-rate"><label>Rate<input data-field="rate" type="range" min="0" max="1" step="0.001"></label><label class="drawer-hz"><input data-field="rateHz" type="number" min="0.005" max="8" step="0.005"><span>Hz</span></label><select data-field="rateRange"><option value="slow">Slow</option><option value="full">Full</option></select></div>
     <label class="drawer-range">Phase<input data-field="phase" type="range" min="0" max="360" step="1"><output></output></label>
     <div class="drawer-audio">
-      <div class="drawer-audio-head"><span>Signal</span><div class="drawer-segments" role="group"><button type="button" data-source="bass" aria-pressed="false">Full</button><button type="button" data-source="kick" aria-pressed="false"><span class="drawer-kick-led" aria-hidden="true"></span>Kick</button><button type="button" data-source="none" aria-pressed="true">Off</button></div></div>
+      <div class="drawer-audio-head"><label>Signal <select data-field="audioSource"></select></label><span class="drawer-kick-led" aria-hidden="true"></span></div>
       <div class="drawer-audio-depth"><label class="drawer-range">Depth<input data-field="audioDepth" type="range" min="0" max="1" step="0.01"><output></output></label><div class="drawer-segments drawer-audio-polarity" role="group"><button type="button" data-audio-polarity="-1" aria-pressed="false">−</button><button type="button" data-audio-polarity="1" aria-pressed="true">+</button></div></div>
     </div>
     <details class="drawer-global-settings"><summary>Global audio settings</summary>
@@ -91,6 +92,7 @@ export function createModulationDrawer({
     <div class="drawer-value"><span>Value</span><output></output></div>`;
   const fields = new Map();
   const labels = {
+    audioSource: "audio source",
     waveform: "waveform",
     enabled: "modulation enabled",
     polarity: "modulation direction",
@@ -130,10 +132,9 @@ export function createModulationDrawer({
   }
   const svg = element.querySelector("svg");
   svg.setAttribute("aria-label", `${definition.label} LFO curve and playhead`);
-  element
-    .querySelector(".drawer-segments")
-    .setAttribute("aria-label", `${definition.label} audio mode`);
-  const sourceButtons = element.querySelectorAll("button[data-source]");
+  const sourceSelect = fields.get("audioSource");
+  for (const { value, label } of MODULATION_SOURCES)
+    sourceSelect.add(new Option(label, value));
   const polarityButtons = element.querySelectorAll("[data-audio-polarity]");
   element
     .querySelector(".drawer-audio-polarity")
@@ -216,11 +217,22 @@ export function createModulationDrawer({
       );
     }
     audio.dataset.source = route.source;
-    for (const button of sourceButtons)
-      button.setAttribute(
-        "aria-pressed",
-        String(button.dataset.source === route.source),
+    // Legacy aliases are offered only when hydrating an existing route.
+    for (const option of [...sourceSelect.options])
+      if (option.dataset.legacy && option.value !== route.source)
+        option.remove();
+    if (
+      ["bass", "kick"].includes(route.source) &&
+      ![...sourceSelect.options].some((option) => option.value === route.source)
+    ) {
+      const option = new Option(
+        route.source === "bass" ? "Music (legacy)" : "Kick (legacy)",
+        route.source,
       );
+      option.dataset.legacy = "true";
+      sourceSelect.add(option);
+    }
+    sourceSelect.value = route.source;
     const shape = `${config.waveform}:${config.polarity || "bipolar"}`;
     if (shape !== previousShape) {
       let path = "";
@@ -316,10 +328,9 @@ export function createModulationDrawer({
       .addEventListener("input", (event) =>
         rhythmController[setter](event.target.value),
       );
-  for (const button of sourceButtons)
-    button.addEventListener("click", () =>
-      onAudioSource(button.dataset.source),
-    );
+  sourceSelect.addEventListener("change", () =>
+    onAudioSource(sourceSelect.value),
+  );
   let lastValue = "";
   let lastPosition = "";
   let lastHeight = "";

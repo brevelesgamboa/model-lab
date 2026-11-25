@@ -9,7 +9,6 @@ import { supportsModulation } from "../core/model-contract.js";
 import { modulationIsActive } from "../ui/modulation-panel.js";
 import { createNeuronGallery } from "../ui/neuron-gallery.js";
 import { CURATED_NEURONS } from "../models/neural-growth/neuron-archetypes.js";
-import { isPausedAudioControl } from "../models/neural-growth/audio-effects.js";
 import {
   GROWTH_BRUSH_KEYS,
   GROWTH_CONTROL_SECTIONS,
@@ -346,8 +345,7 @@ export function createControlsController({
     definitions.forEach((definition) => {
       if (
         currentModel.id === "neural-growth" &&
-        (GROWTH_BRUSH_KEYS.includes(definition.key) ||
-          isPausedAudioControl(definition.key))
+        GROWTH_BRUSH_KEYS.includes(definition.key)
       )
         return;
       const section = grouped
@@ -429,6 +427,10 @@ export function createControlsController({
           `Toggle modulation for ${definition.label}`,
         );
         modulationToggle.textContent = "MOD";
+        const modulationWrapRange = modulationRange.cloneNode(false);
+        modulationWrapRange.classList.add("modulation-track__range--wrapped");
+        modulationWrapRange.setAttribute("aria-hidden", "true");
+        modulationTrack.append(modulationWrapRange);
         const config = currentLfoState[definition.key] || defaultLfoConfig();
         currentLfoState[definition.key] = config;
         const audioRoute = getAudioRoute(currentModel.id, definition.key);
@@ -516,6 +518,7 @@ export function createControlsController({
           syncLfoConfig: modulation.syncLfoConfig,
           modulationTrack,
           modulationRange,
+          modulationWrapRange,
           baseMarker,
           effectiveMarker,
           feedbackBounds: { leftPercent: 0, widthPercent: 0 },

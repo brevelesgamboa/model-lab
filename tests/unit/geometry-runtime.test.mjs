@@ -154,3 +154,24 @@ test("echo history survives display resizing and snapshot draws never write hist
   }
   assert.ok(history.every((target) => !released.includes(target)));
 });
+
+test("ripple uniforms retain a zero origin, explicit radius and zero amplitude", () => {
+  const { runtime, canvas, uploads } = drawRuntime();
+  runtime.draw(canvas, {
+    ripples: [
+      {
+        x: 0,
+        y: 0,
+        radius: 16,
+        amplitude: 0,
+        startTime: performance.now() - 100,
+        duration: 1,
+      },
+    ],
+  });
+  const frame = uploads.get("visualize");
+  assert.equal(frame.u_ripple0[0], 0);
+  assert.equal(frame.u_ripple0[1], 0);
+  assert.equal(frame.u_ripple0[3], 16);
+  assert.equal(frame.u_rippleAmps[0], 0);
+});

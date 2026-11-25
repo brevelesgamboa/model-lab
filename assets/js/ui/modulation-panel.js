@@ -23,8 +23,12 @@ export function makeModulationPanel({
   const panel = document.createElement("div");
   panel.className = "modulation-panel";
   panel.hidden = !modulationIsActive(config, audioRoute);
-  const updateConfig = (wasActive = modulationIsActive(config, audioRoute)) => {
-    audioRoute = setAudioRoute(modelId, definition.key, audioRoute);
+  const updateConfig = (
+    wasActive = modulationIsActive(config, audioRoute),
+    audioChanged = false,
+  ) => {
+    if (audioChanged)
+      audioRoute = setAudioRoute(modelId, definition.key, audioRoute);
     drawer.sync();
     const active = modulationIsActive(config, audioRoute);
     onChange({
@@ -58,17 +62,21 @@ export function makeModulationPanel({
     onLfoChange: (key, value) => setLfoConfig({ [key]: value }),
     onAudioSource(source) {
       const wasActive = modulationIsActive(config, audioRoute);
-      audioRoute.source = source;
+      audioRoute = { source, depth: audioRoute.depth, owner: "user" };
       if (source !== "none") {
         const base = Number(getVisibleBase());
         if (Number.isFinite(base))
           onCaptureBase(coerceRangeValue(definition, base));
       }
-      updateConfig(wasActive);
+      updateConfig(wasActive, true);
     },
     onAudioDepth(value) {
-      audioRoute.depth = clamp(Number(value), -1, 1);
-      updateConfig();
+      audioRoute = {
+        source: audioRoute.source,
+        depth: clamp(Number(value), -1, 1),
+        owner: "user",
+      };
+      updateConfig(undefined, true);
     },
   });
   panel.append(drawer.element);

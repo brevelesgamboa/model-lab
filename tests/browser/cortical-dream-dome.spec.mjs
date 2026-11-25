@@ -127,9 +127,7 @@ test("the independent dome closes a 360 view, renders all waves, supports drag/k
   }
   const images = [];
   for (const mode of ["0", "1", "2", "3"]) {
-    await page
-      .getByLabel("WAVE MODE", { exact: true })
-      .selectOption(mode);
+    await page.getByLabel("WAVE MODE", { exact: true }).selectOption(mode);
     await expect(page.locator("#render-state")).toHaveText("FRAME READY");
     images.push(await canvas.evaluate((c) => c.toDataURL()));
   }
@@ -287,9 +285,7 @@ test("a missing feature model keeps depth and waves interactive and only retries
   if (!(await wavesSection.getAttribute("open"))) {
     await page.locator('details[data-section="waves"] > summary').click();
   }
-  await page
-    .getByLabel("WAVE MODE", { exact: true })
-    .selectOption("0");
+  await page.getByLabel("WAVE MODE", { exact: true }).selectOption("0");
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   expect(await page.evaluate(() => window.__dome.featureEstimator.runs)).toBe(
     1,
@@ -545,13 +541,14 @@ test("dream target UI is hidden from dome drawer, color retention control is abs
 }) => {
   await openDome(page);
   // Verify color retention control is not present under MODEL CONTROLS
-  await expect(page.locator('[data-parameter="colorRetention"]')).toHaveCount(0);
+  await expect(page.locator('[data-parameter="colorRetention"]')).toHaveCount(
+    0,
+  );
 
   // Verify section grouping: first section open by default, others closed
-  await expect(page.locator('details[data-section="geometry"]')).toHaveAttribute(
-    "open",
-    "",
-  );
+  await expect(
+    page.locator('details[data-section="geometry"]'),
+  ).toHaveAttribute("open", "");
   await expect(
     page.locator('details[data-section="waves"]'),
   ).not.toHaveAttribute("open", "");
@@ -633,7 +630,9 @@ test("cortical dream dome wires live NCA controls, presets, resolution, and rend
     .toBe(128);
 
   // Verify there is only ONE Bio-Sheen Opacity slider (no duplicates)
-  await expect(page.locator('input[aria-label="Bio-Sheen Opacity"]')).toHaveCount(1);
+  await expect(
+    page.locator('input[aria-label="Bio-Sheen Opacity"]'),
+  ).toHaveCount(1);
 
   // Sliders for relief (ncaExtrude in Geometry & Depth) and sheen (ncaSheen)
   const extrudeSlider = page.locator('input[aria-label="NCA RELIEF"]');
@@ -711,6 +710,26 @@ test("cortical dream dome wires live NCA controls, presets, resolution, and rend
   // Wait a couple of frames to ensure live NCA steps, drains spores, and renders without errors
   await page.waitForTimeout(600);
 
+  const contrastContract = await page.evaluate(() => {
+    const dome = window.__dome,
+      runtime = dome.ncaRuntime;
+    const run = runtime.run;
+    let captured;
+    runtime.run = function (name, output, inputs, uniforms) {
+      if (name === "disturb") captured = uniforms;
+      return run.call(this, name, output, inputs, uniforms);
+    };
+    dome.ncaActiveSpores = [];
+    dome.injectSoftSpores({ count: 1, mode: "kick_color" });
+    dome.stepActiveSpores();
+    runtime.run = run;
+    return {
+      explicitDye: captured.u_explicitDye,
+      automatic: captured.u_automatic,
+      error: runtime.gl.getError(),
+    };
+  });
+  expect(contrastContract).toEqual({ explicitDye: 0, automatic: 0, error: 0 });
+
   expect(errors).toEqual([]);
 });
-
