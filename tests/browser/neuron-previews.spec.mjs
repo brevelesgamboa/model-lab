@@ -16,7 +16,7 @@ test("real Inception feature previews encode 64px WebP without retaining tensors
     const { InceptionDreamModel } =
       await import("/assets/js/models/inception-dream.js");
     const { generateNeuronPreview } =
-      await import("/assets/js/models/neural-growth/dream-guidance.js");
+      await import("/assets/js/models/neural-growth/neuron-preview-provider.js");
     const owner = new InceptionDreamModel();
     let timer;
     try {
@@ -75,27 +75,27 @@ test("real Inception feature previews encode 64px WebP without retaining tensors
 
 async function installPreviewFixture(page, { bundled = false } = {}) {
   await page.evaluate(async (useBundled) => {
-    const { DreamGuidanceBridge } =
-      await import("/assets/js/models/neural-growth/dream-guidance.js");
-    const { TextureNcaRuntime } =
-      await import("/assets/js/models/neural-growth/runtime.js");
-    const draw = TextureNcaRuntime.prototype.draw;
-    TextureNcaRuntime.prototype.draw = function (...args) {
-      window.__previewRuntime = this;
-      return draw.apply(this, args);
+    const { NeuronPreviewProvider } =
+      await import("/assets/js/models/neural-growth/neuron-preview-provider.js");
+    const { InceptionDreamModel } =
+      await import("/assets/js/models/inception-dream.js");
+    const render = InceptionDreamModel.prototype.render;
+    InceptionDreamModel.prototype.render = function (...args) {
+      window.__previewOwner = this;
+      return render.apply(this, args);
     };
-    const loadBundled = DreamGuidanceBridge.prototype.loadBundledPreviews;
-    DreamGuidanceBridge.prototype.loadBundledPreviews = async function () {
+    const loadBundled = NeuronPreviewProvider.prototype.loadBundledPreviews;
+    NeuronPreviewProvider.prototype.loadBundledPreviews = async function () {
       window.__previewBridge = this;
       if (useBundled) return loadBundled.call(this);
       this._previewNamespace = "fixture-checkpoint:fourier-v2:96:96";
       return this.previewCache;
     };
-    DreamGuidanceBridge.prototype.ensureModel = async function () {
+    NeuronPreviewProvider.prototype.ensureModel = async function () {
       return {};
     };
-    const start = DreamGuidanceBridge.prototype._startPreviewQueue;
-    DreamGuidanceBridge.prototype._startPreviewQueue = function () {
+    const start = NeuronPreviewProvider.prototype._startPreviewQueue;
+    NeuronPreviewProvider.prototype._startPreviewQueue = function () {
       window.__previewBridge = this;
       this._generatePreview = async (
         _model,
@@ -131,337 +131,23 @@ async function installPreviewFixture(page, { bundled = false } = {}) {
   }, bundled);
 }
 
-async function openGrowth(page) {
-  await page.locator("#model-select").selectOption("neural-growth");
-  await expect(page.locator("#step-growth")).toBeEnabled();
-  const dreamSection = page.locator('[data-section="dream"]');
-  if (!(await dreamSection.evaluate((section) => section.open)))
-    await dreamSection.locator(":scope > summary").click();
+async function openDream(page) {
+  await page.locator("#model-select").selectOption("inception-dream");
+  await expect(page.locator("#neural-dream-tools")).toBeVisible();
+  await expect(page.locator(".neuron-gallery")).toBeVisible();
 }
 
 async function field(page) {
-  return page.evaluate(async () => ({
-    steps: window.__previewRuntime.steps,
-    hash: Array.from(
-      new Uint8Array(
-        await crypto.subtle.digest(
-          "SHA-256",
-          window.__previewRuntime.readState(),
-        ),
+  return page.evaluate(() => ({
+    steps: window.__previewOwner.totalSteps,
+    image: document.getElementById("output-canvas").toDataURL(),
+    parameters: [
+      ...document.querySelectorAll(
+        "#parameter-controls input, #parameter-controls select",
       ),
-    ),
+    ].map((input) => [input.getAttribute("aria-label"), input.value]),
   }));
 }
-
-test("sensor previews share the neuron gallery, require manual generation, and leave Dream targets and the field intact", async ({
-  page,
-}) => {
-  await installPreviewFixture(page, { bundled: true });
-  await page.evaluate(async () => {
-    const { inceptionSensor } =
-      await import("/assets/js/models/neural-growth/inception-sensor.js");
-    // This test exercises UI/cache wiring; the sensor spec covers the real GPU worker.
-    inceptionSensor.createWorker = () => {
-      const worker = {
-        postMessage(message) {
-          message.bitmap?.close();
-          queueMicrotask(() =>
-            worker.onmessage?.({
-              data:
-                message.type === "init"
-                  ? { type: "ready", backend: "fixture" }
-                  : { type: "sample", id: message.id, raw: 1 },
-            }),
-          );
-        },
-        terminate() {},
-      };
-      return worker;
-    };
-  });
-  await openGrowth(page);
-  const control = page.locator('[data-parameter="rotation"]');
-  await control.evaluate((element) => (element.closest("details").open = true));
-  await control.locator(".modulation-toggle").click();
-  const drawer = control.locator(".modulation-drawer");
-  await drawer.getByRole("button", { name: "Inception", exact: true }).click();
-  await page.locator("#toggle-animation").click();
-  const before = await field(page);
-  const dreamLayer = await page
-    .getByLabel("DREAM LAYER", { exact: true })
-    .inputValue();
-  const dreamChannel = await page
-    .getByLabel("DREAM NEURON exact value", { exact: true })
-    .inputValue();
-  const preview = drawer.locator(".sensor-neuron-preview");
-  await expect(preview.locator("figcaption")).toHaveText(
-    "Conv2d_4a_3x3 · Channel #42",
-  );
-  await expect(preview.locator("img")).toBeHidden();
-  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
-  await preview
-    .getByRole("button", { name: "Preview selected neuron", exact: true })
-    .click();
-  await expect(preview.locator("img")).toBeVisible();
-  await expect(preview.locator("img")).toHaveAttribute(
-    "src",
-    await page.evaluate(() => window.__previewResults.Conv2d_4a_3x3_42),
-  );
-
-  await drawer.locator('[data-field="sensorLayer"]').selectOption("mixed_5b");
-  await drawer.locator('[data-field="sensorChannel"]').fill("120");
-  await drawer.locator('[data-field="sensorChannel"]').dispatchEvent("change");
-  await expect(preview.locator("img")).toHaveAttribute(
-    "src",
-    /mixed_5b-120\.webp$/,
-  );
-  await drawer
-    .getByRole("button", { name: "Browse neuron gallery", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Neuron explorer",
-    exact: true,
-  });
-  await expect(dialog.locator(".neuron-explorer__detail h3")).toContainText(
-    "mixed_5b · Channel #120",
-  );
-  await expect(dialog.locator(".neuron-explorer__detail img")).toBeInViewport();
-  await dialog
-    .getByLabel("Explorer layer", { exact: true })
-    .selectOption("mixed_6c");
-  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("144");
-  await dialog.locator('.neuron-explorer__card[data-channel="144"]').click();
-  await dialog
-    .getByRole("button", { name: "Use as sensor", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
-  await expect(drawer.locator('[data-field="sensorLayer"]')).toHaveValue(
-    "mixed_6c",
-  );
-  await expect(drawer.locator('[data-field="sensorChannel"]')).toHaveValue(
-    "144",
-  );
-  await expect(preview.locator("img")).toHaveAttribute(
-    "src",
-    /mixed_6c-144\.webp$/,
-  );
-  await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
-    dreamLayer,
-  );
-  await expect(
-    page.getByLabel("DREAM NEURON exact value", { exact: true }),
-  ).toHaveValue(dreamChannel);
-
-  await drawer
-    .locator('[data-field="sensorLayer"]')
-    .selectOption("Conv2d_4a_3x3");
-  await drawer.locator('[data-field="sensorChannel"]').fill("42");
-  await drawer.locator('[data-field="sensorChannel"]').dispatchEvent("change");
-  await expect(preview.locator("img")).toBeVisible();
-  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
-    "Conv2d_4a_3x3_42",
-  ]);
-  expect(await field(page)).toEqual(before);
-  expect(await page.evaluate(() => Boolean(window.tf))).toBe(false);
-  const subscriptions = await page.evaluate(
-    () => window.__previewBridge._previewListeners.size,
-  );
-  await drawer
-    .getByRole("button", { name: "Browse neuron gallery", exact: true })
-    .click();
-  await dialog.getByLabel("Preview collection").selectOption("all");
-  await dialog
-    .getByLabel("Explorer layer", { exact: true })
-    .selectOption("mixed_6c");
-  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("");
-  await dialog.locator('.neuron-explorer__card[data-channel="-1"]').click();
-  await expect(
-    dialog.getByRole("button", { name: "Use as sensor", exact: true }),
-  ).toBeDisabled();
-  await dialog
-    .getByRole("button", { name: "Close neuron explorer", exact: true })
-    .click();
-  await expect(drawer.locator('[data-field="sensorChannel"]')).toHaveValue(
-    "42",
-  );
-
-  await page.locator("#model-select").selectOption("folded-fractal");
-  expect(
-    await page.evaluate(() => window.__previewBridge._previewListeners.size),
-  ).toBe(0);
-  const fractalDrawer = page.locator(
-    '[data-parameter="rotation"] .modulation-drawer',
-  );
-  await page.locator('[data-parameter="rotation"] .modulation-toggle').click();
-  await fractalDrawer
-    .getByRole("button", { name: "Inception", exact: true })
-    .click();
-  await fractalDrawer
-    .getByRole("button", { name: "Browse neuron gallery", exact: true })
-    .click();
-  await expect(dialog).toBeVisible();
-  await expect(
-    dialog.getByRole("button", { name: "Use as Dream target", exact: true }),
-  ).toBeHidden();
-  await dialog
-    .getByLabel("Explorer layer", { exact: true })
-    .selectOption("mixed_5b");
-  await dialog.getByLabel("Find neuron channel", { exact: true }).fill("120");
-  await dialog.locator('.neuron-explorer__card[data-channel="120"]').click();
-  await dialog
-    .getByRole("button", { name: "Use as sensor", exact: true })
-    .click();
-  await expect(
-    fractalDrawer.locator(".sensor-neuron-preview img"),
-  ).toHaveAttribute("src", /mixed_5b-120\.webp$/);
-  await page.locator("#model-select").selectOption("neural-growth");
-  await expect(page.locator("dialog.neuron-explorer")).toHaveCount(1);
-  expect(
-    await page.evaluate(() => window.__previewBridge._previewListeners.size),
-  ).toBe(subscriptions);
-});
-
-test("manual channel previews follow exact layer bounds, reuse cache, and preserve the cellular field", async ({
-  page,
-}) => {
-  await installPreviewFixture(page);
-  await openGrowth(page);
-  const listeners = await page.evaluate(
-    () => window.__previewBridge._previewListeners.size,
-  );
-  await page.locator("#step-growth").click();
-  const before = await field(page);
-  let dialog = await inspectPreview(page, 1800, "mixed_7b");
-  expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
-  await dialog
-    .getByRole("button", { name: "Generate neuron preview", exact: true })
-    .click();
-  const image = dialog.locator(".neuron-explorer__detail img");
-  await expect(image).toBeVisible();
-  const original = await image.getAttribute("src");
-  await dialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
-    .click();
-  const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
-  await expect(channel).toHaveValue("1800");
-  await expect(channel).toHaveAttribute("max", "2047");
-  await page
-    .getByLabel("DREAM LAYER", { exact: true })
-    .selectOption("mixed_5b");
-  await expect(channel).toHaveValue("255");
-  await expect(channel).toHaveAttribute("max", "255");
-  dialog = await inspectPreview(page, 1800, "mixed_7b");
-  await expect(dialog.locator(".neuron-explorer__detail img")).toHaveAttribute(
-    "src",
-    original,
-  );
-  await expect(
-    dialog.getByRole("button", {
-      name: "Generate neuron preview",
-      exact: true,
-    }),
-  ).toBeHidden();
-  await dialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
-    .click();
-  await expect(channel).toHaveValue("1800");
-  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
-    "mixed_7b_1800",
-  ]);
-  expect(await field(page)).toEqual(before);
-  await page.locator('[data-view="about"]').click();
-  await page.locator('[data-view="lab"]').click();
-  dialog = await inspectPreview(page, 1800, "mixed_7b");
-  await expect(dialog.locator(".neuron-explorer__detail img")).toHaveAttribute(
-    "src",
-    original,
-  );
-  expect(
-    await page.evaluate(() => window.__previewBridge._previewListeners.size),
-  ).toBe(listeners);
-  expect(await field(page)).toEqual(before);
-});
-
-test("layer-grouped gallery searches every channel and selects without changing strength or playback", async ({
-  page,
-}) => {
-  await installPreviewFixture(page);
-  await openGrowth(page);
-  await page.locator("#step-growth").click();
-  const before = await field(page);
-  await page
-    .getByLabel("DREAM STRENGTH exact value", { exact: true })
-    .fill("0.37");
-  await page
-    .getByRole("button", { name: "Browse neuron previews", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", {
-    name: "Neuron explorer",
-    exact: true,
-  });
-  await expect(dialog).toBeVisible();
-  await expect(
-    dialog.getByLabel("Explorer layer").locator("optgroup"),
-  ).toHaveCount(4);
-  await dialog.getByLabel("Preview collection").selectOption("all");
-  await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(12);
-  await dialog.getByRole("button", { name: "Next neuron page" }).click();
-  await expect(
-    dialog.locator(".neuron-explorer__pagination [role='status']"),
-  ).toContainText("13–24");
-  await dialog.getByLabel("Explorer layer").selectOption("mixed_7b");
-  await dialog.getByLabel("Find neuron channel").fill("2047");
-  const card = dialog.locator('.neuron-explorer__card[data-channel="2047"]');
-  await expect(dialog.locator(".neuron-explorer__card")).toHaveCount(1);
-  await expect(card.locator("img")).toBeHidden();
-  await card.click();
-  await expect(dialog).toBeVisible();
-  await dialog
-    .getByRole("button", { name: "Generate neuron preview", exact: true })
-    .click();
-  await expect(card.locator("img")).toBeVisible();
-  expect(await field(page)).toEqual(before);
-  for (const width of [360, 900, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    expect(
-      await dialog.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth + 1,
-      ),
-    ).toBe(true);
-  }
-  await dialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
-    .click();
-  await expect(dialog).not.toBeVisible();
-  await expect(page.getByLabel("DREAM LAYER", { exact: true })).toHaveValue(
-    "mixed_7b",
-  );
-  await expect(
-    page.getByLabel("DREAM STRENGTH exact value", { exact: true }),
-  ).toHaveValue("0.37");
-  await expect(page.getByLabel("DREAM GUIDANCE", { exact: true })).toHaveValue(
-    "off",
-  );
-  await expect(
-    page.getByLabel("DREAM NEURON exact value", { exact: true }),
-  ).toHaveValue("2047");
-  expect(await field(page)).toEqual(before);
-  await page.locator("#toggle-animation").click();
-  await page
-    .getByRole("button", { name: "Browse neuron previews", exact: true })
-    .click();
-  await expect(dialog).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.__previewRuntime.steps))
-    .toBeGreaterThan(before.steps);
-  await page.keyboard.press("Escape");
-  await expect(dialog).not.toBeVisible();
-  await expect(page.locator("#toggle-animation")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.locator("#toggle-animation").click();
-});
 
 test("obsolete previews stay hidden and failed previews offer a working retry", async ({
   page,
@@ -469,7 +155,7 @@ test("obsolete previews stay hidden and failed previews offer a working retry", 
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await installPreviewFixture(page);
-  await openGrowth(page);
+  await openDream(page);
   await page.evaluate(() => {
     window.__slowChannel = 21;
   });
@@ -532,7 +218,7 @@ test("bundled Fourier previews render without downloading Inception weights", as
     if (/models\/inception\/.*\.bin/.test(request.url()))
       weights.push(request.url());
   });
-  await openGrowth(page);
+  await openDream(page);
   const dialog = await browsePreviews(page);
   await showAvailablePreviews(dialog);
   await expect(
@@ -631,7 +317,7 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
       weights.push(request.url());
   });
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   const original = await generateManualPreview(page, 501);
   let dialog = await browsePreviews(page);
   await expect(dialog.getByLabel("Save previews on this device")).toBeChecked();
@@ -644,20 +330,20 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
   await installPreviewFixture(page, { bundled: true });
   // Reusing a preview must work even when generation/model loading is unavailable.
   await page.evaluate(async () => {
-    const { DreamGuidanceBridge } =
-      await import("/assets/js/models/neural-growth/dream-guidance.js");
-    DreamGuidanceBridge.prototype.ensureModel = async () => {
+    const { NeuronPreviewProvider } =
+      await import("/assets/js/models/neural-growth/neuron-preview-provider.js");
+    NeuronPreviewProvider.prototype.ensureModel = async () => {
       throw new Error("Unexpected Inception load");
     };
   });
-  await openGrowth(page);
+  await openDream(page);
   dialog = await browsePreviews(page);
   const card = dialog.locator('[data-layer="mixed_6c"][data-channel="501"]');
   await expect(card.locator("img")).toHaveAttribute("src", original);
   await card.locator("img").evaluate((image) => image.decode());
   await card.click();
   await dialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
     .click();
   dialog = await inspectPreview(page, 501);
   await expect(dialog.locator(".neuron-explorer__detail img")).toHaveAttribute(
@@ -671,7 +357,7 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   dialog = await browsePreviews(page);
   await expect(
     dialog.getByLabel("Save previews on this device"),
@@ -695,7 +381,7 @@ test("saved neuron previews survive reload, respect opt-out, and can be cleared"
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   dialog = await browsePreviews(page);
   await expect(dialog.getByLabel("Save previews on this device")).toBeChecked();
   await showAvailablePreviews(dialog);
@@ -710,24 +396,22 @@ test("stem channels use exact bounds and saved previews survive reload", async (
   page,
 }) => {
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
-  const layer = page.getByLabel("DREAM LAYER", { exact: true });
-  const channel = page.getByLabel("DREAM NEURON exact value", { exact: true });
+  await openDream(page);
   for (const [name, lastChannel] of [
     ["Conv2d_4a_3x3", 191],
     ["Conv2d_3b_1x1", 79],
     ["Conv2d_2b_3x3", 63],
   ]) {
-    await layer.selectOption(name);
-    await expect(channel).toHaveAttribute("max", String(lastChannel));
     const dialog = await inspectPreview(page, lastChannel, name);
+    await expect(
+      dialog.getByLabel("Explorer layer").locator(`option[value="${name}"]`),
+    ).toContainText(`${lastChannel + 1} channels`);
     await expect(dialog.getByLabel("Find neuron channel")).toHaveValue(
       String(lastChannel),
     );
     await dialog
-      .getByRole("button", { name: "Use as Dream target", exact: true })
+      .getByRole("button", { name: "Close neuron explorer", exact: true })
       .click();
-    await expect(channel).toHaveValue(String(lastChannel));
   }
   const original = await generateManualPreview(page, 63, "Conv2d_2b_3x3");
   const dialog = await browsePreviews(page);
@@ -737,7 +421,7 @@ test("stem channels use exact bounds and saved previews survive reload", async (
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   const restored = await browsePreviews(page);
   await showAvailablePreviews(restored);
   await expect(
@@ -753,7 +437,7 @@ test("clearing saved previews also fences saves from generation already in fligh
   page,
 }) => {
   await installPreviewFixture(page);
-  await openGrowth(page);
+  await openDream(page);
   await generateManualPreview(page, 501);
   await page.evaluate(() => {
     window.__slowChannel = 502;
@@ -786,7 +470,7 @@ test("clearing saved previews also fences saves from generation already in fligh
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page);
-  await openGrowth(page);
+  await openDream(page);
   const restored = await browsePreviews(page);
   await showAvailablePreviews(restored);
   await expect(page.locator(".neuron-explorer__card")).toHaveCount(0);
@@ -879,7 +563,7 @@ test("restricted storage and quota failures keep session previews usable", async
       return put.apply(this, args);
     };
   });
-  await openGrowth(page);
+  await openDream(page);
   await generateManualPreview(page, 501);
   let dialog = await browsePreviews(page);
   await expect(
@@ -902,7 +586,7 @@ test("restricted storage and quota failures keep session previews usable", async
       },
     });
   });
-  await openGrowth(page);
+  await openDream(page);
   await generateManualPreview(page, 502);
   dialog = await browsePreviews(page);
   await expect(
@@ -920,10 +604,10 @@ test("browsing, inspecting, favorites and restored filters never generate withou
       weights.push(request.url());
   });
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   const initialDialog = await inspectPreview(page, 400);
   await initialDialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
     .click();
   const before = await field(page);
   let dialog = await browsePreviews(page);
@@ -951,22 +635,16 @@ test("browsing, inspecting, favorites and restored filters never generate withou
   await page.waitForTimeout(350);
   expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
   expect(await field(page)).toEqual(before);
-  await expect(
-    page.getByLabel("DREAM NEURON exact value", { exact: true }),
-  ).toHaveValue("400");
   await dialog
-    .getByRole("button", { name: "Use as Dream target", exact: true })
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
     .click();
-  await expect(
-    page.getByLabel("DREAM NEURON exact value", { exact: true }),
-  ).toHaveValue("1000");
   expect(await page.evaluate(() => window.__previewCalls || [])).toEqual([]);
   expect(await field(page)).toEqual(before);
 
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page, { bundled: true });
-  await openGrowth(page);
+  await openDream(page);
   dialog = await browsePreviews(page);
   await expect(dialog.getByLabel("Explorer layer")).toHaveValue("mixed_7b");
   await expect(dialog.getByLabel("Preview collection")).toHaveValue("recent");
@@ -987,8 +665,7 @@ test("background ranges span pages, pause for user control, prioritize selected 
 }) => {
   test.setTimeout(90_000);
   await installPreviewFixture(page);
-  await openGrowth(page);
-  await page.locator("#step-growth").click();
+  await openDream(page);
   const before = await field(page);
   let dialog = await browsePreviews(page);
   await dialog.locator(".neuron-explorer__background > summary").click();
@@ -1038,7 +715,6 @@ test("background ranges span pages, pause for user control, prioritize selected 
     ),
   ).toBe(0);
   expect(await field(page)).toEqual(before);
-  await page.locator("#toggle-animation").click();
   dialog = await browsePreviews(page);
   await dialog.getByLabel("Explorer layer").selectOption("mixed_5b");
   await dialog.getByLabel("Find neuron channel").fill("");
@@ -1049,9 +725,6 @@ test("background ranges span pages, pause for user control, prioritize selected 
     .getByRole("button", { name: "Close neuron explorer", exact: true })
     .click();
   await expect
-    .poll(() => page.evaluate(() => window.__previewRuntime.steps))
-    .toBeGreaterThan(before.steps);
-  await expect
     .poll(() =>
       page.evaluate(
         () => window.__previewBridge.backgroundPreviewStatus.completed,
@@ -1060,7 +733,6 @@ test("background ranges span pages, pause for user control, prioritize selected 
     .toBeGreaterThan(0);
   // Software WebGL is deliberately slow; verify concurrent progress, then let
   // the remaining batch finish without requiring a hardware-specific deadline.
-  await page.locator("#toggle-animation").click();
   await expect
     .poll(
       () =>
@@ -1085,7 +757,7 @@ test("background ranges span pages, pause for user control, prioritize selected 
   await page.reload();
   await expect(page.locator("#render-state")).toHaveText("FRAME READY");
   await installPreviewFixture(page);
-  await openGrowth(page);
+  await openDream(page);
   dialog = await browsePreviews(page);
   await expect(dialog.getByLabel("Background batch scope")).toHaveValue(
     "range",
@@ -1109,7 +781,7 @@ test("cancelling or clearing a background batch prevents further generation and 
   page,
 }) => {
   await installPreviewFixture(page);
-  await openGrowth(page);
+  await openDream(page);
   const dialog = await browsePreviews(page);
   await dialog.locator(".neuron-explorer__background > summary").click();
   await dialog.getByLabel("Background batch scope").selectOption("range");
@@ -1169,4 +841,40 @@ test("cancelling or clearing a background batch prevents further generation and 
   await expect(
     dialog.getByRole("button", { name: "Start background cache", exact: true }),
   ).toBeEnabled();
+});
+
+test("standalone Dream gallery previews channels without altering image or ascent settings", async ({
+  page,
+}) => {
+  await installPreviewFixture(page);
+  await openDream(page);
+  const before = await field(page);
+  let dialog = await inspectPreview(page, 1800, "mixed_7b");
+  await expect(
+    dialog.getByRole("button", { name: "Use as Dream target", exact: true }),
+  ).toBeHidden();
+  await dialog
+    .getByRole("button", { name: "Generate neuron preview", exact: true })
+    .click();
+  const image = dialog.locator(".neuron-explorer__detail img");
+  await expect(image).toBeVisible();
+  const url = await image.getAttribute("src");
+  await dialog
+    .getByRole("button", { name: "Close neuron explorer", exact: true })
+    .click();
+  dialog = await inspectPreview(page, 1800, "mixed_7b");
+  await expect(dialog.locator(".neuron-explorer__detail img")).toHaveAttribute(
+    "src",
+    url,
+  );
+  expect(await page.evaluate(() => window.__previewCalls)).toEqual([
+    "mixed_7b_1800",
+  ]);
+  for (const width of [360, 900, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    ).toBe(true);
+  }
+  expect(await field(page)).toEqual(before);
 });

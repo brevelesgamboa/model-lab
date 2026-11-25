@@ -22,78 +22,8 @@ import {
   CameraMotionEngine,
   CAMERA_BREATHING_MODES,
 } from "./neural-growth/camera-motion.js";
-import {
-  DreamGuidanceBridge,
-  INCEPTION_LAYER_CHANNELS,
-  getInceptionLayerChannels,
-  clampDreamChannel,
-} from "./neural-growth/dream-guidance.js";
 
 const STILL_PAN = Object.freeze([0, 0]);
-
-// Feature-ascent starting points inspired by https://distill.pub/2017/feature-visualization/.
-// These project presets are visual suggestions, not published identifications
-// of these exact InceptionV3 channels. Channel semantics depend on the checkpoint.
-export const CURATED_NEURONS = Object.freeze(
-  [
-    {
-      id: "ensemble",
-      name: "Full Ensemble",
-      layer: "mixed_6c",
-      channel: -1,
-      strength: 0.15,
-      desc: "All features at once: balanced, multi-scale dream patterns.",
-    },
-    {
-      id: "curve",
-      name: "Curve Detector",
-      layer: "mixed_6c",
-      channel: 144,
-      strength: 0.22,
-      desc: "Circular geometry: concentric rings, loops, and eye-like whorls.",
-    },
-    {
-      id: "gabor",
-      name: "Complex Gabor",
-      layer: "mixed_6c",
-      channel: 215,
-      strength: 0.25,
-      desc: "Directional waves: parallel ribs, arches, and flowing crests.",
-    },
-    {
-      id: "compound",
-      name: "Compound Texture",
-      layer: "mixed_6a",
-      channel: 82,
-      strength: 0.2,
-      desc: "Segmented tessellation: overlapping scales and armor-like plates.",
-    },
-    {
-      id: "surround",
-      name: "Center-Surround",
-      layer: "mixed_5c",
-      channel: 48,
-      strength: 0.18,
-      desc: "Radial pores: fine cellular foam, bubbles, and tiny vesicles.",
-    },
-    {
-      id: "hatch",
-      name: "Hatch Frequency",
-      layer: "mixed_5b",
-      channel: 120,
-      strength: 0.18,
-      desc: "Lattice grid: tight woven lines and orthogonal cross-hatching.",
-    },
-    {
-      id: "semantic",
-      name: "Semantic Parts",
-      layer: "mixed_7b",
-      channel: 312,
-      strength: 0.3,
-      desc: "Macro structures: high-order animal forms, limbs, and complex motifs.",
-    },
-  ].map(Object.freeze),
-);
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -127,7 +57,6 @@ export class NeuralGrowthModel {
     load = loadCheckpoint,
     createRuntime = (options) => new TextureNcaRuntime(options),
     capabilities = detectCapabilities(),
-    getInceptionModel = null,
   } = {}) {
     this.id = "neural-growth";
     this.name = "Neural Growth";
@@ -168,19 +97,12 @@ export class NeuralGrowthModel {
     this._lastPaletteTime = null;
     this._acousticEmitter = null;
     this._cameraMotion = new CameraMotionEngine();
-    this._dreamBridge = new DreamGuidanceBridge({ getInceptionModel, archetypes: CURATED_NEURONS });
-    this._dreamStepCounter = 0;
-    this._dreamRequestId = 0;
     this._effectiveZoom = 1.0;
     this._effectivePan = [0.0, 0.0];
     this._capabilities = capabilities;
     this._parameters = sanitizeParameters(this);
     this.lastError = null;
     this._failedConfiguration = null;
-  }
-
-  get dreamBridge() {
-    return this._dreamBridge;
   }
 
   get effectiveZoom() {
@@ -234,11 +156,7 @@ export class NeuralGrowthModel {
     return this.controlsForParameters(this._parameters);
   }
 
-  get neuronArchetypes() {
-    return CURATED_NEURONS;
-  }
-
-  controlsForParameters(parameters) {
+  controlsForParameters() {
     return [
       {
         key: "pattern",
@@ -1524,229 +1442,6 @@ export class NeuralGrowthModel {
         ],
         help: "Blending operator used to combine current frames with fading historical impressions.",
       },
-      {
-        key: "dreamEnabled",
-        label: "DREAM GUIDANCE",
-        type: "select",
-        default: "off",
-        options: [
-          {
-            value: "off",
-            label: "Off · Vanilla Growth",
-            compute: "neutral",
-            guidance: "Default. Pure cellular automaton growth rules.",
-          },
-          {
-            value: "on",
-            label: "On · Inception Guided",
-            compute: "balanced",
-            guidance: "Couples live InceptionV3 perceptual gradient ascent into the growing pattern.",
-          },
-        ],
-        help: "Injects live InceptionV3 perceptual gradients into the visible cell phenotype.",
-      },
-      {
-        key: "dreamStrength",
-        label: "DREAM STRENGTH",
-        type: "range",
-        min: 0.0,
-        max: 1.0,
-        step: 0.01,
-        default: 0.0,
-        modulation: false,
-        help: "Perceptual gradient injection strength into visible phenotype cells.",
-        getGuidance: (value) => {
-          const s = Number(value) || 0;
-          if (s <= 0.001) {
-            return {
-              compute: "neutral",
-              tag: "dormant",
-              text: "No perceptual gradients injected. Vanilla cellular growth.",
-            };
-          }
-          if (s <= 0.15) {
-            return {
-              compute: "balanced",
-              tag: "subtle",
-              text: "Subtle perceptual guidance. Preserves organic cellular texture while coaxing motifs.",
-            };
-          }
-          if (s <= 0.40) {
-            return {
-              compute: "balanced",
-              tag: "pronounced",
-              text: "Pronounced dream motifs. Inception features emerge visibly in cellular colonies.",
-            };
-          }
-          return {
-            compute: "intensive",
-            tag: "intense",
-            text: "Strong feature attractor. Deep dream forms dominate cellular morphogenesis.",
-          };
-        },
-      },
-      {
-        key: "dreamCadence",
-        label: "DREAM CADENCE",
-        type: "range",
-        min: 1,
-        max: 32,
-        step: 1,
-        default: 8,
-        modulation: false,
-        help: "Evaluate Inception perceptual gradients every K cellular steps.",
-        getGuidance: (value) => {
-          const k = Math.round(Number(value) || 8);
-          if (k <= 4) {
-            return {
-              compute: "intensive",
-              tag: "rapid",
-              text: "Evaluates every 1-4 steps. Fast guidance, high GPU load.",
-            };
-          }
-          if (k <= 12) {
-            return {
-              compute: "balanced",
-              tag: "recommended",
-              text: `Recommended (${k} steps). Fluid perceptual guidance with locked 60fps simulation.`,
-            };
-          }
-          return {
-            compute: "light",
-            tag: "relaxed",
-            text: `Evaluates every ${k} steps. Relaxed guidance, minimal compute overhead.`,
-          };
-        },
-      },
-      {
-        key: "targetLayer",
-        label: "DREAM LAYER",
-        type: "select",
-        default: "mixed_6c",
-        modulation: false,
-        options: Object.entries(INCEPTION_LAYER_CHANNELS).map(
-          ([value, channels]) => ({
-            value,
-            label: `${value} · ${channels} channels`,
-          }),
-        ),
-        help: "InceptionV3 layer depth for perceptual feature ascent guidance.",
-      },
-      {
-        key: "targetChannel",
-        label: "DREAM NEURON",
-        type: "range",
-        min: -1,
-        max: getInceptionLayerChannels(parameters?.targetLayer) - 1,
-        step: 1,
-        default: -1,
-        format: "integer",
-        modulation: false,
-        help: "Single feature channel (neuron) index to target, or -1 to optimize all channels simultaneously.",
-        getGuidance: (value) => {
-          const ch = Math.round(Number(value));
-          if (ch < 0) {
-            return {
-              compute: "balanced",
-              tag: "all-neurons",
-              text: "Optimizing all feature channels in the layer simultaneously.",
-            };
-          }
-          return {
-            compute: "intensive",
-            tag: `neuron #${ch}`,
-            text: `Isolating feature map channel #${ch} for single-neuron feature ascent.`,
-          };
-        },
-      },
-      {
-        key: "dreamJitter",
-        label: "DREAM JITTER",
-        type: "select",
-        default: "on",
-        options: [
-          {
-            value: "on",
-            label: "On · Spatial Roll",
-            compute: "balanced",
-            guidance: "Shifts input randomly by [-8, 8] px each cadence to diffuse dream motifs across boundaries.",
-          },
-          {
-            value: "off",
-            label: "Off · Static Alignment",
-            compute: "neutral",
-            guidance: "Fixes coordinate alignment to grid center without spatial translations.",
-          },
-        ],
-        help: "Random circular spatial roll during gradient ascent to eliminate edge seam artifacts.",
-      },
-      {
-        key: "dreamTvWeight",
-        label: "DREAM SMOOTHNESS (TV)",
-        type: "range",
-        min: 0.0,
-        max: 0.05,
-        step: 0.001,
-        default: 0.005,
-        modulation: false,
-        help: "Total Variation regularizer penalizing pixel-to-pixel discontinuity and high-frequency static.",
-        getGuidance: (value) => {
-          const w = Number(value) || 0;
-          if (w <= 0.0005) {
-            return {
-              compute: "neutral",
-              tag: "raw",
-              text: "Minimal TV penalty. Maximum feature contrast, higher static risk.",
-            };
-          }
-          if (w <= 0.015) {
-            return {
-              compute: "balanced",
-              tag: "clean",
-              text: "Balanced TV regularization. Eliminates checkerboard static while retaining contours.",
-            };
-          }
-          return {
-            compute: "gentle",
-            tag: "soft",
-            text: "Strong smoothness prior. Coaxes soft, painterly macro structures.",
-          };
-        },
-      },
-      {
-        key: "dreamChroma",
-        label: "DREAM CHROMINANCE",
-        type: "range",
-        min: 0.0,
-        max: 1.0,
-        step: 0.05,
-        default: 0.0,
-        format: "percent",
-        modulation: false,
-        help: "Ratio of chromatic color gradient versus structural luminance contrast. 0% is strictly achromatic structure.",
-        getGuidance: (value) => {
-          const c = Number(value) || 0;
-          if (c <= 0.01) {
-            return {
-              compute: "balanced",
-              tag: "structural",
-              text: "Zero color alteration. Guides morphology and edges purely via luminance contrast.",
-            };
-          }
-          if (c <= 0.3) {
-            return {
-              compute: "balanced",
-              tag: "subtle",
-              text: "Gentle pastel tints over structural contours.",
-            };
-          }
-          return {
-            compute: "intensive",
-            tag: "vivid",
-            text: "Full multi-channel color gradients.",
-          };
-        },
-      },
     ];
   }
 
@@ -1823,7 +1518,6 @@ export class NeuralGrowthModel {
   }
 
   cancel() {
-    this._invalidateDreamGuidance();
     this._epoch += 1;
     this._abort?.abort();
     this._abort = null;
@@ -1839,15 +1533,7 @@ export class NeuralGrowthModel {
     return this._pending || Promise.resolve();
   }
 
-  parameterDefaultsForChange(key, value, parameters = this._parameters) {
-    if (key === "targetLayer") {
-      return {
-        targetChannel: clampDreamChannel(
-          parameters?.targetChannel,
-          value,
-        ),
-      };
-    }
+  parameterDefaultsForChange(key, value) {
     if (key === "pattern") {
       const startup = getPattern(value).startup;
       if (!startup) return null;
@@ -1912,7 +1598,7 @@ export class NeuralGrowthModel {
     });
   }
 
-  normalizeStoredParameter(key, value, parameters = this._parameters) {
+  normalizeStoredParameter(key, value) {
     if (key === "audioProfile") {
       if (value === "ambient" || value === "rhythm") {
         return "custom";
@@ -2117,33 +1803,6 @@ export class NeuralGrowthModel {
       if (valid.includes(value)) return value;
       return "phosphor";
     }
-    if (key === "dreamEnabled") {
-      return value === "on" || value === true ? "on" : "off";
-    }
-    if (key === "dreamStrength") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.0, Math.min(1.0, num));
-      }
-      return 0.0;
-    }
-    if (key === "dreamCadence") {
-      const num = Math.round(Number(value));
-      if (Number.isInteger(num)) {
-        return Math.max(1, Math.min(32, num));
-      }
-      return 8;
-    }
-    if (key === "targetLayer") {
-      if (Object.hasOwn(INCEPTION_LAYER_CHANNELS, value)) return value;
-      return "mixed_6c";
-    }
-    if (key === "targetChannel") {
-      return clampDreamChannel(value, parameters?.targetLayer);
-    }
-    if (key === "dreamJitter") {
-      return value === "off" || value === false ? "off" : "on";
-    }
     if (key === "foldCount") {
       const num = Math.round(Number(value));
       if (Number.isFinite(num)) {
@@ -2158,64 +1817,18 @@ export class NeuralGrowthModel {
       }
       return 0.0;
     }
-    if (key === "dreamTvWeight") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.0, Math.min(0.05, num));
-      }
-      return 0.005;
-    }
-    if (key === "dreamChroma") {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        return Math.max(0.0, Math.min(1.0, num));
-      }
-      return 0.0;
-    }
     return value;
   }
 
   onParameterChange(key, value) {
-    if (key === "targetLayer" || key === "targetChannel") {
-      value = this.normalizeStoredParameter(key, value);
-    }
-    const previous = this._parameters?.[key];
-    if (
-      previous !== value &&
-      [
-        "targetLayer",
-        "targetChannel",
-        "dreamJitter",
-        "dreamTvWeight",
-        "dreamEnabled",
-        "pattern",
-        "seed",
-        "simulationSize",
-      ].includes(key)
-    )
-      this._invalidateDreamGuidance();
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
-    }
-    if (key === "targetLayer") {
-      this._parameters.targetChannel = clampDreamChannel(
-        this._parameters.targetChannel,
-        value,
-      );
     }
     if (
       key === "echoDecay" ||
       key === "echoDrift" ||
       key === "echoMode" ||
       key === "echoStyle" ||
-      key === "dreamEnabled" ||
-      key === "dreamStrength" ||
-      key === "dreamCadence" ||
-      key === "targetLayer" ||
-      key === "targetChannel" ||
-      key === "dreamJitter" ||
-      key === "dreamTvWeight" ||
-      key === "dreamChroma" ||
       key === "foldCount" ||
       key === "latentMomentum" ||
       key === "palette" ||
@@ -2298,16 +1911,6 @@ export class NeuralGrowthModel {
 
   async _render(canvas, parameters, timeSeconds, advance, epoch) {
     if (this._disposed) return null;
-    if (
-      [
-        "targetLayer",
-        "targetChannel",
-        "dreamJitter",
-        "dreamTvWeight",
-        "dreamEnabled",
-      ].some((key) => parameters[key] !== this._parameters[key])
-    )
-      this._invalidateDreamGuidance();
     const configuration = `${parameters.pattern}:${parameters.simulationSize}:${parameters.seed}`;
     let candidate = null;
     let runtimeOperation = false;
@@ -2409,7 +2012,6 @@ export class NeuralGrowthModel {
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
         });
-        this._invalidateDreamGuidance({ clearTexture: false });
         this._runtime?.dispose();
         this._runtime = candidate;
         this._activePattern = pattern.id;
@@ -2419,7 +2021,6 @@ export class NeuralGrowthModel {
         candidate = null;
       } else if (this._runtime.seed !== parameters.seed) {
         runtimeOperation = true;
-        this._invalidateDreamGuidance({ clearTexture: false });
         this._runtime.restart(parameters.seed);
         this._lastTick = null;
         this._accumulator = 0;
@@ -2448,12 +2049,6 @@ export class NeuralGrowthModel {
               (Number(parameters.rotation || 0) * Math.PI) / 180;
             const twistRad =
               (Number(parameters.twist || 0) * Math.PI) / 180;
-            const isDreamActive =
-              (parameters.dreamEnabled === "on" || parameters.dreamEnabled === true) &&
-              Number(parameters.dreamStrength) > 0.0001;
-            const effectiveDreamStrength = isDreamActive
-              ? Number(parameters.dreamStrength)
-              : 0.0;
             this._runtime.step(count, {
               rotation: angleRad,
               topology: parameters.topology,
@@ -2464,24 +2059,9 @@ export class NeuralGrowthModel {
               geometryCenterY: parameters.geometryCenterY,
               geometrySoftness: parameters.geometrySoftness,
               resonance: this._getResonanceConfig(),
-              dreamStrength: effectiveDreamStrength,
-              dreamChroma: Number(parameters.dreamChroma ?? 0.0),
               foldCount: parameters.foldCount,
               latentMomentum: parameters.latentMomentum,
             });
-            if (isDreamActive) {
-              this._dreamStepCounter += count;
-              const cadence = Math.max(1, Math.round(Number(parameters.dreamCadence) || 8));
-              if (this._dreamStepCounter >= cadence) {
-                this._dreamStepCounter %= cadence;
-                this._dispatchDreamGuidance(
-                  parameters.targetLayer,
-                  parameters.targetChannel,
-                  parameters.dreamJitter !== "off",
-                  parameters.dreamTvWeight,
-                );
-              }
-            }
             this._accumulator -= count;
           }
           const excessWholeSteps = Math.floor(this._accumulator);
@@ -2536,7 +2116,6 @@ export class NeuralGrowthModel {
     configuration = `${this._parameters.pattern}:${this._parameters.simulationSize}:${this._parameters.seed}`,
     { invalidateRuntime = true } = {},
   ) {
-    this._invalidateDreamGuidance({ clearTexture: false });
     this.lastError = error instanceof Error ? error.message : String(error);
     this._failedConfiguration = configuration;
     this._needsRuntime ||= invalidateRuntime;
@@ -2573,12 +2152,6 @@ export class NeuralGrowthModel {
     this._drainDisturbances();
     const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
     const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
-    const isDreamActive =
-      (this._parameters.dreamEnabled === "on" || this._parameters.dreamEnabled === true) &&
-      Number(this._parameters.dreamStrength) > 0.0001;
-    const effectiveDreamStrength = isDreamActive
-      ? Number(this._parameters.dreamStrength)
-      : 0.0;
     this._runRuntime(() =>
       this._runtime.step(1, {
         rotation: angleRad,
@@ -2590,25 +2163,10 @@ export class NeuralGrowthModel {
         geometryCenterY: this._parameters.geometryCenterY,
         geometrySoftness: this._parameters.geometrySoftness,
         resonance: this._getResonanceConfig(),
-        dreamStrength: effectiveDreamStrength,
-        dreamChroma: Number(this._parameters.dreamChroma ?? 0.0),
         foldCount: this._parameters.foldCount,
         latentMomentum: this._parameters.latentMomentum,
       }),
     );
-    if (isDreamActive) {
-      this._dreamStepCounter += 1;
-      const cadence = Math.max(1, Math.round(Number(this._parameters.dreamCadence) || 8));
-      if (this._dreamStepCounter >= cadence) {
-        this._dreamStepCounter %= cadence;
-        this._dispatchDreamGuidance(
-          this._parameters.targetLayer,
-          this._parameters.targetChannel,
-          this._parameters.dreamJitter !== "off",
-          this._parameters.dreamTvWeight,
-        );
-      }
-    }
     this._lastTick = null;
     this._accumulator = 0;
   }
@@ -2627,58 +2185,6 @@ export class NeuralGrowthModel {
     this._kickInputIndex = 0;
     this._lastTick = null;
     this._accumulator = 0;
-    this._invalidateDreamGuidance({ clearTexture: false });
-  }
-
-  _invalidateDreamGuidance({ clearTexture = true } = {}) {
-    this._dreamRequestId += 1;
-    this._dreamStepCounter = 0;
-    this._dreamBridge?.resetMomentum?.();
-    if (clearTexture) this._runtime?.clearDreamGradient?.();
-  }
-
-  _dispatchDreamGuidance(
-    targetLayer,
-    targetChannel = -1,
-    jitter = true,
-    tvWeight = 0.005,
-  ) {
-    if (!this._runtime || !this._dreamBridge || this._dreamBridge.isBusy) {
-      return;
-    }
-    const runtime = this._runtime;
-    const requestId = ++this._dreamRequestId;
-    const epoch = this._epoch;
-    const current = () =>
-      !this._disposed &&
-      runtime === this._runtime &&
-      !runtime.disposed &&
-      requestId === this._dreamRequestId &&
-      epoch === this._epoch;
-    try {
-      const rgbBytes = runtime.readPhenotypeRgb(192, 192);
-      return this._dreamBridge
-        .computeGradient(
-          rgbBytes,
-          192,
-          192,
-          targetLayer,
-          targetChannel,
-          jitter,
-          tvWeight,
-        )
-        .then((gradBytes) => {
-          if (gradBytes && current()) {
-            runtime.updateDreamGradient(gradBytes, 192, 192);
-          }
-        })
-        .catch((error) => {
-          if (current())
-            console.warn("[DreamGuidance] Gradient evaluation error:", error);
-        });
-    } catch (err) {
-      console.warn("[DreamGuidance] Phenotype read error:", err);
-    }
   }
 
   setGeometryCenter(cx, cy) {
@@ -3036,7 +2542,6 @@ export class NeuralGrowthModel {
   dispose() {
     this.cancel();
     this._disposed = true;
-    this._dreamBridge?.dispose();
     this._runtime?.dispose();
     this._runtime = null;
     this._checkpoints.clear();

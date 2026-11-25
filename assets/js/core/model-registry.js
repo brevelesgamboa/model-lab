@@ -1,3 +1,4 @@
+import { NeuronPreviewProvider } from "../models/neural-growth/neuron-preview-provider.js";
 import { DigiFaceVaeModel } from "../models/digiface-vae.js";
 import { createGpuModels } from "../models/gpu-fields.js";
 import { FractalFunctionModel } from "../models/fractal-functions.js";
@@ -19,12 +20,14 @@ export class ModelRegistry {
   constructor() {
     this.customModel = new CustomPcaModel();
     this.neuralModel = new LocalNeuralModel();
-    const inceptionDream = new InceptionDreamModel({
-      onModelReady: (model) => neuralGrowth.dreamBridge.onModelReady(model),
-    });
-    const neuralGrowth = new NeuralGrowthModel({
+    let inceptionDream;
+    this.neuronPreviews = new NeuronPreviewProvider({
       getInceptionModel: () => inceptionDream,
     });
+    inceptionDream = new InceptionDreamModel({
+      onModelReady: (model) => this.neuronPreviews.onModelReady(model),
+    });
+    const neuralGrowth = new NeuralGrowthModel();
     this.models = [
       ...createGpuModels(),
       new FractalFunctionModel(),
@@ -76,6 +79,7 @@ export class ModelRegistry {
   }
 
   dispose() {
+    this.neuronPreviews.dispose();
     this.models.forEach((model) => model.dispose?.());
   }
 }

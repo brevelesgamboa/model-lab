@@ -50,7 +50,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   const neurons = await page.evaluate(
     async () =>
-      (await import("/assets/js/models/neural-growth.js")).CURATED_NEURONS,
+      (await import("/assets/js/models/neural-growth/neuron-archetypes.js")).CURATED_NEURONS,
   );
   await page.evaluate(async () => {
     const { InceptionDreamModel } =
@@ -62,7 +62,7 @@ try {
     images.push(
       await page.evaluate(async ({ layer, channel }) => {
         const { generateNeuronPreview } =
-          await import("/assets/js/models/neural-growth/dream-guidance.js");
+          await import("/assets/js/models/neural-growth/neuron-preview-provider.js");
         const {
           previewSeed,
           NEURON_PREVIEW_RECIPE,

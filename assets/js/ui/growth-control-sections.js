@@ -39,20 +39,6 @@ export const GROWTH_CONTROL_SECTIONS = Object.freeze([
     ],
   },
   {
-    id: "dream",
-    label: "Dream",
-    keys: [
-      "dreamEnabled",
-      "dreamStrength",
-      "dreamCadence",
-      "targetLayer",
-      "targetChannel",
-      "dreamJitter",
-      "dreamTvWeight",
-      "dreamChroma",
-    ],
-  },
-  {
     id: "display",
     label: "Display",
     keys: [

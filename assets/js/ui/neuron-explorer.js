@@ -62,7 +62,10 @@ export function createNeuronExplorer({
       ? "a visual sensor or Dream target"
       : "a visual sensor"
     : "a Dream target";
-  note.textContent = `InceptionV3 · Inspect a channel, then use it as ${purpose}. Previews show optimized feature examples. New previews generate only when you ask.`;
+  note.textContent =
+    onSelect || onSensorSelect
+      ? `InceptionV3 · Inspect a channel, then use it as ${purpose}. Previews show optimized feature examples. New previews generate only when you ask.`
+      : "InceptionV3 · Browse optimized feature examples. New previews generate only when you ask; browsing does not change the source image or feature ascent settings.";
   const toolbar = document.createElement("div");
   toolbar.className = "neuron-explorer__toolbar";
   const layerLabel = document.createElement("label");

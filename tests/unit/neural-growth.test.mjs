@@ -18,8 +18,8 @@ const checkpointUrl = new URL(
   import.meta.url,
 );
 
-test("resonance feedback resolves canonical and legacy shader uniforms once per program", () => {
-  for (const available of ["u_resonanceFeedback", "u_latentFeedback", null]) {
+test("resonance feedback resolves the canonical shader uniform once per program", () => {
+  for (const available of ["u_resonanceFeedback", null]) {
     const queries = [];
     const uploads = [];
     const location = {};
@@ -46,9 +46,7 @@ test("resonance feedback resolves canonical and legacy shader uniforms once per 
     runtime.run("update", null, {}, { u_resonanceFeedback: 0.4 });
     assert.deepEqual(
       queries,
-      available === "u_resonanceFeedback"
-        ? ["u_size", "u_resonanceFeedback"]
-        : ["u_size", "u_resonanceFeedback", "u_latentFeedback"],
+      ["u_size", "u_resonanceFeedback"],
     );
     assert.deepEqual(uploads, [
       [available ? location : null, 0.2],

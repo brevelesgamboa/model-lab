@@ -16,7 +16,7 @@ export function createNeuronGallery({
   const note = document.createElement("p");
   note.className = "neuron-gallery__note";
   note.append(
-    "InceptionV3 feature previews and Dream targets. Curated names describe suggested appearances; trained growth patterns are in the Growth gallery. ",
+    "InceptionV3 feature previews. Curated names describe suggested appearances rather than fixed channel identities. ",
   );
   const source = document.createElement("a");
   source.href = "https://distill.pub/2017/feature-visualization/";

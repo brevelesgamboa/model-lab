@@ -8,8 +8,7 @@ import { getAudioRoute } from "../core/modulation-matrix.js";
 import { supportsModulation } from "../core/model-contract.js";
 import { modulationIsActive } from "../ui/modulation-panel.js";
 import { createNeuronGallery } from "../ui/neuron-gallery.js";
-import { createNeuronExplorer } from "../ui/neuron-explorer.js";
-import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
+import { CURATED_NEURONS } from "../models/neural-growth/neuron-archetypes.js";
 import { isPausedAudioControl } from "../models/neural-growth/audio-effects.js";
 import {
   GROWTH_BRUSH_KEYS,
@@ -119,7 +118,8 @@ export function renderModelTechnicalInfo(elements, model) {
   if (info.provenanceUrl) {
     const link = document.createElement("a");
     link.href = info.provenanceUrl;
-    link.textContent = info.provenanceLabel || "Checkpoint attribution and license";
+    link.textContent =
+      info.provenanceLabel || "Checkpoint attribution and license";
     link.target = "_blank";
     link.rel = "noopener";
     elements.modelInfoContent.append(link);
@@ -139,7 +139,7 @@ export function createControlsController({
   elements,
   controlElements,
   getModel,
-  getNeuronModel = getModel,
+  neuronPreviews,
   getParameters,
   getLfoState,
   onPreset,
@@ -148,11 +148,9 @@ export function createControlsController({
   onInfo,
   makeModulationPanel,
   onModulationOpen,
-  onNeuronPreset,
 }) {
   let presetSelect = null;
   let neuronGallery = null;
-  let sensorExplorer = null;
   const sectionsKey = "gl-bench:control-sections";
   let sectionState = {};
   try {
@@ -162,52 +160,6 @@ export function createControlsController({
     /* Storage is optional. */
   }
 
-  function selectSensorNeuron({ layer, channel }) {
-    inceptionSensor.setTarget(layer, channel);
-    for (const control of controlElements.values())
-      control.modulationDrawer?.sync();
-  }
-
-  function openSensorNeurons() {
-    const target = inceptionSensor.getTarget();
-    if (neuronGallery) return neuronGallery.open({ inspectTarget: target });
-    if (!sensorExplorer) {
-      const model = getNeuronModel();
-      sensorExplorer = createNeuronExplorer({
-        parameters: {
-          targetLayer: target.layer,
-          targetChannel: target.channel,
-        },
-        neurons: model.neuronArchetypes,
-        previewBridge: model.dreamBridge,
-        onSensorSelect: selectSensorNeuron,
-      });
-    }
-    sensorExplorer.update({
-      targetLayer: target.layer,
-      targetChannel: target.channel,
-    });
-    return sensorExplorer.open({ inspectTarget: target });
-  }
-
-  function syncNeuronGallery(options) {
-    if (!neuronGallery) return;
-    const parameters = getParameters();
-    neuronGallery.update(parameters, options);
-    const channel = controlElements.get("targetChannel");
-    const definition = getModel()
-      .controlsForParameters(parameters)
-      .find((entry) => entry.key === "targetChannel");
-    if (!channel || !definition) return;
-    // Keep the object captured by the range/stepper listeners current too.
-    Object.assign(channel.definition, definition);
-    channel.slider.max = channel.fine.max = String(definition.max);
-    channel.slider.value = channel.fine.value = String(
-      parameters.targetChannel,
-    );
-    channel.guidance.update(parameters.targetChannel);
-    updateRangeProgress(channel.slider);
-  }
   function makeLabel(definition) {
     const wrapper = document.createElement("span");
     wrapper.className = "control-label-wrap";
@@ -322,10 +274,6 @@ export function createControlsController({
     const currentParameters = getParameters();
     const currentLfoState = getLfoState();
     neuronGallery?.dispose();
-    sensorExplorer?.dispose();
-    sensorExplorer = null;
-    for (const control of controlElements.values())
-      control.modulationDrawer?.dispose();
     for (const section of elements.parameterControls.querySelectorAll(
       ".control-section",
     )) {
@@ -380,17 +328,16 @@ export function createControlsController({
       }
       if (currentModel.id === "neural-growth") {
         sectionContents.get("pattern")?.append(elements.growthTools);
-        const browseNeurons = document.createElement("button");
-        browseNeurons.type = "button";
-        browseNeurons.className = "mini-button browse-neurons";
-        browseNeurons.textContent = "Browse neurons";
-        browseNeurons.addEventListener("click", () => {
-          const dreamParent = sectionContents.get("dream")?.parentElement;
-          if (dreamParent) dreamParent.open = true;
-          neuronGallery?.open();
-        });
-        sectionContents.get("pattern")?.append(browseNeurons);
       }
+    }
+
+    if (currentModel.id === "inception-dream") {
+      neuronGallery = createNeuronGallery({
+        neurons: CURATED_NEURONS,
+        parameters: { targetLayer: "mixed_6c", targetChannel: -1 },
+        previewBridge: neuronPreviews,
+      });
+      elements.parameterControls.append(neuronGallery.element);
     }
 
     const definitions =
@@ -404,31 +351,15 @@ export function createControlsController({
       )
         return;
       const section = grouped
-        ? modelSections.find(({ keys }) =>
-            keys.includes(definition.key),
-          )?.id || modelSections[0]?.id
+        ? modelSections.find(({ keys }) => keys.includes(definition.key))?.id ||
+          modelSections[0]?.id
         : null;
       const parent = grouped
         ? sectionContents.get(section) || elements.parameterControls
         : elements.parameterControls;
-      if (definition.key === "targetLayer" && currentModel.neuronArchetypes) {
-        neuronGallery = createNeuronGallery({
-          neurons: currentModel.neuronArchetypes,
-          parameters: currentParameters,
-          onSelect: onNeuronPreset,
-          onSensorSelect: selectSensorNeuron,
-          previewBridge: currentModel.dreamBridge,
-        });
-        parent.append(neuronGallery.element);
-      }
       const block = document.createElement("div");
       block.className = "control-block";
       block.dataset.parameter = definition.key;
-      if (definition.key === "targetChannel" && currentModel.neuronArchetypes) {
-        block.id = "dream-channel-control";
-        block.hidden = true;
-        block.style.display = "none";
-      }
 
       if (definition.type === "range") {
         const head = document.createElement("div");
@@ -775,8 +706,6 @@ export function createControlsController({
 
   return {
     render,
-    syncNeuronGallery,
-    openSensorNeurons,
     setPreset: (name) => {
       if (presetSelect) presetSelect.value = name;
     },

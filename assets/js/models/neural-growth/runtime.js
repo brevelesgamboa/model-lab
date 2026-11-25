@@ -307,13 +307,10 @@ uniform sampler2D u_state;
 uniform sampler2D u_delta;
 uniform sampler2D u_inverse;
 uniform sampler2D u_barrier;
-uniform sampler2D u_dreamGrad;
 uniform ivec2 u_offset;
 uniform float u_resonanceFeedback;
 uniform float u_latentDecay;
 uniform float u_noiseStrength;
-uniform float u_dreamStrength;
-uniform float u_dreamChroma;
 uniform float u_latentMomentum;
 uniform int u_stepSeed;
 
@@ -348,13 +345,6 @@ void main() {
     int(round(inverse.g * 255.0)) + highY * 256
   );
   vec4 delta = decodeState(texelFetch(u_delta, ivec2(compressed.x + group * u_size, compressed.y), 0));
-  if (group == 0 && u_dreamStrength > 0.0001) {
-    vec2 dreamUv = (vec2(xy) + 0.5) / float(u_size);
-    vec3 dreamDelta = (textureLod(u_dreamGrad, dreamUv, 0.0).rgb - 127.0 / 255.0) * 2.0;
-    float dreamLum = dot(dreamDelta, vec3(0.299, 0.587, 0.114));
-    vec3 effectiveDream = mix(vec3(dreamLum), dreamDelta, clamp(u_dreamChroma, 0.0, 1.0));
-    delta.rgb += effectiveDream * u_dreamStrength;
-  }
   if (group > 0 && u_noiseStrength > 0.0001) {
     delta += hashNoise(xy, group, u_stepSeed) * u_noiseStrength;
   }
@@ -1069,14 +1059,6 @@ export class TextureNcaRuntime {
       this.weights = model.layers.map((layer) =>
         this.allocate(layer.shape[1] / 4, layer.shape[0], false, layer.weights),
       );
-      const neutralGradient = new Uint8Array(192 * 192 * 4).fill(127);
-      this.dreamGradTexture = this.allocate(192, 192, false, neutralGradient);
-      gl.bindTexture(gl.TEXTURE_2D, this.dreamGradTexture.texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      this.dreamStrength = 0.0;
-      this.dreamChroma = 0.0;
-      this._phenotypeTarget = null;
       this.rotation = 0;
       this.topology = "square";
       this.coordinateTransform = "cartesian";
@@ -1221,9 +1203,7 @@ export class TextureNcaRuntime {
     gl.bindVertexArray(this.vao);
     const location = (key) => {
       if (!program.locations.has(key)) {
-        let value = gl.getUniformLocation(program.handle, key);
-        if (value === null && key === "u_resonanceFeedback")
-          value = gl.getUniformLocation(program.handle, "u_latentFeedback");
+        const value = gl.getUniformLocation(program.handle, key);
         program.locations.set(key, value);
       }
       return program.locations.get(key);
@@ -1322,23 +1302,6 @@ export class TextureNcaRuntime {
         gl.clear(gl.COLOR_BUFFER_BIT);
       }
     }
-    if (this.dreamGradTexture) {
-      const gw = this.dreamGradTexture.width;
-      const gh = this.dreamGradTexture.height;
-      const neutralGradient = new Uint8Array(gw * gh * 4).fill(127);
-      gl.bindTexture(gl.TEXTURE_2D, this.dreamGradTexture.texture);
-      gl.texSubImage2D(
-        gl.TEXTURE_2D,
-        0,
-        0,
-        0,
-        gw,
-        gh,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        neutralGradient,
-      );
-    }
     this.clearMotionField();
     this.steps = 0;
   }
@@ -1355,8 +1318,6 @@ export class TextureNcaRuntime {
       geometryCenterY = this.geometryCenterY,
       geometrySoftness = this.geometrySoftness,
       resonance = this.resonance,
-      dreamStrength = this.dreamStrength,
-      dreamChroma = this.dreamChroma,
       foldCount = this.foldCount,
       latentMomentum = this.latentMomentum,
     } = {},
@@ -1371,12 +1332,6 @@ export class TextureNcaRuntime {
       : 6.0;
     this.latentMomentum = Number.isFinite(Number(latentMomentum))
       ? Math.max(0.0, Math.min(0.9, Number(latentMomentum)))
-      : 0.0;
-    this.dreamStrength = Number.isFinite(Number(dreamStrength))
-      ? Math.max(0.0, Math.min(1.0, Number(dreamStrength)))
-      : 0.0;
-    this.dreamChroma = Number.isFinite(Number(dreamChroma))
-      ? Math.max(0.0, Math.min(1.0, Number(dreamChroma)))
       : 0.0;
     this.geometryStrength = clampGeometryStrength(geometryStrength);
     this.geometryCenterX = Number.isFinite(Number(geometryCenterX))
@@ -1474,15 +1429,12 @@ export class TextureNcaRuntime {
           u_delta: this.delta,
           u_inverse: this.inverseTexture,
           u_barrier: this.barrier,
-          u_dreamGrad: this.dreamGradTexture,
         },
         {
           u_offset: this.lastOffset,
           u_resonanceFeedback: resUniforms?.latentFeedback ?? 0.0,
           u_latentDecay: resUniforms?.latentDecay ?? 1.0,
           u_noiseStrength: resUniforms?.noiseStrength ?? 0.0,
-          u_dreamStrength: this.dreamStrength,
-          u_dreamChroma: this.dreamChroma,
           u_latentMomentum: this.latentMomentum,
           u_stepSeed: resUniforms?.stepSeed ?? 0,
         },
@@ -1518,7 +1470,7 @@ export class TextureNcaRuntime {
       {
         u_state: this.state,
         u_barrier: this.barrier,
-        u_velocity: this._motionFieldTexture || this.dreamGradTexture,
+        u_velocity: this._motionFieldTexture || this.state,
       },
       {
         u_flowField: field === "learned" ? 2 : field === "vortex" ? 1 : 0,
@@ -1920,85 +1872,6 @@ export class TextureNcaRuntime {
     context.drawImage(this.canvas, drawX, drawY, extent, extent);
   }
 
-  clearDreamGradient() {
-    if (this.disposed || !this.dreamGradTexture || this.gl.isContextLost())
-      return;
-    const { width, height } = this.dreamGradTexture;
-    this.updateDreamGradient(
-      new Uint8Array(width * height * 4).fill(127),
-      width,
-      height,
-    );
-  }
-
-  updateDreamGradient(uint8Array, width = 192, height = 192) {
-    this.assertActive();
-    if (!uint8Array || uint8Array.length !== width * height * 4) return;
-    const gl = this.gl;
-    if (
-      !this.dreamGradTexture ||
-      this.dreamGradTexture.width !== width ||
-      this.dreamGradTexture.height !== height
-    ) {
-      this.dreamGradTexture = this.allocate(width, height, false, uint8Array);
-      gl.bindTexture(gl.TEXTURE_2D, this.dreamGradTexture.texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      return;
-    }
-    gl.bindTexture(gl.TEXTURE_2D, this.dreamGradTexture.texture);
-    gl.texSubImage2D(
-      gl.TEXTURE_2D,
-      0,
-      0,
-      0,
-      width,
-      height,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      uint8Array,
-    );
-  }
-
-  readPhenotypeRgb(targetWidth = 192, targetHeight = 192) {
-    this.assertActive();
-    const gl = this.gl;
-    if (
-      !this._phenotypeTarget ||
-      this._phenotypeTarget.width !== targetWidth ||
-      this._phenotypeTarget.height !== targetHeight
-    ) {
-      this._phenotypeTarget = this.allocate(targetWidth, targetHeight, true);
-    }
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.state.framebuffer);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._phenotypeTarget.framebuffer);
-    gl.blitFramebuffer(
-      0,
-      0,
-      this.size,
-      this.size,
-      0,
-      0,
-      targetWidth,
-      targetHeight,
-      gl.COLOR_BUFFER_BIT,
-      gl.LINEAR,
-    );
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this._phenotypeTarget.framebuffer);
-    const rawBytes = new Uint8Array(targetWidth * targetHeight * 4);
-    gl.readPixels(
-      0,
-      0,
-      targetWidth,
-      targetHeight,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      rawBytes,
-    );
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return rawBytes;
-  }
-
   readState() {
     this.assertActive();
     const gl = this.gl;
@@ -2137,8 +2010,6 @@ export class TextureNcaRuntime {
     this.programs.length = 0;
     this.vao = null;
     this.textureBytes = 0;
-    this._phenotypeTarget = null;
-    this.dreamGradTexture = null;
     this._motionFieldTexture = null;
     this._motionFieldMax = 0;
     this.canvas.width = 1;

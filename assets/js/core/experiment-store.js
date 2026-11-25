@@ -35,14 +35,6 @@ function normalizeRecord(record) {
       record.audioModulation && typeof record.audioModulation === "object"
         ? record.audioModulation
         : {},
-    inceptionSensorTarget:
-      record.inceptionSensorTarget &&
-      typeof record.inceptionSensorTarget === "object"
-        ? {
-            layer: String(record.inceptionSensorTarget.layer || ""),
-            channel: Number(record.inceptionSensorTarget.channel),
-          }
-        : null,
     animationRunning: Boolean(record.animationRunning),
     guidedMotion:
       record.guidedMotion && typeof record.guidedMotion === "object"
@@ -230,7 +222,6 @@ export const ExperimentStore = {
         JSON.stringify(record.effectiveParameters || {}),
         JSON.stringify(record.modulation || {}),
         JSON.stringify(record.audioModulation || {}),
-        JSON.stringify(record.inceptionSensorTarget || null),
         JSON.stringify(record.guidedMotion || {}),
         JSON.stringify(record.anchors || {}),
         JSON.stringify(record.modelMetrics || {}),

@@ -1,11 +1,9 @@
 import { clamp } from "./utils.js";
-import { inceptionSensor } from "../models/neural-growth/inception-sensor.js";
 
 const AUDIO_MODULATION_SOURCES = Object.freeze([
   { value: "none", label: "NONE" },
   { value: "bass", label: "BASS / MUSIC" },
   { value: "kick", label: "KICK" },
-  { value: "inception", label: "NEURAL ENERGY" },
 ]);
 
 const VALID_SOURCES = new Set(
@@ -86,13 +84,7 @@ export function hasModulationSource(modelId, source) {
 }
 
 export function getModulationLevel(source, levels) {
-  return clamp(
-    Number(
-      source === "inception" ? inceptionSensor.getLevel() : levels?.[source],
-    ) || 0,
-    0,
-    1,
-  );
+  return clamp(Number(levels?.[source]) || 0, 0, 1);
 }
 
 export function applyAudioModulation(definition, value, route, levels) {

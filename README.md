@@ -7,11 +7,11 @@ A browser playground for generative graphics and neural visualization, built wit
 ## What is Inside
 
 - **Fractals & Chromatic Flow:** Explore animated fractals and shader fields with interactive controls.
-- **Neural Growth:** Grow and brush living NCA textures, explore trained checkpoints, and apply live Inception dream guidance.
+- **Neural Growth:** Grow and brush living NCA textures with trained checkpoints, geometry transforms, and temporal effects.
 - **Inception Dream:** Transform uploaded images through InceptionV3 feature ascent.
 - **Cortical Dream Dome:** Explore a 360° panoramic photo dome with live Neural Growth NCA relief, bio-sheen, autonomous drift, audio-reactive ripples, and optional MI-GAN outpainting.
 - **3D Cortical Topography:** Orbit a photo-derived surface with depth and neural relief, animated cortical waves, and pan/zoom controls.
-- **Neuron Explorer:** Browse InceptionV3 channels, generate and cache feature previews, save favorites, and select dream targets.
+- **Neuron Explorer:** Browse InceptionV3 channels, generate and cache feature previews, and bookmark favorites.
 - **DigiFace Generator:** Explore a local ONNX face decoder through latent-coordinate and color controls.
 - **Workbench:** Shared controls, Saved Runs, browser training, model-specific PNG/GIF export, and audio/LFO modulation.
 
@@ -50,8 +50,8 @@ npm run test:browser
 ## How It Works and Performance Tips
 
 - **Local data:** Uploaded images are processed in the browser; saved runs and preview caches use browser storage.
-- **GPU and resolution:** WebGL2 is required. Lower the simulation grid or preview resolution if NCA growth or Inception guidance becomes slow.
-- **Neuron previews:** Generate previews on demand or in a background batch that yields to live guidance; enable local caching to reuse them after reload.
+- **GPU and resolution:** WebGL2 is required. Lower the simulation grid or preview resolution if NCA growth or Inception feature ascent becomes slow.
+- **Neuron previews:** Generate previews on demand or in a background batch that yields to standalone Inception ascent; enable local caching to reuse them after reload.
 
 ---
 

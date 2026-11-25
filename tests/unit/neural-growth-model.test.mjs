@@ -10,6 +10,7 @@ import {
 import {
   captureCapabilities,
   defaultParameters,
+  sanitizeParameters,
   validateModelDefinition,
 } from "../../assets/js/core/model-contract.js";
 import {
@@ -428,36 +429,7 @@ test("simulation clock preserves fractional remainder across irregular frames an
   assert.equal(runtimes[0].steps, 7);
 });
 
-test("dream guidance cadence strictly reflects executed steps", async (context) => {
-  const { model, params, canvas, runtimes } = setup(context);
-  const live = { advanceSimulation: true };
-  const dispatched = [];
-  model._dispatchDreamGuidance = (...args) => dispatched.push(args);
 
-  const dreamParams = {
-    ...params,
-    growthSpeed: 30,
-    dreamEnabled: "on",
-    dreamStrength: 0.1,
-    dreamCadence: 4,
-  };
-
-  await model.render(canvas, dreamParams, 0);
-  model.setClockRunning(true);
-  await model.render(canvas, dreamParams, 0, live);
-
-  // Execute 3 steps in one frame (t = 0.1s at 10 FPS)
-  await model.render(canvas, dreamParams, 0.1, live);
-  assert.equal(runtimes[0].steps, 3);
-  assert.equal(model._dreamStepCounter, 3);
-  assert.equal(dispatched.length, 0);
-
-  // Execute another 3 steps (t = 0.2s) -> total 6 steps -> triggers cadence 4 once, remainder 2
-  await model.render(canvas, dreamParams, 0.2, live);
-  assert.equal(runtimes[0].steps, 6);
-  assert.equal(model._dreamStepCounter, 2);
-  assert.equal(dispatched.length, 1);
-});
 
 test("failed initialization is latched until explicit retry; stale loads cannot paint", async (context) => {
   let loads = 0;
@@ -1703,3 +1675,20 @@ test("restored audio effects cannot inject state or override manual zoom", async
 
 
 
+
+
+test("legacy guidance parameters are ignored while pure NCA state and temporal controls remain usable", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  const retired = {
+    dreamEnabled: "on", dreamStrength: 1, dreamCadence: 1,
+    targetLayer: "mixed_7b", targetChannel: 1800,
+    dreamJitter: "on", dreamTvWeight: 0.02, dreamChroma: 1,
+  };
+  const restored = sanitizeParameters(model, { ...params, ...retired, latentMomentum: 0.4 });
+  for (const key of Object.keys(retired)) assert.equal(Object.hasOwn(restored, key), false, key);
+  await model.render(canvas, restored, 0);
+  model.step();
+  assert.equal(runtimes[0].steps, 1);
+  assert.equal(runtimes[0].lastStepOptions.latentMomentum, 0.4);
+  for (const key of Object.keys(retired)) assert.equal(Object.hasOwn(runtimes[0].lastStepOptions, key), false, key);
+});
