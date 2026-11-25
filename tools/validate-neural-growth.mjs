@@ -341,7 +341,7 @@ async function main() {
   }
   const output =
     options.output ??
-    (await mkdtemp(path.join(os.tmpdir(), "latent-field-nca-validation-")));
+    (await mkdtemp(path.join(os.tmpdir(), "gl-bench-nca-validation-")));
   await mkdir(output, { recursive: true });
   console.log(`Validation artifacts: ${output}`);
   const report = {

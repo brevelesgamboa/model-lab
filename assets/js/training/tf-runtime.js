@@ -12,7 +12,7 @@ function loadScript(src) {
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
-    script.dataset.latentFieldRuntime = "tensorflow-js";
+    script.dataset.glBenchRuntime = "tensorflow-js";
     script.onload = resolve;
     script.onerror = () => {
       script.remove();

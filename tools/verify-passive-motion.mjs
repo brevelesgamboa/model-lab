@@ -11,7 +11,7 @@ import { createStaticServer } from "../server.mjs";
 const args = process.argv.slice(2);
 const output = path.resolve(
   args.find((arg) => !arg.startsWith("--")) ||
-    "/tmp/latent-field-passive-motion",
+    "/tmp/gl-bench-passive-motion",
 );
 const quick = args.includes("--quick"),
   long = args.includes("--long");

@@ -111,7 +111,7 @@ if (
   const host = process.env.HOST || "127.0.0.1";
   const server = await createStaticServer(root);
   server.listen(port, host, () => {
-    console.log("LATENT FIELD serving " + root);
+    console.log("gl-bench serving " + root);
     console.log("Open http://" + host + ":" + server.address().port);
   });
 }

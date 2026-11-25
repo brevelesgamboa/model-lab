@@ -11,7 +11,7 @@ import { createStaticServer } from "../server.mjs";
 const quick = process.argv.includes("--quick");
 const output = path.resolve(
   process.argv.slice(2).find((arg) => !arg.startsWith("--")) ||
-    "/tmp/latent-field-inception-motion",
+    "/tmp/gl-bench-inception-motion",
 );
 const root = fileURLToPath(new URL("../", import.meta.url));
 await mkdir(path.join(output, "frames"), { recursive: true });

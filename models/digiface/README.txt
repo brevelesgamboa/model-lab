@@ -1,6 +1,6 @@
 DIGIFACE_LATENT_VAE_01 deployment model
 
-This directory contains the default browser decoder used by LATENT FIELD:
+This directory contains the default browser decoder used by gl-bench:
 
     digiface_decoder.onnx
 

@@ -79,7 +79,7 @@ async function main() {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > 10000)
     throw new Error("Iterations must be 1–10000.");
   const output = path.resolve(
-    process.argv[3] || "/tmp/latent-field-membrane-training",
+    process.argv[3] || "/tmp/gl-bench-membrane-training",
   );
   await mkdir(output, { recursive: true });
   const pattern = process.argv[4] || "membrane-field";

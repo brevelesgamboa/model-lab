@@ -1,7 +1,7 @@
 # Neural Growth attribution and provenance
 
 Neural Growth evaluates one published Texture Neural Cellular
-Automaton (NCA). It is not a newly trained Latent Field model, a biological
+Automaton (NCA). It is not a newly trained gl-bench model, a biological
 simulation, or a model of human perception. The main application and development
 harness share this checkpoint and the same inference engine.
 

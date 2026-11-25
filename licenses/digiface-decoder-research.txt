@@ -1,4 +1,4 @@
-Latent Field DigiFace-derived decoder — Non-commercial Research Terms
+gl-bench DigiFace-derived decoder — Non-commercial Research Terms
 
 Scope: models/digiface/digiface_decoder.onnx (DIGIFACE_LATENT_VAE_01).
 These terms apply to the decoder weights, not the application source code.

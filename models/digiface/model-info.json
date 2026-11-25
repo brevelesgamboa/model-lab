@@ -7,7 +7,7 @@
   "datasetAgreement": "Research Use of Data Agreement v1.0",
   "modelTerms": "licenses/digiface-decoder-research.txt",
   "trainingProvenance": {
-    "trainedBy": "Latent Field project author",
+    "trainedBy": "gl-bench project author",
     "trainedFromScratch": true,
     "pretrainedInitialization": false,
     "assistance": "ChatGPT-assisted training workflow",

@@ -59,7 +59,7 @@ export function buildAutoencoder(
   const encoder = tf.model({
     inputs: imageInput,
     outputs: latent,
-    name: "latent_field_encoder",
+    name: "gl_bench_encoder",
   });
 
   const latentInput = tf.input({ shape: [latentDim], name: "latent_input" });
@@ -104,13 +104,13 @@ export function buildAutoencoder(
   const decoder = tf.model({
     inputs: latentInput,
     outputs: decoded,
-    name: "latent_field_decoder",
+    name: "gl_bench_decoder",
   });
   const reconstruction = decoder.apply(encoder.apply(imageInput));
   const trainingModel = tf.model({
     inputs: imageInput,
     outputs: reconstruction,
-    name: "latent_field_autoencoder",
+    name: "gl_bench_autoencoder",
   });
   trainingModel.compile({
     optimizer: tf.train.adam(0.001),

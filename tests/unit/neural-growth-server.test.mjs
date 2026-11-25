@@ -52,7 +52,7 @@ for (const file of ["runtime.js", "reference.js"]) {
 
 async function createFixture(context, { populate = true } = {}) {
   const root = await mkdtemp(
-    path.join(os.tmpdir(), "latent-field-nca-server-test-"),
+    path.join(os.tmpdir(), "gl-bench-nca-server-test-"),
   );
   // This exact, uniquely allocated fixture is the only recursively removed target.
   context.after(() => rm(root, { recursive: true, force: true }));

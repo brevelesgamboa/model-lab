@@ -6,7 +6,7 @@ import { createTrainingServer } from "./train-neural-growth.mjs";
 
 const checkpoint = JSON.parse(await readFile(process.argv[2], "utf8"));
 const output = path.resolve(
-  process.argv[3] || "/tmp/latent-field-original-validation",
+  process.argv[3] || "/tmp/gl-bench-original-validation",
 );
 await mkdir(output, { recursive: true });
 const server = createTrainingServer(checkpoint.id);

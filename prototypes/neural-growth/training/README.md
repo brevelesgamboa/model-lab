@@ -74,9 +74,9 @@ With dependencies and local TensorFlow.js assets prepared, these commands use
 the released recipes (not necessarily bit-identical cross-driver checkpoints):
 
 ```sh
-node tools/train-neural-growth.mjs 1200 /tmp/latent-field-membrane-training
-node tools/train-neural-growth.mjs 1600 /tmp/latent-field-filament-spatial filament-network spatial
-node tools/train-neural-growth.mjs 1600 /tmp/latent-field-reef-spatial xeno-reef spatial
+node tools/train-neural-growth.mjs 1200 /tmp/gl-bench-membrane-training
+node tools/train-neural-growth.mjs 1600 /tmp/gl-bench-filament-spatial filament-network spatial
+node tools/train-neural-growth.mjs 1600 /tmp/gl-bench-reef-spatial xeno-reef spatial
 node tools/validate-original-pattern.mjs /path/to/checkpoint.json /tmp/pattern-validation
 node tools/validate-original-pattern.mjs /path/to/spatial-checkpoint.json /tmp/spatial-validation spatial
 ```

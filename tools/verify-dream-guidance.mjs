@@ -10,7 +10,7 @@ import { createStaticServer } from "../server.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const output = path.resolve(
-  process.argv[2] || "/tmp/latent-field-dream-guidance-quality",
+  process.argv[2] || "/tmp/gl-bench-dream-guidance-quality",
 );
 const baselineRef = process.argv[3] || "99bcc35";
 const bridgePath = "assets/js/models/neural-growth/dream-guidance.js";
