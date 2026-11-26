@@ -398,20 +398,26 @@ export class NeuralGrowthModel {
             };
           }
           if (transform === "kaleidoscope") {
-            const folds = Math.min(12, Math.max(3, Math.round(6 + (Number(value) || 0) / 22.5)));
             return {
               compute: "balanced",
-              tag: `${folds}-fold petals`,
-              text: `${folds}-fold radial reflection symmetry. Modulates flower petal count.`,
+              tag: "petal rotation",
+              text: "Rotates the mirrored directional field. Folds controls the petal count.",
             };
           }
           if (transform === "vortex_pair") {
             const v = Number(value) || 0;
-            if (v < -5) {
+            if (v <= -20) {
               return {
                 compute: "moderate",
                 tag: "counter-spin",
                 text: "Opposite spin (counter-rotating). Drives a central jet stream between poles.",
+              };
+            }
+            if (v < 0) {
+              return {
+                compute: "moderate",
+                tag: "spin transition",
+                text: "Smoothly reverses the second vortex from co-rotation through stillness to counter-spin at -20 degrees.",
               };
             }
             if (v > 5) {
@@ -1887,6 +1893,9 @@ export class NeuralGrowthModel {
         this._accumulator = 0;
       }
       this._parameters = parameters;
+      runtimeOperation = true;
+      // Configure without GPU work or advancing the paused simulation.
+      this._runtime.step(0, this._runtimeParameters(parameters));
       if (parameters.automaticRecovery !== true) this._audioResponse.cancel("recovery", "recovery-off");
       this.lastError = null;
       this._failedConfiguration = null;
@@ -1910,23 +1919,7 @@ export class NeuralGrowthModel {
             Math.floor(this._accumulator + 1e-9),
           );
           if (count > 0) {
-            const angleRad =
-              (Number(parameters.rotation || 0) * Math.PI) / 180;
-            const twistRad =
-              (Number(parameters.twist || 0) * Math.PI) / 180;
-            this._runtime.step(count, {
-              rotation: angleRad,
-              topology: parameters.topology,
-              coordinateTransform: parameters.coordinateTransform,
-              twist: twistRad,
-              geometryStrength: parameters.geometryStrength,
-              geometryCenterX: parameters.geometryCenterX,
-              geometryCenterY: parameters.geometryCenterY,
-              geometrySoftness: parameters.geometrySoftness,
-              resonance: this._getResonanceConfig(),
-              foldCount: parameters.foldCount,
-              latentMomentum: parameters.latentMomentum,
-            });
+            this._runtime.step(count, this._runtimeParameters(parameters));
             this._accumulator -= count;
           }
           const excessWholeSteps = Math.floor(this._accumulator);
@@ -2013,26 +2006,26 @@ export class NeuralGrowthModel {
     };
   }
 
+  _runtimeParameters(parameters = this._parameters) {
+    return {
+      rotation: (Number(parameters.rotation || 0) * Math.PI) / 180,
+      topology: parameters.topology,
+      coordinateTransform: parameters.coordinateTransform,
+      twist: (Number(parameters.twist || 0) * Math.PI) / 180,
+      geometryStrength: parameters.geometryStrength,
+      geometryCenterX: parameters.geometryCenterX,
+      geometryCenterY: parameters.geometryCenterY,
+      geometrySoftness: parameters.geometrySoftness,
+      resonance: this._getResonanceConfig(),
+      foldCount: parameters.foldCount,
+      latentMomentum: parameters.latentMomentum,
+    };
+  }
+
   step() {
     if (!this.ready) return;
     this._drainDisturbances();
-    const angleRad = (Number(this._parameters.rotation || 0) * Math.PI) / 180;
-    const twistRad = (Number(this._parameters.twist || 0) * Math.PI) / 180;
-    this._runRuntime(() =>
-      this._runtime.step(1, {
-        rotation: angleRad,
-        topology: this._parameters.topology,
-        coordinateTransform: this._parameters.coordinateTransform,
-        twist: twistRad,
-        geometryStrength: this._parameters.geometryStrength,
-        geometryCenterX: this._parameters.geometryCenterX,
-        geometryCenterY: this._parameters.geometryCenterY,
-        geometrySoftness: this._parameters.geometrySoftness,
-        resonance: this._getResonanceConfig(),
-        foldCount: this._parameters.foldCount,
-        latentMomentum: this._parameters.latentMomentum,
-      }),
-    );
+    this._runRuntime(() => this._runtime.step(1, this._runtimeParameters()));
     this._lastTick = null;
     this._accumulator = 0;
   }

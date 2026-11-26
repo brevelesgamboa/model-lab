@@ -21,11 +21,16 @@ import {
 
 import { GpuVitalityProbe, PROBE_SIZE, SNAPSHOT_SIZE } from "./vitality-probe.js";
 import { INTENT_SIZE } from "./vitality-watchdog.js";
+import {
+  ANGLE_GLSL,
+  GEOMETRY_GLSL,
+  SPIRAL_MAX_PITCH_DEGREES,
+  SPIRAL_MAX_PITCH_RADIANS,
+} from "./geometry-field.js";
 
 let nextRuntimeGeneration = 0;
 
-export const SPIRAL_MAX_PITCH_DEGREES = 89;
-export const SPIRAL_MAX_PITCH_RADIANS = (SPIRAL_MAX_PITCH_DEGREES * Math.PI) / 180;
+export { SPIRAL_MAX_PITCH_DEGREES, SPIRAL_MAX_PITCH_RADIANS };
 
 const TRANSFORM_CODES = Object.freeze({
   cartesian: 0,
@@ -164,6 +169,7 @@ uniform float u_geometryCenterX;
 uniform float u_geometryCenterY;
 uniform float u_geometrySoftness;
 uniform float u_foldCount;
+${GEOMETRY_GLSL}
 const int SX[9] = int[9](-1, 0, 1, -2, 0, 2, -1, 0, 1);
 const int SY[9] = int[9](-1, -2, -1, 0, 0, 0, 1, 2, 1);
 const int LP[9] = int[9](1, 2, 1, 2, -12, 2, 1, 2, 1);
@@ -184,135 +190,16 @@ void main() {
     return;
   }
   float effectiveAngle = u_angle + u_perceptionPhase;
-  float theta = effectiveAngle;
-  float activeStrength = 0.0;
-  float geometryStrength = clamp(u_geometryStrength, 0.0, 1.0);
-  if (u_transform != 0 && geometryStrength > 0.0) {
-    vec2 centerOffset = vec2(u_geometryCenterX, u_geometryCenterY);
-    vec2 pos = ((vec2(xy) + 0.5) / (float(u_size) * 0.5) - 1.0) - centerOffset;
-    float r = length(pos);
-    float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
-    float phi = atan(pos.y, pos.x);
-    float transTheta = effectiveAngle;
-    if (u_transform == 1) {
-      transTheta = phi + 1.5707963 + u_twist + effectiveAngle;
-    } else if (u_transform == 2) {
-      float pitch = clamp(u_twist, -${SPIRAL_MAX_PITCH_RADIANS}, ${SPIRAL_MAX_PITCH_RADIANS});
-      transTheta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(pitch) + effectiveAngle;
-    } else if (u_transform == 3) {
-      vec2 z = pos * 1.25;
-      vec2 c = vec2(-0.8, 0.156);
-      for (int i = 0; i < 5; i++) {
-        z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
-      }
-      transTheta = atan(z.y, z.x) + u_twist + effectiveAngle;
-    } else if (u_transform == 4) {
-      vec2 p1 = pos - vec2(-0.45, 0.0);
-      vec2 p2 = pos - vec2(0.45, 0.0);
-      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
-      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
-      vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
-      transTheta = atan(flow.y, flow.x) + u_twist + effectiveAngle;
-    } else if (u_transform == 5) {
-      float waveFreq = 6.2831853;
-      float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + effectiveAngle;
-      float waveOffset = sin(wavePhase) * (0.85 + abs(u_twist) * 0.5);
-      transTheta = effectiveAngle + waveOffset + u_twist;
-    } else if (u_transform == 6) {
-      float saddleAngle = atan(-pos.y, pos.x);
-      transTheta = saddleAngle + u_twist + effectiveAngle;
-    } else if (u_transform == 7) {
-      float folds = clamp(u_foldCount, 3.0, 12.0);
-      float sectorAngle = 6.2831853 / folds;
-      float halfSector = sectorAngle * 0.5;
-      float phiNorm = mod(phi + 3.14159265, 6.2831853);
-      float inSector = mod(phiNorm, sectorAngle);
-      float folded = abs(inSector - halfSector);
-      float petalAngle = (phiNorm - inSector) + (folded < halfSector * 0.5 ? folded : (halfSector - folded)) * 2.0;
-      transTheta = petalAngle + 1.5707963 + u_twist + effectiveAngle;
-    } else if (u_transform == 8) {
-      float spacing = mix(0.25, 0.65, clamp(u_geometrySoftness * 1.5, 0.0, 1.0));
-      vec2 p1 = pos - vec2(-spacing, 0.0);
-      vec2 p2 = pos - vec2(spacing, 0.0);
-      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
-      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
-      float twistMag = abs(u_twist);
-      float w1 = 1.0;
-      float spinSign = u_twist < -0.01 ? -1.0 : 1.0;
-      float w2 = spinSign * max(0.2, 1.0 - twistMag * 0.45);
-      vec2 flow = vec2(
-        -w1 * p1.y / d1 - w2 * p2.y / d2,
-        w1 * p1.x / d1 + w2 * p2.x / d2
-      );
-      transTheta = atan(flow.y, flow.x) + effectiveAngle;
-    } else if (u_transform == 9) {
-      float cellScale = mix(2.2, 4.2, u_geometrySoftness);
-      vec2 gridCoord = pos * cellScale;
-      vec2 i_coord = floor(gridCoord);
-      vec2 f_coord = fract(gridCoord);
-      vec2 minDiff = vec2(0.0);
-      vec2 secondDiff = vec2(0.0);
-      float minDist = 10.0;
-      float secondMinDist = 10.0;
-      for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-          vec2 neighbor = vec2(float(x), float(y));
-          vec2 p = i_coord + neighbor;
-          vec2 seed = 0.5 + 0.38 * sin(vec2(
-            dot(p, vec2(127.1, 311.7)),
-            dot(p, vec2(269.5, 183.3))
-          ));
-          vec2 diff = neighbor + seed - f_coord;
-          float dist = dot(diff, diff);
-          if (dist < minDist) {
-            secondMinDist = minDist;
-            secondDiff = minDiff;
-            minDist = dist;
-            minDiff = diff;
-          } else if (dist < secondMinDist) {
-            secondMinDist = dist;
-            secondDiff = diff;
-          }
-        }
-      }
-      float d1 = sqrt(minDist);
-      float d2 = sqrt(secondMinDist);
-      float wallDist = max(0.0001, d2 - d1);
-      vec2 safeMinDiff = length(minDiff) < 0.0001 ? vec2(0.0001, 0.0) : minDiff;
-      float islandCircAngle = atan(safeMinDiff.y, safeMinDiff.x) + 1.5707963;
-      vec2 wallVec = vec2(-(secondDiff.y - minDiff.y), secondDiff.x - minDiff.x);
-      float wallAngle = atan(wallVec.y, wallVec.x);
-      float wallBaseWeight = smoothstep(mix(0.35, 0.6, u_geometrySoftness), 0.02, wallDist);
-      float wallWeight = clamp(wallBaseWeight * (1.0 - clamp(u_twist * 0.8, -0.6, 0.6)), 0.0, 1.0);
-      float radialBlend = clamp(u_twist * 0.7, -1.0, 1.0);
-      vec2 vIsland = vec2(cos(islandCircAngle), sin(islandCircAngle));
-      vec2 vWall = vec2(cos(wallAngle), sin(wallAngle));
-      vec2 vCell = mix(vIsland, vWall, wallWeight);
-      float baseAngle = length(vCell) > 0.0001 ? atan(vCell.y, vCell.x) : islandCircAngle;
-      transTheta = baseAngle + radialBlend * 1.5707963 + effectiveAngle;
-    }
-    float edgeFalloff = mix(1.0, smoothstep(1.3, 0.4, r), u_geometrySoftness);
-    activeStrength = clamp(geometryStrength * edgeFalloff, 0.0, 1.0);
-    theta = transTheta;
-  }
+  vec2 pos = ((vec2(xy) + 0.5) / (float(u_size) * 0.5) - 1.0) - vec2(u_geometryCenterX, u_geometryCenterY);
+  float theta = geometryAngle(pos, effectiveAngle);
   vec4 orient = texelFetch(u_orientation, xy, 0);
   if (orient.b > 0.05) {
-    vec2 dir = orient.rg * 2.0 - 1.0;
-    float groomedAngle = atan(dir.y, dir.x);
-    theta = mix(theta, groomedAngle, orient.b);
+    float groomedAngle = directionAngle(orient.rg * 2.0 - 1.0, theta);
+    theta = circularMix(theta, groomedAngle, orient.b);
   }
+  // Unit magnitude at every Strength, including antipodal directions at 50%.
   float cosA = cos(theta);
   float sinA = sin(theta);
-  if (u_transform != 0 && geometryStrength > 0.0 && activeStrength < 1.0) {
-    // Blend perception coefficients directly, retaining grooming in both branches.
-    float baseTheta = effectiveAngle;
-    if (orient.b > 0.05) {
-      vec2 dir = orient.rg * 2.0 - 1.0;
-      baseTheta = mix(baseTheta, atan(dir.y, dir.x), orient.b);
-    }
-    cosA = mix(cos(baseTheta), cosA, activeStrength);
-    sinA = mix(sin(baseTheta), sinA, activeStrength);
-  }
   vec4 result = vec4(0.0);
   if (u_topology == 0) {
     for (int y = 0; y < 3; y++) {
@@ -527,6 +414,7 @@ uniform ivec2 u_center;
 uniform float u_radius;
 uniform float u_strokeAngle;
 uniform int u_orientMode;
+${ANGLE_GLSL}
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec2 distance = vec2(abs(p - u_center));
@@ -534,11 +422,12 @@ void main() {
   float dist = length(distance);
   vec4 current = texelFetch(u_orientation, p, 0);
   if (dist <= u_radius) {
-    float weight = smoothstep(u_radius, u_radius * 0.25, dist);
+    float weight = (1.0 - smoothstep(u_radius * 0.25, u_radius, dist));
     if (u_orientMode == 1) {
       vec2 targetDir = vec2(cos(u_strokeAngle), sin(u_strokeAngle));
       vec2 existingDir = current.b > 0.05 ? (current.rg * 2.0 - 1.0) : targetDir;
-      vec2 blended = normalize(mix(existingDir, targetDir, weight * 0.85));
+      float existingAngle = directionAngle(existingDir, u_strokeAngle);
+      vec2 blended = angleDirection(circularMix(existingAngle, u_strokeAngle, weight * 0.85));
       float newStrength = min(1.0, current.b + weight * 0.85);
       out_color = vec4(blended * 0.5 + 0.5, newStrength, 1.0);
     } else {
@@ -564,6 +453,7 @@ uniform int u_explicitDye;
 uniform int u_automatic;
 uniform float u_quantizationPhase;
 uniform int u_lockBarrier;
+${ANGLE_GLSL}
 vec3 rgbToHsv(vec3 c) {
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
   vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -588,14 +478,14 @@ void main() {
   if (u_automatic == 1) {
     weight = (1.0 - smoothstep(u_radius * 0.35, u_radius, dist)) * clamp(u_strength, 0.0, 1.0);
   } else if (u_mode == 5 || u_mode == 6 || u_mode == 7 || u_mode == 8) {
-    float angle = atan(delta.y, delta.x);
+    float angle = directionAngle(delta, 0.0);
     float rMod = u_radius * (1.0 + 0.22 * cos(3.0 * angle + 1.25) + 0.12 * sin(5.0 * angle));
     if (dist <= rMod) {
       float sigma = max(2.0, rMod * 0.45);
       weight = exp(-(dist * dist) / (2.0 * sigma * sigma)) * u_strength;
     }
   } else if (dist <= u_radius) {
-    weight = smoothstep(u_radius, u_radius * 0.35, dist);
+    weight = (1.0 - smoothstep(u_radius * 0.35, u_radius, dist));
   }
   if (weight <= 0.0 || (u_automatic == 0 && weight < 0.001)) {
     out_color = texelFetch(u_state, p, 0);
@@ -943,6 +833,7 @@ uniform int u_style;
 uniform int u_transform;
 uniform float u_twist;
 uniform float u_angle;
+uniform float u_perceptionPhase;
 uniform float u_geometryStrength;
 uniform float u_geometryCenterX;
 uniform float u_geometryCenterY;
@@ -950,6 +841,7 @@ uniform float u_geometrySoftness;
 uniform float u_foldCount;
 uniform float u_zoom;
 uniform vec2 u_pan;
+${GEOMETRY_GLSL}
 
 float wrapEchoAxis(float u, float period, float halfTexel) {
   if (abs(period - 1.0) <= 0.001) return fract(u);
@@ -979,115 +871,13 @@ void main() {
   vec2 centered = (v_uv - 0.5) * aspectVec;
   vec2 world = fract(0.5 + centered / zoom + u_pan);
   vec2 pos = world * 2.0 - 1.0 - vec2(u_geometryCenterX, u_geometryCenterY);
-  float r = length(pos);
-  float phi = atan(pos.y, pos.x);
-
-  vec2 driftDir = vec2(cos(u_angle), sin(u_angle));
+  vec2 driftDir = angleDirection(u_angle);
   if (u_mode == 0) {
-    float theta = u_angle;
-    if (u_transform == 1) {
-      theta = phi + 1.5707963 + u_twist + u_angle;
-    } else if (u_transform == 2) {
-      float r_eff = sqrt(r * r + 0.0001 + u_geometrySoftness * 0.15);
-      float pitch = clamp(u_twist, -${SPIRAL_MAX_PITCH_RADIANS}, ${SPIRAL_MAX_PITCH_RADIANS});
-      theta = phi + 1.5707963 + log(max(r_eff, 0.01)) * tan(pitch) + u_angle;
-    } else if (u_transform == 3) {
-      vec2 z = pos * 1.25;
-      vec2 c = vec2(-0.8, 0.156);
-      for (int i = 0; i < 5; i++) {
-        z = vec2(z.x * z.x - z.y * z.y + c.x, 2.0 * z.x * z.y + c.y);
-      }
-      theta = atan(z.y, z.x) + u_twist + u_angle;
-    } else if (u_transform == 4) {
-      vec2 p1 = pos - vec2(-0.45, 0.0);
-      vec2 p2 = pos - vec2(0.45, 0.0);
-      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
-      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
-      vec2 flow = vec2(-p1.y / d1 - p2.y / d2, p1.x / d1 + p2.x / d2);
-      theta = atan(flow.y, flow.x) + u_twist + u_angle;
-    } else if (u_transform == 5) {
-      float waveFreq = 6.2831853;
-      float wavePhase = pos.y * waveFreq + pos.x * sin(u_twist) * 3.14159 + u_angle;
-      float waveOffset = sin(wavePhase) * (0.85 + abs(u_twist) * 0.5);
-      theta = u_angle + waveOffset + u_twist;
-    } else if (u_transform == 6) {
-      float saddleAngle = atan(-pos.y, pos.x);
-      theta = saddleAngle + u_twist + u_angle;
-    } else if (u_transform == 7) {
-      float folds = clamp(u_foldCount, 3.0, 12.0);
-      float sectorAngle = 6.2831853 / folds;
-      float halfSector = sectorAngle * 0.5;
-      float phiNorm = mod(phi + 3.14159265, 6.2831853);
-      float inSector = mod(phiNorm, sectorAngle);
-      float folded = abs(inSector - halfSector);
-      float petalAngle = (phiNorm - inSector) + (folded < halfSector * 0.5 ? folded : (halfSector - folded)) * 2.0;
-      theta = petalAngle + 1.5707963 + u_twist + u_angle;
-    } else if (u_transform == 8) {
-      float spacing = mix(0.25, 0.65, clamp(u_geometrySoftness * 1.5, 0.0, 1.0));
-      vec2 p1 = pos - vec2(-spacing, 0.0);
-      vec2 p2 = pos - vec2(spacing, 0.0);
-      float d1 = dot(p1, p1) + 0.01 + u_geometrySoftness * 0.15;
-      float d2 = dot(p2, p2) + 0.01 + u_geometrySoftness * 0.15;
-      float twistMag = abs(u_twist);
-      float w1 = 1.0;
-      float spinSign = u_twist < -0.01 ? -1.0 : 1.0;
-      float w2 = spinSign * max(0.2, 1.0 - twistMag * 0.45);
-      vec2 flow = vec2(-w1 * p1.y / d1 - w2 * p2.y / d2, w1 * p1.x / d1 + w2 * p2.x / d2);
-      theta = atan(flow.y, flow.x) + u_angle;
-    } else if (u_transform == 9) {
-      float cellScale = mix(2.2, 4.2, u_geometrySoftness);
-      vec2 gridCoord = pos * cellScale;
-      vec2 i_coord = floor(gridCoord);
-      vec2 f_coord = fract(gridCoord);
-      vec2 minDiff = vec2(0.0);
-      vec2 secondDiff = vec2(0.0);
-      float minDist = 10.0;
-      float secondMinDist = 10.0;
-      for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-          vec2 neighbor = vec2(float(x), float(y));
-          vec2 p = i_coord + neighbor;
-          vec2 seed = 0.5 + 0.38 * sin(vec2(
-            dot(p, vec2(127.1, 311.7)),
-            dot(p, vec2(269.5, 183.3))
-          ));
-          vec2 diff = neighbor + seed - f_coord;
-          float dist = dot(diff, diff);
-          if (dist < minDist) {
-            secondMinDist = minDist;
-            secondDiff = minDiff;
-            minDist = dist;
-            minDiff = diff;
-          } else if (dist < secondMinDist) {
-            secondMinDist = dist;
-            secondDiff = diff;
-          }
-        }
-      }
-      float d1 = sqrt(minDist);
-      float d2 = sqrt(secondMinDist);
-      float wallDist = max(0.0001, d2 - d1);
-      vec2 safeMinDiff = length(minDiff) < 0.0001 ? vec2(0.0001, 0.0) : minDiff;
-      float islandCircAngle = atan(safeMinDiff.y, safeMinDiff.x) + 1.5707963;
-      vec2 wallVec = vec2(-(secondDiff.y - minDiff.y), secondDiff.x - minDiff.x);
-      float wallAngle = atan(wallVec.y, wallVec.x);
-      float wallBaseWeight = smoothstep(mix(0.35, 0.6, u_geometrySoftness), 0.02, wallDist);
-      float wallWeight = clamp(wallBaseWeight * (1.0 - clamp(u_twist * 0.8, -0.6, 0.6)), 0.0, 1.0);
-      float radialBlend = clamp(u_twist * 0.7, -1.0, 1.0);
-      vec2 vIsland = vec2(cos(islandCircAngle), sin(islandCircAngle));
-      vec2 vWall = vec2(cos(wallAngle), sin(wallAngle));
-      vec2 vCell = mix(vIsland, vWall, wallWeight);
-      float baseAngle = length(vCell) > 0.0001 ? atan(vCell.y, vCell.x) : islandCircAngle;
-      theta = baseAngle + radialBlend * 1.5707963 + u_angle;
-    }
-    vec2 vBase = vec2(cos(u_angle), sin(u_angle));
-    vec2 vTrans = vec2(cos(theta), sin(theta));
-    vec2 vBlend = mix(vBase, vTrans, clamp(u_geometryStrength, 0.0, 1.0));
-    driftDir = length(vBlend) > 0.0001 ? normalize(vBlend) : vBase;
+    driftDir = angleDirection(geometryAngle(pos, u_angle + u_perceptionPhase));
   } else if (u_mode == 1) {
-    driftDir = r > 0.001 ? normalize(pos) : vec2(0.0);
-  } else {
-    driftDir = vec2(cos(u_angle), sin(u_angle));
+    float r = length(pos);
+    // A zero radial drift at the focal point is intentional, without normalizing a zero vector.
+    driftDir = r > 0.001 ? pos / r : vec2(0.0);
   }
 
   float stepLen = u_drift * 0.006 * zoom;
@@ -1514,7 +1304,7 @@ export class TextureNcaRuntime {
     } = {},
   ) {
     this.assertActive();
-    this.rotation = Number(rotation) || 0;
+    this.rotation = Number.isFinite(Number(rotation)) ? Number(rotation) : 0;
     this.topology = topology === "hexagonal" ? "hexagonal" : "square";
     this.coordinateTransform = coordinateTransform || "cartesian";
     this.twist = clampGeometryTwist(this.coordinateTransform, twist);
@@ -1544,6 +1334,7 @@ export class TextureNcaRuntime {
     }
     if (!Number.isInteger(count) || count < 0 || count > 128)
       throw new RangeError("Step count must be between zero and 128.");
+    if (count === 0) this.lastPerceptionPhase = this.resonance?.toUniforms(this.steps)?.perceptionPhase ?? 0;
     const transformCode = TRANSFORM_CODES[this.coordinateTransform] ?? 0;
     for (let index = 0; index < count; index += 1) {
       this.lastOffset = [
@@ -2024,6 +1815,7 @@ export class TextureNcaRuntime {
           u_pan: visualizeUniforms.u_pan,
           u_twist: clampGeometryTwist(this.coordinateTransform, this.twist),
           u_angle: this.rotation,
+          u_perceptionPhase: this.lastPerceptionPhase ?? 0,
           u_geometryStrength: clampGeometryStrength(this.geometryStrength),
           u_geometryCenterX: this.geometryCenterX,
           u_geometryCenterY: this.geometryCenterY,

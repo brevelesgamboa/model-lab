@@ -227,8 +227,8 @@ test("coordinateTransform suggests smart defaults and forwards to runtime steps"
   assert.equal(twistCtrl.getGuidance(25, { coordinateTransform: "wave" }).tag, "skewed wave");
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "saddle" }).tag, "orthogonal");
   assert.equal(twistCtrl.getGuidance(30, { coordinateTransform: "saddle" }).tag, "spiral saddle");
-  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "kaleidoscope" }).tag, "6-fold petals");
-  assert.equal(twistCtrl.getGuidance(45, { coordinateTransform: "kaleidoscope" }).tag, "8-fold petals");
+  assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "kaleidoscope" }).tag, "petal rotation");
+  assert.equal(twistCtrl.getGuidance(45, { coordinateTransform: "kaleidoscope" }).tag, "petal rotation");
   assert.equal(twistCtrl.getGuidance(0, { coordinateTransform: "vortex_pair" }).tag, "balanced pair");
   assert.equal(twistCtrl.getGuidance(20, { coordinateTransform: "vortex_pair" }).tag, "co-rotating");
   assert.equal(twistCtrl.getGuidance(-20, { coordinateTransform: "vortex_pair" }).tag, "counter-spin");
@@ -1556,4 +1556,52 @@ test("explicit context-loss retry clears CPU intent without uploading into the l
   assert.equal(model.ready, true);
   assert.equal(runtimes.length, 2);
   assert.equal(lost.disposed, true);
+});
+
+test("paused redraws synchronize geometry controls without advancing or reading state", async (context) => {
+  const { model, params, canvas, runtimes } = setup(context);
+  await model.render(canvas, params, 0);
+  const runtime = runtimes[0];
+  runtime.readState = () =>
+    assert.fail("Paused geometry sync must not read state");
+  for (const coordinateTransform of ["spiral", "kaleidoscope", "voronoi"]) {
+    await model.render(
+      canvas,
+      {
+        ...params,
+        coordinateTransform,
+        twist: 89,
+        rotation: 120,
+        geometryStrength: 0.5,
+        geometryCenterX: 0.125,
+        geometryCenterY: -0.25,
+        geometrySoftness: 0.8,
+        foldCount: 9,
+        topology: "hexagonal",
+      },
+      1,
+    );
+    assert.equal(runtime.steps, 0);
+    assert.equal(
+      runtime.lastStepOptions.coordinateTransform,
+      coordinateTransform,
+    );
+    assert.equal(runtime.lastStepOptions.twist, (89 * Math.PI) / 180);
+    assert.equal(runtime.lastStepOptions.rotation, (120 * Math.PI) / 180);
+    assert.equal(runtime.lastStepOptions.geometryStrength, 0.5);
+    assert.equal(runtime.lastStepOptions.geometryCenterX, 0.125);
+    assert.equal(runtime.lastStepOptions.geometryCenterY, -0.25);
+    assert.equal(runtime.lastStepOptions.geometrySoftness, 0.8);
+    assert.equal(runtime.lastStepOptions.foldCount, 9);
+    assert.equal(runtime.lastStepOptions.topology, "hexagonal");
+  }
+  const twist = model.controls.find((c) => c.key === "twist");
+  for (const degrees of [-90, 0, 90]) {
+    const guidance = twist.getGuidance(degrees, {
+      coordinateTransform: "kaleidoscope",
+      foldCount: 9,
+    });
+    assert.match(guidance.text, /Rotates.*Folds controls the petal count/);
+    assert.doesNotMatch(guidance.text, /Modulates.*count/);
+  }
 });

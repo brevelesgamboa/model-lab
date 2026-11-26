@@ -136,12 +136,21 @@ test("growthDebug URL enables HUD and Force Probe is fenced, paused and separate
   await hud.getByRole("button", { name: "Test Spore" }).click();
   await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.reason)).toBe("paused-or-stale");
   await page.locator("#toggle-animation").click();
-  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().activeBlockers.includes("paused-or-stale"))).toBe(false);
-  await hud.getByRole("button", { name: "Test Spore" }).click();
-  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.status)).toBe("admitted");
+  // On software GPUs a probe can become stale between an awaited check and a
+  // click. Check freshness and dispatch the real HUD action in the same task.
+  await expect.poll(() => hud.getByRole("button", { name: "Test Spore" }).evaluate((button) => {
+    const model = window.__vitalityModel;
+    if (model.getVitalityDiagnostics().activeBlockers.includes("paused-or-stale")) return "waiting-for-fresh-probe";
+    button.click();
+    return model.getVitalityDiagnostics().actions.testSpore.status;
+  })).toBe("admitted");
   await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().recovery.emittedDose)).toBeGreaterThan(0);
-  await hud.getByRole("button", { name: "Test Spore" }).click();
-  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.reason)).toBe("cooldown");
+  await expect.poll(() => hud.getByRole("button", { name: "Test Spore" }).evaluate((button) => {
+    const model = window.__vitalityModel;
+    if (model.getVitalityDiagnostics().activeBlockers.includes("paused-or-stale")) return "waiting-for-fresh-probe";
+    button.click();
+    return model.getVitalityDiagnostics().actions.testSpore.reason;
+  })).toBe("cooldown");
   await page.locator("#toggle-animation").click();
 });
 
@@ -2840,3 +2849,316 @@ test("widescreen fullscreen fills panel, wraps wing clicks cleanly, and generate
   expect(thumbSize).toEqual({ width: 220, height: 220 });
   expect(errors).toEqual([]);
 });
+
+test("GPU geometry field matches finite circular reference samples and grooming seams", async ({
+  page,
+}) => {
+  const { geometrySamples } = await import("../helpers/geometry-reference.mjs");
+  const samples = geometrySamples();
+  const results = await page.evaluate(async (samples) => {
+    const { GEOMETRY_GLSL } =
+      await import("/assets/js/models/neural-growth/geometry-field.js");
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const gl = canvas.getContext("webgl2", { antialias: false });
+    if (!gl) throw new Error("WebGL2 unavailable");
+    const shader = (type, source) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, source);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+        throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const program = gl.createProgram();
+    gl.attachShader(
+      program,
+      shader(
+        gl.VERTEX_SHADER,
+        `#version 300 es
+      void main() { vec2 p = vec2(float((gl_VertexID << 1) & 2),float(gl_VertexID & 2)); gl_Position=vec4(p*2.0-1.0,0,1); }`,
+      ),
+    );
+    gl.attachShader(
+      program,
+      shader(
+        gl.FRAGMENT_SHADER,
+        `#version 300 es
+      precision highp float; precision highp int;
+      uniform int u_size, u_transform, u_kind;
+      uniform float u_twist, u_geometryStrength, u_geometrySoftness, u_foldCount, u_base, u_target;
+      uniform vec2 u_pos;
+      out vec4 result;
+      ${GEOMETRY_GLSL}
+      void main() {
+        float theta = geometryAngle(u_pos,u_base);
+        if (u_kind == 1) theta = circularMix(u_base,u_target,u_geometryStrength);
+        if (u_kind == 2) theta = directionAngle(u_pos,u_base);
+        vec2 dir = angleDirection(theta);
+        result=vec4(dir*.5+.5,finiteAngle(theta)?1.0:0.0,length(dir)*.5);
+      }`,
+      ),
+    );
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    gl.disable(gl.DITHER);
+    gl.viewport(0, 0, 1, 1);
+    const f = (name, value) =>
+      gl.uniform1f(gl.getUniformLocation(program, name), value);
+    const i = (name, value) =>
+      gl.uniform1i(gl.getUniformLocation(program, name), value);
+    const output = [];
+    const run = ({ pos, options = {} }, kind = 0) => {
+      i("u_size", options.size ?? 256);
+      i("u_transform", options.mode ?? 0);
+      i("u_kind", kind);
+      f("u_twist", options.twist ?? 0);
+      f("u_geometryStrength", options.strength ?? 1);
+      f("u_geometrySoftness", options.softness ?? 0.25);
+      f("u_foldCount", options.folds ?? 6);
+      f("u_base", options.base ?? 0);
+      f("u_target", options.target ?? 0);
+      gl.uniform2f(gl.getUniformLocation(program, "u_pos"), ...pos);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const pixel = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+      return [...pixel];
+    };
+    for (const sample of samples) output.push(run(sample));
+    const half = run(
+      { pos: [0, 0], options: { base: 0, target: Math.PI, strength: 0.5 } },
+      1,
+    );
+    const groom = run(
+      {
+        pos: [0, 0],
+        options: {
+          base: Math.PI - 0.01,
+          target: -Math.PI + 0.01,
+          strength: 0.5,
+        },
+      },
+      1,
+    );
+    const zero = run({ pos: [0, 0], options: { base: 0.6 } }, 2);
+    const overflow = run({ pos: [1e10, -1e10], options: { mode: 3, base: 0.6, twist: 0.2 } });
+    const error = gl.getError();
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return { output, half, groom, zero, overflow, error };
+  }, samples);
+  expect(results.error).toBe(0);
+  for (let n = 0; n < samples.length; n++) {
+    const actual = results.output[n],
+      { expected } = samples[n];
+    expect(actual[2], JSON.stringify(samples[n])).toBe(255);
+    expect(actual[3]).toBeGreaterThanOrEqual(127);
+    expect(actual[3]).toBeLessThanOrEqual(128);
+    expect(
+      Math.abs((actual[0] / 255) * 2 - 1 - Math.cos(expected)),
+      JSON.stringify(samples[n]),
+    ).toBeLessThan(0.025);
+    expect(
+      Math.abs((actual[1] / 255) * 2 - 1 - Math.sin(expected)),
+      JSON.stringify(samples[n]),
+    ).toBeLessThan(0.025);
+  }
+  expect(Math.abs((results.half[1] / 255) * 2 - 1)).toBeGreaterThan(0.99);
+  expect(results.groom[0]).toBe(0);
+  expect(
+    Math.abs((results.zero[0] / 255) * 2 - 1 - Math.cos(0.6)),
+  ).toBeLessThan(0.01);
+  expect(results.overflow[2]).toBe(255);
+  expect(Math.abs((results.overflow[0] / 255) * 2 - 1 - Math.cos(0.6))).toBeLessThan(0.01);
+  expect(Math.abs((results.overflow[1] / 255) * 2 - 1 - Math.sin(0.6))).toBeLessThan(0.01);
+});
+
+test("paused geometry edits reach echo uniforms and diagnostics without stepping or reading state", async ({
+  page,
+}) => {
+  await observeVitalityModel(page);
+  await selectGrowth(page);
+  const before = await state(page);
+  await page.evaluate(() => {
+    const r = window.__growthRuntime;
+    window.__geometryReads = 0;
+    const read = r.readState.bind(r);
+    r.readState = (...args) => {
+      window.__geometryReads++;
+      return read(...args);
+    };
+  });
+  await page
+    .getByLabel("COORDINATE GEOMETRY", { exact: true })
+    .selectOption("kaleidoscope");
+  await page
+    .getByLabel("SPIRAL PITCH / TWIST exact value", { exact: true })
+    .fill("45");
+  await page
+    .getByLabel("SPIRAL PITCH / TWIST exact value", { exact: true })
+    .dispatchEvent("change");
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime.twist))
+    .toBeCloseTo(Math.PI / 4, 5);
+  await expect
+    .poll(() => page.evaluate(() => window.__growthRuntime.coordinateTransform))
+    .toBe("kaleidoscope");
+  const after = await page.evaluate(() => ({
+    steps: window.__growthRuntime.steps,
+    reads: window.__geometryReads,
+    applied:
+      window.__vitalityModel.getVitalityDiagnostics().geometry.applied
+        .coordinateTransform,
+  }));
+  expect(after).toEqual({
+    steps: before.steps,
+    reads: 0,
+    applied: "kaleidoscope",
+  });
+});
+
+for (const pattern of ["mixed4c-439", "membrane-field"]) {
+  test(`sustained GPU geometry stability across modes, pitch extremes and grooming: ${pattern}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await selectGrowth(page);
+    const results = await page.evaluate(async (pattern) => {
+      const { TextureNcaRuntime } =
+        await import("/assets/js/models/neural-growth/runtime.js");
+      const { getPattern } =
+        await import("/assets/js/models/neural-growth/patterns.js");
+      const { validateCheckpoint } =
+        await import("/assets/js/models/neural-growth/reference.js");
+      const model = validateCheckpoint(
+        await (await fetch(getPattern(pattern).checkpointUrl)).json(),
+      );
+      const r = new TextureNcaRuntime({ model, size: 128, seed: 1 });
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 144;
+      const stats = (data) => {
+        let variance = 0,
+          clipping = 0;
+        for (let ch = 0; ch < 3; ch++) {
+          let sum = 0,
+            squared = 0;
+          for (let n = ch; n < data.length; n += 12) {
+            const v = data[n] / 255;
+            sum += v;
+            squared += v * v;
+          }
+          const count = data.length / 12;
+          variance += Math.max(0, squared / count - (sum / count) ** 2) / 3;
+        }
+        for (const v of data) if (v <= 2 || v >= 253) clipping++;
+        return {
+          contrast: Math.sqrt(variance),
+          clipping: clipping / data.length,
+        };
+      };
+      try {
+        r.step(128);
+        const warm = r.readState(),
+          baseline = stats(warm),
+          out = [];
+        const cases = [
+          { coordinateTransform: "vortex" },
+          { coordinateTransform: "vortex", geometryStrength: 1 },
+          { coordinateTransform: "saddle" },
+          {
+            coordinateTransform: "spiral",
+            twist: Math.PI / 2,
+            geometrySoftness: 0,
+          },
+          {
+            coordinateTransform: "spiral",
+            twist: Math.PI / 2,
+            geometrySoftness: 0,
+            geometryStrength: 1,
+          },
+          {
+            coordinateTransform: "spiral",
+            twist: -Math.PI / 2,
+            geometrySoftness: 0,
+          },
+          { coordinateTransform: "julia" },
+          { coordinateTransform: "dipole" },
+          { coordinateTransform: "vortex_pair", twist: -0.01 },
+          { coordinateTransform: "wave" },
+          { coordinateTransform: "kaleidoscope", foldCount: 6 },
+          { coordinateTransform: "voronoi" },
+        ];
+        for (const parameters of cases) {
+          r.restart(1);
+          r.writeState(warm);
+          // Put the focus exactly on a cell center, default to 50% Strength, and paint
+          // across the grooming +/-pi seam before stepping.
+          const options = {
+            rotation: 0,
+            twist: 0,
+            foldCount: 6,
+            geometryStrength: 0.5,
+            geometrySoftness: 0.25,
+            geometryCenterX: 1 / 128,
+            geometryCenterY: 1 / 128,
+            ...parameters,
+          };
+          r.disturb(40, 64, 12, "groom", { strokeAngle: 0 });
+          r.disturb(40, 64, 12, "groom", { strokeAngle: Math.PI });
+          r.disturb(64, 64, 12, "groom", { strokeAngle: Math.PI - 0.01 });
+          r.disturb(64, 64, 12, "groom", { strokeAngle: -Math.PI + 0.01 });
+          const measurements = [];
+          let previous = warm;
+          for (let frame = 0; frame < 3; frame++) {
+            r.step(64, options);
+            r.draw(canvas, {
+              palette: "native",
+              echoDecay: 0.8,
+              echoDrift: 0.4,
+              echoMode: frame === 2 ? "radial_bloom" : "field_advection",
+            });
+            const raw = r.readState();
+            let delta = 0;
+            for (let n = 0; n < raw.length; n++)
+              delta += Math.abs(raw[n] - previous[n]) / 255;
+            measurements.push({ ...stats(raw), delta: delta / raw.length });
+            previous = raw;
+          }
+          const pixels = canvas
+            .getContext("2d")
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          let min = 255,
+            max = 0;
+          for (let n = 0; n < pixels.length; n++)
+            if (n % 4 !== 3) {
+              min = Math.min(min, pixels[n]);
+              max = Math.max(max, pixels[n]);
+            }
+          out.push({
+            parameters,
+            measurements,
+            displayRange: max - min,
+            error: r.gl.getError(),
+            lost: r.gl.isContextLost(),
+          });
+        }
+        return { baseline, out };
+      } finally {
+        r.dispose();
+      }
+    }, pattern);
+    expect(results.baseline.contrast).toBeGreaterThan(0.005);
+    for (const entry of results.out) {
+      expect(entry.error, JSON.stringify(entry)).toBe(0);
+      expect(entry.lost).toBe(false);
+      expect(entry.displayRange, JSON.stringify(entry)).toBeGreaterThan(5);
+      for (const metrics of entry.measurements) {
+        expect(metrics.contrast, JSON.stringify(entry)).toBeGreaterThan(0.004);
+        expect(metrics.clipping, JSON.stringify(entry)).toBeLessThan(0.85);
+        expect(metrics.delta, JSON.stringify(entry)).toBeGreaterThan(0.0001);
+      }
+    }
+  });
+}

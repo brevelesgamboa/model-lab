@@ -175,3 +175,55 @@ test("ripple uniforms retain a zero origin, explicit radius and zero amplitude",
   assert.equal(frame.u_ripple0[3], 16);
   assert.equal(frame.u_rippleAmps[0], 0);
 });
+
+test("paused configuration changes geometry without GPU passes, readbacks or simulation steps", () => {
+  const { runtime, canvas, uploads } = drawRuntime();
+  runtime.step(0, {
+    coordinateTransform: "spiral",
+    rotation: Infinity,
+    twist: 2,
+    geometryStrength: 0.5,
+    geometryCenterX: 0.125,
+    geometryCenterY: -0.25,
+    geometrySoftness: 0.8,
+    foldCount: 12,
+    topology: "hexagonal",
+  });
+  assert.equal(runtime.steps, 0);
+  assert.equal(uploads.size, 0);
+  runtime.draw(canvas, { echoDecay: 0.8 });
+  const echo = uploads.get("echo");
+  assert.equal(echo.u_transform, 2);
+  assert.equal(echo.u_twist, SPIRAL_MAX_PITCH_RADIANS);
+  assert.equal(echo.u_angle, 0);
+  assert.equal(echo.u_geometryStrength, 0.5);
+  assert.equal(echo.u_geometryCenterX, 0.125);
+  assert.equal(echo.u_geometryCenterY, -0.25);
+  assert.equal(echo.u_geometrySoftness, 0.8);
+  assert.equal(echo.u_foldCount, 12);
+  assert.equal(runtime.topology, "hexagonal");
+});
+
+test("echo field uses the applied perception phase and paused sync refreshes it", () => {
+  const { runtime, canvas, uploads } = drawRuntime();
+  runtime.steps = 20;
+  const resonance = new ResonanceConfig({
+    enabled: true,
+    perceptionDrift: 0.02,
+  });
+  runtime.step(3, { rotation: 0.3, resonance, coordinateTransform: "vortex" });
+  const perception = uploads.get("perception");
+  runtime.draw(canvas, { echoDecay: 0.8 });
+  assert.equal(
+    uploads.get("echo").u_angle + uploads.get("echo").u_perceptionPhase,
+    perception.u_angle + perception.u_perceptionPhase,
+  );
+  runtime.step(0, { rotation: 0.7, resonance });
+  runtime.draw(canvas, { echoDecay: 0.8 });
+  assert.equal(runtime.steps, 23);
+  assert.equal(uploads.get("echo").u_angle, 0.7);
+  assert.equal(uploads.get("echo").u_perceptionPhase, 23 * 0.02);
+  runtime.draw(canvas, { echoDecay: 0.8, echoMode: "linear_drift" });
+  assert.equal(uploads.get("echo").u_mode, 2);
+  assert.equal(uploads.get("echo").u_angle, 0.7);
+});
