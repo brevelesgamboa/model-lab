@@ -44,39 +44,99 @@ export class AudioResponse {
     this.pointerDown = false;
     this.manualUntil = -Infinity;
     this.sequence = 0;
+    this.revision = 0;
+    this.emittedDose = 0;
+    this.lastCancellationReason = null;
+    this.lastRejectionReason = null;
   }
-  cancel(kind = "audio") {
-    this.active =
-      kind === "all"
-        ? []
-        : this.active.filter((spore) => (spore.kind || "audio") !== kind);
+  cancel(kind = "audio", reason = "cancelled") {
+    const before = this.active.length;
+    this.active = this.active.filter((spore) => {
+      if (kind === "all") return false;
+      if (kind === "recovery" && spore.kind === "recovery-test")
+        return reason === "recovery-off";
+      return (spore.kind || "audio") !== kind;
+    });
     if (!this.active.length) this.lastStep = null;
+    if (before !== this.active.length) {
+      this.lastCancellationReason = reason;
+      this.revision++;
+    }
   }
   interact(down, timestamp) {
     this.pointerDown = Boolean(down);
     this.manualUntil = timestamp + SPORE_POLICY.manualYield;
-    this.cancel("all");
+    this.cancel("all", down ? "pointer-held" : "manual-yield");
   }
-  queueRecovery(timestamp, x, y) {
+  queueRecovery(timestamp, x, y, { test = false } = {}) {
     this.active = this.active.filter(
       (spore) => timestamp - spore.start < SPORE_POLICY.lifetime,
     );
-    if (
-      this.pointerDown ||
-      timestamp < this.manualUntil ||
-      this.active.length >= SPORE_POLICY.maximum
-    )
+    this.lastRejectionReason = this.pointerDown
+      ? "pointer-held"
+      : timestamp < this.manualUntil
+        ? "manual-yield"
+        : this.active.length >= SPORE_POLICY.maximum
+          ? "spore-capacity"
+          : null;
+    if (this.lastRejectionReason) {
+      this.revision++;
       return false;
+    }
     this.active.push({
       start: timestamp,
       x,
       y,
       amount: SPORE_POLICY.rate,
-      kind: "recovery",
+      kind: test ? "recovery-test" : "recovery",
       mode: "noise",
+      emittedDose: 0,
     });
     if (this.lastStep === null) this.lastStep = timestamp;
+    this.revision++;
     return true;
+  }
+  getDiagnostics(timestamp, size) {
+    const active = this.active.filter(
+      (spore) => timestamp - spore.start < SPORE_POLICY.lifetime,
+    );
+    const spores = active.map((spore) => {
+      const age = Math.max(
+        0,
+        Math.min(1, (timestamp - spore.start) / SPORE_POLICY.lifetime),
+      );
+      return {
+        x: spore.x,
+        y: spore.y,
+        mode: spore.mode,
+        kind: spore.kind,
+        radius: Math.max(1, Math.round(SPORE_POLICY.radius * size)),
+        remainingLifetimeMs: Math.max(
+          0,
+          SPORE_POLICY.lifetime - (timestamp - spore.start),
+        ),
+        emittedDose: spore.emittedDose,
+        remainingEnvelopeDose:
+          (spore.amount *
+            (SPORE_POLICY.lifetime / 1000) *
+            (1 + Math.cos(Math.PI * age))) /
+          (Math.PI * active.length),
+      };
+    });
+    return {
+      activeSpores: spores.length,
+      spores,
+      rateCeiling: SPORE_POLICY.rate,
+      emittedDose: this.emittedDose,
+      remainingEnvelopeDose: spores.reduce(
+        (sum, spore) => sum + spore.remainingEnvelopeDose,
+        0,
+      ),
+      doseMeaning:
+        "Requested mixing weight; remaining envelope is an estimate, not measured GPU application.",
+      lastCancellationReason: this.lastCancellationReason,
+      lastRejectionReason: this.lastRejectionReason,
+    };
   }
   step(timestamp, size, disturb, dyeColor) {
     const previous = this.lastStep;
@@ -109,6 +169,9 @@ export class AudioResponse {
           quantizationPhase: ++this.sequence,
         },
       );
+      spore.emittedDose += strength;
+      this.emittedDose += strength;
+      this.revision++;
     }
   }
 }

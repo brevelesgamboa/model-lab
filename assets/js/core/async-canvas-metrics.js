@@ -21,18 +21,20 @@ export class AsyncCanvasMetrics {
     this.worker = null;
     this.pending = null;
     this.value = EMPTY;
+    this.sample = null;
     this.fresh = true;
     this.failed = false;
   }
-  read(canvas, refresh = false) {
+  read(canvas, refresh = false, metadata = {}) {
     if ((refresh || this.fresh) && !this.pending && !this.failed)
-      this.capture(canvas);
+      this.capture(canvas, metadata);
     return this.value;
   }
-  async capture(canvas) {
+  async capture(canvas, metadata = {}) {
     const id = ++this.sequence;
     this.pending = id;
     this.fresh = false;
+    this.pendingMetadata = { ...metadata, capturedAt: performance.now() };
     let bitmap;
     try {
       bitmap = await createImageBitmap(canvas, {
@@ -51,6 +53,7 @@ export class AsyncCanvasMetrics {
           if (this.worker !== worker || this.pending !== data.id) return;
           this.pending = null;
           this.value = Object.freeze(data.metrics);
+          this.sample = Object.freeze({ ...this.pendingMetadata, metrics: this.value });
           this.onUpdate();
         };
         worker.onerror = () => {

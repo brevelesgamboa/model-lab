@@ -68,6 +68,9 @@ export class GpuVitalityProbe {
     this.capture = capture;
     this.slots = [];
     this.latest = null;
+    this.latestDiagnostic = null;
+    this.forceRequest = null;
+    this.requestSequence = 0;
     this.generation = null;
     this.lastLaunch = -Infinity;
     this.lastSteps = 0;
@@ -97,6 +100,8 @@ export class GpuVitalityProbe {
   invalidate(generation) {
     this.generation = generation;
     this.latest = null;
+    this.latestDiagnostic = null;
+    this.forceRequest = null;
     this.hasHistory = false;
     for (const slot of this.slots) {
       if (slot.sync) this.gl.deleteSync(slot.sync);
@@ -118,7 +123,8 @@ export class GpuVitalityProbe {
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.buffer);
         gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, slot.bytes);
         const result = decodeVitalityProbe(slot.bytes, slot.metadata);
-        if (!this.latest || result.steps > this.latest.steps)
+        if (result.forced) this.latestDiagnostic = result;
+        else if (!this.latest || result.steps > this.latest.steps)
           this.latest = result;
       }
       gl.deleteSync(slot.sync);
@@ -127,7 +133,22 @@ export class GpuVitalityProbe {
     }
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
   }
-  update(timestamp, { generation, steps, activeSeconds = 0 }) {
+  requestProbe(generation) {
+    if (this.disposed || this.unavailable || this.forcePending) return null;
+    if (this.generation !== generation) this.invalidate(generation);
+    this.forceRequest = ++this.requestSequence;
+    return this.forceRequest;
+  }
+  get forcePending() {
+    return (
+      this.forceRequest !== null ||
+      this.slots.some((slot) => slot.sync && slot.metadata?.forced)
+    );
+  }
+  update(
+    timestamp,
+    { generation, steps, activeSeconds = 0, pollOnly = false },
+  ) {
     if (this.disposed || this.unavailable) return null;
     try {
       if (this.generation !== generation) this.invalidate(generation);
@@ -135,7 +156,13 @@ export class GpuVitalityProbe {
       if (!this.target) this.initialize();
       this.poll(timestamp, generation);
       const interval = this.size <= 256 ? 500 : 1000;
-      if (steps <= this.lastSteps || timestamp - this.lastLaunch < interval)
+      const forced = this.forceRequest !== null;
+      if (
+        !forced &&
+        (pollOnly ||
+          steps <= this.lastSteps ||
+          timestamp - this.lastLaunch < interval)
+      )
         return this.latest;
       const slot = this.slots.find((entry) => !entry.sync);
       if (!slot) return this.latest;
@@ -144,7 +171,8 @@ export class GpuVitalityProbe {
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, slot.buffer);
       gl.readPixels(0, 0, WIDTH, PROBE_SIZE, gl.RGBA, gl.UNSIGNED_BYTE, 0);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      this.capture(this.history);
+      // Debug samples must not alter production history, cadence, or evidence.
+      if (!forced) this.capture(this.history);
       slot.metadata = {
         generation,
         steps,
@@ -152,13 +180,18 @@ export class GpuVitalityProbe {
         timestamp,
         hasHistory: this.hasHistory,
         size: this.size,
+        forced,
+        requestId: forced ? this.forceRequest : null,
       };
       slot.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
       if (!slot.sync) throw new Error("Could not fence vitality readback.");
       gl.flush();
-      this.hasHistory = true;
-      this.lastLaunch = timestamp;
-      this.lastSteps = steps;
+      if (forced) this.forceRequest = null;
+      else {
+        this.hasHistory = true;
+        this.lastLaunch = timestamp;
+        this.lastSteps = steps;
+      }
     } catch (error) {
       this.error = error;
       this.unavailable = true;

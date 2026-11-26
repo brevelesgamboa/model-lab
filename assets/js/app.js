@@ -118,6 +118,7 @@ let panelVisibility = readPanelVisibility();
 let qualityMode = readQualityMode();
 let qualityProfile = resolveQuality(qualityMode, capabilities);
 const canvasMetrics = new AsyncCanvasMetrics(() => {
+  currentModel?.setVitalityDisplayMetrics?.(canvasMetrics.sample);
   if (!latestRender || currentModel.getCanvasMetrics) return;
   const commonMetrics = canvasMetrics.value;
   latestRender.commonMetrics = commonMetrics;
@@ -139,6 +140,7 @@ const renderer = createRenderController({
       hqRendering
     )
       return null;
+    currentModel.setDiagnosticsBaseParameters?.(currentParameters);
     return {
       model: currentModel,
       canvas: elements.canvas,
@@ -178,6 +180,7 @@ const navigation = createNavigationController({
     if (currentView !== view) renderer.invalidate();
     currentView = view;
     playback.sync();
+    growthController.update();
     if (view === "saved") archiveController.render();
     if (view === "experiments") studioController.refreshPanels();
     if (view === "lab") renderCurrentFrame({ forceAnalysis: true });
@@ -344,7 +347,9 @@ function acceptRenderedFrame({
     forceAnalysis || !latestRender || now - lastAnalyzedAt >= interval;
   const commonMetrics = model.getCanvasMetrics
     ? model.getCanvasMetrics(elements.canvas, shouldAnalyze)
-    : canvasMetrics.read(elements.canvas, shouldAnalyze);
+    : canvasMetrics.read(elements.canvas, shouldAnalyze, {
+      modelId: model.id, frameId: frameCounter, ...model.getVitalityFrameContext?.(),
+    });
   if (shouldAnalyze) lastAnalyzedAt = now;
   latestRender = {
     backend: result?.backend || model.backend,

@@ -2,7 +2,7 @@ import { sanitizeParameters } from "../core/model-contract.js";
 import { hexToRgb } from "../core/utils.js";
 import { detectCapabilities } from "../core/quality.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
-import { TextureNcaRuntime } from "./neural-growth/runtime.js";
+import { TextureNcaRuntime, clampGeometryTwist } from "./neural-growth/runtime.js";
 import {
   DEFAULT_PATTERN,
   PATTERNS,
@@ -16,6 +16,16 @@ import {
 import { VitalityWatchdog, RecoveryIntentMask, INTENT_SIZE } from "./neural-growth/vitality-watchdog.js";
 
 const STILL_PAN = Object.freeze([0, 0]);
+const GEOMETRY_KEYS = ["coordinateTransform", "rotation", "twist", "geometryStrength",
+  "geometryCenterX", "geometryCenterY", "geometrySoftness", "foldCount", "topology"];
+const geometryValues = (parameters = {}) => Object.fromEntries(GEOMETRY_KEYS.map((key) => [key, parameters[key] ?? null]));
+const freezeSnapshot = (value) => {
+  if (value && typeof value === "object") {
+    Object.values(value).forEach(freezeSnapshot);
+    Object.freeze(value);
+  }
+  return value;
+};
 
 async function loadCheckpoint(signal, pattern) {
   const response = await fetch(pattern.checkpointUrl, { signal });
@@ -87,6 +97,10 @@ export class NeuralGrowthModel {
     this._recoveryIntent = new RecoveryIntentMask();
     this._vitalityActiveSeconds = 0;
     this._recoveryIndex = 0;
+    this._rawStateView = false;
+    this._diagnosticsBase = null;
+    this._debugProbeAction = { status: "idle" };
+    this._debugSporeAction = { status: "idle" };
     this._palettePhaseAccumulator = 0.0;
     this._lastPaletteTime = null;
     this._capabilities = capabilities;
@@ -1360,7 +1374,7 @@ export class NeuralGrowthModel {
 
   setClockRunning(running) {
     if (!running) {
-      this.cancelAudio({all: true});
+      this.cancelAudio({all: true, reason: "clock-paused"});
       this._vitalityWatchdog.suspend();
     }
     if (this._clockRunning !== Boolean(running)) {
@@ -1371,6 +1385,7 @@ export class NeuralGrowthModel {
   }
 
   cancel() {
+    this._rawStateView = false;
     this._epoch += 1;
     this._abort?.abort();
     this._abort = null;
@@ -1659,7 +1674,7 @@ export class NeuralGrowthModel {
   onParameterChange(key, value) {
     if (key !== "pattern" || value !== this._requestedPattern) this.noteManualControlEdit();
     if (key === "automaticRecovery" && value !== true)
-      this._audioResponse.cancel("recovery");
+      this._audioResponse.cancel("recovery", "recovery-off");
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
     }
@@ -1714,7 +1729,7 @@ export class NeuralGrowthModel {
       return true;
     }
     if (key !== "pattern" || value === this._requestedPattern) return false;
-    this.cancelAudio({ all: true });
+    this.cancelAudio({ all: true, reason: "pattern-change" });
     getPattern(value);
     this._requestedPattern = value;
     this._epoch += 1;
@@ -1854,7 +1869,7 @@ export class NeuralGrowthModel {
         this._syncRecoveryProtection();
         this._vitalityActiveSeconds = 0;
         this._vitalityWatchdog.suspend();
-        this.cancelAudio({all: true});
+        this.cancelAudio({all: true, reason: "runtime-replaced"});
         this._activePattern = pattern.id;
         this._needsRuntime = false;
         this._lastTick = null;
@@ -1872,13 +1887,13 @@ export class NeuralGrowthModel {
         this._accumulator = 0;
       }
       this._parameters = parameters;
-      if (parameters.automaticRecovery !== true) this._audioResponse.cancel("recovery");
+      if (parameters.automaticRecovery !== true) this._audioResponse.cancel("recovery", "recovery-off");
       this.lastError = null;
       this._failedConfiguration = null;
       runtimeOperation = true;
       this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
-        if (globalThis.document?.hidden) this.cancelAudio({ all: true });
+        if (globalThis.document?.hidden) this.cancelAudio({ all: true, reason: "document-hidden" });
         else this._audioResponse.step(
           performance.now(), this.simulationSize,
           (...args) => this._runtime.disturb(...args),
@@ -1937,6 +1952,7 @@ export class NeuralGrowthModel {
       }
       const effectiveZoom = parameters.zoom;
       this._runtime.draw(canvas, {
+        rawStateView: this._rawStateView,
         palette: parameters.palette,
         palettePhase: effectivePhaseRad,
         zoom: effectiveZoom,
@@ -1950,6 +1966,8 @@ export class NeuralGrowthModel {
         echoMode: parameters.echoMode,
         echoStyle: parameters.echoStyle,
       });
+      this._diagnosticsFrame = { timestamp: performance.now(), generation: this._runtime.generation,
+        steps: this._runtime.steps, rawStateView: this._rawStateView };
       return this._result();
     } catch (error) {
       candidate?.dispose();
@@ -2028,7 +2046,7 @@ export class NeuralGrowthModel {
       this._runRuntime(() => this._runtime?.restart(this._parameters.seed));
     }
     this._queuedDisturbances = [];
-    this.cancelAudio({all: true});
+    this.cancelAudio({all: true, reason: "restart"});
     this._resetVitality();
     this._lastTick = null;
     this._accumulator = 0;
@@ -2182,7 +2200,287 @@ export class NeuralGrowthModel {
 
   noteManualControlEdit() {
     this._vitalityWatchdog.noteManualEdit(performance.now());
-    this._audioResponse.cancel("recovery");
+    this._audioResponse.cancel("recovery", "manual-control-edit");
+  }
+
+  setDiagnosticsBaseParameters(parameters) {
+    this._diagnosticsBase = geometryValues(parameters);
+  }
+
+  setRawStateView(enabled) {
+    this._rawStateView = Boolean(enabled);
+  }
+
+  getVitalityFrameContext() {
+    return this._diagnosticsFrame ? { ...this._diagnosticsFrame } : null;
+  }
+
+  setVitalityDisplayMetrics(sample) {
+    if (sample?.modelId !== this.id) return;
+    this._diagnosticsDisplay = { ...sample, metrics: { ...sample.metrics } };
+  }
+
+  _eligibleRecoverySeeds(probe) {
+    if (
+      this._seedCache?.probe === probe &&
+      this._seedCache.revision === this._recoveryIntent.revision
+    )
+      return this._seedCache.tiles;
+    const tiles = [];
+    for (let tile = 0; tile < (probe?.eligible?.length || 0); tile++) {
+      const x = ((tile % INTENT_SIZE) + 0.5) / INTENT_SIZE;
+      const y = (Math.floor(tile / INTENT_SIZE) + 0.5) / INTENT_SIZE;
+      if (probe.eligible[tile] >= 192 && this._recoveryIntent.allows(x, y))
+        tiles.push(tile);
+    }
+    this._seedCache = { probe, revision: this._recoveryIntent.revision, tiles };
+    return tiles;
+  }
+
+  // Cached CPU state only. In particular, this getter must never call monitorVitality.
+  getVitalityDiagnostics(now = performance.now()) {
+    const runtime = this._runtime;
+    const cached = runtime?.vitalityDiagnosticsProbe ?? runtime?.vitalityProbe;
+    const probe = cached?.generation === runtime?.generation ? cached : null;
+    const probeState = runtime?.vitalityProbeState || {};
+    const recovery = this._audioResponse.getDiagnostics(
+      now,
+      this.simulationSize,
+    );
+    const decision = this._vitalityWatchdog.getDiagnostics(probe, {
+      timestamp: now,
+      checkpoint: this._activePattern,
+      size: this.simulationSize,
+      generation: runtime?.generation,
+      enabled: this._parameters.automaticRecovery === true,
+      active:
+        this._clockRunning &&
+        Number(this._parameters.growthSpeed) > 0 &&
+        !globalThis.document?.hidden,
+      pointerDown: this._audioResponse.pointerDown,
+      protectionRevision: this._recoveryIntent.signature,
+      unavailable:
+        !runtime || runtime.disposed || runtime.lost || probeState.unavailable,
+      eligibleSeeds: probe ? this._eligibleRecoverySeeds(probe).length : null,
+      recovering: recovery.activeSpores > 0,
+    });
+    const modulated = geometryValues(this._parameters);
+    const applied = runtime ? geometryValues(runtime) : null;
+    if (applied) {
+      applied.rotation = ((runtime.rotation ?? 0) * 180) / Math.PI;
+      applied.twist = ((runtime.twist ?? 0) * 180) / Math.PI;
+    }
+    const display = this._diagnosticsDisplay;
+    const alignment = {
+      generationMatches: Boolean(
+        probe && display?.generation === probe.generation,
+      ),
+      timestampDeltaMs:
+        probe && display ? display.timestamp - probe.timestamp : null,
+      stepDelta: probe && display ? display.steps - probe.steps : null,
+      displayFrameId: display?.frameId ?? null,
+    };
+    const aligned = Boolean(
+      probe &&
+      display &&
+      !this._rawStateView &&
+      !display.rawStateView &&
+      alignment.generationMatches &&
+      Math.abs(alignment.timestampDeltaMs) <= 1500 &&
+      now - probe.timestamp <= 3000 &&
+      now - display.timestamp <= 3000,
+    );
+    const discrepancy = aligned
+      ? probe.rgbContrast > 0.01 && display.metrics.signalDeviation < 0.002
+      : null;
+    const rawProbe = probe
+      ? Object.fromEntries(
+          [
+            "rgbContrast",
+            "rgbEnergy",
+            "rgbDelta",
+            "hiddenEnergy",
+            "hiddenDelta",
+            "clipping",
+            "coverage",
+            "timestamp",
+            "generation",
+            "steps",
+            "activeSeconds",
+            "forced",
+            "requestId",
+          ].map((key) => [key, probe[key] ?? null]),
+        )
+      : null;
+    if (rawProbe)
+      Object.assign(rawProbe, {
+        ageMs: Math.max(0, now - probe.timestamp),
+        clippingPercent: probe.clipping * 100,
+        eligibleCoveragePercent: probe.coverage * 100,
+      });
+    const geometry = {
+      base: this._diagnosticsBase ? { ...this._diagnosticsBase } : modulated,
+      modulated,
+      applied,
+      effectiveSpiralTwistDegrees:
+        (clampGeometryTwist(
+          this._parameters.coordinateTransform,
+          (Number(this._parameters.twist || 0) * Math.PI) / 180,
+        ) *
+          180) /
+        Math.PI,
+      resonancePhase: runtime?.lastPerceptionPhase ?? 0,
+    };
+    const settings = Object.fromEntries(
+      [
+        "channelView",
+        "palette",
+        "palettePhase",
+        "echoDecay",
+        "echoDrift",
+        "echoMode",
+        "echoStyle",
+        "displayFilter",
+        "zoom",
+      ].map((key) => [key, this._parameters[key]]),
+    );
+    return freezeSnapshot({
+      ...decision,
+      probe: rawProbe,
+      probeError: probeState.error || null,
+      recovery: {
+        ...recovery,
+        lastAdmittedAttempt: decision.lastAdmittedAttempt,
+        attemptsRemaining: decision.attemptsRemaining,
+      },
+      geometry,
+      display: {
+        settings,
+        rawStateView: this._rawStateView,
+        cached: display
+          ? { ...display, metrics: { ...display.metrics } }
+          : null,
+        alignment: aligned ? "aligned" : "unavailable-or-misaligned",
+        alignmentDetails: alignment,
+        discrepancy,
+        discrepancyMeaning:
+          "Heuristic: energetic raw RGB with a flat displayed viewport; camera and palette can also explain it.",
+        upstreamNonfinite: "unavailable",
+      },
+      actions: {
+        forceProbe: { ...this._debugProbeAction },
+        testSpore: { ...this._debugSporeAction },
+      },
+      revision: JSON.stringify([
+        probe?.timestamp,
+        probe?.generation,
+        this._vitalityWatchdog.assessment,
+        this._audioResponse.revision,
+        recovery.activeSpores,
+        geometry,
+        settings,
+        this._rawStateView,
+        display?.timestamp,
+        aligned,
+        decision.state,
+        decision.activeBlockers,
+        decision.attemptsRemaining,
+        probeState.error,
+        this._debugProbeAction,
+        this._debugSporeAction,
+      ]),
+    });
+  }
+
+  forceVitalityProbe(now = performance.now()) {
+    if (
+      !this.ready ||
+      !this._runtime?.monitorVitality ||
+      this._runtime.lost ||
+      this._runtime.disposed ||
+      this._runtime.vitalityProbeState?.unavailable
+    )
+      return (this._debugProbeAction = {
+        status: "rejected",
+        reason: "probe-unavailable",
+        timestamp: now,
+      });
+    if (this._runtime.vitalityProbeState?.pending)
+      return { ...this._debugProbeAction };
+    this._debugProbeAction = {
+      status: "pending",
+      timestamp: now,
+      generation: this._runtime.generation,
+    };
+    this._runtime.monitorVitality(now, this._vitalityActiveSeconds, {
+      force: true,
+      pollOnly: true,
+    });
+    this.pollVitalityDiagnostics(now);
+    return { ...this._debugProbeAction };
+  }
+
+  pollVitalityDiagnostics(now = performance.now()) {
+    if (this._debugProbeAction.status !== "pending") return;
+    const runtime = this._runtime;
+    if (!runtime || runtime.generation !== this._debugProbeAction.generation) {
+      this._debugProbeAction = {
+        status: "rejected",
+        reason: "generation-changed",
+        timestamp: now,
+      };
+      return;
+    }
+    runtime.monitorVitality(now, this._vitalityActiveSeconds, {
+      pollOnly: true,
+    });
+    const sample = runtime.vitalityForcedProbe;
+    const state = runtime.vitalityProbeState || {};
+    if (runtime.lost || runtime.disposed || state.unavailable)
+      this._debugProbeAction = {
+        status: "rejected",
+        reason: "probe-unavailable",
+        timestamp: now,
+      };
+    else if (
+      sample?.forced &&
+      sample.timestamp >= this._debugProbeAction.timestamp
+    )
+      this._debugProbeAction = {
+        status: "complete",
+        timestamp: sample.timestamp,
+        requestId: sample.requestId,
+      };
+    else if (now - this._debugProbeAction.timestamp > 5000)
+      this._debugProbeAction = {
+        status: "rejected",
+        reason: "probe-timeout",
+        timestamp: now,
+      };
+  }
+
+  testRecoverySpore(now = performance.now()) {
+    const diagnostics = this.getVitalityDiagnostics(now);
+    // Explicit test bypasses opt-in/baseline learning only; production protection,
+    // manual yield, clock and admission limits still apply.
+    const reason = [
+      "probe-unavailable",
+      "paused-or-stale",
+      "manual-hold",
+      "cooldown",
+      "rate-cap",
+      "protected-region",
+      "no-eligible-seed",
+    ].find((name) => diagnostics.activeBlockers.includes(name));
+    const result = reason
+      ? { status: "rejected", reason }
+      : this._queueRecoverySpores(
+          this._runtime.vitalityDiagnosticsProbe ?? this._runtime.vitalityProbe,
+          now,
+          { test: true },
+        );
+    this._debugSporeAction = { ...result, timestamp: now };
+    return { ...this._debugSporeAction };
   }
 
   get vitalityStatus() {
@@ -2205,7 +2503,7 @@ export class NeuralGrowthModel {
     this._recoveryIntent.clear();
     this._syncRecoveryProtection();
     this._vitalityWatchdog.noteManualEdit(performance.now());
-    this._audioResponse.cancel("all");
+    this._audioResponse.cancel("all", "protection-cleared");
   }
 
   _monitorVitality(timestamp) {
@@ -2224,9 +2522,15 @@ export class NeuralGrowthModel {
       enabled: this._parameters.automaticRecovery === true,
       pointerDown: this._audioResponse.pointerDown,
       protectionRevision: this._recoveryIntent.signature,
+      provenance: geometryValues(this._parameters),
     });
     if (!result.recover) return;
+    this._queueRecoverySpores(probe, timestamp);
+  }
+
+  _queueRecoverySpores(probe, timestamp, { test = false } = {}) {
     let queued = false;
+    let admitted = 0;
     // Start at different eligible coarse cells on successive attempts. The GPU
     // intent/barrier tests still protect every individual fragment of a spore.
     const offset = (++this._recoveryIndex * 397) % INTENT_SIZE ** 2;
@@ -2240,16 +2544,19 @@ export class NeuralGrowthModel {
       const y = (Math.floor(tile / INTENT_SIZE) + 0.5) / INTENT_SIZE;
       if (probe.eligible[tile] < 192 || !this._recoveryIntent.allows(x, y))
         continue;
-      if (this._audioResponse.queueRecovery(timestamp, x, y)) {
+      if (this._audioResponse.queueRecovery(timestamp, x, y, { test })) {
         queued = true;
+        admitted++;
         count++;
       }
     }
     if (queued) this._vitalityWatchdog.recordRecovery(timestamp);
+    return queued ? { status: "admitted", count: admitted } : { status: "rejected",
+      reason: this._audioResponse.lastRejectionReason || "no-eligible-seed" };
   }
 
-  cancelAudio({all = false} = {}) {
-    this._audioResponse.cancel(all ? "all" : "audio");
+  cancelAudio({all = false, reason = "cancelled"} = {}) {
+    this._audioResponse.cancel(all ? "all" : "audio", reason);
     this._activeRipples =
       this._activeRipples?.filter((r) => !r.automatic) || [];
   }
@@ -2261,7 +2568,7 @@ export class NeuralGrowthModel {
 
   onAudioFrame(_levels, _timestamp, _parameters, enabled = true) {
     if (!enabled || !this.ready || !this._clockRunning) {
-      this.cancelAudio({ all: true });
+      this.cancelAudio({ all: true, reason: "context-inactive" });
     }
   }
 
@@ -2314,7 +2621,7 @@ export class NeuralGrowthModel {
   }
 
   renderSnapshot(canvas, options = {}) {
-    this.cancelAudio({all: true});
+    this.cancelAudio({all: true, reason: "snapshot-export"});
     this._vitalityWatchdog.suspend();
     if (!this.ready)
       throw new Error(
@@ -2327,6 +2634,7 @@ export class NeuralGrowthModel {
 
     this._runRuntime(() =>
       this._runtime.draw(canvas, {
+        rawStateView: false,
         palette: options.palette ?? this._parameters.palette,
         palettePhase:
           options.palettePhase !== undefined

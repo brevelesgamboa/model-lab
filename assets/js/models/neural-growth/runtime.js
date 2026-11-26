@@ -699,6 +699,20 @@ void main() {
 
 }`;
 
+// Debug-only encoded-byte atlas: rows are packed RGBA groups, columns channels.
+const RAW_ATLAS = `${PREFIX}
+uniform sampler2D u_state;
+uniform ivec2 u_viewport;
+void main() {
+  vec2 uv = gl_FragCoord.xy / vec2(u_viewport);
+  int group = clamp(int(floor((1.0 - uv.y) * 3.0)), 0, 2);
+  int channel = clamp(int(floor(uv.x * 4.0)), 0, 3);
+  vec2 local = fract(uv * vec2(4.0, 3.0));
+  ivec2 cell = min(ivec2(local * float(u_size)), ivec2(u_size - 1));
+  float value = texelFetch(u_state, ivec2(cell.x + group * u_size, cell.y), 0)[channel];
+  out_color = vec4(vec3(value), 1.0);
+}`;
+
 const VISUALIZE = `${PREFIX}
 uniform sampler2D u_state;
 uniform sampler2D u_barrier;
@@ -1537,6 +1551,7 @@ export class TextureNcaRuntime {
         Math.floor(this.layout.random() * this.size),
       ];
       const resUniforms = this.resonance?.toUniforms(this.steps);
+      this.lastPerceptionPhase = resUniforms?.perceptionPhase ?? 0;
       this.run(
         "perception",
         this.perception,
@@ -1836,6 +1851,10 @@ export class TextureNcaRuntime {
 
   draw(targetCanvas, optionsOrPalette = "native", zoomArg = 1) {
     this.assertActive();
+    if (optionsOrPalette?.rawStateView === true) {
+      this.drawRawState(targetCanvas);
+      return;
+    }
     const options =
       typeof optionsOrPalette === "object" && optionsOrPalette !== null
         ? optionsOrPalette
@@ -2044,6 +2063,23 @@ export class TextureNcaRuntime {
     context.drawImage(this.canvas, 0, 0, targetWidth, targetHeight);
   }
 
+  drawRawState(targetCanvas) {
+    if (!this.program.rawAtlas) {
+      const handle = link(this.gl, RAW_ATLAS);
+      this.programs.push(handle);
+      this.program.rawAtlas = { handle, locations: new Map() };
+    }
+    const width = Math.max(1, targetCanvas.width || this.size);
+    const height = Math.max(1, targetCanvas.height || this.size);
+    if (this.canvas.width !== width) this.canvas.width = width;
+    if (this.canvas.height !== height) this.canvas.height = height;
+    this.run("rawAtlas", null, { u_state: this.state }, { u_viewport: [width, height] });
+    const context = targetCanvas.getContext("2d");
+    if (!context) throw new Error("A 2D display canvas is required.");
+    context.imageSmoothingEnabled = false;
+    context.drawImage(this.canvas, 0, 0, width, height);
+  }
+
   readState() {
     this.assertActive();
     const gl = this.gl;
@@ -2169,12 +2205,12 @@ export class TextureNcaRuntime {
     this.invalidateVitality();
   }
 
-  monitorVitality(timestamp, activeSeconds = 0) {
+  monitorVitality(timestamp, activeSeconds = 0, { force = false, pollOnly = false } = {}) {
     if (
       this.disposed ||
       this.lost ||
       this._vitalityUnavailable ||
-      (this.steps <= 0 && !this._vitalityProbe)
+      (this.steps <= 0 && !this._vitalityProbe && !force)
     )
       return null;
     if (this.gl.isContextLost()) {
@@ -2215,10 +2251,12 @@ export class TextureNcaRuntime {
             this.run("vitalitySnapshot", history, { u_state: this.state }),
         });
       }
+      if (force) this._vitalityProbe.requestProbe(this.generation);
       return this._vitalityProbe.update(timestamp, {
         generation: this.generation,
         steps: this.steps,
         activeSeconds,
+        pollOnly,
       });
     } catch (error) {
       this._vitalityUnavailable = true;
@@ -2230,6 +2268,22 @@ export class TextureNcaRuntime {
 
   get vitalityProbe() {
     return this._vitalityProbe?.latest ?? null;
+  }
+
+  get vitalityDiagnosticsProbe() {
+    const normal = this.vitalityProbe;
+    const debug = this._vitalityProbe?.latestDiagnostic;
+    return debug && (!normal || debug.timestamp >= normal.timestamp) ? debug : normal;
+  }
+
+  get vitalityForcedProbe() {
+    return this._vitalityProbe?.latestDiagnostic ?? null;
+  }
+
+  get vitalityProbeState() {
+    return { unavailable: Boolean(this._vitalityUnavailable || this._vitalityProbe?.unavailable),
+      error: String(this._vitalityError?.message || this._vitalityProbe?.error?.message || ""),
+      pending: Boolean(this._vitalityProbe?.forcePending) };
   }
 
   isDormant() {

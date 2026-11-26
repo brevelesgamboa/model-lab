@@ -5,6 +5,7 @@ import {
 } from "../ui/workbench-shell.js";
 import { renderModelTechnicalInfo } from "./controls-controller.js";
 import { PATTERNS } from "../models/neural-growth/patterns.js";
+import { createGrowthVitalityHud } from "../ui/growth-vitality-hud.js";
 
 const FAVORITES_KEY = "latent-field:growth-favorites";
 const RECENTS_KEY = "latent-field:growth-recents";
@@ -86,6 +87,8 @@ export function createGrowthController({
     getView() === "lab" && getModel()?.id === "neural-growth"
       ? getModel()
       : null;
+  const vitalityHud = createGrowthVitalityHud({ panel: elements.growthDiagnostics,
+    getModel: activeModel, render: () => render({ forceAnalysis: true }) });
 
   // Gallery state
   const favorites = new Set(loadStorageJson(FAVORITES_KEY, []));
@@ -431,6 +434,7 @@ export function createGrowthController({
   }
 
   function update() {
+    vitalityHud.update();
     const model = activeModel();
     elements.growthTools.hidden = !model;
     if (elements.growthCanvasTools) {
@@ -998,6 +1002,6 @@ export function createGrowthController({
     schedulePausedRender,
     onAudioFrame,
     openGallery,
-    dispose: () => listeners.forEach((remove) => remove()),
+    dispose: () => { vitalityHud.dispose(); listeners.forEach((remove) => remove()); },
   };
 }

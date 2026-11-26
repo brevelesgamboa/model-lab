@@ -55,6 +55,146 @@ async function selectGrowth(page, { expandSections = true } = {}) {
   }
 }
 
+async function observeVitalityModel(page) {
+  await page.evaluate(async () => {
+    const { NeuralGrowthModel } = await import("/assets/js/models/neural-growth.js");
+    const original = NeuralGrowthModel.prototype.render;
+    NeuralGrowthModel.prototype.render = async function (...args) {
+      const result = await original.apply(this, args);
+      window.__vitalityModel = this;
+      window.__growthRuntime = this._runtime;
+      return result;
+    };
+  });
+}
+
+test("vitality HUD is opt-in, ignores typing focus, and is scoped to the Growth lab route", async ({ page }) => {
+  await selectGrowth(page);
+  const hud = page.locator("#growth-vitality-diagnostics");
+  await expect(hud).toBeHidden();
+  await page.getByLabel("GROWTH SPEED exact value", { exact: true }).focus();
+  await page.keyboard.press("d");
+  await expect(hud).toBeHidden();
+  await page.getByLabel("COORDINATE GEOMETRY", { exact: true }).focus();
+  await page.keyboard.press("d");
+  await expect(hud).toBeHidden();
+  // Exercise textarea and contenteditable guards without changing application UI.
+  for (const tag of ["textarea", "div"]) {
+    await page.evaluate((tag) => {
+      const node = document.createElement(tag); node.id = "typing-guard";
+      if (tag === "div") node.contentEditable = "true";
+      document.body.append(node); node.focus();
+    }, tag);
+    await page.keyboard.press("d");
+    await expect(hud).toBeHidden();
+    await page.locator("#typing-guard").evaluate((node) => node.remove());
+  }
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("d");
+  await expect(hud).toBeVisible();
+  await expect(hud).toHaveAttribute("open", "");
+  await page.keyboard.press("d");
+  await expect(hud).toBeHidden();
+  await page.keyboard.press("d");
+  await hud.locator(":scope > summary").click();
+  await expect(hud).not.toHaveAttribute("open");
+  await hud.locator(":scope > summary").click();
+  await page.locator('[data-view="saved"]').click();
+  await expect(hud).toHaveAttribute("hidden", "");
+  await page.locator('[data-view="lab"]').click();
+  await expect(hud).toBeVisible();
+  await page.locator("#model-select").selectOption("folded-fractal");
+  await expect(hud).toHaveAttribute("hidden", "");
+  await page.keyboard.press("d");
+  await expect(hud).toBeHidden();
+});
+
+test("growthDebug URL enables HUD and Force Probe is fenced, paused and separate from evidence", async ({ page }) => {
+  await page.goto("/?growthDebug=1");
+  await observeVitalityModel(page);
+  await selectGrowth(page);
+  const hud = page.locator("#growth-vitality-diagnostics");
+  await expect(hud).toBeVisible();
+  const before = await page.evaluate(() => {
+    const model = window.__vitalityModel, gl = model._runtime.gl;
+    window.__diagnosticReads = { pbo: 0, cpu: 0 };
+    const read = gl.readPixels.bind(gl);
+    gl.readPixels = (...args) => {
+      window.__diagnosticReads[typeof args.at(-1) === "number" ? "pbo" : "cpu"]++;
+      return read(...args);
+    };
+    for (let i = 0; i < 50; i++) model.getVitalityDiagnostics();
+    return { steps: model._runtime.steps, evidence: model._vitalityWatchdog.lastStep };
+  });
+  await expect.poll(() => page.evaluate(() => window.__diagnosticReads.pbo)).toBe(0);
+  await hud.getByRole("button", { name: "Force Probe" }).click();
+  await expect(hud.locator('[data-vitality-field="probe"]')).toContainText("forced diagnostic");
+  const after = await page.evaluate(() => ({ ...window.__diagnosticReads,
+    steps: window.__growthRuntime.steps, evidence: window.__vitalityModel._vitalityWatchdog.lastStep,
+    action: window.__vitalityModel.getVitalityDiagnostics().actions.forceProbe.status }));
+  expect(after).toEqual({ ...before, pbo: 1, cpu: 0, action: "complete" });
+  await hud.getByRole("button", { name: "Test Spore" }).click();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.reason)).toBe("paused-or-stale");
+  await page.locator("#toggle-animation").click();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().activeBlockers.includes("paused-or-stale"))).toBe(false);
+  await hud.getByRole("button", { name: "Test Spore" }).click();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.status)).toBe("admitted");
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().recovery.emittedDose)).toBeGreaterThan(0);
+  await hud.getByRole("button", { name: "Test Spore" }).click();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().actions.testSpore.reason)).toBe("cooldown");
+  await page.locator("#toggle-animation").click();
+});
+
+test("raw 12-channel atlas restores cleanly, stays outside PNG snapshots, and works fullscreen", async ({ page }) => {
+  await observeVitalityModel(page);
+  await selectGrowth(page);
+  await page.evaluate(() => {
+    const runtime = window.__growthRuntime;
+    const bytes = new Uint8Array(runtime.size ** 2 * 12);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i % 12 + 1) * 17;
+    runtime.writeState(bytes);
+  });
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("d");
+  const hud = page.locator("#growth-vitality-diagnostics");
+  const raw = hud.getByRole("checkbox", { name: "Raw State View" });
+  await raw.check();
+  await expect.poll(() => page.evaluate(() => {
+    const canvas = document.getElementById("output-canvas"), ctx = canvas.getContext("2d");
+    return Array.from({ length: 12 }, (_, ch) => ctx.getImageData(
+      Math.floor(((ch % 4) + .5) * canvas.width / 4),
+      Math.floor((Math.floor(ch / 4) + .5) * canvas.height / 3), 1, 1).data[0]);
+  })).toEqual(Array.from({ length: 12 }, (_, ch) => (ch + 1) * 17));
+  const expected = await page.evaluate(() => {
+    const canvas = document.createElement("canvas"), live = document.getElementById("output-canvas");
+    canvas.width = live.width; canvas.height = live.height;
+    window.__vitalityModel.renderSnapshot(canvas);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator("#save-image").click();
+  await page.locator('input[name="export-resolution"][value="current"]').check();
+  const downloaded = page.waitForEvent("download");
+  await page.locator("#export-modal-confirm").click();
+  const bytes = await readFile(await (await downloaded).path());
+  expect(bytes.toString("base64")).toBe(expected);
+  await expect(raw).toBeChecked();
+  expect(await page.evaluate(() => "rawStateView" in window.__vitalityModel.parameters)).toBe(false);
+  await raw.uncheck();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().display.rawStateView)).toBe(false);
+  await page.locator("#toggle-fullscreen").click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement?.id)).toBe("output-panel");
+  await expect(hud).toBeVisible();
+  const bounds = await hud.boundingBox();
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  await raw.check();
+  await raw.evaluate((node) => node.blur());
+  await page.keyboard.press("d");
+  await expect(hud).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.__vitalityModel.getVitalityDiagnostics().display.rawStateView)).toBe(false);
+  await page.evaluate(() => document.exitFullscreen());
+});
+
 test("growth sections default to Pattern and keep brush settings in the right rail", async ({
   page,
 }) => {

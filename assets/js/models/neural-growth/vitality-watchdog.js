@@ -104,7 +104,124 @@ export class VitalityWatchdog {
   }
   recordRecovery(timestamp) {
     this.attempts.push(timestamp);
+    this.lastAdmittedAttempt = timestamp;
     this.suspend();
+  }
+  // Read-only projection: never advances evidence, learns, or prunes policy state.
+  getDiagnostics(probe, context) {
+    const {
+      timestamp: now,
+      checkpoint,
+      size,
+      generation,
+      enabled,
+      active = true,
+      pointerDown = false,
+      protectionRevision = 0,
+      unavailable = false,
+      eligibleSeeds = null,
+      recovering = false,
+    } = context;
+    const key = `${checkpoint}:${size}:${protectionRevision}`;
+    const entry = this.baselines.get(key);
+    const current = probe?.generation === generation ? probe : null;
+    const base = entry?.baseline;
+    const warming =
+      !current ||
+      current.steps < WATCHDOG_POLICY.warmupSteps ||
+      current.activeSeconds < WATCHDOG_POLICY.warmupSeconds;
+    const attempts = this.attempts.filter((time) => now - time < 60000);
+    const remaining = (deadline) => Math.max(0, (deadline - now) / 1000);
+    const cooldown = remaining(
+      (attempts.at(-1) ?? -Infinity) + WATCHDOG_POLICY.cooldown,
+    );
+    const cap =
+      attempts.length >= WATCHDOG_POLICY.attemptsPerMinute
+        ? remaining(
+            attempts[attempts.length - WATCHDOG_POLICY.attemptsPerMinute] +
+              60000,
+          )
+        : 0;
+    const age = current ? Math.max(0, now - current.timestamp) : Infinity;
+    const blockerDetails = {};
+    const add = (name, seconds = null) => {
+      blockerDetails[name] = { remainingSeconds: seconds };
+    };
+    if (!enabled) add("recovery-off");
+    if (pointerDown || now < this.manualUntil)
+      add("manual-hold", remaining(this.manualUntil));
+    if (cooldown > 0) add("cooldown", cooldown);
+    if (cap > 0) add("rate-cap", cap);
+    if (current?.coverage < 0.05) add("protected-region");
+    if (!base) add("no-baseline");
+    if (eligibleSeeds === 0 && current) add("no-eligible-seed");
+    if (unavailable) add("probe-unavailable");
+    if (!active || !current || age > (size <= 256 ? 1500 : 3000))
+      add("paused-or-stale");
+    let state = warming ? "warming-up" : "uncertain";
+    if (current && base && !warming) {
+      const collapsed =
+        current.rgbContrast < base.rgbContrast * 0.22 &&
+        current.hiddenEnergy < base.hiddenEnergy * 0.25 &&
+        current.hiddenDelta !== null &&
+        current.hiddenDelta < Math.max(0.0015, base.hiddenDelta * 0.25);
+      const saturated =
+        current.clipping > 0.35 && current.clipping > base.clipping + 0.25;
+      state = saturated
+        ? "saturated"
+        : collapsed
+          ? "collapsed"
+          : current.hiddenDelta < 0.0015 && current.rgbDelta < 0.0015
+            ? "still"
+            : "healthy";
+    }
+    if (unavailable) state = "uncertain";
+    if (recovering) state = "recovering";
+    const activeBlockers = Object.keys(blockerDetails);
+    const ratios = Object.fromEntries(
+      ["rgbContrast", "hiddenEnergy", "hiddenDelta", "clipping"].map((name) => [
+        name,
+        current?.[name] != null && base?.[name] > 0
+          ? current[name] / base[name]
+          : null,
+      ]),
+    );
+    return {
+      state,
+      primaryBlocker: activeBlockers[0] ?? null,
+      activeBlockers,
+      blockerDetails,
+      badCount: this.badCount,
+      baseline: {
+        status: warming
+          ? "warming-up"
+          : base
+            ? "locked"
+            : entry?.samples.length
+              ? "learning"
+              : "missing",
+        key,
+        sampleCount: base
+          ? WATCHDOG_POLICY.baselineProbes
+          : (entry?.samples.length ?? 0),
+        requiredSamples: WATCHDOG_POLICY.baselineProbes,
+        reference: base ? { ...base } : null,
+        ratios,
+        provenance: entry?.provenance
+          ? {
+              ...entry.provenance,
+              geometry: entry.provenance.geometry
+                ? { ...entry.provenance.geometry }
+                : null,
+            }
+          : null,
+      },
+      lastAdmittedAttempt: this.lastAdmittedAttempt ?? null,
+      attemptsRemaining: Math.max(
+        0,
+        WATCHDOG_POLICY.attemptsPerMinute - attempts.length,
+      ),
+    };
   }
   observe(
     probe,
@@ -117,6 +234,7 @@ export class VitalityWatchdog {
       active = true,
       pointerDown = false,
       protectionRevision = 0,
+      provenance = null,
     },
   ) {
     const report = (status, extra = {}) =>
@@ -196,6 +314,15 @@ export class VitalityWatchdog {
           (name) => [name, median(entry.samples.map((sample) => sample[name]))],
         ),
       );
+      entry.provenance = {
+        checkpoint,
+        size,
+        generation,
+        steps: probe.steps,
+        timestamp,
+        protectionRevision,
+        geometry: provenance ? { ...provenance } : null,
+      };
       entry.samples = [];
     }
     const base = entry.baseline;

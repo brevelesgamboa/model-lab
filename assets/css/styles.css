@@ -3549,3 +3549,28 @@ input[type="range"]::-moz-range-progress {
   background: var(--bg-card);
   font-size: 10px;
 }
+
+.growth-vitality-hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 12;
+  width: min(370px, calc(100% - 20px));
+  border: 1px solid var(--border-active);
+  border-radius: 6px;
+  background: var(--bg-chrome);
+  color: var(--text-primary);
+  font: 10px/1.5 var(--font-mono);
+  box-shadow: 0 4px 20px #0006;
+}
+.growth-vitality-hud[hidden] { display: none; }
+.growth-vitality-hud > summary { padding: 8px 10px; cursor: pointer; }
+.growth-vitality-hud kbd { float: right; color: var(--text-muted); }
+.growth-vitality-hud__body { padding: 0 10px 10px; max-height: min(65vh, 650px); overflow: auto; }
+.growth-vitality-hud dl { margin: 8px 0; }
+.growth-vitality-hud dt { color: var(--text-muted); margin-top: 5px; }
+.growth-vitality-hud dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.growth-vitality-hud pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.growth-vitality-hud__actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.growth-vitality-hud__actions label { display: flex; gap: 4px; align-items: center; }
+.growth-vitality-hud__body > details { border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 5px; }

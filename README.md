@@ -52,6 +52,7 @@ npm run test:browser
 - **Local data:** Uploaded images are processed in the browser; saved runs and preview caches use browser storage.
 - **GPU and resolution:** WebGL2 is required. Lower the simulation grid or preview resolution if NCA growth or Inception feature ascent becomes slow.
 - **Neuron previews:** Generate previews on demand or in a background batch that yields to standalone Inception ascent; enable local caching to reuse them after reload.
+- **Neural Growth diagnostics:** Press **D** outside an input, or open `/?growthDebug=1`, to show the collapsible Vitality diagnostics panel. It uses cached telemetry and separates recovery blockers from field state. **Force Probe** requests one fenced asynchronous sample, including while paused. **Test Spore** uses the production dose and protection masks, requires a running clock and fresh probe, and bypasses recovery opt-in/baseline learning only. **Raw State View** shows all twelve encoded channels; normal PNG snapshots and saved settings exclude this debug view. Upstream shader NaN/Inf detection remains unavailable.
 
 ---
 

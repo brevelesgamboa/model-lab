@@ -120,6 +120,7 @@ export function collectElements() {
     restartGrowth: document.getElementById("restart-growth"),
     disturbGrowth: document.getElementById("disturb-growth"),
     growthStatus: document.getElementById("growth-status"),
+    growthDiagnostics: document.getElementById("growth-vitality-diagnostics"),
     growthCanvasTools: document.getElementById("growth-canvas-tools"),
     growthBrushBtns: Array.from(document.querySelectorAll(".growth-brush-btn")),
     growthBrushRadius: document.getElementById("growth-brush-radius"),

@@ -281,3 +281,26 @@ test("continuous manual invalidation preserves cadence and needs fresh simulatio
     "Manual generations without a new NCA step must not launch probes",
   );
 });
+
+test("forced paused probes use fences without changing production cadence, history or latest evidence", () => {
+  const { probe, calls, update, signal } = setup();
+  update(0, 100);
+  signal(); update(16, 100);
+  const original = probe.latest;
+  const history = probe.hasHistory;
+  assert.equal(probe.requestProbe(1), 1);
+  assert.equal(probe.requestProbe(1), null);
+  probe.update(20, { generation: 1, steps: 100, pollOnly: true });
+  assert.equal(calls.reads.length, 2);
+  assert.equal(probe.latestDiagnostic, null, "never copy in launch frame");
+  signal();
+  probe.update(36, { generation: 1, steps: 100, pollOnly: true });
+  assert.equal(probe.latestDiagnostic.requestId, 1);
+  assert.equal(probe.latest, original);
+  assert.equal(probe.hasHistory, history);
+  assert.equal(probe.lastLaunch, 0);
+  assert.equal(probe.lastSteps, 100);
+  for (let i = 0; i < 10; i++) probe.update(50 + i, { generation: 1, steps: 100, pollOnly: true });
+  assert.equal(calls.reads.length, 2);
+  assert.ok(calls.waits.every(([flags, timeout]) => flags === 0 && timeout === 0));
+});
