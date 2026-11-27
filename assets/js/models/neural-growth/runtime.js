@@ -116,8 +116,10 @@ void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   int lane = p.x / ${PROBE_SIZE};
   ivec2 tile = ivec2(p.x % ${PROBE_SIZE}, p.y);
-  vec3 rgb = vec3(0.0), squared = vec3(0.0);
+  vec3 rgb = vec3(0.0), rawMean = vec3(0.0), rawM2 = vec3(0.0);
+  vec3 nativeSum = vec3(0.0), nativeMean = vec3(0.0), nativeM2 = vec3(0.0);
   float energy = 0.0, delta = 0.0, clip = 0.0, coverage = 0.0, rgbEnergy = 0.0, rgbDelta = 0.0;
+  float rgbClip = 0.0, black = 0.0, white = 0.0, nativeDelta = 0.0;
   for (int sy = 0; sy < 2; sy++) for (int sx = 0; sx < 2; sx++) {
     ivec2 site = tile * 2 + ivec2(sx, sy);
     ivec2 xy = probeCell(site);
@@ -133,25 +135,59 @@ void main() {
     float ha = (a.a - 127.0 / 255.0) * 2.0;
     vec4 db = b - oldB, dc = c - oldC;
     float da = a.a - oldA.a;
-    rgb += a.rgb;
-    squared += a.rgb * a.rgb;
+    // Welford moments in exact byte/half-byte units. A constant tile has
+    // identically zero deviation, rather than two separately rounded moments.
+    vec3 raw = round(a.rgb * 255.0);
+    vec3 native = clamp(raw * 2.0 - 126.5, 0.0, 255.0);
+    coverage += 1.0;
+    vec3 diff = raw - rawMean;
+    rawMean += diff / coverage; rawM2 += diff * (raw - rawMean);
+    diff = native - nativeMean;
+    nativeMean += diff / coverage; nativeM2 += diff * (native - nativeMean);
+    rgb += raw; nativeSum += native;
     energy += sqrt((dot(hb, hb) + dot(hc, hc) + ha * ha) / 9.0);
     delta += u_hasHistory == 1 ? sqrt((dot(db, db) + dot(dc, dc) + da * da) / 9.0) : 0.0;
     clip += (clipped(a) + clipped(b) + clipped(c)) / 12.0;
+    rgbClip += clipped(vec4(a.rgb, 0.5)) / 3.0;
+    black += all(lessThanEqual(raw, vec3(63.0))) ? 1.0 : 0.0;
+    white += all(greaterThanEqual(raw, vec3(191.0))) ? 1.0 : 0.0;
     rgbEnergy += dot(abs(a.rgb - 127.0 / 255.0), vec3(1.0 / 3.0));
     rgbDelta += u_hasHistory == 1 ? dot(abs(a.rgb - oldA.rgb), vec3(1.0 / 3.0)) : 0.0;
-    coverage += 1.0;
+    vec3 oldNative = clamp(round(oldA.rgb * 255.0) * 2.0 - 126.5, 0.0, 255.0);
+    nativeDelta += u_hasHistory == 1 ? dot(abs(native - oldNative), vec3(1.0 / (255.0 * 3.0))) : 0.0;
   }
   float divisor = max(coverage, 1.0);
-  rgb /= divisor; squared /= divisor;
+  float rawDeviation = sqrt(max(0.0, dot(rawM2, vec3(1.0 / 3.0)) / divisor)) / 255.0;
+  float nativeDeviation = sqrt(max(0.0, dot(nativeM2, vec3(1.0 / 3.0)) / divisor)) / 255.0;
   vec2 values;
-  if (lane == 0) values = rgb.rg;
-  else if (lane == 1) values = vec2(rgb.b, squared.r);
-  else if (lane == 2) values = squared.gb;
-  else if (lane == 3) values = vec2(energy, delta) / divisor;
-  else if (lane == 4) values = vec2(clip / divisor, coverage / 4.0);
-  else values = vec2(rgbEnergy, rgbDelta) / divisor;
+  // Byte sums are decoded back to exact integers; deviation is quantized
+  // directly at 1/131070 precision. CPU reduction merges within/between tiles.
+  if (lane == 0) values = rgb.rg / 1020.0;
+  else if (lane == 1) values = vec2(rgb.b / 1020.0, rawDeviation * 2.0);
+  else if (lane == 2) values = nativeSum.rg / 1020.0;
+  else if (lane == 3) values = vec2(nativeSum.b / 1020.0, nativeDeviation * 2.0);
+  else if (lane == 4) values = vec2(energy, delta) / divisor;
+  else if (lane == 5) values = vec2(clip / divisor, coverage / 4.0);
+  else if (lane == 6) values = vec2(rgbEnergy, rgbDelta) / divisor;
+  else if (lane == 7) values = vec2(rgbClip, black) / divisor;
+  else values = vec2(white, nativeDelta) / divisor;
   out_color = vec4(encode16(values.x), encode16(values.y));
+}`;
+
+const RECOVERY_SEED_SIZE = 32;
+const RECOVERY_SEED = `${PREFIX}
+uniform sampler2D u_state;
+uniform sampler2D u_barrier;
+uniform sampler2D u_intent;
+uniform int u_hasIntent;
+uniform ivec2 u_seedCenter;
+void main() {
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  int group = p.x / ${RECOVERY_SEED_SIZE};
+  ivec2 xy = wrapCell(ivec2(p.x % ${RECOVERY_SEED_SIZE}, p.y) - ${RECOVERY_SEED_SIZE / 2} + u_seedCenter);
+  bool protectedCell = texelFetch(u_barrier, xy, 0).r > 0.5;
+  if (u_hasIntent == 1) protectedCell = protectedCell || texelFetch(u_intent, xy * ${INTENT_SIZE} / u_size, 0).r > 0.5;
+  out_color = protectedCell ? vec4(127.0 / 255.0) : texelFetch(u_state, ivec2(xy.x + group * u_size, xy.y), 0);
 }`;
 
 const PERCEPTION = `${PREFIX}
@@ -452,6 +488,9 @@ uniform vec3 u_dyeColor;
 uniform int u_explicitDye;
 uniform int u_automatic;
 uniform float u_quantizationPhase;
+uniform float u_seedNoise;
+uniform sampler2D u_recoverySeed;
+uniform int u_hasRecoverySeed;
 uniform int u_lockBarrier;
 ${ANGLE_GLSL}
 vec3 rgbToHsv(vec3 c) {
@@ -500,13 +539,22 @@ void main() {
     return;
   }
   vec4 current = texelFetch(u_state, p, 0);
-  if (u_mode == 1) {
+  if (u_mode == 1 || u_mode == 9) {
     vec2 coord = vec2(p);
     float n1 = fract(sin(dot(coord, vec2(12.9898, 78.233))) * 43758.5453);
     float n2 = fract(sin(dot(coord + vec2(17.1, 41.3), vec2(39.346, 11.135))) * 23421.631);
     float n3 = fract(sin(dot(coord + vec2(73.5, 91.2), vec2(73.156, 52.235))) * 84621.157);
     float n4 = fract(sin(dot(coord + vec2(103.7, 15.8), vec2(91.732, 29.412))) * 19283.472);
     vec4 target = vec4(n1, n2, n3, n4);
+    // Rescue toward the checkpoint startup distribution, not full-range dye.
+    if (u_mode == 9) {
+      target = clamp(vec4(127.0 / 255.0) + (target - 0.5) * u_seedNoise, 0.0, 1.0);
+      if (u_hasRecoverySeed == 1) {
+        ivec2 seedXY = (xy - u_center + ${RECOVERY_SEED_SIZE / 2}) % ${RECOVERY_SEED_SIZE};
+        seedXY = (seedXY + ${RECOVERY_SEED_SIZE}) % ${RECOVERY_SEED_SIZE};
+        target = texelFetch(u_recoverySeed, ivec2(seedXY.x + group * ${RECOVERY_SEED_SIZE}, seedXY.y), 0);
+      }
+    }
     out_color = mix(current, target, weight);
   } else if (u_mode == 2) {
     if (group == 0) {
@@ -1213,6 +1261,7 @@ export class TextureNcaRuntime {
           "u_lockBarrier",
           "u_hasHistory",
           "u_hasIntent",
+          "u_hasRecoverySeed",
           "u_explicitDye",
           "u_automatic",
           "u_rippleCount",
@@ -1595,15 +1644,13 @@ export class TextureNcaRuntime {
       ? Math.max(0, Number(strength))
       : 1.0;
     let effectiveRadius = radius;
-    if (mode === "noise") modeCode = 1;
+    if (mode === "seed") modeCode = 9;
+    else if (mode === "noise") modeCode = 1;
     else if (mode === "dye") modeCode = 2;
     else if (mode === "invert") modeCode = 4;
     else if (mode === "shockwave") {
       modeCode = 5;
-      effectiveRadius = Math.min(
-        12,
-        Math.max(6, Math.round(this.size * 0.05)),
-      );
+      effectiveRadius = Math.min(12, Math.max(6, Math.round(this.size * 0.05)));
       effectiveStrength = 0.18;
     } else if (mode === "kick_color") modeCode = 5;
     else if (mode === "kick_perturb") modeCode = 6;
@@ -1612,8 +1659,23 @@ export class TextureNcaRuntime {
     this.run(
       "disturb",
       this.nextState,
-      { u_state: this.state, u_barrier: this.barrier, u_intent: this._protectionTexture || this.barrier },
       {
+        u_state: this.state,
+        u_barrier: this.barrier,
+        u_intent: this._protectionTexture || this.barrier,
+        u_recoverySeed: this._recoverySeed || this.state,
+      },
+      {
+        u_hasRecoverySeed: this._recoverySeed ? 1 : 0,
+        u_seedNoise:
+          (Math.max(
+            0.025,
+            this.model.startup?.seedState === "noise"
+              ? this.model.startup.noiseStd
+              : 0.05,
+          ) *
+            Math.sqrt(12)) /
+          4,
         u_hasIntent: this._protectionTexture ? 1 : 0,
         u_center: [x, y],
         u_radius: effectiveRadius,
@@ -1995,6 +2057,56 @@ export class TextureNcaRuntime {
       this._protectionBytes,
     );
     this.invalidateVitality();
+  }
+
+  get hasRecoverySeed() {
+    return Boolean(this._recoverySeed);
+  }
+
+  // One small contiguous healthy patch, retained on the GPU for this checkpoint.
+  // Capture only after trusted baseline learning, never from a collapsed state.
+  captureRecoverySeed(probe) {
+    if (
+      this._recoverySeed ||
+      probe.generation !== this.generation ||
+      probe.seedTile === null ||
+      probe.seedTile === undefined
+    )
+      return;
+    this.assertActive();
+    if (!this.program.recoverySeed) {
+      const handle = link(this.gl, RECOVERY_SEED);
+      this.programs.push(handle);
+      this.program.recoverySeed = { handle, locations: new Map() };
+    }
+    this._recoverySeed = this.allocate(
+      RECOVERY_SEED_SIZE * 3,
+      RECOVERY_SEED_SIZE,
+      true,
+    );
+    const x = Math.floor(
+      (((probe.seedTile % PROBE_SIZE) + 0.5) / PROBE_SIZE) * this.size,
+    );
+    const y = Math.floor(
+      ((Math.floor(probe.seedTile / PROBE_SIZE) + 0.5) / PROBE_SIZE) *
+        this.size,
+    );
+    this.run(
+      "recoverySeed",
+      this._recoverySeed,
+      {
+        u_state: this.state,
+        u_barrier: this.barrier,
+        u_intent: this._protectionTexture || this.barrier,
+      },
+      { u_hasIntent: this._protectionTexture ? 1 : 0, u_seedCenter: [x, y] },
+    );
+    this.recoverySeedInfo = {
+      steps: this.steps,
+      generation: this.generation,
+      tile: probe.seedTile,
+      size: RECOVERY_SEED_SIZE,
+    };
   }
 
   monitorVitality(timestamp, activeSeconds = 0, { force = false, pollOnly = false } = {}) {

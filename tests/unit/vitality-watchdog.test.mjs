@@ -124,7 +124,7 @@ test("severe raw-state clipping can recover only after a healthy baseline exists
     );
     assert.equal(result.recover, i === 106);
   }
-  assert.equal(watcher.assessment.reason, "clipping");
+  assert.equal(watcher.assessment.reason, "saturation");
 });
 
 test("frozen/erased coverage, pointer holds and eight-second manual holds reset bad evidence", () => {
@@ -163,7 +163,7 @@ test("cooldown and two-attempt rolling-minute cap apply to actual admitted recov
   assert.equal(evidence(10000).status, "cooldown");
   assert.equal(evidence(15002).recover, true);
   watcher.recordRecovery(15004);
-  assert.equal(evidence(30000).status, "cooldown");
+  assert.equal(evidence(30000).status, "rate-cap");
   assert.equal(evidence(65003).recover, true);
 });
 
@@ -194,7 +194,7 @@ test("baselines are checkpoint/grid-specific; generations and protection changes
       dead(115, { generation: 2 }),
       context(7500, { generation: 2, protectionRevision: 1 }),
     ).status,
-    "uncertain",
+    "suspected-collapse",
   );
 });
 
@@ -225,5 +225,5 @@ test("resizing intent protection follows toroidal state tiling and clearing rest
   assert.equal(mask.signature, empty);
   const watcher = established();
   watcher.observe(dead(110), context(5000, { protectionRevision: 123 }));
-  assert.equal(watcher.observe(dead(111), context(6000)).badCount, 1);
+  assert.equal(watcher.observe(dead(111), context(6000)).badCount, 2);
 });

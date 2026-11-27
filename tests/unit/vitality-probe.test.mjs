@@ -9,7 +9,7 @@ import {
 import { TextureNcaRuntime } from "../../assets/js/models/neural-growth/runtime.js";
 
 function encoded(
-  metrics = [0.5, 0.5, 0.5, 0.26, 0.26, 0.26, 0.2, 0.03, 0, 1, 0.1, 0.02],
+  metrics = [0.5,0.5,0.5,0.2,0.5,0.5,0.5,0.4,0.2,0.03,0,1,0.1,0.02,0,0,0,0.04],
 ) {
   const width = PROBE_SIZE * METRIC_PLANES,
     bytes = new Uint8Array(width * PROBE_SIZE * 4);
@@ -103,7 +103,7 @@ test("GPU statistics preserve spatial second moments instead of contrasting aver
   assert.equal(result.coverage, 1);
   assert.ok(result.eligible.every((value) => value === 255));
   const protectedResult = decodeVitalityProbe(
-    encoded([0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 1, 1, 1, 0, 1, 1]),
+    encoded(new Array(18).fill(0)),
     { hasHistory: true },
   );
   assert.equal(protectedResult.coverage, 0);
@@ -303,4 +303,19 @@ test("forced paused probes use fences without changing production cadence, histo
   for (let i = 0; i < 10; i++) probe.update(50 + i, { generation: 1, steps: 100, pollOnly: true });
   assert.equal(calls.reads.length, 2);
   assert.ok(calls.waits.every(([flags, timeout]) => flags === 0 && timeout === 0));
+});
+
+test("constant byte fields have zero raw and native contrast, including three eligible sites", () => {
+  for (const byte of [0,20,63,64,127,128,191,255]) for (const count of [3,4]) {
+    const native = Math.max(0,Math.min(255,byte*2-126.5));
+    const metrics = new Array(18).fill(0);
+    metrics.fill(byte*count/1020,0,3);
+    metrics.fill(native*count/1020,4,7);
+    metrics[11]=count/4;
+    const result=decodeVitalityProbe(encoded(metrics),{hasHistory:true});
+    assert.ok(result.rgbContrast<1e-12,`raw byte ${byte}`);
+    assert.ok(result.nativeContrast<1e-12,`native byte ${byte}`);
+    assert.equal(result.eligible[0],count===3?191:255);
+    assert.equal(result.nativeBrightness,native/255);
+  }
 });

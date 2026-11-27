@@ -50,19 +50,54 @@ export function createGrowthVitalityHud({ panel, getModel, render }) {
     write(
       "lifetime",
       d.recovery.spores
-        .map((spore) => `${spore.remainingLifetimeMs.toFixed(0)}ms`)
+        .map((spore) => `${spore.remainingUpdates} updates`)
         .join(" / ") || "No active spores",
     );
     write("remaining-dose", number(d.recovery.remainingEnvelopeDose));
     if (revision === d.revision) return;
     revision = d.revision;
     write("state", `${d.state} · bad probes ${d.badCount}/3`);
+    write("diagnosis", d.diagnosis || "none");
     write("primary", d.primaryBlocker || "none");
     write(
       "rgb",
       p
         ? `${number(p.rgbContrast)} / ${number(p.rgbEnergy)} / ${number(p.rgbDelta)}`
         : "unavailable",
+    );
+    write(
+      "native",
+      p
+        ? `${number(p.nativeContrast)} / ${number(p.nativeBrightness)} / ${number(p.nativeDelta)}`
+        : "unavailable",
+    );
+    write(
+      "rgb-clipping",
+      p
+        ? [p.rgbClipping, p.nativeBlackCoverage, p.nativeWhiteCoverage]
+            .map((value) =>
+              Number.isFinite(value)
+                ? `${(value * 100).toFixed(2)}%`
+                : "unavailable",
+            )
+            .join(" / ")
+        : "unavailable",
+    );
+    const counts = d.recovery.counters;
+    write(
+      "outcomes",
+      counts
+        ? `${counts.admitted} admitted · ${counts.applied} applied · ${counts.cancelled} cancelled · ${counts.succeeded} succeeded · ${counts.failed} failed`
+        : "unavailable",
+    );
+    const observation = d.recovery.observation;
+    write(
+      "observation",
+      observation
+        ? `${observation.phase} · ${observation.observedUpdates}/${observation.requiredUpdates} updates · ${observation.healthyProbes} healthy probes`
+        : d.recovery.lastOutcome
+          ? `${d.recovery.lastOutcome.status}: ${d.recovery.lastOutcome.reason}`
+          : "No attempt yet",
     );
     write(
       "hidden",
@@ -100,7 +135,7 @@ export function createGrowthVitalityHud({ panel, getModel, render }) {
     );
     write(
       "dose",
-      `${number(d.recovery.emittedDose)} emitted · ${d.recovery.rateCeiling}/s ceiling`,
+      `${number(d.recovery.emittedDose)} emitted · ${number(d.recovery.rateCeiling)}/update per-spore peak`,
     );
     write(
       "spores",

@@ -1,15 +1,20 @@
 export const PROBE_SIZE = 32;
 export const SNAPSHOT_SIZE = PROBE_SIZE * 2;
-export const METRIC_PLANES = 6;
+export const METRIC_PLANES = 9;
+export const ELIGIBLE_TILE_MINIMUM = Math.round((255 * 3) / 4);
 const WIDTH = PROBE_SIZE * METRIC_PLANES;
 const BYTE_LENGTH = WIDTH * PROBE_SIZE * 4;
 
-// Each tile carries twelve 16-bit statistics. Moments and nonlinear metrics
-// were computed from individual eligible cells on the GPU, before averaging.
+// Exact byte sums plus directly encoded local deviations avoid phantom variance.
+// Weighted Welford merging retains both within-tile and between-tile contrast.
 export function decodeVitalityProbe(bytes, metadata) {
-  const sums = new Float64Array(12);
+  const sums = new Float64Array(18);
   const eligible = new Uint8Array(PROBE_SIZE * PROBE_SIZE);
-  let coverage = 0;
+  const means = [new Float64Array(3), new Float64Array(3)];
+  const moments = [0, 0];
+  let coverage = 0,
+    seedTile = null,
+    seedContrast = -1;
   const metric = (x, y, index) => {
     const offset =
       (y * WIDTH + Math.floor(index / 2) * PROBE_SIZE + x) * 4 +
@@ -18,27 +23,50 @@ export function decodeVitalityProbe(bytes, metadata) {
   };
   for (let y = 0; y < PROBE_SIZE; y++)
     for (let x = 0; x < PROBE_SIZE; x++) {
-      const weight = metric(x, y, 9);
-      eligible[y * PROBE_SIZE + x] = Math.round(weight * 255);
-      coverage += weight;
-      for (let index = 0; index < sums.length; index++)
-        sums[index] += metric(x, y, index) * weight;
+      const count = Math.round(metric(x, y, 11) * 4);
+      eligible[y * PROBE_SIZE + x] = Math.round((count / 4) * 255);
+      if (!count) continue;
+      const nextCoverage = coverage + count;
+      if (count >= 3 && metric(x, y, 7) > seedContrast) {
+        seedContrast = metric(x, y, 7);
+        seedTile = y * PROBE_SIZE + x;
+      }
+      for (let group = 0; group < 2; group++) {
+        const scale = group === 0 ? 1020 : 2040;
+        const unit = group === 0 ? 255 : 510;
+        for (let ch = 0; ch < 3; ch++) {
+          const mean =
+            Math.round(metric(x, y, group * 4 + ch) * scale) / (count * unit);
+          const delta = mean - means[group][ch];
+          moments[group] +=
+            (delta * delta * coverage * count) / nextCoverage / 3;
+          means[group][ch] += (delta * count) / nextCoverage;
+        }
+        moments[group] += (metric(x, y, group * 4 + 3) / 2) ** 2 * count;
+      }
+      coverage = nextCoverage;
+      for (let index = 8; index < sums.length; index++)
+        sums[index] += metric(x, y, index) * count;
     }
   if (coverage > 0)
-    for (let index = 0; index < sums.length; index++) sums[index] /= coverage;
-  const variance =
-    (sums[3] - sums[0] ** 2 + sums[4] - sums[1] ** 2 + sums[5] - sums[2] ** 2) /
-    3;
+    for (let index = 8; index < sums.length; index++) sums[index] /= coverage;
   return Object.freeze({
     ...metadata,
-    rgbContrast: Math.sqrt(Math.max(0, variance)),
-    hiddenEnergy: sums[6],
-    hiddenDelta: metadata.hasHistory ? sums[7] : null,
-    clipping: sums[8],
-    coverage: coverage / eligible.length,
-    rgbEnergy: sums[10],
-    rgbDelta: metadata.hasHistory ? sums[11] : null,
+    rgbContrast: coverage ? Math.sqrt(moments[0] / coverage) : 0,
+    nativeContrast: coverage ? Math.sqrt(moments[1] / coverage) : 0,
+    nativeBrightness: (means[1][0] + means[1][1] + means[1][2]) / 3,
+    hiddenEnergy: sums[8],
+    hiddenDelta: metadata.hasHistory ? sums[9] : null,
+    clipping: sums[10],
+    coverage: coverage / (eligible.length * 4),
+    rgbEnergy: sums[12],
+    rgbDelta: metadata.hasHistory ? sums[13] : null,
+    rgbClipping: sums[14],
+    nativeBlackCoverage: sums[15],
+    nativeWhiteCoverage: sums[16],
+    nativeDelta: metadata.hasHistory ? sums[17] : null,
     eligible,
+    seedTile,
   });
 }
 

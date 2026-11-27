@@ -2397,6 +2397,256 @@ test("erase protection blocks automatic spores, survives until cleared, and rese
   );
 });
 
+// Advance a controlled simulation clock, but use the production monitor,
+// asynchronous GPU readbacks, classifier, seed queue and outcome evaluator.
+// No probe values, baselines or watchdog evidence are injected.
+async function prepareGpuRecovery(page) {
+  await observeVitalityModel(page);
+  await selectGrowth(page);
+  await page.getByLabel("SIMULATION GRID", { exact: true }).selectOption("128");
+  await expect(page.locator("#growth-status")).toHaveAttribute(
+    "data-size",
+    "128",
+  );
+  await page.evaluate(async () => {
+    const m = window.__vitalityModel,
+      r = m._runtime;
+    let now = Math.max(performance.now(), m._vitalityWatchdog.manualUntil) + 1;
+    const collect = async () => {
+      const previous = r.vitalityProbe;
+      now += 600;
+      m._monitorVitality(now);
+      for (let frame = 0; frame < 900; frame++) {
+        await new Promise(requestAnimationFrame);
+        m._monitorVitality(++now);
+        if (r.vitalityProbe && r.vitalityProbe !== previous)
+          return r.vitalityProbe;
+      }
+      throw new Error(
+        `GPU fence timed out: ${JSON.stringify(r.vitalityProbeState)}`,
+      );
+    };
+    const advance = async (count) => {
+      m._advanceSimulation(count, now);
+      m._vitalityActiveSeconds += count / 12;
+      now += (count / 12) * 1000;
+      return collect();
+    };
+    m.setClockRunning(true);
+    for (let n = 0; n < 10 && !r.hasRecoverySeed; n++) await advance(16);
+    window.__recoveryHarness = {
+      m,
+      r,
+      collect,
+      advance,
+      diagnostics: () => m.getVitalityDiagnostics(now),
+    };
+    if (!r.hasRecoverySeed)
+      throw new Error("Trusted healthy GPU seed was not learned");
+  });
+}
+
+for (const fixture of [
+  {
+    name: "a fixed-point collapsed checkpoint",
+    vector: [114, 102, 100, 113, 118, 79, 0, 120, 115, 149, 142, 177],
+  },
+  {
+    name: "flat RGB with static nonzero latent channels",
+    vector: [115, 104, 102, 113, 116, 73, 0, 119, 118, 143, 141, 182],
+  },
+]) {
+  test(`Automatic recovery restores sustained visible contrast from ${fixture.name}`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await prepareGpuRecovery(page);
+    const before = await page.evaluate(async (vector) => {
+      const { r, advance, diagnostics } = window.__recoveryHarness;
+      const bytes = new Uint8Array(r.size ** 2 * 12);
+      for (let i = 0; i < bytes.length; i++) bytes[i] = vector[i % 12];
+      r.writeState(bytes);
+      // This is a true checkpoint fixed point, verified over real NCA updates.
+      await advance(32);
+      await advance(8);
+      await advance(8);
+      const d = diagnostics();
+      return {
+        contrast: d.probe.rgbContrast,
+        delta: d.probe.hiddenDelta,
+        energy: d.probe.hiddenEnergy,
+        diagnosis: d.diagnosis,
+        admitted: d.recovery.counters.admitted,
+        hold: window.__vitalityModel._vitalityWatchdog.manualUntil,
+      };
+    }, fixture.vector);
+    expect(before.contrast).toBeLessThan(0.00001);
+    expect(before.delta).toBeLessThan(0.00001);
+    expect(before.energy).toBeGreaterThan(0.1);
+    expect(before.diagnosis).toBe("visible-flat");
+    expect(before.admitted).toBe(0);
+    await page.getByRole("switch", { name: "Automatic recovery" }).check();
+    expect(
+      await page.evaluate(
+        () => window.__vitalityModel._vitalityWatchdog.manualUntil,
+      ),
+    ).toBe(before.hold);
+    const result = await page.evaluate(async () => {
+      const { r, advance, diagnostics } = window.__recoveryHarness;
+      await advance(1);
+      const admitted = diagnostics();
+      const samples = [];
+      for (let n = 0; n < 10; n++) {
+        await advance(32);
+        const d = diagnostics();
+        samples.push({
+          steps: r.steps,
+          contrast: d.probe.rgbContrast,
+          native: d.probe.nativeContrast,
+        });
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 128;
+      r.draw(canvas, { palette: "native" });
+      const pixels = canvas.getContext("2d").getImageData(0, 0, 128, 128).data;
+      let sum = 0,
+        squared = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const v = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 765;
+        sum += v;
+        squared += v * v;
+      }
+      return {
+        admitted: admitted.recovery.counters.admitted,
+        spores: admitted.recovery.activeSpores,
+        counters: diagnostics().recovery.counters,
+        outcome: diagnostics().recovery.lastOutcome,
+        samples,
+        displayContrast: Math.sqrt(squared / 16384 - (sum / 16384) ** 2),
+        error: r.gl.getError(),
+      };
+    });
+    expect(result.error).toBe(0);
+    expect(result.admitted).toBe(1);
+    expect(result.spores).toBe(2);
+    expect(result.counters).toEqual({
+      admitted: 1,
+      applied: 1,
+      cancelled: 0,
+      succeeded: 1,
+      failed: 0,
+    });
+    expect(result.outcome.reason).toBe("sustained-contrast");
+    for (const probe of result.samples.slice(-3)) {
+      expect(probe.contrast).toBeGreaterThan(0.03);
+      expect(probe.native).toBeGreaterThan(0.06);
+    }
+    expect(result.displayContrast).toBeGreaterThan(0.04);
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("d");
+    await expect(
+      page.locator('[data-vitality-field="outcomes"]'),
+    ).toContainText("1 succeeded");
+  });
+}
+
+test("production rescue never changes erase-protected or barrier pixels and frozen grids block automatic admission", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await prepareGpuRecovery(page);
+  const report = await page.evaluate(async () => {
+    const { m, r, advance, diagnostics } = window.__recoveryHarness;
+    // Mark an actual erased patch and a barrier. Compare every protected byte
+    // immediately around each rescue dispatch, before the separate NCA update.
+    m.queueDisturbance(64, 64, 12, "erase");
+    m._drainDisturbances();
+    r.disturb(16, 16, 8, "freeze");
+    await advance(1);
+    await advance(1);
+    // Exercise mask clipping inside a spore footprint, rather than only
+    // checking that distant protected pixels happen to remain unchanged.
+    const tiles = m._eligibleRecoverySeeds(r.vitalityProbe);
+    for (let sequence = 1; sequence <= tiles.length; sequence++) {
+      const tile = tiles[(sequence * 397) % tiles.length];
+      const x = ((tile % 32) + .5) * 4;
+      const y = (Math.floor(tile / 32) + .5) * 4;
+      const distance = Math.hypot(x-64,y-64);
+      if (distance > 18 && distance < 26) {
+        m._recoveryIndex = sequence - 1;
+        break;
+      }
+    }
+    const base = r.disturb.bind(r);
+    let protectedChecks = 0,
+      maskedOverlap = false;
+    r.disturb = (x, y, radius, mode, options) => {
+      if (!options?.automatic) return base(x, y, radius, mode, options);
+      const before = r.readState();
+      base(x, y, radius, mode, options);
+      const after = r.readState();
+      for (let row = 0; row < r.size; row++)
+        for (let col = 0; col < r.size; col++) {
+          const erased = !m._recoveryIntent.allows(
+            (col + 0.5) / r.size,
+            (row + 0.5) / r.size,
+          );
+          const frozen = Math.hypot(col - 16, row - 16) <= 8;
+          if (!erased && !frozen) continue;
+          const dx = Math.min(Math.abs(col - x), r.size - Math.abs(col - x));
+          const dy = Math.min(Math.abs(row - y), r.size - Math.abs(row - y));
+          if (Math.hypot(dx, dy) < radius) maskedOverlap = true;
+          for (let ch = 0; ch < 12; ch++)
+            if (
+              before[(row * r.size + col) * 12 + ch] !==
+              after[(row * r.size + col) * 12 + ch]
+            )
+              throw new Error("Recovery overrode a protected byte");
+        }
+      protectedChecks++;
+    };
+    // Controlled admission exercises the identical protected production queue.
+    const queued = m._queueRecoverySpores(
+      r.vitalityProbe,
+      performance.now() + 100000,
+      { test: true },
+    );
+    await advance(64);
+    r.disturb = base;
+    m.cancelAudio({ all: true, reason: "test-complete" });
+    const admitted = m._vitalityWatchdog.counters.admitted;
+    const gl = r.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, r.barrier.framebuffer);
+    gl.clearColor(1, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    r.invalidateVitality();
+    m.onParameterChange("automaticRecovery", true);
+    const frozenBefore = r.readState();
+    for (let n = 0; n < 4; n++) await advance(32);
+    const d = diagnostics();
+    const frozenAfter = r.readState();
+    return {
+      queued,
+      protectedChecks,
+      maskedOverlap,
+      coverage: d.probe.coverage,
+      blockers: d.activeBlockers,
+      admittedBefore: admitted,
+      admittedAfter: d.recovery.counters.admitted,
+      unchanged: frozenBefore.every((v, i) => v === frozenAfter[i]),
+      error: gl.getError(),
+    };
+  });
+  expect(report.queued.status).toBe("admitted");
+  expect(report.protectedChecks).toBe(128);
+  expect(report.maskedOverlap).toBe(true);
+  expect(report.coverage).toBe(0);
+  expect(report.blockers).toContain("protected-region");
+  expect(report.admittedAfter).toBe(report.admittedBefore);
+  expect(report.unchanged).toBe(true);
+  expect(report.error).toBe(0);
+});
+
 test("raw vitality moments detect checkerboards, hidden activity and clipping without display effects", async ({
   page,
 }) => {
@@ -2423,6 +2673,14 @@ test("raw vitality moments detect checkerboards, hidden activity and clipping wi
       }
       throw new Error("GPU vitality fence did not complete");
     }
+    const constants=[];
+    for(const value of [127,20,63]) {
+      runtime.writeState(new Uint8Array(data.length).fill(value));
+      runtime.steps++; timestamp+=600;
+      const flat=await collect();
+      constants.push({value,raw:flat.rgbContrast,native:flat.nativeContrast,black:flat.nativeBlackCoverage,rgbClipping:flat.rgbClipping});
+    }
+    runtime.writeState(data); runtime.steps++; timestamp+=600;
     const first = await collect();
     runtime.draw(document.createElement("canvas"), {
       palette: "neon",
@@ -2479,6 +2737,7 @@ test("raw vitality moments detect checkerboards, hidden activity and clipping wi
     const frozen = await collect();
     return {
       contrast: first.rgbContrast,
+      constants,
       displayed: display.rgbContrast,
       delta: hidden.hiddenDelta,
       clipping: clipped.clipping,
@@ -2488,6 +2747,12 @@ test("raw vitality moments detect checkerboards, hidden activity and clipping wi
     };
   });
   expect(result.error).toBe(0);
+  for(const flat of result.constants) {
+    expect(flat.raw).toBeLessThan(.000001);
+    expect(flat.native).toBeLessThan(.000001);
+    expect(flat.black).toBe(flat.value<=63?1:0);
+    expect(flat.rgbClipping).toBe(0);
+  }
   expect(result.contrast).toBeGreaterThan(0.2);
   expect(result.displayed).toBeCloseTo(result.contrast, 4);
   expect(result.delta).toBeGreaterThan(0.01);

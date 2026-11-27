@@ -5,6 +5,7 @@ import {
   applyAudioPreset,
   AUDIO_PRESETS,
   SPORE_POLICY,
+  RECOVERY_POLICY,
 } from "../../assets/js/models/neural-growth/audio-response.js";
 import {
   audioMatrixForModel,
@@ -31,12 +32,7 @@ test("audio presets expose only Off and a Kick preset targeting safe visual para
 
 test("route-only Kick preset preserves user routes, explicit Off, base parameters and LFOs", () => {
   const id = "preset-policy";
-  const keys = [
-    "rotation",
-    "palettePhase",
-    "echoDrift",
-    "echoDecay",
-  ];
+  const keys = ["rotation", "palettePhase", "echoDrift", "echoDecay"];
   restoreAudioMatrix(id, {}, keys);
   const base = { echoDecay: 0.9, rotation: 110 };
   const lfo = { rotation: { enabled: true, depth: 0.7 } };
@@ -60,10 +56,14 @@ test("route-only Kick preset preserves user routes, explicit Off, base parameter
   assert.equal(audioMatrixForModel(id).echoDecay.owner, "user");
 
   // Re-apply Kick after clearing echoDecay so preset ceiling behavior is exercised.
-  restoreAudioMatrix(id, {
-    echoDrift: { source: "audioAir", depth: -0.2 },
-    palettePhase: { source: "audioBeat", depth: 0.3, owner: "user" },
-  }, keys);
+  restoreAudioMatrix(
+    id,
+    {
+      echoDrift: { source: "audioAir", depth: -0.2 },
+      palettePhase: { source: "audioBeat", depth: 0.3, owner: "user" },
+    },
+    keys,
+  );
   applyAudioPreset(id, "kick", keys);
   const matrix = audioMatrixForModel(id);
   assert.equal(matrix.echoDrift.depth, -0.2);
@@ -150,38 +150,56 @@ test("recovery spores yield while pointer is held and for two seconds after rele
   assert.equal(policy.active.length, 1);
 });
 
-test("recovery spore mixing stays under its per-second budget at varied frame rates and grid sizes", () => {
-  for (const size of [128, 256, 512, 1024])
+test("recovery delivers the same complete update-based envelope at 15 to 144 FPS", () => {
+  for (const size of [128, 256, 512, 1024]) {
+    let reference;
     for (const fps of [15, 30, 60, 144]) {
-      const policy = new AudioResponse();
-      const calls = [];
-      let nextBatch = -Infinity;
-      for (let t = 0; t <= 1000; t += 1000 / fps) {
-        if (t >= nextBatch) {
-          policy.queueRecovery(t, 0.25, 0.25);
-          policy.queueRecovery(t, 0.75, 0.75);
-          nextBatch = t + 450;
-        }
-        assert.ok(policy.active.length <= SPORE_POLICY.maximum);
-        policy.step(t, size, (...args) => calls.push(args), [1, 0, 0]);
+      const policy = new AudioResponse(),
+        calls = [];
+      policy.queueRecovery(0, 0.25, 0.25);
+      policy.queueRecovery(0, 0.75, 0.75);
+      let delivered = 0;
+      for (let frame = 0; frame <= fps * 6; frame++) {
+        const steps = Math.floor((frame / fps) * 12 + 1e-9),
+          count = steps - delivered;
+        policy.step(
+          (frame / fps) * 1000,
+          size,
+          (...args) => calls.push(args),
+          [1, 0, 0],
+          { updates: count, simulationSteps: delivered },
+        );
+        delivered = steps;
       }
-      assert.ok(calls.length > 0);
-      assert.ok(
-        calls.reduce((sum, args) => sum + args[4].strength, 0) <=
-          SPORE_POLICY.rate * 3,
-      );
+      assert.ok(Math.abs(policy.emittedDose - 2 * RECOVERY_POLICY.dose) < 1e-9);
+      assert.equal(policy.active.length, 0);
+      const strengths = calls.map((args) => args[4].strength);
+      if (reference) assert.deepEqual(strengths, reference);
+      else reference = strengths;
       for (const [x, y, radius, mode, options] of calls) {
         assert.ok(x >= 0 && x < size && y >= 0 && y < size);
-        assert.equal(radius, Math.max(1, Math.round(size * 0.03)));
-        assert.equal(mode, "noise");
+        assert.equal(
+          radius,
+          Math.max(1, Math.round(size * RECOVERY_POLICY.radius)),
+        );
+        assert.equal(mode, "seed");
         assert.equal(options.lockBarrier, true);
         assert.equal(options.automatic, true);
+        assert.ok(
+          options.strength > 0 &&
+            options.strength <
+              -Math.expm1(
+                (-RECOVERY_POLICY.dose * Math.PI) /
+                  (2 * RECOVERY_POLICY.updates),
+              ) +
+                1e-9,
+        );
       }
-      policy.step(1600, size, () =>
-        assert.fail("Expired spores must not drain"),
+      policy.step(100000, size, () =>
+        assert.fail("Completed spores must not drain"),
       );
-      assert.equal(policy.active.length, 0);
     }
+  }
 });
 
 test("recovery spore budget enforces maximum of two and clears on cancel or manual interaction", () => {
@@ -192,10 +210,10 @@ test("recovery spore budget enforces maximum of two and clears on cancel or manu
   assert.equal(policy.queueRecovery(0, 0.75, 0.75), false);
   for (let time = 16; time < 400; time += 16)
     policy.step(time, 256, (...args) => calls.push(args), [0, 1, 1]);
-  assert.ok(calls.some((args) => args[3] === "noise"));
+  assert.ok(calls.some((args) => args[3] === "seed"));
   assert.ok(
     calls.reduce((sum, args) => sum + args[4].strength, 0) <=
-      SPORE_POLICY.rate * 0.4 + 1e-9,
+      2 * RECOVERY_POLICY.dose + 1e-9,
   );
   policy.cancel("audio");
   assert.equal(policy.active.length, 2);
@@ -204,4 +222,18 @@ test("recovery spore budget enforces maximum of two and clears on cancel or manu
   assert.equal(policy.queueRecovery(500, 0.5, 0.5), true);
   policy.interact(true, 510);
   assert.equal(policy.active.length, 0);
+});
+
+test("wall-clock gaps do not spend rescue lifetime without simulation progress", () => {
+  const response = new AudioResponse();
+  response.queueRecovery(0, 0.5, 0.5);
+  response.step(100000, 256, () => assert.fail("No simulation update"), null, {
+    updates: 0,
+  });
+  assert.equal(
+    response.getDiagnostics(100000, 256).spores[0].remainingUpdates,
+    RECOVERY_POLICY.updates,
+  );
+  assert.equal(response.emittedDose, 0);
+  assert.equal(SPORE_POLICY.rate, 0.08);
 });

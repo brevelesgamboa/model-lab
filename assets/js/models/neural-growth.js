@@ -2,6 +2,7 @@ import { sanitizeParameters } from "../core/model-contract.js";
 import { hexToRgb } from "../core/utils.js";
 import { detectCapabilities } from "../core/quality.js";
 import { validateCheckpoint } from "./neural-growth/reference.js";
+import { ELIGIBLE_TILE_MINIMUM } from "./neural-growth/vitality-probe.js";
 import { TextureNcaRuntime, clampGeometryTwist } from "./neural-growth/runtime.js";
 import {
   DEFAULT_PATTERN,
@@ -13,7 +14,7 @@ import {
   ResonanceConfig,
   RESONANCE_PRESETS,
 } from "./neural-growth/resonance-config.js";
-import { VitalityWatchdog, RecoveryIntentMask, INTENT_SIZE } from "./neural-growth/vitality-watchdog.js";
+import { VitalityWatchdog, RecoveryIntentMask, INTENT_SIZE, selectRecoverySeeds } from "./neural-growth/vitality-watchdog.js";
 
 const STILL_PAN = Object.freeze([0, 0]);
 const GEOMETRY_KEYS = ["coordinateTransform", "rotation", "twist", "geometryStrength",
@@ -92,8 +93,11 @@ export class NeuralGrowthModel {
     this._lastTick = null;
     this._accumulator = 0;
     this._queuedDisturbances = [];
-    this._audioResponse = new AudioResponse();
     this._vitalityWatchdog = new VitalityWatchdog();
+    this._audioResponse = new AudioResponse({
+      onRecoveryEvent: (event) =>
+        this._vitalityWatchdog.handleRecoveryEvent(event),
+    });
     this._recoveryIntent = new RecoveryIntentMask();
     this._vitalityActiveSeconds = 0;
     this._recoveryIndex = 0;
@@ -1678,9 +1682,13 @@ export class NeuralGrowthModel {
   }
 
   onParameterChange(key, value) {
-    if (key !== "pattern" || value !== this._requestedPattern) this.noteManualControlEdit();
+    if (
+      key !== "automaticRecovery" &&
+      (key !== "pattern" || value !== this._requestedPattern)
+    )
+      this.noteManualControlEdit();
     if (key === "automaticRecovery" && value !== true)
-      this._audioResponse.cancel("recovery", "recovery-off");
+      this._cancelAutomaticRecovery();
     if (this._parameters && key in this._parameters) {
       this._parameters[key] = value;
     }
@@ -1804,7 +1812,10 @@ export class NeuralGrowthModel {
       if (epoch !== this._epoch || this._disposed) return null;
       if (Number.isFinite(timeSeconds)) {
         if (this._lastPaletteTime !== null) {
-          const dt = Math.max(0, Math.min(0.1, timeSeconds - this._lastPaletteTime));
+          const dt = Math.max(
+            0,
+            Math.min(0.1, timeSeconds - this._lastPaletteTime),
+          );
           const driftSpeed = Number(parameters.paletteCycleSpeed || 0);
           if (Math.abs(driftSpeed) > 0.0001) {
             this._palettePhaseAccumulator =
@@ -1867,8 +1878,17 @@ export class NeuralGrowthModel {
           displayFilter: parameters.displayFilter,
           channelView: parameters.channelView,
         });
-        const preserveProtection = Boolean(this._runtime && this._activePattern === pattern.id && this._runtime.seed === parameters.seed && !this._needsRuntime);
-        if (preserveProtection) this._recoveryIntent.resize(this._runtime.size, parameters.simulationSize);
+        const preserveProtection = Boolean(
+          this._runtime &&
+          this._activePattern === pattern.id &&
+          this._runtime.seed === parameters.seed &&
+          !this._needsRuntime,
+        );
+        if (preserveProtection)
+          this._recoveryIntent.resize(
+            this._runtime.size,
+            parameters.simulationSize,
+          );
         this._runtime?.dispose();
         this._runtime = candidate;
         if (!preserveProtection) this._recoveryIntent.clear();
@@ -1896,22 +1916,19 @@ export class NeuralGrowthModel {
       runtimeOperation = true;
       // Configure without GPU work or advancing the paused simulation.
       this._runtime.step(0, this._runtimeParameters(parameters));
-      if (parameters.automaticRecovery !== true) this._audioResponse.cancel("recovery", "recovery-off");
+      if (parameters.automaticRecovery !== true)
+        this._cancelAutomaticRecovery();
       this.lastError = null;
       this._failedConfiguration = null;
       runtimeOperation = true;
       this._drainDisturbances();
       if (advance && this._clockRunning && Number.isFinite(timeSeconds)) {
-        if (globalThis.document?.hidden) this.cancelAudio({ all: true, reason: "document-hidden" });
-        else this._audioResponse.step(
-          performance.now(), this.simulationSize,
-          (...args) => this._runtime.disturb(...args),
-          hexToRgb(parameters.dyeColor || "#00f0ff"),
-        );
+        if (globalThis.document?.hidden)
+          this.cancelAudio({ all: true, reason: "document-hidden" });
         if (this._lastTick !== null) {
           const delta = Math.max(0, timeSeconds - this._lastTick);
           const speed = Math.max(0, Number(parameters.growthSpeed) || 0);
-          if (speed > 0) this._vitalityActiveSeconds += Math.min(.25, delta);
+          if (speed > 0) this._vitalityActiveSeconds += Math.min(0.25, delta);
           this._accumulator += delta * speed;
           const maxStepsPerFrame = 3;
           const count = Math.min(
@@ -1919,7 +1936,7 @@ export class NeuralGrowthModel {
             Math.floor(this._accumulator + 1e-9),
           );
           if (count > 0) {
-            this._runtime.step(count, this._runtimeParameters(parameters));
+            this._advanceSimulation(count, performance.now(), parameters);
             this._accumulator -= count;
           }
           const excessWholeSteps = Math.floor(this._accumulator);
@@ -1959,8 +1976,12 @@ export class NeuralGrowthModel {
         echoMode: parameters.echoMode,
         echoStyle: parameters.echoStyle,
       });
-      this._diagnosticsFrame = { timestamp: performance.now(), generation: this._runtime.generation,
-        steps: this._runtime.steps, rawStateView: this._rawStateView };
+      this._diagnosticsFrame = {
+        timestamp: performance.now(),
+        generation: this._runtime.generation,
+        steps: this._runtime.steps,
+        rawStateView: this._rawStateView,
+      };
       return this._result();
     } catch (error) {
       candidate?.dispose();
@@ -1975,6 +1996,7 @@ export class NeuralGrowthModel {
     configuration = `${this._parameters.pattern}:${this._parameters.simulationSize}:${this._parameters.seed}`,
     { invalidateRuntime = true } = {},
   ) {
+    this.cancelAudio({ all: true, reason: "runtime-error" });
     this.lastError = error instanceof Error ? error.message : String(error);
     this._failedConfiguration = configuration;
     this._needsRuntime ||= invalidateRuntime;
@@ -2020,6 +2042,30 @@ export class NeuralGrowthModel {
       foldCount: parameters.foldCount,
       latentMomentum: parameters.latentMomentum,
     };
+  }
+
+  _advanceSimulation(count, timestamp, parameters = this._parameters) {
+    const runtime = this._runtime;
+    if (
+      this._audioResponse.active.some(
+        (spore) =>
+          spore.generation !== null && spore.generation !== runtime.generation,
+      )
+    ) {
+      this._audioResponse.cancel("recovery", "state-changed");
+    }
+    const options = this._runtimeParameters(parameters);
+    for (let index = 0; index < count; index++) {
+      if (!globalThis.document?.hidden)
+        this._audioResponse.step(
+          timestamp,
+          runtime.size,
+          (...args) => runtime.disturb(...args),
+          hexToRgb(parameters.dyeColor || "#00f0ff"),
+          { updates: 1, simulationSteps: runtime.steps },
+        );
+      runtime.step(1, options);
+    }
   }
 
   step() {
@@ -2223,11 +2269,25 @@ export class NeuralGrowthModel {
     for (let tile = 0; tile < (probe?.eligible?.length || 0); tile++) {
       const x = ((tile % INTENT_SIZE) + 0.5) / INTENT_SIZE;
       const y = (Math.floor(tile / INTENT_SIZE) + 0.5) / INTENT_SIZE;
-      if (probe.eligible[tile] >= 192 && this._recoveryIntent.allows(x, y))
+      if (
+        probe.eligible[tile] >= ELIGIBLE_TILE_MINIMUM &&
+        this._recoveryIntent.allows(x, y)
+      )
         tiles.push(tile);
     }
     this._seedCache = { probe, revision: this._recoveryIntent.revision, tiles };
     return tiles;
+  }
+
+  _nativeProjectionReliable() {
+    const phase =
+      (Number(this._parameters.palettePhase || 0) * Math.PI) / 180 +
+      this._palettePhaseAccumulator;
+    return (
+      Math.abs(Math.sin(phase)) < 1e-5 &&
+      Math.cos(phase) > 0 &&
+      this._parameters.channelView === "phenotype"
+    );
   }
 
   // Cached CPU state only. In particular, this getter must never call monitorVitality.
@@ -2246,6 +2306,7 @@ export class NeuralGrowthModel {
       size: this.simulationSize,
       generation: runtime?.generation,
       enabled: this._parameters.automaticRecovery === true,
+      nativeProjectionReliable: this._nativeProjectionReliable(),
       active:
         this._clockRunning &&
         Number(this._parameters.growthSpeed) > 0 &&
@@ -2290,6 +2351,12 @@ export class NeuralGrowthModel {
       ? Object.fromEntries(
           [
             "rgbContrast",
+            "nativeContrast",
+            "nativeBrightness",
+            "nativeDelta",
+            "rgbClipping",
+            "nativeBlackCoverage",
+            "nativeWhiteCoverage",
             "rgbEnergy",
             "rgbDelta",
             "hiddenEnergy",
@@ -2343,6 +2410,10 @@ export class NeuralGrowthModel {
       probeError: probeState.error || null,
       recovery: {
         ...recovery,
+        ...decision.recoveryTracking,
+        seedTemplate: runtime?.recoverySeedInfo
+          ? { ...runtime.recoverySeedInfo }
+          : null,
         lastAdmittedAttempt: decision.lastAdmittedAttempt,
         attemptsRemaining: decision.attemptsRemaining,
       },
@@ -2368,6 +2439,7 @@ export class NeuralGrowthModel {
         probe?.timestamp,
         probe?.generation,
         this._vitalityWatchdog.assessment,
+        this._vitalityWatchdog.recoveryRevision,
         this._audioResponse.revision,
         recovery.activeSpores,
         geometry,
@@ -2461,6 +2533,7 @@ export class NeuralGrowthModel {
       "paused-or-stale",
       "manual-hold",
       "cooldown",
+      "recovery-pending",
       "rate-cap",
       "protected-region",
       "no-eligible-seed",
@@ -2474,6 +2547,10 @@ export class NeuralGrowthModel {
         );
     this._debugSporeAction = { ...result, timestamp: now };
     return { ...this._debugSporeAction };
+  }
+
+  get vitalityDiagnosis() {
+    return this._vitalityWatchdog.assessment.diagnosis ?? null;
   }
 
   get vitalityStatus() {
@@ -2513,45 +2590,83 @@ export class NeuralGrowthModel {
       generation: runtime.generation,
       timestamp,
       enabled: this._parameters.automaticRecovery === true,
+      nativeProjectionReliable: this._nativeProjectionReliable(),
       pointerDown: this._audioResponse.pointerDown,
       protectionRevision: this._recoveryIntent.signature,
       provenance: geometryValues(this._parameters),
     });
+    if (result.seedEligible && !runtime.hasRecoverySeed)
+      runtime.captureRecoverySeed?.(probe);
     if (!result.recover) return;
     this._queueRecoverySpores(probe, timestamp);
   }
 
   _queueRecoverySpores(probe, timestamp, { test = false } = {}) {
-    let queued = false;
+    if (this._vitalityWatchdog.pending)
+      return { status: "rejected", reason: "recovery-pending" };
+    const sequence = ++this._recoveryIndex;
+    const tiles = selectRecoverySeeds(
+      this._eligibleRecoverySeeds(probe),
+      sequence * 397,
+    );
+    if (!tiles.length)
+      return { status: "rejected", reason: "no-eligible-seed" };
+    const runtime = this._runtime;
+    const attemptId = `${runtime.generation}:${sequence}`;
     let admitted = 0;
-    // Start at different eligible coarse cells on successive attempts. The GPU
-    // intent/barrier tests still protect every individual fragment of a spore.
-    const offset = (++this._recoveryIndex * 397) % INTENT_SIZE ** 2;
-    for (
-      let index = 0, count = 0;
-      index < probe.eligible.length && count < 2;
-      index++
-    ) {
-      const tile = (index + offset) % probe.eligible.length;
+    for (const tile of tiles) {
       const x = ((tile % INTENT_SIZE) + 0.5) / INTENT_SIZE;
       const y = (Math.floor(tile / INTENT_SIZE) + 0.5) / INTENT_SIZE;
-      if (probe.eligible[tile] < 192 || !this._recoveryIntent.allows(x, y))
-        continue;
-      if (this._audioResponse.queueRecovery(timestamp, x, y, { test })) {
-        queued = true;
+      if (
+        this._audioResponse.queueRecovery(timestamp, x, y, {
+          test,
+          attemptId,
+          generation: runtime.generation,
+        })
+      )
         admitted++;
-        count++;
-      }
     }
-    if (queued) this._vitalityWatchdog.recordRecovery(timestamp);
-    return queued ? { status: "admitted", count: admitted } : { status: "rejected",
-      reason: this._audioResponse.lastRejectionReason || "no-eligible-seed" };
+    if (!admitted)
+      return {
+        status: "rejected",
+        reason: this._audioResponse.lastRejectionReason || "no-eligible-seed",
+      };
+    this._vitalityWatchdog.admitRecovery(
+      attemptId,
+      timestamp,
+      {
+        checkpoint: this._activePattern,
+        size: runtime.size,
+        generation: runtime.generation,
+        protectionRevision: this._recoveryIntent.signature,
+        diagnosis: this._vitalityWatchdog.assessment.diagnosis,
+        test,
+      },
+      probe,
+    );
+    return { status: "admitted", count: admitted, attemptId };
   }
 
   cancelAudio({all = false, reason = "cancelled"} = {}) {
     this._audioResponse.cancel(all ? "all" : "audio", reason);
+    if (all)
+      this._vitalityWatchdog.finishRecovery(
+        "cancelled",
+        reason,
+        performance.now(),
+      );
     this._activeRipples =
       this._activeRipples?.filter((r) => !r.automatic) || [];
+  }
+
+  _cancelAutomaticRecovery() {
+    this._audioResponse.cancel("recovery", "recovery-off");
+    if (this._vitalityWatchdog.pending && !this._vitalityWatchdog.pending.test)
+      this._vitalityWatchdog.finishRecovery(
+        "cancelled",
+        "recovery-off",
+        performance.now(),
+      );
   }
 
   notePointerInteraction(down, timestamp = performance.now()) {
@@ -2560,9 +2675,9 @@ export class NeuralGrowthModel {
   }
 
   onAudioFrame(_levels, _timestamp, _parameters, enabled = true) {
-    if (!enabled || !this.ready || !this._clockRunning) {
+    if (!this.ready || !this._clockRunning) {
       this.cancelAudio({ all: true, reason: "context-inactive" });
-    }
+    } else if (!enabled) this.cancelAudio();
   }
 
   triggerRipple(

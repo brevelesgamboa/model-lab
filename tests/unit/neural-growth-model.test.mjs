@@ -1496,14 +1496,18 @@ test("monitoring remains active when recovery is off; opt-in queues bounded reco
     2,
     "Audio silence must not cancel independent recovery",
   );
+  model.onAudioFrame({}, 4017, params, false);
+  assert.equal(model._audioResponse.active.length, 2, "Turning audio analysis off must preserve recovery");
   const now = performance.now();
   model._audioResponse.lastStep = now - 16;
   for (const spore of model._audioResponse.active) spore.start = now - 100;
   await model.render(canvas, { ...params, automaticRecovery: true }, 0.1, {
     advanceSimulation: true,
   });
+  assert.equal(runtime.disturbances.length, 0, "No rescue dose without an NCA update");
+  await model.render(canvas, { ...params, automaticRecovery: true }, 0.2, { advanceSimulation: true });
   assert.ok(runtime.disturbances.length > 0);
-  assert.equal(runtime.disturbances[0][3], "noise");
+  assert.equal(runtime.disturbances[0][3], "seed");
   assert.equal(runtime.disturbances[0][4].automatic, true);
   assert.equal(runtime.disturbances[0][4].lockBarrier, true);
   model.onParameterChange("rotation", 45);

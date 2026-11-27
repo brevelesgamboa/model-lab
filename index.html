@@ -605,16 +605,21 @@
                   <div class="growth-vitality-hud__body">
                     <p data-vitality-field="state">Waiting for telemetry</p>
                     <dl>
+                      <dt>Diagnosis</dt><dd data-vitality-field="diagnosis"></dd>
                       <dt>Primary blocker</dt><dd data-vitality-field="primary"></dd>
                       <dt>All blockers</dt><dd data-vitality-field="countdowns"></dd>
                       <dt>Probe age</dt><dd data-vitality-field="age"></dd>
                       <dt>Probe timestamp</dt><dd data-vitality-field="probe"></dd>
                       <dt>RGB contrast / energy / delta</dt><dd data-vitality-field="rgb"></dd>
+                      <dt>Native contrast / brightness / delta</dt><dd data-vitality-field="native"></dd>
+                      <dt>RGB clipping / native black / white</dt><dd data-vitality-field="rgb-clipping"></dd>
                       <dt>Hidden energy / delta</dt><dd data-vitality-field="hidden"></dd>
                       <dt>Clipping / eligible coverage</dt><dd data-vitality-field="coverage"></dd>
                       <dt>Baseline</dt><dd data-vitality-field="baseline"></dd>
                       <dt>Recovery</dt><dd data-vitality-field="recovery"></dd>
-                      <dt>Requested mixing dose</dt><dd data-vitality-field="dose"></dd>
+                      <dt>Recovery outcomes</dt><dd data-vitality-field="outcomes"></dd>
+                      <dt>Observation window</dt><dd data-vitality-field="observation"></dd>
+                      <dt>Envelope dose</dt><dd data-vitality-field="dose"></dd>
                       <dt>Remaining envelope estimate</dt><dd data-vitality-field="remaining-dose"></dd>
                       <dt>Spore lifetime</dt><dd data-vitality-field="lifetime"></dd>
                       <dt>Last cancellation</dt><dd data-vitality-field="cancellation"></dd>
@@ -625,7 +630,7 @@
                       <label><input type="checkbox" data-vitality-raw />Raw State View</label>
                     </div>
                     <p>Raw atlas: channels 0–3 / 4–7 / 8–11, left to right. Encoded bytes; 127 is neutral. Exports use the normal view.</p>
-                    <p>Test Spore requires a running clock and a fresh probe. It bypasses recovery opt-in and baseline learning only. Dose is requested mixing weight, not measured GPU application.</p>
+                    <p>Test Spore requires a running clock and a fresh probe. It bypasses recovery opt-in and baseline learning only. Recovery uses a checkpoint seed envelope over simulation updates. Application counts track meaningful dispatch; outcomes require sustained contrast after delivery.</p>
                     <details><summary>Baseline reference &amp; provenance</summary><pre data-vitality-field="reference"></pre></details>
                     <details><summary>Spore locations &amp; actions</summary><pre data-vitality-field="spores"></pre><pre data-vitality-field="actions"></pre></details>
                     <details><summary>Geometry: base / modulated / applied</summary><pre data-vitality-field="geometry"></pre></details>

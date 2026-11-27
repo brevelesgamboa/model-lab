@@ -537,7 +537,7 @@ export function createGrowthController({
         "-",
         " ",
       );
-      const label = `Monitoring · ${state}${model.parameters?.automaticRecovery ? "" : " · recovery off"}`;
+      const label = `Monitoring · ${state}${model.vitalityDiagnosis ? ` · ${model.vitalityDiagnosis}` : ""}${model.parameters?.automaticRecovery ? "" : " · recovery off"}`;
       if (vitalityOutput.textContent !== label)
         vitalityOutput.textContent = label;
     }

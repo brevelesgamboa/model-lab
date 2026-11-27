@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NeuralGrowthModel } from "../../assets/js/models/neural-growth.js";
-import { AudioResponse } from "../../assets/js/models/neural-growth/audio-response.js";
+import { AudioResponse, RECOVERY_POLICY } from "../../assets/js/models/neural-growth/audio-response.js";
 
 const probe = (extra = {}) => ({
   generation: 7,
@@ -158,7 +158,7 @@ test("Test Spore uses production queue, protection, clock and admission limits w
     "explicit test bypasses opt-out and baseline",
   );
   assert.equal(model._audioResponse.active.length, 2);
-  assert.equal(model._audioResponse.active[0].mode, "noise");
+  assert.equal(model._audioResponse.active[0].mode, "seed");
   model._audioResponse.cancel("recovery", "recovery-off");
   assert.equal(
     model._audioResponse.active.length,
@@ -166,10 +166,10 @@ test("Test Spore uses production queue, protection, clock and admission limits w
     "an explicit test survives recovery opt-out",
   );
   model._audioResponse.step(10016, 256, (_x, _y, _radius, mode, options) => {
-    assert.equal(mode, "noise");
+    assert.equal(mode, "seed");
     assert.equal(options.automatic, true);
     assert.equal(options.lockBarrier, true);
-  });
+  }, undefined, {updates:4,simulationSteps:200});
   assert.ok(model._audioResponse.emittedDose > 0);
   assert.equal(
     model.getVitalityDiagnostics(10000).recovery.attemptsRemaining,
@@ -253,7 +253,7 @@ test("spore telemetry reports requested dose, envelope lifetime and cancellation
   response.queueRecovery(0, 0.5, 0.5);
   response.step(100, 256, () => {});
   const d = response.getDiagnostics(100, 256);
-  assert.equal(d.spores[0].remainingLifetimeMs, 300);
+  assert.equal(d.spores[0].remainingUpdates, RECOVERY_POLICY.updates - 1);
   assert.ok(d.emittedDose > 0);
   assert.ok(d.remainingEnvelopeDose > 0);
   const emitted = d.emittedDose;
